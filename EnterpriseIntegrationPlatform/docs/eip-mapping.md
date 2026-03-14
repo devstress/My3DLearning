@@ -1,0 +1,91 @@
+# Enterprise Integration Patterns Mapping
+
+## Overview
+
+This document maps the canonical Enterprise Integration Patterns (EIP), as defined by Gregor Hohpe and Bobby Woolf in *Enterprise Integration Patterns: Designing, Building, and Deploying Messaging Solutions*, to their implementations in the Enterprise Integration Platform.
+
+The platform was designed with these patterns as first-class concerns. Each pattern maps to a specific component, namespace, or infrastructure capability.
+
+## Pattern Mapping Table
+
+| EIP Pattern              | Platform Component                    | Implementation Details                                                                 |
+|--------------------------|---------------------------------------|----------------------------------------------------------------------------------------|
+| **Message Channel**      | Kafka Topics                          | Each logical channel is a Kafka topic. Topics are partitioned by tenant and type.      |
+| **Message**              | `IntegrationEnvelope`                 | The canonical message wrapper carrying payload, metadata, headers, and correlation ID. |
+| **Pipes and Filters**    | Temporal Activity Chain               | Workflows compose activities as sequential or parallel filters in a processing pipeline.|
+| **Content-Based Router** | `Processing.Routing`                  | Routes messages to different Kafka topics or workflows based on message content/type.  |
+| **Recipient List**       | `Processing.Routing`                  | Dynamically resolves a list of target connectors based on routing rules and message metadata.|
+| **Message Translator**   | `Processing.Transform`               | Transforms message payloads between formats (JSON↔XML, CSV→JSON, schema mapping).     |
+| **Splitter**             | `Processing.Transform`               | Splits a batch message into individual messages, each published as a separate envelope.|
+| **Aggregator**           | `Processing.Transform`               | Collects related messages by correlation ID and produces a combined output message.    |
+| **Resequencer**          | `Workflow.Temporal`                   | Temporal workflows reorder out-of-sequence messages using sequence numbers and buffering.|
+| **Dead Letter Channel**  | Kafka DLQ Topics                      | Failed messages are routed to `*.dlq` topics with diagnostic metadata for review.      |
+| **Idempotent Receiver**  | `Storage.Cassandra` Dedup Table       | Message IDs are checked against a Cassandra deduplication table before processing.     |
+| **Correlation Identifier**| `IntegrationEnvelope.CorrelationId`  | Every envelope carries a GUID correlation ID linking related messages across the pipeline.|
+| **Process Manager**      | Temporal Workflows                    | Long-running, stateful workflows coordinate multi-step integration processes.          |
+| **Claim Check**          | `Storage.Cassandra`                   | Large payloads are stored in Cassandra; envelopes carry a reference key for retrieval. |
+| **Wire Tap**             | OpenTelemetry / Observability         | All messages are traced via OpenTelemetry; audit events are emitted to dedicated topics.|
+| **Message Filter**       | `Processing.Routing`                  | Filters discard messages that do not match configured predicates before further processing.|
+| **Envelope Wrapper**     | `IntegrationEnvelope`                 | Wraps raw payloads with standardized metadata, routing headers, and processing context.|
+| **Normalizer**           | Ingress Adapters                      | Each protocol adapter normalizes incoming data into the canonical envelope format.     |
+| **Guaranteed Delivery**  | Kafka + Temporal                      | Kafka durability plus Temporal workflow persistence ensures no message is lost.         |
+| **Return Address**       | `IntegrationEnvelope.ReplyTo`         | The envelope's ReplyTo field specifies where response messages should be sent.         |
+| **Message Expiration**   | Kafka Retention + Envelope TTL        | Messages carry a TTL; Kafka retention policies enforce topic-level expiration.         |
+| **Channel Adapter**      | Ingress/Connector Adapters            | Protocol-specific adapters bridge external systems to/from the Kafka backbone.         |
+
+## Detailed Pattern Implementations
+
+### Content-Based Router
+
+The `Processing.Routing` namespace implements content-based routing through a rules engine:
+
+```
+Message arrives → Evaluate routing rules → Select target topic/workflow → Publish
+```
+
+Routing rules are defined as JSON configurations specifying field paths, operators, and target destinations. Rules are evaluated in priority order; the first match determines the route. A default route handles unmatched messages.
+
+### Message Translator (Processing.Transform)
+
+Transformations are implemented as Temporal activities. Each transformation activity receives an `IntegrationEnvelope`, applies a mapping definition, and returns a new envelope with the transformed payload. Supported transformation types include:
+
+- **Schema mapping** — Field-to-field mapping with type conversion
+- **Format conversion** — JSON to XML, XML to JSON, CSV to JSON
+- **Enrichment** — Augment messages with data from external lookups
+- **Template-based** — Apply Liquid or Handlebars templates to produce output
+
+### Splitter and Aggregator
+
+The Splitter activity breaks a batch envelope into individual envelopes, each published to Kafka with a shared `CorrelationId` and unique `SequenceNumber`. The Aggregator activity collects envelopes by `CorrelationId`, waits for the expected count (carried in the `TotalCount` header), and produces a combined output envelope.
+
+### Dead Letter Channel
+
+When a message exhausts its retry budget (configured per-activity in Temporal), the workflow publishes it to the corresponding DLQ topic. DLQ messages include:
+
+- Original envelope (unmodified)
+- Error details (exception type, message, stack trace)
+- Processing history (which activities succeeded/failed)
+- Retry metadata (attempt count, last attempt timestamp)
+
+An admin API provides endpoints to inspect, replay, or discard DLQ messages.
+
+### Process Manager (Temporal Workflows)
+
+Temporal workflows implement the Process Manager pattern for complex integration scenarios:
+
+- **Multi-step orchestration** — Coordinate validation, transformation, routing, and delivery.
+- **Saga compensation** — If a downstream delivery fails after partial completion, compensation activities undo prior steps.
+- **Human-in-the-loop** — Workflows can pause and wait for manual approval signals before proceeding.
+- **Scheduled processing** — Workflows can include timer-based delays for batch windows or rate limiting.
+
+### Claim Check
+
+For messages exceeding a configurable size threshold (default: 256 KB), the ingress adapter stores the full payload in Cassandra and replaces it with a claim check reference in the envelope. Downstream activities retrieve the payload on demand using the claim check key, avoiding large message overhead on Kafka.
+
+### Wire Tap (Observability)
+
+Every processing step emits OpenTelemetry spans and structured log events. The Wire Tap pattern is implemented transparently — no explicit tapping configuration is needed. All message processing is observable by default through:
+
+- Distributed traces linking ingress to delivery
+- Audit events published to dedicated Kafka audit topics
+- Metrics exported to Prometheus-compatible backends
