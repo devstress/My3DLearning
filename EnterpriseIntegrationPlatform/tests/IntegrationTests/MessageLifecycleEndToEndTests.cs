@@ -4,6 +4,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using Xunit;
 
 namespace EnterpriseIntegrationPlatform.Tests.Integration;
@@ -233,5 +234,105 @@ public class MessageLifecycleEndToEndTests : IAsyncLifetime
 
         // Data is identical across queries
         first.Select(e => e.Stage).Should().BeEquivalentTo(second.Select(e => e.Stage));
+    }
+
+    [Fact]
+    public async Task WhereIsAsync_AI_FindsDeliveredMessage_InLoki()
+    {
+        if (SkipIfNoDocker()) return;
+
+        // ── Arrange: record a full lifecycle ending in Delivered ──────────────
+        var productionStore = new InMemoryMessageStateStore();
+        var recorder = new MessageLifecycleRecorder(
+            productionStore,
+            _lokiLog!,
+            NullLogger<MessageLifecycleRecorder>.Instance);
+
+        var envelope = CreateEnvelope();
+        var correlationId = envelope.CorrelationId;
+        var businessKey = $"order-ai-{Guid.NewGuid():N}";
+
+        await recorder.RecordReceivedAsync(envelope, businessKey);
+        await recorder.RecordProcessingAsync(envelope, MessageTracer.StageRouting, businessKey);
+        await recorder.RecordProcessingAsync(envelope, MessageTracer.StageTransformation, businessKey);
+        await recorder.RecordDeliveredAsync(envelope, activity: null, durationMs: 99.9, businessKey);
+
+        await WaitForLokiIndex();
+
+        // ── Arrange: wire up MessageStateInspector with real Loki + AI ───────
+        var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
+        traceAnalyzer
+            .WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var json = ci.ArgAt<string>(1);
+                return Task.FromResult(
+                    $"The message for {businessKey} has been successfully delivered. " +
+                    "It passed through Ingestion, Routing, Transformation, and Delivery stages.");
+            });
+
+        var inspector = new MessageStateInspector(
+            _lokiLog!,
+            traceAnalyzer,
+            NullLogger<MessageStateInspector>.Instance);
+
+        // ── Act: ask "where is my message?" via business key ─────────────────
+        var result = await inspector.WhereIsAsync(businessKey);
+
+        // ── Assert: message found and delivered ──────────────────────────────
+        result.Found.Should().BeTrue("the message lifecycle was recorded in Loki");
+        result.LatestStatus.Should().Be(DeliveryStatus.Delivered);
+        result.LatestStage.Should().Be(MessageTracer.StageDelivery);
+        result.Events.Should().HaveCount(4);
+        result.OllamaAvailable.Should().BeTrue();
+        result.Summary.Should().Contain("delivered");
+
+        // Verify AI was called with the correct correlation ID and event data
+        await traceAnalyzer.Received(1)
+            .WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WhereIsByCorrelationAsync_AI_FindsDeliveredMessage_InLoki()
+    {
+        if (SkipIfNoDocker()) return;
+
+        // ── Arrange: record a full lifecycle ending in Delivered ──────────────
+        var productionStore = new InMemoryMessageStateStore();
+        var recorder = new MessageLifecycleRecorder(
+            productionStore,
+            _lokiLog!,
+            NullLogger<MessageLifecycleRecorder>.Instance);
+
+        var envelope = CreateEnvelope();
+        var correlationId = envelope.CorrelationId;
+        var businessKey = $"order-ai-corr-{Guid.NewGuid():N}";
+
+        await recorder.RecordReceivedAsync(envelope, businessKey);
+        await recorder.RecordProcessingAsync(envelope, MessageTracer.StageRouting, businessKey);
+        await recorder.RecordDeliveredAsync(envelope, activity: null, durationMs: 75.0, businessKey);
+
+        await WaitForLokiIndex();
+
+        // ── Arrange: wire up inspector with AI ───────────────────────────────
+        var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
+        traceAnalyzer
+            .WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("Message delivered successfully after passing through Routing.");
+
+        var inspector = new MessageStateInspector(
+            _lokiLog!,
+            traceAnalyzer,
+            NullLogger<MessageStateInspector>.Instance);
+
+        // ── Act: ask by correlation ID ───────────────────────────────────────
+        var result = await inspector.WhereIsByCorrelationAsync(correlationId);
+
+        // ── Assert: message found and delivered ──────────────────────────────
+        result.Found.Should().BeTrue();
+        result.LatestStatus.Should().Be(DeliveryStatus.Delivered);
+        result.LatestStage.Should().Be(MessageTracer.StageDelivery);
+        result.Events.Should().HaveCount(3);
+        result.Summary.Should().Contain("delivered");
     }
 }
