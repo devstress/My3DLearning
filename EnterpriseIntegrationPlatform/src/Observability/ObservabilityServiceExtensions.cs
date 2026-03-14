@@ -12,8 +12,8 @@ public static class ObservabilityServiceExtensions
 {
     /// <summary>
     /// Registers the platform's custom <see cref="DiagnosticsConfig.ActivitySource"/>
-    /// and <see cref="DiagnosticsConfig.Meter"/> with the OpenTelemetry pipeline
-    /// so that traces and metrics are exported alongside the built-in ASP.NET Core telemetry.
+    /// and <see cref="DiagnosticsConfig.Meter"/> with the OpenTelemetry pipeline,
+    /// plus the message state store, lifecycle recorder, and AI-powered inspector.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The same <paramref name="services"/> for chaining.</returns>
@@ -29,6 +29,13 @@ public static class ObservabilityServiceExtensions
                 metrics.AddMeter(DiagnosticsConfig.ServiceName);
             });
 
+        // State store (in-memory by default; swap for Cassandra-backed in production)
+        services.AddSingleton<IMessageStateStore, InMemoryMessageStateStore>();
+
+        // Lifecycle recorder (writes to store + emits OTel)
+        services.AddSingleton<MessageLifecycleRecorder>();
+
+        // AI-powered analysis
         services.AddSingleton<ITraceAnalyzer, TraceAnalyzer>();
         services.AddSingleton<MessageStateInspector>();
 

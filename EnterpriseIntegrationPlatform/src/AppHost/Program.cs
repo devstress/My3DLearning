@@ -11,4 +11,7 @@ var adminApi = builder.AddProject<Projects.Admin_Api>("admin-api");
 var adminWeb = builder.AddProject<Projects.Admin_Web>("admin-web")
     .WithReference(adminApi);
 
+var openClaw = builder.AddProject<Projects.OpenClaw_Web>("openclaw")
+    .WithExternalHttpEndpoints();
+
 builder.Build().Run();

@@ -4,7 +4,77 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
-## Chunk 004 – Contracts and canonical message envelope
+## Chunk 008 & 009 – Ollama AI integration + OpenTelemetry Observability + OpenClaw Web UI
+
+- **Date**: 2026-03-14
+- **Status**: done
+- **Goal**: Implement full observability stack with message state store, OpenTelemetry instrumentation, Ollama AI-powered trace analysis, and the OpenClaw web UI for querying message state from any device.
+
+### Architecture
+
+OpenTelemetry instruments all services but does NOT store data. The observability layer adds:
+
+1. **IMessageStateStore** – queryable store that records every lifecycle event for every message
+2. **MessageLifecycleRecorder** – writes to the store AND emits OpenTelemetry traces/metrics simultaneously
+3. **MessageStateInspector** – answers "where is my shipment for order 02?" by querying the store, then sending the full history to Ollama for AI-powered analysis
+4. **OpenClaw.Web** – ASP.NET Core web app (registered in Aspire AppHost) that provides:
+   - Responsive web UI accessible from any device (phone/tablet/desktop)
+   - REST API endpoints for querying by business key or correlation ID
+   - AI-generated diagnostic summaries via Ollama
+
+### Flow: "Where is my shipment with order 02?"
+
+```
+User → OpenClaw Web UI → /api/inspect/business/order-02
+  → MessageStateInspector queries InMemoryMessageStateStore
+  → Gets full lifecycle: [Pending → InFlight (Routing) → InFlight (Transform) → ...]
+  → Sends to TraceAnalyzer → Ollama generates summary
+  → Returns InspectionResult with AI summary + event timeline
+```
+
+- **Files created**:
+  - `src/Observability/PlatformActivitySource.cs` — central ActivitySource for distributed tracing
+  - `src/Observability/PlatformMeters.cs` — counters and histograms for message processing metrics
+  - `src/Observability/TraceEnricher.cs` — enriches Activity spans with IntegrationEnvelope metadata
+  - `src/Observability/CorrelationPropagator.cs` — propagates correlation IDs across service boundaries
+  - `src/Observability/MessageTracer.cs` — high-level API for tracing message lifecycle stages
+  - `src/Observability/MessageEvent.cs` — record of a single lifecycle event
+  - `src/Observability/IMessageStateStore.cs` — interface for storing/querying message state
+  - `src/Observability/InMemoryMessageStateStore.cs` — in-memory implementation (swappable for Cassandra)
+  - `src/Observability/MessageLifecycleRecorder.cs` — records events to store + emits OTel
+  - `src/Observability/ITraceAnalyzer.cs` — interface for AI-assisted trace analysis
+  - `src/Observability/TraceAnalyzer.cs` — Ollama-backed implementation
+  - `src/Observability/ObservabilityServiceExtensions.cs` — DI registration
+  - `src/AI.Ollama/OllamaService.cs` — HttpClient-based Ollama API client
+  - `src/AI.Ollama/OllamaHealthCheck.cs` — health check for Ollama connectivity
+  - `src/AI.Ollama/OllamaServiceExtensions.cs` — DI registration
+  - `src/OpenClaw.Web/OpenClaw.Web.csproj` — ASP.NET Core web app project
+  - `src/OpenClaw.Web/Program.cs` — API endpoints + embedded responsive HTML UI
+  - `src/OpenClaw.Web/appsettings.json`, `appsettings.Development.json`
+  - `src/OpenClaw.Web/Properties/launchSettings.json`
+  - `tests/UnitTests/InMemoryMessageStateStoreTests.cs` — 8 tests for the state store
+  - `tests/UnitTests/MessageStateInspectorTests.cs` — 5 tests for inspector + AI fallback
+  - `tests/UnitTests/MessageLifecycleRecorderTests.cs` — 7 tests for lifecycle recording
+  - `tests/UnitTests/TraceEnricherTests.cs` — 3 tests for trace enrichment
+  - `tests/UnitTests/TraceAnalyzerTests.cs` — 4 tests for AI trace analysis
+- **Files modified**:
+  - `src/Observability/DiagnosticsConfig.cs` — expanded with ActivitySource, Meter, ServiceVersion
+  - `src/Observability/Observability.csproj` — added references to Contracts, AI.Ollama, OpenTelemetry
+  - `src/Observability/MessageStateInspector.cs` — rewritten to query state store + Ollama + return InspectionResult
+  - `src/AI.Ollama/IOllamaService.cs` — added GenerateAsync, AnalyseAsync, IsHealthyAsync methods
+  - `src/AI.Ollama/AI.Ollama.csproj` — added FrameworkReference for health checks
+  - `src/AppHost/AppHost.csproj` — added ProjectReference to OpenClaw.Web
+  - `src/AppHost/Program.cs` — added OpenClaw.Web with WithExternalHttpEndpoints()
+  - `tests/UnitTests/UnitTests.csproj` — added ProjectReferences to Contracts, Observability, AI.Ollama
+  - `rules/milestones.md` — marked chunks 008 and 009 as done
+  - `rules/completion-log.md` — this entry
+- **Notes**:
+  - All 28 unit tests pass (27 new + 1 pre-existing placeholder)
+  - Build: 0 warnings, 0 errors
+  - OpenClaw is registered in Aspire AppHost with `WithExternalHttpEndpoints()` for device access
+  - InMemoryMessageStateStore supports business key (case-insensitive), correlation ID, and message ID lookups
+  - When Ollama is unavailable, fallback summaries are generated from stored state
+  - The state store is designed to be swappable — replace InMemoryMessageStateStore with a Cassandra-backed implementation for production
 
 - **Date**: 2026-03-14
 - **Status**: done

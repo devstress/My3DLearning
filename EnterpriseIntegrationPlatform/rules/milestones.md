@@ -40,8 +40,8 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 005 | Kafka ingestion service | Implement Kafka consumer/producer for message ingestion | not-started |
 | 006 | Temporal workflow host | Set up Temporal worker and basic workflow definitions | not-started |
 | 007 | Cassandra storage module | Implement Cassandra repository and data access | not-started |
-| 008 | Ollama AI integration | Integrate Ollama for AI-assisted operations | not-started |
-| 009 | OpenTelemetry observability | Configure distributed tracing, metrics, and logging | not-started |
+| 008 | Ollama AI integration | Integrate Ollama for AI-assisted operations | done |
+| 009 | OpenTelemetry observability | Configure distributed tracing, metrics, logging, and message state store with OpenClaw web UI | done |
 | 010 | Admin API | Build administration API for platform management | not-started |
 | 011 | End-to-end demo pipeline | Wire all components into a working demo pipeline | not-started |
 

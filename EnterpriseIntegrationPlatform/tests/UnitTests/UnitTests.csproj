@@ -10,4 +10,9 @@
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="NSubstitute" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Observability\Observability.csproj" />
+    <ProjectReference Include="..\..\src\AI.Ollama\AI.Ollama.csproj" />
+  </ItemGroup>
 </Project>
