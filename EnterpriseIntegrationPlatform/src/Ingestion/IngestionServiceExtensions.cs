@@ -11,7 +11,7 @@ public static class IngestionServiceExtensions
 {
     /// <summary>
     /// Registers <see cref="BrokerOptions"/> from the <c>Broker</c> configuration section.
-    /// Downstream provider registration methods (e c>AddNatsJetStreamBroker</c>,
+    /// Downstream provider registration methods (e.g. <c>AddNatsJetStreamBroker</c>,
     /// <c>AddKafkaBroker</c>, <c>AddPulsarBroker</c>) use these options to wire the
     /// correct <see cref="IMessageBrokerProducer"/> and <see cref="IMessageBrokerConsumer"/>.
     /// </summary>

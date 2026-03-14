@@ -1,4 +1,3 @@
-using System.Text.Json;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
 using Microsoft.Extensions.Logging;
