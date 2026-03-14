@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Enterprise Integration Platform is an event-driven, workflow-orchestrated integration system built on .NET 10. It processes messages from diverse sources, transforms and routes them through configurable pipelines, and delivers them to target systems with guaranteed reliability.
+The Enterprise Integration Platform is a workflow-orchestrated integration system with configurable message brokers, built on .NET 10. It processes messages from diverse sources, transforms and routes them through configurable pipelines, and delivers them to target systems with guaranteed reliability.
 
 ## High-Level Flow
 
@@ -12,8 +12,8 @@ The Enterprise Integration Platform is an event-driven, workflow-orchestrated in
 │                                                                          │
 │  ┌──────────┐    ┌───────────┐    ┌───────────┐    ┌──────────────────┐  │
 │  │          │    │           │    │           │    │                  │  │
-│  │ Ingress  │───▶│   Kafka   │───▶│ Temporal  │───▶│   Activities     │  │
-│  │ Adapters │    │  Topics   │    │ Workflows │    │ (Transform/Route)│  │
+│  │ Ingress  │───▶│  Broker   │───▶│ Temporal  │───▶│   Activities     │  │
+│  │ Adapters │    │  Layer    │    │ Workflows │    │ (Transform/Route)│  │
 │  │          │    │           │    │           │    │                  │  │
 │  └──────────┘    └───────────┘    └───────────┘    └────────┬─────────┘  │
 │       ▲                │                                    │            │
@@ -45,7 +45,7 @@ The Enterprise Integration Platform is an event-driven, workflow-orchestrated in
 │  │             │  │             │  │            │  │        │ │
 │  │ • HTTP Recv │  │ • Routes    │  │ • Temporal │  │ • Code │ │
 │  │ • SFTP Poll │  │ • Tenants   │  │   Workers  │  │   Gen  │ │
-│  │ • Email Mon │  │ • Config    │  │ • Kafka    │  │ • Docs │ │
+│  │ • Email Mon │  │ • Config    │  │ • Broker   │  │ • Docs │ │
 │  │ • File Watch│  │ • Monitor   │  │   Consumer │  │   Gen  │ │
 │  └──────┬──────┘  └──────┬──────┘  └─────┬──────┘  └───┬────┘ │
 │         │                │               │              │      │
@@ -61,8 +61,8 @@ The Enterprise Integration Platform is an event-driven, workflow-orchestrated in
          │              │               │              │
          ▼              ▼               ▼              ▼
 ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌──────────┐
-│   Kafka    │  │  Temporal  │  │ Cassandra  │  │  Ollama  │
-│  Cluster   │  │  Server    │  │  Cluster   │  │  Server  │
+│ Kafka/NATS │  │  Temporal  │  │ Cassandra  │  │  Ollama  │
+│  Brokers   │  │  Server    │  │  Cluster   │  │  Server  │
 └────────────┘  └────────────┘  └────────────┘  └──────────┘
 ```
 
@@ -70,15 +70,15 @@ The Enterprise Integration Platform is an event-driven, workflow-orchestrated in
 
 ### Ingress Layer
 
-The ingress layer is the entry point for all external messages. It supports multiple protocols and normalizes every incoming payload into the platform's canonical `IntegrationEnvelope` format. Each adapter runs independently, enabling protocol-specific scaling. Ingress adapters publish envelopes to Kafka ingestion topics, decoupling reception from processing.
+The ingress layer is the entry point for all external messages. It supports multiple protocols and normalizes every incoming payload into the platform's canonical `IntegrationEnvelope` format. Each adapter runs independently, enabling protocol-specific scaling. Ingress adapters publish envelopes to the configured message broker, decoupling reception from processing.
 
-### Kafka Event Backbone
+### Configurable Broker Layer
 
-Apache Kafka provides the durable, ordered, and partitioned event backbone. All inter-service communication flows through Kafka topics. This decoupling ensures that producers and consumers can scale independently, fail independently, and be deployed independently. Topic partitioning by tenant ID and message type ensures ordered processing within logical boundaries.
+The platform uses a configurable message broker layer. Apache Kafka handles broadcast event streaming, audit log streaming, and fan-out analytics — workloads where Kafka's partitioned log model excels. Task-oriented message delivery (ingestion, routing, DLQ) uses NATS JetStream (default) or Apache Pulsar with Key_Shared subscriptions (switchable for large-scale production). This separation avoids Kafka's per-partition serialization (head-of-line blocking), ensuring that Recipient A never blocks Recipient B, even at 1 million recipients. All inter-service communication flows through the appropriate broker, ensuring that producers and consumers can scale independently, fail independently, and be deployed independently.
 
 ### Temporal Workflow Orchestration
 
-Temporal.io orchestrates the processing lifecycle of every message. When a Kafka consumer picks up a new envelope, it starts a Temporal workflow that coordinates validation, transformation, routing, and delivery as a series of durable activities. Temporal guarantees that workflows run to completion even across process restarts, infrastructure failures, or long-running operations.
+Temporal.io orchestrates the processing lifecycle of every message. When a broker consumer picks up a new envelope, it starts a Temporal workflow that coordinates validation, transformation, routing, and delivery as a series of durable activities. Temporal guarantees that workflows run to completion even across process restarts, infrastructure failures, or long-running operations.
 
 ### Activity Processing
 
@@ -94,7 +94,7 @@ Apache Cassandra provides the distributed, highly-available storage layer. It st
 
 ### Observability
 
-OpenTelemetry is embedded in every layer, providing distributed tracing that follows a message from ingress through Kafka, Temporal workflows, activities, and connector delivery. Structured logs are correlated with trace and span IDs. Metrics cover throughput, latency percentiles, error rates, and resource utilization.
+OpenTelemetry is embedded in every layer, providing distributed tracing that follows a message from ingress through the message broker, Temporal workflows, activities, and connector delivery. Structured logs are correlated with trace and span IDs. Metrics cover throughput, latency percentiles, error rates, and resource utilization.
 
 ### AI Runtime (Ollama)
 
@@ -104,8 +104,8 @@ Ollama runs locally to provide AI-powered code generation. It indexes the platfo
 
 1. External system sends a message via HTTP, drops a file on SFTP, or sends an email.
 2. The appropriate ingress adapter receives the message and wraps it in an `IntegrationEnvelope`.
-3. The envelope is published to a Kafka ingestion topic.
-4. A Kafka consumer picks up the envelope and initiates a Temporal workflow.
+3. The envelope is published to the configured message broker (NATS/Pulsar for task delivery, Kafka for streaming).
+4. A broker consumer picks up the envelope and initiates a Temporal workflow.
 5. The workflow executes activities: validation → transformation → routing.
 6. Based on routing rules, the workflow invokes the appropriate connector(s).
 7. Connectors deliver the message to target system(s) and report success or failure.

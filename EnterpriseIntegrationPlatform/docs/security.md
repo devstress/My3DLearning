@@ -20,7 +20,7 @@ Internal communication between platform services uses mutual TLS (mTLS):
 
 - Each service has a unique TLS certificate issued by an internal Certificate Authority.
 - Certificates are rotated automatically on a configurable schedule (default: 90 days).
-- Kafka, Temporal, and Cassandra connections all use mTLS.
+- Kafka, NATS/Pulsar, Temporal, and Cassandra connections all use mTLS.
 
 ### Connector Authentication
 
@@ -91,6 +91,7 @@ Secrets are stored in a secure vault and injected at runtime:
 |-------------------------|-----------------|---------------------------|
 | Database credentials    | 90 days         | Vault with auto-rotation  |
 | Kafka SASL credentials  | 90 days         | Vault with auto-rotation  |
+| NATS/Pulsar credentials | 90 days         | Vault with auto-rotation  |
 | Temporal API keys       | 180 days        | Vault                     |
 | Connector credentials   | Per policy      | Vault, referenced by ID   |
 | TLS certificates        | 90 days         | Cert manager (auto-renew) |
@@ -127,6 +128,7 @@ All network communication is encrypted:
 | Client → Ingress API   | HTTPS      | TLS 1.2             |
 | Client → Admin API     | HTTPS      | TLS 1.2             |
 | Service → Kafka        | TLS        | TLS 1.2             |
+| Service → NATS/Pulsar  | TLS        | TLS 1.2             |
 | Service → Temporal     | gRPC + TLS | TLS 1.2             |
 | Service → Cassandra    | CQL + TLS  | TLS 1.2             |
 | Connector → Target     | HTTPS/SFTP | TLS 1.2             |
@@ -137,6 +139,7 @@ Data at rest is encrypted in all storage layers:
 
 - **Cassandra** — Transparent data encryption (TDE) enabled for all tables.
 - **Kafka** — Disk-level encryption enabled on broker storage volumes.
+- **NATS/Pulsar** — Pulsar uses BookKeeper encryption for persistent messages; NATS JetStream uses file-level encryption on stream storage.
 - **Temporal** — Payload encryption using Temporal's Data Converter with AES-256-GCM.
 - **Sensitive fields** — Individual fields marked as sensitive are encrypted at the application level before storage.
 

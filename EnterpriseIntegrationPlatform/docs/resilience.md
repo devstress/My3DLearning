@@ -79,7 +79,7 @@ Bulkheads isolate failures in one component from affecting others, preventing a 
 
 1. **Process isolation** — Each service type (Ingress, Worker, Admin) runs as a separate process/container.
 2. **Thread pool isolation** — Within a service, each connector type has its own thread pool with a bounded concurrency limit.
-3. **Kafka consumer group isolation** — Different processing concerns use separate consumer groups.
+3. **Kafka consumer group isolation** — Different streaming concerns use separate Kafka consumer groups; task delivery uses NATS/Pulsar consumer isolation (per-subject queue groups or Key_Shared subscriptions).
 4. **Temporal task queue isolation** — Different workflow types use separate task queues with independent worker pools.
 5. **Tenant isolation** — Resource quotas per tenant prevent a noisy neighbor from starving others.
 
@@ -118,6 +118,7 @@ Workflow Execution Timeout (e.g., 1 hour)
 | Email SMTP send              | 30 seconds |
 | Cassandra query              | 5 seconds  |
 | Kafka produce                | 10 seconds |
+| NATS/Pulsar publish          | 10 seconds |
 
 ## Dead Letter Queues
 
@@ -186,7 +187,8 @@ When dependencies are unavailable, the platform degrades gracefully rather than 
 
 | Dependency Failure | Degradation Behavior                                              |
 |--------------------|-------------------------------------------------------------------|
-| Kafka unavailable  | Ingress returns 503; buffered messages retry on recovery          |
+| Kafka unavailable  | Streaming workloads degrade; ingress returns 503 for streaming; buffered messages retry on recovery. Task delivery via NATS/Pulsar continues. |
+| NATS/Pulsar unavailable | Ingress returns 503 for task delivery; Kafka streaming continues       |
 | Temporal unavailable| Messages queue in Kafka; processing resumes when Temporal returns |
 | Cassandra unavailable| Dedup checks bypassed (log warning); writes queued for retry     |
 | Ollama unavailable | AI features disabled; manual development continues unaffected    |

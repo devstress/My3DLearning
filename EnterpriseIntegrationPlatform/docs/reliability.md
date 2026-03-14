@@ -10,8 +10,8 @@ The Enterprise Integration Platform is designed for enterprise-grade reliability
 
 The platform guarantees at-least-once delivery at every boundary:
 
-1. **Ingress → Kafka:** Messages are published to Kafka with `acks=all` and synchronous confirmation. The ingress API returns 202 Accepted only after Kafka acknowledges the write.
-2. **Kafka → Temporal:** Consumer offsets are committed only after the Temporal workflow is successfully started.
+1. **Ingress → Broker:** For Kafka streaming, messages are published with `acks=all` and synchronous confirmation. For task delivery, messages are published to the configured queue broker (NATS JetStream or Pulsar) with at-least-once delivery guarantees. The ingress API returns 202 Accepted only after the broker acknowledges the write.
+2. **Message broker → Temporal:** Consumer offsets (Kafka) or acknowledgments (NATS/Pulsar) are committed only after the Temporal workflow is successfully started.
 3. **Temporal → Activities:** Temporal guarantees activity execution. Failed activities are retried according to the configured retry policy.
 4. **Activities → Connectors:** Connector delivery is confirmed before the activity reports success. Failed deliveries trigger retries or DLQ routing.
 
@@ -94,13 +94,25 @@ Cassandra ensures data durability and availability:
 
 ### Kafka Broker Failure
 
-**Impact:** Temporary inability to publish or consume messages.
+**Impact:** Temporary inability to publish or consume streaming messages.
 
 **Mitigation:**
 - Kafka runs as a multi-broker cluster (minimum 3 brokers).
 - Replication factor of 3 ensures data survives broker failures.
 - Producers retry with exponential backoff on send failures.
 - Consumers resume from last committed offset on reconnection.
+- Task delivery continues via the queue broker (NATS/Pulsar).
+
+### Queue Broker (NATS/Pulsar) Failure
+
+**Impact:** Temporary inability to publish or consume task delivery messages.
+
+**Mitigation:**
+- NATS JetStream runs as a clustered deployment (minimum 3 nodes) with Raft-based replication.
+- Pulsar (if configured) uses BookKeeper for durable, replicated message storage.
+- Producers retry with exponential backoff on publish failures.
+- Consumers resume from last acknowledged position on reconnection.
+- Kafka streaming workloads continue unaffected.
 
 ### Temporal Server Failure
 

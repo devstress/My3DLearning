@@ -10,7 +10,7 @@ The platform was designed with these patterns as first-class concerns. Each patt
 
 | EIP Pattern              | Platform Component                    | Implementation Details                                                                 |
 |--------------------------|---------------------------------------|----------------------------------------------------------------------------------------|
-| **Message Channel**      | Kafka Topics                          | Each logical channel is a Kafka topic. Topics are partitioned by tenant and type.      |
+| **Message Channel**      | Configured Message Broker             | Each logical channel maps to the configured broker — Kafka topics for streaming, NATS subjects or Pulsar topics for task delivery. Partitioned by tenant and type. |
 | **Message**              | `IntegrationEnvelope`                 | The canonical message wrapper carrying payload, metadata, headers, and correlation ID. |
 | **Pipes and Filters**    | Temporal Activity Chain               | Workflows compose activities as sequential or parallel filters in a processing pipeline.|
 | **Content-Based Router** | `Processing.Routing`                  | Routes messages to different Kafka topics or workflows based on message content/type.  |
@@ -19,7 +19,7 @@ The platform was designed with these patterns as first-class concerns. Each patt
 | **Splitter**             | `Processing.Transform`               | Splits a batch message into individual messages, each published as a separate envelope.|
 | **Aggregator**           | `Processing.Transform`               | Collects related messages by correlation ID and produces a combined output message.    |
 | **Resequencer**          | `Workflow.Temporal`                   | Temporal workflows reorder out-of-sequence messages using sequence numbers and buffering.|
-| **Dead Letter Channel**  | Kafka DLQ Topics                      | Failed messages are routed to `*.dlq` topics with diagnostic metadata for review.      |
+| **Dead Letter Channel**  | DLQ Topics/Subjects                   | Failed messages are routed to `*.dlq` topics or subjects on the configured broker with diagnostic metadata for review. |
 | **Idempotent Receiver**  | `Storage.Cassandra` Dedup Table       | Message IDs are checked against a Cassandra deduplication table before processing.     |
 | **Correlation Identifier**| `IntegrationEnvelope.CorrelationId`  | Every envelope carries a GUID correlation ID linking related messages across the pipeline.|
 | **Process Manager**      | Temporal Workflows                    | Long-running, stateful workflows coordinate multi-step integration processes.          |
@@ -31,7 +31,7 @@ The platform was designed with these patterns as first-class concerns. Each patt
 | **Guaranteed Delivery**  | Kafka + Temporal                      | Kafka durability plus Temporal workflow persistence ensures no message is lost.         |
 | **Return Address**       | `IntegrationEnvelope.ReplyTo`         | The envelope's ReplyTo field specifies where response messages should be sent.         |
 | **Message Expiration**   | Kafka Retention + Envelope TTL        | Messages carry a TTL; Kafka retention policies enforce topic-level expiration.         |
-| **Channel Adapter**      | Ingress/Connector Adapters            | Protocol-specific adapters bridge external systems to/from the Kafka backbone.         |
+| **Channel Adapter**      | Ingress/Connector Adapters            | Protocol-specific adapters bridge external systems to/from the configured message broker. |
 
 ## Detailed Pattern Implementations
 
@@ -56,7 +56,7 @@ Transformations are implemented as Temporal activities. Each transformation acti
 
 ### Splitter and Aggregator
 
-The Splitter activity breaks a batch envelope into individual envelopes, each published to Kafka with a shared `CorrelationId` and unique `SequenceNumber`. The Aggregator activity collects envelopes by `CorrelationId`, waits for the expected count (carried in the `TotalCount` header), and produces a combined output envelope.
+The Splitter activity breaks a batch envelope into individual envelopes, each published to the configured message broker with a shared `CorrelationId` and unique `SequenceNumber`. The Aggregator activity collects envelopes by `CorrelationId`, waits for the expected count (carried in the `TotalCount` header), and produces a combined output envelope.
 
 ### Dead Letter Channel
 
@@ -80,12 +80,12 @@ Temporal workflows implement the Process Manager pattern for complex integration
 
 ### Claim Check
 
-For messages exceeding a configurable size threshold (default: 256 KB), the ingress adapter stores the full payload in Cassandra and replaces it with a claim check reference in the envelope. Downstream activities retrieve the payload on demand using the claim check key, avoiding large message overhead on Kafka.
+For messages exceeding a configurable size threshold (default: 256 KB), the ingress adapter stores the full payload in Cassandra and replaces it with a claim check reference in the envelope. Downstream activities retrieve the payload on demand using the claim check key, avoiding large message overhead on the message broker.
 
 ### Wire Tap (Observability)
 
 Every processing step emits OpenTelemetry spans and structured log events. The Wire Tap pattern is implemented transparently — no explicit tapping configuration is needed. All message processing is observable by default through:
 
 - Distributed traces linking ingress to delivery
-- Audit events published to dedicated Kafka audit topics
+- Audit events published to dedicated Kafka audit topics (Kafka is used specifically for audit streaming)
 - Metrics exported to Prometheus-compatible backends

@@ -14,8 +14,8 @@ Every message processed by the platform generates a distributed trace that spans
 
 ```
 Trace: IngressAPI.ReceiveMessage
-  └── Span: Kafka.Produce (ingestion topic)
-        └── Span: KafkaConsumer.Consume
+  └── Span: Broker.Produce (ingestion topic/subject)
+        └── Span: BrokerConsumer.Consume
               └── Span: Temporal.StartWorkflow
                     ├── Span: Activity.Validate
                     ├── Span: Activity.Transform
@@ -30,8 +30,8 @@ Trace context (W3C TraceContext format) is propagated across all boundaries:
 
 | Boundary          | Propagation Method                                          |
 |--------------------|-------------------------------------------------------------|
-| HTTP → Kafka       | `traceparent` header serialized into Kafka message headers  |
-| Kafka → Temporal   | Trace context extracted from Kafka headers, injected into Temporal workflow context |
+| HTTP → Broker     | `traceparent` header serialized into broker message headers   |
+| Broker → Temporal | Trace context extracted from broker headers, injected into Temporal workflow context |
 | Temporal → Activity| Temporal SDK propagates trace context automatically         |
 | Activity → HTTP    | `traceparent` header included in outbound HTTP requests     |
 | Activity → Cassandra| Trace context attached to Cassandra query spans            |
@@ -101,8 +101,10 @@ Metrics are collected using OpenTelemetry Metrics API and exported to Prometheus
 | `eip.messages.processed`            | Counter   | Total messages successfully processed     |
 | `eip.messages.failed`               | Counter   | Total messages routed to DLQ              |
 | `eip.messages.duration_ms`          | Histogram | End-to-end processing duration            |
-| `eip.kafka.consumer_lag`            | Gauge     | Consumer group lag per partition           |
-| `eip.kafka.produce_duration_ms`     | Histogram | Kafka produce latency                     |
+| `eip.kafka.consumer_lag`            | Gauge     | Kafka streaming consumer group lag per partition |
+| `eip.kafka.produce_duration_ms`     | Histogram | Kafka streaming produce latency               |
+| `eip.broker.consumer_pending`       | Gauge     | Queue broker (NATS/Pulsar) pending message count |
+| `eip.broker.publish_duration_ms`    | Histogram | Queue broker publish latency                  |
 | `eip.temporal.workflow_active`      | Gauge     | Currently active workflow executions      |
 | `eip.temporal.activity_duration_ms` | Histogram | Activity execution duration               |
 | `eip.connector.requests`            | Counter   | Outbound connector requests               |

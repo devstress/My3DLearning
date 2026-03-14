@@ -20,6 +20,7 @@ dotnet run
 
 Aspire automatically starts and configures:
 - Kafka (single broker, port 9092)
+- NATS JetStream (single node, port 4222)
 - Temporal (dev server, port 7233)
 - Cassandra (single node, port 9042)
 - Ollama (port 11434)
@@ -32,6 +33,7 @@ Infrastructure must be started in dependency order:
 ```
 1. Cassandra cluster (verify all nodes join the ring)
 2. Kafka cluster (verify all brokers register with controller)
+2a. NATS/Pulsar cluster (verify all nodes are healthy)
 3. Temporal server (verify frontend, history, matching, worker services)
 4. Platform services:
    a. Worker services (Kafka consumers + Temporal workers)
@@ -45,6 +47,7 @@ Before accepting traffic, verify:
 
 - [ ] Cassandra: All nodes UN (Up/Normal) in `nodetool status`
 - [ ] Kafka: All brokers in-sync, no under-replicated partitions
+- [ ] NATS/Pulsar: All nodes healthy, streams/topics available
 - [ ] Temporal: Namespace exists and is active
 - [ ] Worker services: Connected to Kafka and Temporal, health check passing
 - [ ] Ingress API: Health check at `/health/ready` returns 200
@@ -76,6 +79,9 @@ curl -s https://ingress-api/health/ready | jq .
 
 # Check Kafka broker health
 kafka-broker-api-versions.sh --bootstrap-server kafka:9092
+
+# Check NATS JetStream health
+nats server check jetstream --server nats://nats:4222
 
 # Check Temporal namespace
 temporal operator namespace describe --namespace eip-production

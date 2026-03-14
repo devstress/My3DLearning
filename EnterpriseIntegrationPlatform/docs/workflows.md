@@ -235,7 +235,7 @@ public async Task RouteToDlqAsync(
         Timestamp = DateTimeOffset.UtcNow
     };
 
-    await kafkaProducer.PublishAsync(
+    await brokerProducer.PublishAsync(
         $"{envelope.MessageType}.dlq", dlqMessage);
 }
 ```
@@ -312,7 +312,7 @@ public async Task IntegrationWorkflow_HappyPath_CompletesSuccessfully()
 
 Full pipeline tests verify the complete flow:
 
-1. Publish a test envelope to Kafka.
+1. Publish a test envelope to the message broker.
 2. Verify workflow execution in Temporal.
 3. Assert connector delivery to a mock target.
 4. Verify audit records in Cassandra.
