@@ -15,28 +15,51 @@ The platform scales across four primary dimensions:
 
 ## Component Scaling Strategies
 
-### Kafka Partitioning
+### Message Broker Scaling
 
-Kafka provides the primary scaling mechanism for message throughput.
+The platform uses two brokers, each scaled according to its workload:
+
+#### Kafka Scaling (Streaming and Audit)
+
+Kafka provides the scaling mechanism for broadcast event streams and audit.
 
 **Partition Strategy:**
-- Ingestion topics are partitioned by `TenantId` to ensure ordered processing within a tenant.
+- Audit topics are partitioned by `TenantId` to ensure ordered processing within a tenant.
 - The default partition count is 12 per topic, supporting up to 12 parallel consumers.
 - Partition count can be increased without downtime (note: rebalancing occurs).
-- DLQ topics use fewer partitions (3–6) since they handle lower volume.
 
 **Consumer Group Scaling:**
-- Each service type forms a consumer group (e.g., `workflow-starters`, `audit-writers`).
+- Each service type forms a consumer group (e.g., `audit-writers`, `metrics-collectors`).
 - Adding consumer instances within a group automatically rebalances partitions.
 - Maximum effective parallelism equals the partition count.
 
+#### Queue Broker Scaling (Task-Oriented Delivery)
+
+The configurable queue broker (NATS JetStream or Apache Pulsar) provides per-recipient scaling with no Head-of-Line blocking.
+
+**Design Principle: Recipient A must not block Recipient B, even at 1 million recipients.**
+
+**NATS JetStream (default for local dev and cloud):**
+- Per-subject queue groups provide independent consumption per recipient.
+- Adding consumers to a queue group distributes messages automatically.
+- Lightweight single binary — trivial to scale horizontally.
+- Docker image `nats:latest` runs in Aspire for local development.
+
+**Apache Pulsar Key_Shared (switchable for large-scale production):**
+- Messages keyed by recipientId are distributed across consumers automatically.
+- All messages for one recipient stay ordered and go to the same consumer.
+- Different recipients are processed by different consumers independently.
+- Adding consumers to a subscription redistributes keys — scaling is transparent.
+
+Both brokers support millions of tenants without the prohibitive cost of Kafka topics.
+
 **Throughput Targets:**
-| Topic Type    | Partitions | Target Throughput    | Consumer Instances |
-|---------------|------------|----------------------|--------------------|
-| Ingestion     | 12–24      | 10,000–50,000 msg/s  | 6–24               |
-| Routing       | 12         | 10,000–30,000 msg/s  | 6–12               |
-| DLQ           | 3–6        | 100–1,000 msg/s      | 1–3                |
-| Audit         | 6–12       | 10,000–50,000 msg/s  | 3–6                |
+| Broker        | Workload          | Target Throughput    | Scaling Mechanism        |
+|---------------|-------------------|----------------------|--------------------------|
+| Kafka         | Audit events      | 10,000–50,000 msg/s  | Add partitions/consumers |
+| NATS/Pulsar   | Ingestion         | 10,000–50,000 msg/s  | Add queue group/subscription consumers |
+| NATS/Pulsar   | Delivery (per-recipient) | 10,000–100,000 msg/s | Per-subject/key independence |
+| NATS/Pulsar   | DLQ               | 100–1,000 msg/s      | Low volume, minimal scaling |
 
 ### Temporal Worker Scaling
 
@@ -92,7 +115,7 @@ All platform services (Ingress API, Admin API, Worker Service) are stateless and
 
 .NET Aspire manages service composition for local development and can inform production deployment:
 
-- **Local:** Aspire starts all services, Kafka, Temporal, and Cassandra containers in a coordinated graph.
+- **Local:** Aspire starts all services, message brokers (Kafka, NATS via Docker images), Temporal, and Cassandra containers in a coordinated graph.
 - **Production:** Aspire's service discovery model maps to Kubernetes service discovery.
 - **Scaling Config:** Aspire resource definitions specify replica counts and resource limits that translate to Kubernetes manifests.
 
@@ -110,7 +133,9 @@ All platform services (Ingress API, Admin API, Worker Service) are stateless and
              │          │          │
              ▼          ▼          ▼
     ┌──────────────────────────────────────┐
-    │        Kafka Cluster (12+ partitions)│   ← Scale by partition count
+    │   Message Broker Layer               │
+    │   Kafka (streams/audit)              │   ← Scale by partition count
+    │   Redis Streams (task delivery)      │   ← Scale by consumer group
     └──────────────────────────────────────┘
              │          │          │
               ▼          ▼          ▼
@@ -140,6 +165,7 @@ All platform services (Ingress API, Admin API, Worker Service) are stateless and
 | Metric                              | Threshold          | Action                        |
 |-------------------------------------|--------------------|-------------------------------|
 | Kafka consumer lag                  | > 10,000 messages  | Add consumer instances        |
+| NATS/Pulsar pending count           | > 10,000 messages  | Add queue group/subscription consumers |
 | Temporal task queue backlog         | > 1,000 pending    | Add Temporal workers          |
 | Cassandra disk utilization          | > 60%              | Add Cassandra nodes           |
 | Ingress API response latency (p99)  | > 500ms            | Add Ingress API replicas      |
@@ -151,4 +177,4 @@ All platform services (Ingress API, Admin API, Worker Service) are stateless and
 - **Fat envelopes** — Large payloads in Kafka degrade throughput; use claim check for payloads > 256 KB.
 - **Unbounded workflow histories** — Long-running workflows with thousands of events; use continue-as-new.
 - **Hot partitions in Cassandra** — Avoid partition keys that concentrate writes on a single node.
-- **Synchronous inter-service calls** — Defeats the purpose of event-driven architecture; always go through Kafka.
+- **Synchronous inter-service calls** — Defeats the purpose of the asynchronous broker architecture; always go through the configured message broker.
