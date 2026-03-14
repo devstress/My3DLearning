@@ -16,7 +16,7 @@ This guide provides a structured approach for migrating integration solutions fr
 | Maps (XSLT/BizTalk Mapper) | Processing.Transform     | Transformation activities with configurable mappings       |
 | Pipelines              | Activity Chains               | Ordered sequence of processing activities                  |
 | Pipeline Components    | Individual Activities         | Discrete units: validate, decode, transform, encode        |
-| MessageBox             | Apache Kafka                  | Pub/sub message backbone with topic-based routing          |
+| MessageBox             | Configurable Message Broker    | Kafka for streaming, NATS/Pulsar for task delivery — pub/sub with topic/subject-based routing |
 | Subscriptions          | Route Conditions              | Content-based routing rules replacing BizTalk subscriptions|
 | Promoted Properties    | IntegrationEnvelope Headers   | Metadata extracted to envelope headers for routing         |
 | Correlation Sets       | CorrelationId + Temporal State| Correlation managed by envelope IDs and workflow state     |
@@ -61,14 +61,14 @@ This guide provides a structured approach for migrating integration solutions fr
 **Platform Equivalent:**
 - Ingress adapter (HTTP, SFTP, Email, File) receives external messages
 - Adapter normalizes into IntegrationEnvelope
-- Published to Kafka ingestion topic
+- Published to the configured message broker
 
 **Migration Steps:**
 1. Inventory all receive locations with their adapters, URIs, and schedules.
 2. Create corresponding ingress adapter configurations.
 3. Map receive pipeline components to ingress validation activities.
 4. Map promoted properties to envelope headers.
-5. Configure Kafka topics to match the routing topology.
+5. Configure message broker topics/subjects to match the routing topology.
 
 ### Send Ports → Connectors
 
@@ -186,4 +186,4 @@ During migration, BizTalk and the platform run in parallel:
 | Orchestration dehydration points   | Temporal handles this natively; no migration needed        |
 | Send port groups with filters      | Convert to route conditions with recipient lists           |
 | Convoy patterns                    | Implement as Temporal workflows with signal-based correlation|
-| Direct-bound ports                 | Replace with explicit Kafka topic routing                  |
+| Direct-bound ports                 | Replace with explicit message broker topic/subject routing            |

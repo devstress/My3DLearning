@@ -16,7 +16,7 @@ The Enterprise Integration Platform integrates Ollama as a local AI runtime to a
 
 ## Ollama Runtime
 
-Ollama runs as a local HTTP service providing LLM inference:
+Ollama runs as a local HTTP service providing LLM inference. The AI provider is configurable — Ollama is the default for on-premises deployment, but the platform supports switching to other AI providers (e.g., Azure OpenAI, AWS Bedrock, or self-hosted alternatives) via the AI service configuration:
 
 - **Endpoint:** `http://localhost:11434`
 - **Models:** Code-focused models (e.g., CodeLlama, DeepSeek Coder, StarCoder)

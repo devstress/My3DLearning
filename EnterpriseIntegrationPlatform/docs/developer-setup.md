@@ -62,7 +62,7 @@ dotnet new install Aspire.ProjectTemplates
 
 ### Docker (Recommended)
 
-Docker is needed to run infrastructure dependencies locally (Kafka, Temporal, Cassandra, Ollama) via .NET Aspire container orchestration.
+Docker is needed to run infrastructure dependencies locally (Kafka, NATS, Temporal, Cassandra, Ollama) via .NET Aspire container orchestration.
 
 - **Install Docker Desktop:** <https://www.docker.com/products/docker-desktop/>
 
@@ -132,7 +132,7 @@ EnterpriseIntegrationPlatform/
 │   ├── AppHost/                 # .NET Aspire orchestrator
 │   ├── ServiceDefaults/         # Shared service configuration (OpenTelemetry, health checks)
 │   ├── Gateway.Api/             # HTTP ingress API
-│   ├── Ingestion.Kafka/         # Kafka consumer/producer service
+│   ├── Ingestion.Kafka/         # Message broker ingestion service (Kafka streaming + NATS/Pulsar queuing)
 │   ├── Contracts/               # Shared message contracts and interfaces
 │   ├── Workflow.Temporal/       # Temporal workflow worker
 │   ├── Activities/              # Workflow activity implementations
@@ -162,7 +162,8 @@ EnterpriseIntegrationPlatform/
 | Runtime             | .NET                    | 10        |
 | Language            | C#                      | 14        |
 | Orchestration       | .NET Aspire             | 13.1.2    |
-| Event Backbone      | Apache Kafka            | Latest    |
+| Event Streaming     | Apache Kafka            | Latest    |
+| Queue Broker        | NATS JetStream (default)| Latest    |
 | Workflow Engine     | Temporal.io             | Latest    |
 | Storage             | Apache Cassandra        | Latest    |
 | Observability       | OpenTelemetry           | 1.14.0    |

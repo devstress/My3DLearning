@@ -13,13 +13,17 @@
 ## Vision
 
 Build a modern AI-driven Enterprise Integration Platform to replace Microsoft BizTalk Server.  
-The platform uses .NET 10, .NET Aspire, Kafka, Temporal.io, CassandraDB, OpenTelemetry, and Ollama.  
+The platform uses .NET 10, .NET Aspire, a configurable message broker layer, Temporal.io, CassandraDB, OpenTelemetry, and Ollama (configurable AI provider).  
 It implements Enterprise Integration Patterns in a cloud-native, horizontally scalable architecture.
 
 ## Architecture Decisions
 
 - Replace BizTalk orchestration with Temporal workflows
-- Replace ESB-style message brokers with event-driven Kafka backbone
+- **Configurable message broker layer** — The platform uses the right messaging tool for each job:
+  - **Kafka** for broadcast event streams, audit logs, fan-out analytics, and decoupled integration — where its partitioned, ordered, high-throughput model excels. Kafka is partitioned and ordered per partition; within a consumer group each partition is consumed by exactly one consumer at a time. This gives strong scalability but creates per-partition serialization — a slow or poison message blocks progress behind it on that partition (Head-of-Line blocking). Kafka is a strong backbone for high-throughput event streaming, but it is not a universal middleware replacement.
+  - **Configurable queue broker (default: NATS JetStream; Apache Pulsar with Key_Shared for large-scale production)** for task-oriented message delivery where queue semantics, lower HOL risk, or different consumption guarantees are needed. NATS JetStream is a lightweight, cloud-native single binary with per-subject filtering and queue groups that avoids HOL blocking between subjects — ideal for local development, testing, and cloud deployments. For large-scale production on-prem, Apache Pulsar with Key_Shared subscription distributes messages by key (e.g., recipientId) across consumers — all messages for recipient A stay ordered, while recipient B is processed by another consumer. **Recipient A must not block Recipient B, even at 1 million recipients.** Both brokers support built-in multi-tenancy with lightweight topic creation that scales to millions of tenants without the cost overhead of Kafka topics.
+  - **Temporal** for orchestrated business workflows and sagas — Temporal manages long-running, stateful workflow execution with compensation logic.
+  - The broker choice between Kafka and the queue broker is a deployment-time configuration switch per message flow category.
 - Use Cassandra for scalable distributed persistence
 - Use Aspire AppHost to orchestrate the platform locally
 - Integrate Ollama for AI-assisted development and autonomous code generation
@@ -37,7 +41,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 002 | GitHub Actions CI pipeline | Automated build and test on every push/PR | done |
 | 003 | Aspire AppHost infrastructure | Configure Aspire AppHost with service defaults | done |
 | 004 | Contracts and canonical message envelope | Define shared message contracts | done |
-| 005 | Kafka ingestion service | Implement Kafka consumer/producer for message ingestion | not-started |
+| 005 | Configurable message broker ingestion | Implement broker abstraction with Kafka, NATS JetStream (default), and Pulsar (Key_Shared) providers for message ingestion | not-started |
 | 006 | Temporal workflow host | Set up Temporal worker and basic workflow definitions | not-started |
 | 007 | Cassandra storage module | Implement Cassandra repository and data access | not-started |
 | 008 | Ollama AI integration | Integrate Ollama for AI-assisted operations | done |
@@ -79,7 +83,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-Chunk 005 – Kafka ingestion service
+Chunk 005 – Configurable message broker ingestion
 
 ---
 

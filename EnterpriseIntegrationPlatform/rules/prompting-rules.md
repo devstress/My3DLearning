@@ -8,7 +8,7 @@ Before implementing any chunk, verify the development environment:
    - If missing or below `10.0.x`, install from: <https://dotnet.microsoft.com/download/dotnet/10.0>
    - Alternatively use: `winget install Microsoft.DotNet.SDK.10` (Windows), `brew install dotnet-sdk@10` (macOS), or `sudo apt-get install dotnet-sdk-10.0` (Linux)
 2. **.NET Aspire templates** must be installed: `dotnet new install Aspire.ProjectTemplates`
-3. **Docker** must be running for infrastructure containers (Kafka, Temporal, Cassandra, Ollama)
+3. **Docker** must be running for infrastructure containers (Kafka, NATS, Temporal, Cassandra, Ollama)
 
 See `docs/developer-setup.md` for full setup instructions.
 

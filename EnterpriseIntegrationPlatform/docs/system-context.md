@@ -105,11 +105,19 @@ Operations and support personnel who manage and monitor the platform.
 
 ### Apache Kafka
 
-**Role:** Event backbone and durable message store
+**Role:** Event streaming for broadcast, audit, and analytics
 
-Kafka provides the central event bus for all asynchronous communication within the platform. Every message passes through Kafka, ensuring durability, ordering, and decoupling between components.
+Kafka provides the event streaming layer for broadcast workloads, audit log streaming, and fan-out analytics. Task-oriented message delivery (ingestion, routing, DLQ) uses the configurable queue broker (NATS JetStream or Apache Pulsar) to avoid per-partition serialization (head-of-line blocking).
 
-**Dependency Type:** Critical — platform cannot process messages without Kafka.
+**Dependency Type:** Critical for streaming workloads — task delivery falls back to queue broker.
+
+### Queue Broker (NATS JetStream / Apache Pulsar)
+
+**Role:** Task-oriented message delivery with no head-of-line blocking
+
+NATS JetStream (default for local development and cloud) or Apache Pulsar with Key_Shared subscription (switchable for large-scale production) handles ingestion, delivery, and DLQ processing. Per-subject queue groups (NATS) or Key_Shared distribution by recipientId (Pulsar) ensure that Recipient A never blocks Recipient B, even at 1 million recipients.
+
+**Dependency Type:** Critical — platform cannot process task delivery without the queue broker.
 
 ### Temporal.io
 
@@ -145,6 +153,7 @@ Ollama runs large language models locally for code generation, documentation sum
 | Platform          | Target REST APIs   | HTTPS       | OAuth 2.0 / API Key   |
 | Platform          | Target SFTP        | SFTP/SSH    | SSH Keys / Credentials |
 | Platform          | Kafka              | TCP/TLS     | SASL/mTLS             |
+| Platform          | NATS/Pulsar        | TCP/TLS     | Token/mTLS            |
 | Platform          | Temporal           | gRPC/TLS    | mTLS / API Key        |
 | Platform          | Cassandra          | CQL/TLS     | Credentials / mTLS    |
 | Platform          | Ollama             | HTTP        | Local only (no auth)  |
