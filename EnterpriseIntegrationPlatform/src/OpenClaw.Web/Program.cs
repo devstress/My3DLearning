@@ -12,8 +12,17 @@ var ollamaBaseAddress = builder.Configuration["Ollama:BaseAddress"]
                         ?? OllamaServiceExtensions.DefaultBaseAddress;
 builder.Services.AddOllamaService(ollamaBaseAddress);
 
-// Register platform observability (state store, lifecycle recorder, trace analyser)
-builder.Services.AddPlatformObservability();
+// Register platform observability — use Loki when available (Aspire injects the URL),
+// fall back to in-memory for local dev without Docker
+var lokiBaseAddress = builder.Configuration["Loki:BaseAddress"];
+if (!string.IsNullOrWhiteSpace(lokiBaseAddress))
+{
+    builder.Services.AddPlatformObservability(lokiBaseAddress);
+}
+else
+{
+    builder.Services.AddPlatformObservability();
+}
 
 // Seed demo data so "where is my message?" works out of the box
 builder.Services.AddHostedService<DemoDataSeeder>();

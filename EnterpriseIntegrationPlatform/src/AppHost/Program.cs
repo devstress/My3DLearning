@@ -18,6 +18,15 @@ var ragflow = builder.AddContainer("ragflow", "infiniflow/ragflow", "v0.16.0-sli
     .WithVolume("ragflow-data", "/ragflow/data")
     .WithLifetime(ContainerLifetime.Persistent);
 
+// ── Observability Infrastructure ──────────────────────────────────────────────
+// Grafana Loki provides durable, queryable log storage for all message lifecycle
+// events (traces, status, metadata). This replaces in-memory storage for real
+// observability — event logs, traces, status, and metadata are all stored here.
+var loki = builder.AddContainer("loki", "grafana/loki", "3.4.2")
+    .WithHttpEndpoint(targetPort: 3100, name: "loki-api")
+    .WithVolume("loki-data", "/loki")
+    .WithLifetime(ContainerLifetime.Persistent);
+
 // ── Platform Services ─────────────────────────────────────────────────────────
 
 var gatewayApi = builder.AddProject<Projects.Gateway_Api>("gateway-api");
@@ -32,9 +41,11 @@ var adminWeb = builder.AddProject<Projects.Admin_Web>("admin-web")
     .WithReference(adminApi);
 
 // OpenClaw – the observability web UI – talks to Ollama for AI-powered
-// message state diagnostics and references the Ollama endpoint.
+// message state diagnostics. Loki provides real storage for all event logs,
+// traces, status, and metadata.
 var openClaw = builder.AddProject<Projects.OpenClaw_Web>("openclaw")
     .WithExternalHttpEndpoints()
-    .WithEnvironment("Ollama__BaseAddress", ollama.GetEndpoint("ollama-api"));
+    .WithEnvironment("Ollama__BaseAddress", ollama.GetEndpoint("ollama-api"))
+    .WithEnvironment("Loki__BaseAddress", loki.GetEndpoint("loki-api"));
 
 builder.Build().Run();
