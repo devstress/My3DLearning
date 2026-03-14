@@ -25,8 +25,9 @@ The agent must:
 1. Read `rules/milestones.md`
 2. Identify the next chunk with status `not-started`
 3. Implement ONLY that chunk
-4. Update `milestones.md` with completed work
-5. Ensure the repository remains resumable
+4. Update chunk status in `milestones.md`
+5. Log completion details in `rules/completion-log.md`
+6. Ensure the repository remains resumable
 
 ## Chunk Implementation Rules
 
@@ -35,7 +36,7 @@ The agent must:
 - Do not modify completed chunks unless fixing a bug
 - Update chunk status to `in-progress` when starting
 - Update chunk status to `done` when complete
-- Log completion in the Completion Log table
+- Log completion details (files, notes) in `rules/completion-log.md`
 
 ## Code Generation Rules
 
@@ -49,7 +50,8 @@ The agent must:
 
 - Update relevant docs when architecture changes
 - Create ADRs for significant architectural decisions
-- Keep `milestones.md` as the single source of truth
+- Keep `milestones.md` as the source of truth for chunk status (phases and next chunk only)
+- Keep `completion-log.md` as the detailed record of completed work
 
 ## AI Integration Rules
 

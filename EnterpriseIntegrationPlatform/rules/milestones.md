@@ -66,55 +66,10 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 026 | Operational tooling | not-started |
 | 027 | AI-assisted code generation | not-started |
 
-## Chunk Details
-
-### Chunk 001 – Repository scaffold
-
-- **Goal**: Create the full solution structure with all projects and directory layout
-- **Scope**: Solution file, project files, directory structure, global configuration
-- **Files created**:
-  - `EnterpriseIntegrationPlatform.sln`
-  - `global.json`
-  - `Directory.Build.props`
-  - `Directory.Packages.props`
-  - `.editorconfig`
-  - `src/AppHost/AppHost.csproj`
-  - `src/ServiceDefaults/ServiceDefaults.csproj`
-  - `src/Gateway.Api/Gateway.Api.csproj`
-  - `src/Ingestion.Kafka/Ingestion.Kafka.csproj`
-  - `src/Contracts/Contracts.csproj`
-  - `src/Workflow.Temporal/Workflow.Temporal.csproj`
-  - `src/Activities/Activities.csproj`
-  - `src/Connectors/Connector.Http/Connector.Http.csproj`
-  - `src/Connectors/Connector.Sftp/Connector.Sftp.csproj`
-  - `src/Connectors/Connector.Email/Connector.Email.csproj`
-  - `src/Connectors/Connector.File/Connector.File.csproj`
-  - `src/Processing.Transform/Processing.Transform.csproj`
-  - `src/Processing.Routing/Processing.Routing.csproj`
-  - `src/Storage.Cassandra/Storage.Cassandra.csproj`
-  - `src/AI.Ollama/AI.Ollama.csproj`
-  - `src/RuleEngine/RuleEngine.csproj`
-  - `src/Admin.Api/Admin.Api.csproj`
-  - `src/Admin.Web/Admin.Web.csproj`
-  - `src/Observability/Observability.csproj`
-  - `tests/UnitTests/UnitTests.csproj`
-  - `tests/IntegrationTests/IntegrationTests.csproj`
-  - `tests/ContractTests/ContractTests.csproj`
-  - `tests/WorkflowTests/WorkflowTests.csproj`
-  - `tests/LoadTests/LoadTests.csproj`
-  - `docs/*.md` (all documentation files)
-  - `rules/*.md` (all rules files)
-- **Dependencies**: None
-- **Acceptance criteria**: Solution builds successfully on .NET 10 with Aspire 13.1.2, all projects referenced
-- **Status**: done
-
-## Completion Log
-
-| Date | Chunk | Notes |
-|------|-------|-------|
-| 2026-03-14 | 001 | Repository scaffold created with all projects and documentation |
-| 2026-03-14 | 001 | Upgraded to .NET 10, Aspire 13.1.2, latest OpenTelemetry and test packages |
-
 ## Next Chunk
 
 Chunk 002 – Aspire AppHost infrastructure
+
+---
+
+For detailed completion history, files created, and notes see `rules/completion-log.md`.
