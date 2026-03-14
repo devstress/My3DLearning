@@ -29,6 +29,14 @@ var loki = builder.AddContainer("loki", "grafana/loki", "3.4.2")
 
 // ── Platform Services ─────────────────────────────────────────────────────────
 
+// NATS JetStream — default queue broker for task-oriented message delivery.
+// Per-subject independence avoids Head-of-Line blocking between recipients.
+var nats = builder.AddContainer("nats", "nats", "latest")
+    .WithArgs("--jetstream")
+    .WithEndpoint(targetPort: 4222, name: "nats-client", scheme: "nats")
+    .WithVolume("nats-data", "/data")
+    .WithLifetime(ContainerLifetime.Persistent);
+
 var gatewayApi = builder.AddProject<Projects.Gateway_Api>("gateway-api");
 
 // Ingestion.Kafka handles Kafka streaming workloads (audit, analytics).

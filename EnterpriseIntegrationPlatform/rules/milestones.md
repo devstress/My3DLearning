@@ -41,7 +41,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 002 | GitHub Actions CI pipeline | Automated build and test on every push/PR | done |
 | 003 | Aspire AppHost infrastructure | Configure Aspire AppHost with service defaults | done |
 | 004 | Contracts and canonical message envelope | Define shared message contracts | done |
-| 005 | Configurable message broker ingestion | Implement broker abstraction with Kafka, NATS JetStream (default), and Pulsar (Key_Shared) providers for message ingestion | not-started |
+| 005 | Configurable message broker ingestion | Implement broker abstraction with Kafka, NATS JetStream (default), and Pulsar (Key_Shared) providers for message ingestion | done |
 | 006 | Temporal workflow host | Set up Temporal worker and basic workflow definitions | not-started |
 | 007 | Cassandra storage module | Implement Cassandra repository and data access | not-started |
 | 008 | Ollama AI integration | Integrate Ollama for AI-assisted operations | done |
@@ -83,7 +83,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-Chunk 005 – Configurable message broker ingestion
+Chunk 006 – Temporal workflow host
 
 ---
 

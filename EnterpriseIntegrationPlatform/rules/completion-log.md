@@ -4,6 +4,73 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 005 – Configurable message broker ingestion
+
+- **Date**: 2026-03-14
+- **Status**: done
+- **Goal**: Implement broker abstraction with Kafka, NATS JetStream (default), and Pulsar (Key_Shared) providers for message ingestion.
+
+### Architecture
+
+```
+Broker Abstraction Layer (src/Ingestion/):
+  IMessageBrokerProducer → publishes IntegrationEnvelope<T> to a named topic
+  IMessageBrokerConsumer → subscribes to a topic with consumer group semantics
+  BrokerType enum        → NatsJetStream (0, default), Kafka (1), Pulsar (2)
+  BrokerOptions          → deployment-time configuration (Broker section)
+  EnvelopeSerializer     → JSON serialisation for broker transport
+
+Provider Implementations:
+  NATS JetStream (src/Ingestion.Nats/)   → per-subject independence, no HOL blocking (DEFAULT)
+  Apache Kafka (src/Ingestion.Kafka/)    → broadcast streams, audit logs, fan-out analytics
+  Apache Pulsar (src/Ingestion.Pulsar/)  → Key_Shared subscription, key-based distribution
+
+Aspire AppHost:
+  nats (nats:latest --jetstream) → default queue broker container
+  Configuration: Broker:BrokerType + Broker:ConnectionString
+
+Critical constraint: Recipient A must NOT block Recipient B, even at 1 million recipients.
+  NATS: per-subject queue groups bypass HOL blocking
+  Pulsar: Key_Shared distributes by correlationId key across consumers
+```
+
+- **Files created**:
+  - `src/Ingestion/Ingestion.csproj` — broker abstraction library project
+  - `src/Ingestion/BrokerType.cs` — enum: NatsJetStream, Kafka, Pulsar
+  - `src/Ingestion/BrokerOptions.cs` — configuration options (Broker section)
+  - `src/Ingestion/IMessageBrokerProducer.cs` — producer interface
+  - `src/Ingestion/IMessageBrokerConsumer.cs` — consumer interface
+  - `src/Ingestion/EnvelopeSerializer.cs` — JSON serialisation for envelopes
+  - `src/Ingestion/IngestionServiceExtensions.cs` — AddBrokerOptions DI registration
+  - `src/Ingestion.Nats/Ingestion.Nats.csproj` — NATS JetStream provider project
+  - `src/Ingestion.Nats/NatsJetStreamProducer.cs` — NATS producer
+  - `src/Ingestion.Nats/NatsJetStreamConsumer.cs` — NATS consumer with queue groups
+  - `src/Ingestion.Nats/NatsServiceExtensions.cs` — AddNatsJetStreamBroker DI registration
+  - `src/Ingestion.Pulsar/Ingestion.Pulsar.csproj` — Pulsar provider project
+  - `src/Ingestion.Pulsar/PulsarProducer.cs` — Pulsar producer (keyed by correlationId)
+  - `src/Ingestion.Pulsar/PulsarConsumer.cs` — Pulsar consumer with Key_Shared subscription
+  - `src/Ingestion.Pulsar/PulsarServiceExtensions.cs` — AddPulsarBroker DI registration
+  - `src/Ingestion.Kafka/KafkaProducer.cs` — Kafka producer
+  - `src/Ingestion.Kafka/KafkaConsumer.cs` — Kafka consumer
+  - `src/Ingestion.Kafka/KafkaServiceExtensions.cs` — AddKafkaBroker DI registration
+  - `tests/UnitTests/EnvelopeSerializerTests.cs` — 6 serialisation tests
+  - `tests/UnitTests/BrokerOptionsTests.cs` — 6 configuration tests
+  - `tests/UnitTests/BrokerTypeTests.cs` — 4 enum tests
+  - `tests/UnitTests/IngestionServiceExtensionsTests.cs` — 3 DI registration tests
+  - `rules/reality-filter.md` — REALITY FILTER AI agent enforcement rules
+- **Files modified**:
+  - `Directory.Packages.props` — added NATS.Net 2.7.3, DotPulsar 5.2.2, Confluent.Kafka 2.13.2
+  - `src/Ingestion.Kafka/Ingestion.Kafka.csproj` — added Confluent.Kafka + Ingestion project references
+  - `src/Ingestion.Kafka/Program.cs` — wired broker options and KafkaBroker registration
+  - `src/AppHost/Program.cs` — added NATS JetStream container (nats:latest --jetstream)
+  - `EnterpriseIntegrationPlatform.sln` — added Ingestion, Ingestion.Nats, Ingestion.Pulsar projects
+  - `tests/UnitTests/UnitTests.csproj` — added Ingestion project reference
+  - `rules/milestones.md` — chunk 005 → done, next chunk → 006
+- **Test counts**:
+  - UnitTests: 47 (was 28, +19 broker tests)
+  - ContractTests: 29 (unchanged)
+  - Build: 0 warnings, 0 errors
+
 ## Chunk 009 – Remove InMemoryObservabilityEventLog, Loki-only observability
 
 - **Date**: 2026-03-14

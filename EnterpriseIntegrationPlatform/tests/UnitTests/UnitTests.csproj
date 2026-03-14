@@ -14,5 +14,6 @@
     <ProjectReference Include="..\..\src\Contracts\Contracts.csproj" />
     <ProjectReference Include="..\..\src\Observability\Observability.csproj" />
     <ProjectReference Include="..\..\src\AI.Ollama\AI.Ollama.csproj" />
+    <ProjectReference Include="..\..\src\Ingestion\Ingestion.csproj" />
   </ItemGroup>
 </Project>
