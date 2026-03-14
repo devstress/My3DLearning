@@ -4,7 +4,7 @@
 
 1. **Separation of Concerns** – Each project has a single responsibility
 2. **Dependency Inversion** – Depend on abstractions, not implementations
-3. **Event-Driven Architecture** – Kafka is the primary communication backbone
+3. **Configurable Message Broker** – The broker layer is abstraction-based: Kafka for broadcast event streams, audit logs, and fan-out analytics; a configurable queue broker (e.g., RabbitMQ) for task-oriented delivery with independent per-recipient queues and lower Head-of-Line blocking risk. The broker choice is a deployment-time configuration switch.
 4. **Workflow Orchestration** – Temporal manages all long-running processes
 5. **Distributed by Default** – Design for horizontal scaling from day one
 
@@ -14,8 +14,8 @@
 - `ServiceDefaults` has ZERO project dependencies (cross-cutting defaults)
 - `Activities` depends only on `Contracts`
 - `Workflow.Temporal` depends on `Contracts` and `Activities`
-- `Gateway.Api` depends on `Contracts` and `Ingestion.Kafka`
-- `Ingestion.Kafka` depends on `Contracts`
+- `Gateway.Api` depends on `Contracts` and `Ingestion`
+- `Ingestion` depends on `Contracts` (broker abstraction; Kafka and RabbitMQ providers)
 - `Storage.Cassandra` depends on `Contracts`
 - `Processing.*` projects depend on `Contracts`
 - `Connector.*` projects depend on `Contracts`
@@ -29,7 +29,8 @@
 ## Communication Patterns
 
 - **Synchronous**: REST/gRPC via Gateway.Api only for external consumers
-- **Asynchronous**: Kafka for all inter-service communication
+- **Asynchronous (streaming)**: Kafka for broadcast event streams, audit logs, fan-out analytics, and decoupled integration
+- **Asynchronous (queuing)**: Configurable queue broker (e.g., RabbitMQ) for task-oriented delivery with independent per-recipient queues — avoids Head-of-Line blocking so saga processing of recipient B continues even when recipient A is down
 - **Orchestration**: Temporal for complex workflows and sagas
 - **Storage**: Cassandra for all persistent state
 

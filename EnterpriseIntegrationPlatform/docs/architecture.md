@@ -2,13 +2,13 @@
 
 ## Overview
 
-The Enterprise Integration Platform (EIP) is a cloud-native, event-driven integration system designed to replace legacy middleware such as BizTalk Server. It provides reliable, scalable message processing with workflow orchestration, multi-protocol connectivity, and AI-assisted development capabilities.
+The Enterprise Integration Platform (EIP) is a cloud-native integration system designed to replace legacy middleware such as BizTalk Server. It provides reliable, scalable message processing with workflow orchestration, multi-protocol connectivity, and AI-assisted development capabilities.
 
-The platform follows a layered, loosely coupled architecture where each layer communicates through well-defined contracts. Events flow through an immutable pipeline from ingestion to delivery, with full observability at every stage.
+The platform follows a layered, loosely coupled architecture where each layer communicates through well-defined contracts. Messages flow through an immutable pipeline from ingestion to delivery, with full observability at every stage. The message broker layer is configurable — Kafka handles broadcast event streams and audit logs while a configurable queue broker (e.g., RabbitMQ) handles task-oriented delivery with independent per-recipient consumption.
 
 ## Design Principles
 
-1. **Event-Driven First** — All inter-service communication is asynchronous and event-based. Kafka serves as the central nervous system, decoupling producers from consumers.
+1. **Right Tool for Each Job** — The platform uses Kafka for broadcast event streams, audit logs, fan-out analytics, and decoupled integration where its partitioned, ordered, high-throughput model excels. A configurable queue broker (e.g., RabbitMQ) handles task-oriented message delivery where independent per-recipient queues avoid Head-of-Line (HOL) blocking — critical for saga patterns where processing of recipient B must continue even when recipient A is down. Kafka is partitioned and ordered per partition; within a consumer group each partition is consumed by exactly one consumer at a time, creating per-partition serialization that can block progress when one slow or poison message stalls a partition. The broker choice is a deployment-time configuration switch per message flow category.
 2. **Durability Over Speed** — Every message is persisted before acknowledgment. At-least-once delivery with idempotent processing guarantees no data loss.
 3. **Separation of Concerns** — Ingestion, routing, transformation, delivery, and orchestration are independent, deployable units.
 4. **Observable by Default** — OpenTelemetry is integrated at every layer. Every message carries a correlation ID for end-to-end tracing.
@@ -22,7 +22,8 @@ The platform follows a layered, loosely coupled architecture where each layer co
 |--------------------|--------------------|----------------------------------------------|
 | Runtime            | .NET 10            | High-performance, cross-platform runtime     |
 | Orchestration      | .NET Aspire        | Service composition and local orchestration  |
-| Event Backbone     | Apache Kafka       | Durable, partitioned event streaming         |
+| Event Streaming     | Apache Kafka       | Broadcast streams, audit logs, fan-out analytics |
+| Queue Broker        | RabbitMQ (configurable) | Task-oriented delivery, independent per-recipient queues, lower HOL risk |
 | Workflow Engine    | Temporal.io        | Durable workflow orchestration               |
 | Primary Storage    | Apache Cassandra   | Distributed, highly-available data store     |
 | Observability      | OpenTelemetry      | Distributed tracing, metrics, and logging    |
@@ -44,14 +45,25 @@ The ingress layer accepts messages from external systems through multiple protoc
 
 Each ingress adapter normalizes incoming data into an `IntegrationEnvelope` — the canonical message format — and publishes it to the appropriate Kafka ingestion topic.
 
-### Layer 2: Kafka Event Backbone
+### Layer 2: Configurable Message Broker
 
-Kafka serves as the durable, partitioned event bus connecting all layers:
+The message broker layer connects ingress to processing and delivery. The broker is configurable per message flow category:
 
-- **Ingestion topics** — Receive normalized envelopes from ingress adapters.
-- **Routing topics** — Carry messages to specific processing pipelines.
-- **DLQ topics** — Capture failed messages for manual review or automated retry.
+**Kafka (broadcast streams, audit, analytics):**
+
 - **Audit topics** — Record all processing events for compliance and debugging.
+- **Analytics streams** — Fan-out event streams for downstream analytics consumers.
+- **Decoupled integration** — Publish/subscribe patterns where multiple consumers process the same stream independently.
+
+Kafka is a strong backbone for high-throughput event streaming. It is partitioned and ordered per partition; within a consumer group each partition is consumed by exactly one consumer at a time. This gives strong scalability but creates per-partition serialization — a slow or poison message blocks progress behind it on that partition. Per-tenant topics at scale (e.g., 1 million tenants) are prohibitively expensive.
+
+**Queue broker — e.g., RabbitMQ (task-oriented delivery):**
+
+- **Ingestion queues** — Receive normalized envelopes from ingress adapters.
+- **Delivery queues** — Carry messages to specific processing pipelines and connectors.
+- **DLQ queues** — Capture failed messages for manual review or automated retry.
+
+RabbitMQ provides independent per-recipient queues with per-message acknowledgment. If recipient A is down, messages for recipient B continue flowing — no Head-of-Line blocking. Lightweight queue creation supports millions of tenants without the cost overhead of Kafka topics.
 
 Partitioning is based on tenant ID and message type, ensuring ordered processing within a tenant while enabling horizontal scalability across tenants.
 
@@ -103,8 +115,8 @@ OpenTelemetry provides comprehensive observability:
 
 The platform is designed for containerized deployment:
 
-- **Local development** — .NET Aspire orchestrates all services, including Kafka, Temporal, and Cassandra containers.
-- **Staging/Production** — Kubernetes with Helm charts, managed Kafka (Confluent Cloud or MSK), managed Cassandra (Astra or self-hosted), and self-hosted Temporal cluster.
+- **Local development** — .NET Aspire orchestrates all services, including the configured message broker (Kafka and/or RabbitMQ), Temporal, and Cassandra containers.
+- **Staging/Production** — Kubernetes with Helm charts, managed Kafka for streaming (Confluent Cloud or MSK), RabbitMQ for queuing (CloudAMQP or self-hosted), managed Cassandra (Astra or self-hosted), and self-hosted Temporal cluster.
 - **CI/CD** — GitHub Actions pipelines with automated testing, security scanning, and container image publishing.
 
 ### Service Topology
@@ -115,7 +127,8 @@ The platform is designed for containerized deployment:
 ├─────────────┬──────────────┬───────────────┬────────────┤
 │ Ingress API │ Workflow Svc │ Connector Svc │ Admin API  │
 ├─────────────┴──────────────┴───────────────┴────────────┤
-│                   Kafka Cluster                         │
+│                   Message Broker Layer                    │
+│           (Kafka streams / RabbitMQ queues)               │
 ├─────────────────────────────────────────────────────────┤
 │              Temporal Server Cluster                    │
 ├─────────────────────────────────────────────────────────┤
@@ -145,7 +158,7 @@ Every message carries a unique `MessageId` and `CorrelationId`. The deduplicatio
 ### Multi-Tenancy
 
 Tenant isolation is enforced through:
-- Kafka topic partitioning by tenant ID
+- Kafka topic partitioning by tenant ID for streaming workloads; RabbitMQ per-tenant queues for delivery workloads (lightweight queue creation scales to millions of tenants)
 - Cassandra partition keys including tenant ID
 - Temporal namespace or task queue separation per tenant
 - RBAC policies scoped to tenant resources
