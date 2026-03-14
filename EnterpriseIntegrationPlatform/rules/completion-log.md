@@ -4,6 +4,55 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 009 refactor – Isolate observability storage, Prometheus, Playwright tests
+
+- **Date**: 2026-03-14
+- **Status**: done
+- **Goal**: Separate production message storage from observability storage. Add Prometheus as the metrics backend. Add Playwright UI tests. Notify explicitly when Ollama is unavailable.
+
+### Architecture (production vs observability separation)
+
+```
+Production Layer (message processing pipeline only):
+  IMessageStateStore → InMemoryMessageStateStore
+  (Used ONLY by services processing messages. Swappable for Cassandra.)
+
+Observability Layer (isolated, for operators via OpenClaw):
+  Prometheus (/metrics endpoint) → stores/queries aggregated metrics
+  IObservabilityEventLog → InMemoryObservabilityEventLog → stores/queries lifecycle events
+  (Swappable for ELK/Seq/Loki for production log aggregation.)
+
+MessageLifecycleRecorder writes to BOTH:
+  → IMessageStateStore (production)
+  → IObservabilityEventLog (observability)
+  → OpenTelemetry (traces + metrics → Prometheus)
+
+MessageStateInspector queries ONLY observability:
+  → IObservabilityEventLog (NOT IMessageStateStore)
+  → ITraceAnalyzer (Ollama AI) for diagnostic summary
+```
+
+- **Files created**:
+  - `src/Observability/IObservabilityEventLog.cs` — interface for isolated observability event storage
+  - `src/Observability/InMemoryObservabilityEventLog.cs` — in-memory implementation (swappable for ELK/Seq)
+  - `tests/PlaywrightTests/PlaywrightTests.csproj` — Playwright + xUnit test project
+  - `tests/PlaywrightTests/OpenClawUiTests.cs` — 8 Playwright UI tests (graceful skip when browsers not installed)
+- **Files modified**:
+  - `Directory.Packages.props` — added `OpenTelemetry.Exporter.Prometheus.AspNetCore`, `Microsoft.Playwright`, `Microsoft.AspNetCore.Mvc.Testing`
+  - `src/ServiceDefaults/ServiceDefaults.csproj` — added Prometheus exporter package reference
+  - `src/ServiceDefaults/Extensions.cs` — added `.AddPrometheusExporter()` to metrics pipeline, `app.MapPrometheusScrapingEndpoint()` to endpoint mapping
+  - `src/Observability/MessageLifecycleRecorder.cs` — now writes to both `IMessageStateStore` (production) AND `IObservabilityEventLog` (observability)
+  - `src/Observability/MessageStateInspector.cs` — queries `IObservabilityEventLog` instead of `IMessageStateStore`; returns explicit Ollama unavailable notification via `InspectionResult.OllamaAvailable` flag
+  - `src/Observability/ObservabilityServiceExtensions.cs` — registers `IObservabilityEventLog` alongside production store
+  - `src/OpenClaw.Web/Program.cs` — updated hint text to mention Prometheus; shows yellow "⚠️ Ollama Unavailable" notification card when AI is down
+  - `tests/UnitTests/MessageLifecycleRecorderTests.cs` — updated tests to verify dual-write to both stores
+  - `tests/UnitTests/MessageStateInspectorTests.cs` — tests now use observability log; added `OllamaAvailable` assertions
+  - `rules/milestones.md` — updated chunk 009 description
+- **Notes**:
+  - All 28 unit tests pass. Build: 0 warnings, 0 errors.
+  - Prometheus `/metrics` endpoint now exposed on all services via ServiceDefaults.
+  - When Ollama is unavailable, UI shows explicit notification instead of fallback.
+
 ## Chunk 008 & 009 – Ollama AI integration + OpenTelemetry Observability + OpenClaw Web UI
 
 - **Date**: 2026-03-14
