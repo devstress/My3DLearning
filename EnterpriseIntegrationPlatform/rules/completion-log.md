@@ -4,7 +4,30 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
-## Chunk 003 – Aspire AppHost infrastructure
+## Chunk 004 – Contracts and canonical message envelope
+
+- **Date**: 2026-03-14
+- **Status**: done
+- **Goal**: Define the full set of shared message contracts in the `Contracts` project
+- **Files modified**:
+  - `src/Contracts/IntegrationEnvelope.cs` — added `SchemaVersion` (default `"1.0"`), `CausationId` (nullable Guid), `Priority` (default `Normal`), and static `Create<T>()` factory method
+  - `tests/ContractTests/ContractTests.csproj` — added `<ProjectReference>` to `Contracts`
+- **Files created**:
+  - `src/Contracts/MessageHeaders.cs` — string constants for well-known metadata keys (TraceId, SpanId, ContentType, SchemaVersion, SourceTopic, ConsumerGroup, LastAttemptAt, RetryCount)
+  - `src/Contracts/MessagePriority.cs` — enum (Low, Normal, High, Critical)
+  - `src/Contracts/DeliveryStatus.cs` — enum (Pending, InFlight, Delivered, Failed, Retrying, DeadLettered)
+  - `src/Contracts/FaultEnvelope.cs` — record with static `Create<T>()` factory for dead-letter / fault scenarios
+  - `tests/ContractTests/IntegrationEnvelopeTests.cs` — 15 focused unit tests
+  - `tests/ContractTests/FaultEnvelopeTests.cs` — 9 focused unit tests
+  - `tests/ContractTests/MessageHeadersTests.cs` — 5 focused unit tests
+- **Notes**:
+  - `Contracts` project retains ZERO project dependencies (pure DTOs and value types)
+  - `IntegrationEnvelope<T>.Create()` provides a convenient factory that auto-generates MessageId and Timestamp; correlationId and causationId are optional parameters
+  - `FaultEnvelope.Create<T>()` captures exception details (type, message, stack trace) and preserves the original CorrelationId for end-to-end tracing
+  - All 33 tests pass (29 new contract tests + 4 pre-existing placeholder tests)
+  - Build: 0 warnings, 0 errors
+
+
 
 - **Date**: 2026-03-14
 - **Status**: done

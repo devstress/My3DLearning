@@ -36,7 +36,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 001 | Repository scaffold | Create solution structure, projects, directory layout | done |
 | 002 | GitHub Actions CI pipeline | Automated build and test on every push/PR | done |
 | 003 | Aspire AppHost infrastructure | Configure Aspire AppHost with service defaults | done |
-| 004 | Contracts and canonical message envelope | Define shared message contracts | not-started |
+| 004 | Contracts and canonical message envelope | Define shared message contracts | done |
 | 005 | Kafka ingestion service | Implement Kafka consumer/producer for message ingestion | not-started |
 | 006 | Temporal workflow host | Set up Temporal worker and basic workflow definitions | not-started |
 | 007 | Cassandra storage module | Implement Cassandra repository and data access | not-started |
@@ -79,7 +79,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-Chunk 004 – Contracts and canonical message envelope
+Chunk 005 – Kafka ingestion service
 
 ---
 
