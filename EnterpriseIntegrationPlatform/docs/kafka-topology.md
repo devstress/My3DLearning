@@ -44,7 +44,7 @@ eip.{tenant-id}.{domain}.{event-type}
 
 ## Kafka Topic Categories
 
-Kafka is scoped to broadcast event streams and audit — workloads where its partitioned, ordered, high-throughput model excels. Task-oriented delivery (ingestion, routing, delivery, DLQ) uses the configurable queue broker (see RabbitMQ section below).
+Kafka is scoped to broadcast event streams and audit — workloads where its partitioned, ordered, high-throughput model excels. Task-oriented delivery (ingestion, routing, delivery, DLQ) uses the configurable queue broker (see NATS JetStream and Apache Pulsar sections below).
 
 ### Audit Topics
 
