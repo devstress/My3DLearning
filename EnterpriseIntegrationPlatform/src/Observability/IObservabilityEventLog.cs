@@ -5,9 +5,9 @@ namespace EnterpriseIntegrationPlatform.Observability;
 /// This is <b>separate</b> from <see cref="IMessageStateStore"/> which is
 /// production-only message/integration storage.
 /// <para>
-/// Implementations may be in-memory (for development), or backed by
-/// Elasticsearch, Loki, Seq, or another log-aggregation backend for production.
-/// Prometheus handles metrics storage; this interface handles event-level queries.
+/// The production implementation is backed by Grafana Loki for durable,
+/// queryable log storage. Prometheus handles metrics storage; this interface
+/// handles event-level queries.
 /// </para>
 /// </summary>
 public interface IObservabilityEventLog

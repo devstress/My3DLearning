@@ -10,7 +10,7 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
 public class MessageStateInspectorTests
 {
-    private readonly InMemoryObservabilityEventLog _observabilityLog = new();
+    private readonly IObservabilityEventLog _observabilityLog = Substitute.For<IObservabilityEventLog>();
     private readonly ITraceAnalyzer _analyzer = Substitute.For<ITraceAnalyzer>();
     private readonly MessageStateInspector _inspector;
 
@@ -25,6 +25,9 @@ public class MessageStateInspectorTests
     [Fact]
     public async Task WhereIsAsync_ReturnsNotFound_WhenNoEventsExist()
     {
+        _observabilityLog.GetByBusinessKeyAsync("order-99", Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<MessageEvent>());
+
         var result = await _inspector.WhereIsAsync("order-99");
 
         result.Found.Should().BeFalse();
@@ -36,26 +39,32 @@ public class MessageStateInspectorTests
     public async Task WhereIsAsync_QueriesObservabilityLog_NotProductionStore()
     {
         var correlationId = Guid.NewGuid();
-        await _observabilityLog.RecordAsync(new MessageEvent
+        var events = new List<MessageEvent>
         {
-            MessageId = Guid.NewGuid(),
-            CorrelationId = correlationId,
-            MessageType = "OrderShipment",
-            Source = "Gateway",
-            Stage = "Ingestion",
-            Status = DeliveryStatus.Pending,
-            BusinessKey = "order-02",
-        });
-        await _observabilityLog.RecordAsync(new MessageEvent
-        {
-            MessageId = Guid.NewGuid(),
-            CorrelationId = correlationId,
-            MessageType = "OrderShipment",
-            Source = "Gateway",
-            Stage = "Routing",
-            Status = DeliveryStatus.InFlight,
-            BusinessKey = "order-02",
-        });
+            new()
+            {
+                MessageId = Guid.NewGuid(),
+                CorrelationId = correlationId,
+                MessageType = "OrderShipment",
+                Source = "Gateway",
+                Stage = "Ingestion",
+                Status = DeliveryStatus.Pending,
+                BusinessKey = "order-02",
+            },
+            new()
+            {
+                MessageId = Guid.NewGuid(),
+                CorrelationId = correlationId,
+                MessageType = "OrderShipment",
+                Source = "Gateway",
+                Stage = "Routing",
+                Status = DeliveryStatus.InFlight,
+                BusinessKey = "order-02",
+            },
+        };
+
+        _observabilityLog.GetByBusinessKeyAsync("order-02", Arg.Any<CancellationToken>())
+            .Returns(events.AsReadOnly());
 
         _analyzer.WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("The shipment for order-02 is currently in the Routing stage.");
@@ -74,16 +83,22 @@ public class MessageStateInspectorTests
     public async Task WhereIsAsync_NotifiesOllamaUnavailable_WhenAiFails()
     {
         var correlationId = Guid.NewGuid();
-        await _observabilityLog.RecordAsync(new MessageEvent
+        var events = new List<MessageEvent>
         {
-            MessageId = Guid.NewGuid(),
-            CorrelationId = correlationId,
-            MessageType = "OrderShipment",
-            Source = "Gateway",
-            Stage = "Delivery",
-            Status = DeliveryStatus.Delivered,
-            BusinessKey = "order-03",
-        });
+            new()
+            {
+                MessageId = Guid.NewGuid(),
+                CorrelationId = correlationId,
+                MessageType = "OrderShipment",
+                Source = "Gateway",
+                Stage = "Delivery",
+                Status = DeliveryStatus.Delivered,
+                BusinessKey = "order-03",
+            },
+        };
+
+        _observabilityLog.GetByBusinessKeyAsync("order-03", Arg.Any<CancellationToken>())
+            .Returns(events.AsReadOnly());
 
         _analyzer.WhereIsMessageAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new HttpRequestException("Ollama is down"));
@@ -100,15 +115,21 @@ public class MessageStateInspectorTests
     public async Task WhereIsByCorrelationAsync_ReturnsEventsFromObservabilityLog()
     {
         var correlationId = Guid.NewGuid();
-        await _observabilityLog.RecordAsync(new MessageEvent
+        var events = new List<MessageEvent>
         {
-            MessageId = Guid.NewGuid(),
-            CorrelationId = correlationId,
-            MessageType = "InvoicePayment",
-            Source = "Billing",
-            Stage = "Ingestion",
-            Status = DeliveryStatus.Pending,
-        });
+            new()
+            {
+                MessageId = Guid.NewGuid(),
+                CorrelationId = correlationId,
+                MessageType = "InvoicePayment",
+                Source = "Billing",
+                Stage = "Ingestion",
+                Status = DeliveryStatus.Pending,
+            },
+        };
+
+        _observabilityLog.GetByCorrelationIdAsync(correlationId, Arg.Any<CancellationToken>())
+            .Returns(events.AsReadOnly());
 
         _analyzer.WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("Invoice is in Ingestion stage.");

@@ -4,6 +4,42 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 009 – Remove InMemoryObservabilityEventLog, Loki-only observability
+
+- **Date**: 2026-03-14
+- **Status**: done
+- **Goal**: Remove InMemoryObservabilityEventLog entirely. All observability uses real Loki storage via Aspire. No in-memory fallback.
+
+### Architecture (Loki-only)
+
+```
+Aspire AppHost containers:
+  loki (grafana/loki:3.4.2) → durable log storage for all lifecycle events, traces, status, metadata
+  ollama (ollama/ollama)     → local LLM inference
+  ragflow (infiniflow/ragflow) → RAG for integration docs
+
+Observability storage:
+  IObservabilityEventLog interface
+  └── LokiObservabilityEventLog → real storage via Loki HTTP push API + LogQL queries
+
+OpenClaw.Web:
+  Always uses LokiObservabilityEventLog (Loki__BaseAddress from Aspire, defaults to localhost:3100)
+```
+
+- **Files deleted**:
+  - `src/Observability/InMemoryObservabilityEventLog.cs` — removed in-memory fallback
+  - `tests/UnitTests/InMemoryObservabilityEventLogTests.cs` — removed its test
+- **Files modified**:
+  - `src/Observability/ObservabilityServiceExtensions.cs` — removed parameterless `AddPlatformObservability()` overload, kept only `AddPlatformObservability(string lokiBaseUrl)`
+  - `src/Observability/IObservabilityEventLog.cs` — updated doc to reference Loki only
+  - `src/OpenClaw.Web/Program.cs` — removed conditional fallback, always uses Loki
+  - `tests/UnitTests/MessageLifecycleRecorderTests.cs` — replaced InMemoryObservabilityEventLog with NSubstitute mock
+  - `tests/UnitTests/MessageStateInspectorTests.cs` — replaced InMemoryObservabilityEventLog with NSubstitute mock
+- **Test counts**:
+  - UnitTests: 28 (was 29, -1 InMemory smoke test removed)
+  - IntegrationTests: 9 (8 Loki tests + 1 placeholder)
+  - Build: 0 warnings, 0 errors
+
 ## Chunk 009 – Loki-backed observability storage with real integration tests
 
 - **Date**: 2026-03-14

@@ -10,11 +10,17 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 public class MessageLifecycleRecorderTests
 {
     private readonly InMemoryMessageStateStore _productionStore = new();
-    private readonly InMemoryObservabilityEventLog _observabilityLog = new();
+    private readonly IObservabilityEventLog _observabilityLog = Substitute.For<IObservabilityEventLog>();
+    private readonly List<MessageEvent> _capturedObsEvents = [];
     private readonly MessageLifecycleRecorder _recorder;
 
     public MessageLifecycleRecorderTests()
     {
+        _observabilityLog
+            .RecordAsync(Arg.Any<MessageEvent>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask)
+            .AndDoes(ci => _capturedObsEvents.Add(ci.Arg<MessageEvent>()));
+
         _recorder = new MessageLifecycleRecorder(
             _productionStore,
             _observabilityLog,
@@ -43,9 +49,8 @@ public class MessageLifecycleRecorderTests
         prodEvents[0].Status.Should().Be(DeliveryStatus.Pending);
 
         // Observability store also receives the event
-        var obsEvents = await _observabilityLog.GetByBusinessKeyAsync("order-02");
-        obsEvents.Should().ContainSingle();
-        obsEvents[0].Stage.Should().Be(MessageTracer.StageIngestion);
+        _capturedObsEvents.Should().ContainSingle();
+        _capturedObsEvents[0].Stage.Should().Be(MessageTracer.StageIngestion);
     }
 
     [Fact]
@@ -59,9 +64,8 @@ public class MessageLifecycleRecorderTests
         prodEvents.Should().ContainSingle();
         prodEvents[0].Status.Should().Be(DeliveryStatus.InFlight);
 
-        var obsEvents = await _observabilityLog.GetByBusinessKeyAsync("order-02");
-        obsEvents.Should().ContainSingle();
-        obsEvents[0].Status.Should().Be(DeliveryStatus.InFlight);
+        _capturedObsEvents.Should().ContainSingle();
+        _capturedObsEvents[0].Status.Should().Be(DeliveryStatus.InFlight);
     }
 
     [Fact]
@@ -75,9 +79,8 @@ public class MessageLifecycleRecorderTests
         prodEvents.Should().ContainSingle();
         prodEvents[0].Status.Should().Be(DeliveryStatus.Delivered);
 
-        var obsEvents = await _observabilityLog.GetByBusinessKeyAsync("order-02");
-        obsEvents.Should().ContainSingle();
-        obsEvents[0].Status.Should().Be(DeliveryStatus.Delivered);
+        _capturedObsEvents.Should().ContainSingle();
+        _capturedObsEvents[0].Status.Should().Be(DeliveryStatus.Delivered);
     }
 
     [Fact]
@@ -93,9 +96,8 @@ public class MessageLifecycleRecorderTests
         prodEvents.Should().ContainSingle();
         prodEvents[0].Status.Should().Be(DeliveryStatus.Failed);
 
-        var obsEvents = await _observabilityLog.GetByBusinessKeyAsync("order-02");
-        obsEvents.Should().ContainSingle();
-        obsEvents[0].Details.Should().Contain("Connection refused");
+        _capturedObsEvents.Should().ContainSingle();
+        _capturedObsEvents[0].Details.Should().Contain("Connection refused");
     }
 
     [Fact]
@@ -109,9 +111,8 @@ public class MessageLifecycleRecorderTests
         prodEvents.Should().ContainSingle();
         prodEvents[0].Status.Should().Be(DeliveryStatus.Retrying);
 
-        var obsEvents = await _observabilityLog.GetByBusinessKeyAsync("order-02");
-        obsEvents.Should().ContainSingle();
-        obsEvents[0].Details.Should().Contain("#3");
+        _capturedObsEvents.Should().ContainSingle();
+        _capturedObsEvents[0].Details.Should().Contain("#3");
     }
 
     [Fact]
@@ -125,9 +126,8 @@ public class MessageLifecycleRecorderTests
         prodEvents.Should().ContainSingle();
         prodEvents[0].Status.Should().Be(DeliveryStatus.DeadLettered);
 
-        var obsEvents = await _observabilityLog.GetByBusinessKeyAsync("order-02");
-        obsEvents.Should().ContainSingle();
-        obsEvents[0].Details.Should().Contain("Max retries exceeded");
+        _capturedObsEvents.Should().ContainSingle();
+        _capturedObsEvents[0].Details.Should().Contain("Max retries exceeded");
     }
 
     [Fact]
@@ -145,10 +145,9 @@ public class MessageLifecycleRecorderTests
         var prodEvents = await _productionStore.GetByCorrelationIdAsync(correlationId);
         prodEvents.Should().HaveCount(4);
 
-        // Observability store also has all events (isolated)
-        var obsEvents = await _observabilityLog.GetByCorrelationIdAsync(correlationId);
-        obsEvents.Should().HaveCount(4);
-        obsEvents[0].Status.Should().Be(DeliveryStatus.Pending);
-        obsEvents[3].Status.Should().Be(DeliveryStatus.Delivered);
+        // Observability store also receives all events
+        _capturedObsEvents.Should().HaveCount(4);
+        _capturedObsEvents[0].Status.Should().Be(DeliveryStatus.Pending);
+        _capturedObsEvents[3].Status.Should().Be(DeliveryStatus.Delivered);
     }
 }
