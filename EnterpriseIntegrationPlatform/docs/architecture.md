@@ -8,7 +8,7 @@ The platform follows a layered, loosely coupled architecture where each layer co
 
 ## Design Principles
 
-1. **Right Tool for Each Job** — The platform uses Kafka for broadcast event streams, audit logs, fan-out analytics, and decoupled integration where its partitioned, ordered, high-throughput model excels. A configurable queue broker (e.g., RabbitMQ) handles task-oriented message delivery where independent per-recipient queues avoid Head-of-Line (HOL) blocking — critical for saga patterns where processing of recipient B must continue even when recipient A is down. Kafka is partitioned and ordered per partition; within a consumer group each partition is consumed by exactly one consumer at a time, creating per-partition serialization that can block progress when one slow or poison message stalls a partition. The broker choice is a deployment-time configuration switch per message flow category.
+1. **Right Tool for Each Job** — The platform uses Kafka for broadcast event streams, audit logs, fan-out analytics, and decoupled integration where its partitioned, ordered, high-throughput model excels. A configurable queue broker (default: NATS JetStream; Apache Pulsar with Key_Shared for large-scale production) handles task-oriented message delivery where independent per-recipient queues avoid Head-of-Line (HOL) blocking — critical for saga patterns where processing of recipient B must continue even when recipient A is down. Kafka is partitioned and ordered per partition; within a consumer group each partition is consumed by exactly one consumer at a time, creating per-partition serialization that can block progress when one slow or poison message stalls a partition. The broker choice is a deployment-time configuration switch per message flow category.
 2. **Durability Over Speed** — Every message is persisted before acknowledgment. At-least-once delivery with idempotent processing guarantees no data loss.
 3. **Separation of Concerns** — Ingestion, routing, transformation, delivery, and orchestration are independent, deployable units.
 4. **Observable by Default** — OpenTelemetry is integrated at every layer. Every message carries a correlation ID for end-to-end tracing.
@@ -133,7 +133,7 @@ The platform is designed for containerized deployment:
 │ Ingress API │ Workflow Svc │ Connector Svc │ Admin API  │
 ├─────────────┴──────────────┴───────────────┴────────────┤
 │                   Message Broker Layer                    │
-│           (Kafka streams / RabbitMQ queues)               │
+│           (Kafka streams / NATS/Pulsar queues)                │
 ├─────────────────────────────────────────────────────────┤
 │              Temporal Server Cluster                    │
 ├─────────────────────────────────────────────────────────┤

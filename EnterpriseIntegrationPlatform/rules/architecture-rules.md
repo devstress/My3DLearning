@@ -15,7 +15,7 @@
 - `Activities` depends only on `Contracts`
 - `Workflow.Temporal` depends on `Contracts` and `Activities`
 - `Gateway.Api` depends on `Contracts` and `Ingestion`
-- `Ingestion` depends on `Contracts` (broker abstraction; Kafka and RabbitMQ providers)
+- `Ingestion` depends on `Contracts` (broker abstraction; Kafka, NATS, and Pulsar providers)
 - `Storage.Cassandra` depends on `Contracts`
 - `Processing.*` projects depend on `Contracts`
 - `Connector.*` projects depend on `Contracts`

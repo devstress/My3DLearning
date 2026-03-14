@@ -135,7 +135,7 @@ All platform services (Ingress API, Admin API, Worker Service) are stateless and
     ┌──────────────────────────────────────┐
     │   Message Broker Layer               │
     │   Kafka (streams/audit)              │   ← Scale by partition count
-    │   Redis Streams (task delivery)      │   ← Scale by consumer group
+    │   NATS/Pulsar (task delivery)        │   ← Scale by consumer group
     └──────────────────────────────────────┘
              │          │          │
               ▼          ▼          ▼
