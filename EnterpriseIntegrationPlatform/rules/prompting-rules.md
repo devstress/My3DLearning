@@ -1,0 +1,46 @@
+# Prompting Rules
+
+## Resumption Protocol
+
+To continue development, use:
+
+```
+continue next chunk
+```
+
+The agent must:
+
+1. Read `rules/milestones.md`
+2. Identify the next chunk with status `not-started`
+3. Implement ONLY that chunk
+4. Update `milestones.md` with completed work
+5. Ensure the repository remains resumable
+
+## Chunk Implementation Rules
+
+- Implement ONE chunk at a time
+- Do not skip ahead to future chunks
+- Do not modify completed chunks unless fixing a bug
+- Update chunk status to `in-progress` when starting
+- Update chunk status to `done` when complete
+- Log completion in the Completion Log table
+
+## Code Generation Rules
+
+- Generate working, compilable code
+- Follow coding standards in `coding-standards.md`
+- Follow architecture rules in `architecture-rules.md`
+- Include XML documentation on public APIs
+- Include unit tests for new logic
+
+## Documentation Rules
+
+- Update relevant docs when architecture changes
+- Create ADRs for significant architectural decisions
+- Keep `milestones.md` as the single source of truth
+
+## AI Integration Rules
+
+- Ollama prompts must reference `docs/` and `rules/` context
+- Generated code must follow the same standards as hand-written code
+- AI-generated files must be clearly attributed
