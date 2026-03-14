@@ -1,0 +1,6 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.2">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>eip-apphost-dev</UserSecretsId>
+  </PropertyGroup>
+</Project>
