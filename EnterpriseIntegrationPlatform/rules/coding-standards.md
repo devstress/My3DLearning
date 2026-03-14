@@ -2,7 +2,7 @@
 
 ## Language and Framework
 
-- C# 13 / .NET 10
+- C# 14 / .NET 10
 - Nullable reference types enabled globally
 - Implicit usings enabled
 - File-scoped namespaces required

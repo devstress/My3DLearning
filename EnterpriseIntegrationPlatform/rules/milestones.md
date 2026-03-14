@@ -15,6 +15,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 - Integrate Ollama for AI-assisted development and autonomous code generation
 - OpenTelemetry for end-to-end observability
 - Saga-based distributed transactions via Temporal
+- Target .NET 10 (C# 14) with .NET Aspire 13.1.2
 
 ## Phases
 
@@ -104,7 +105,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
   - `docs/*.md` (all documentation files)
   - `rules/*.md` (all rules files)
 - **Dependencies**: None
-- **Acceptance criteria**: Solution builds successfully, all projects referenced
+- **Acceptance criteria**: Solution builds successfully on .NET 10 with Aspire 13.1.2, all projects referenced
 - **Status**: done
 
 ## Completion Log
@@ -112,6 +113,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | Date | Chunk | Notes |
 |------|-------|-------|
 | 2026-03-14 | 001 | Repository scaffold created with all projects and documentation |
+| 2026-03-14 | 001 | Upgraded to .NET 10, Aspire 13.1.2, latest OpenTelemetry and test packages |
 
 ## Next Chunk
 
