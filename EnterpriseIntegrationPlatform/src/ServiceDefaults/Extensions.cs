@@ -41,6 +41,7 @@ public static class Extensions
 
     /// <summary>
     /// Configures OpenTelemetry logging, metrics, and tracing.
+    /// Metrics are exported via Prometheus at <c>/metrics</c>.
     /// </summary>
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -55,7 +56,8 @@ public static class Extensions
             {
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    .AddPrometheusExporter();
             })
             .WithTracing(tracing =>
             {
@@ -97,10 +99,14 @@ public static class Extensions
     }
 
     /// <summary>
-    /// Maps default health check endpoints for liveness and readiness probes.
+    /// Maps default health check endpoints for liveness and readiness probes,
+    /// and the Prometheus <c>/metrics</c> scraping endpoint for observability storage.
     /// </summary>
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
+        // Prometheus metrics endpoint – always available for observability scraping
+        app.MapPrometheusScrapingEndpoint();
+
         if (app.Environment.IsDevelopment())
         {
             app.MapHealthChecks(HealthEndpointPath);
