@@ -6,26 +6,19 @@ namespace EnterpriseIntegrationPlatform.Observability;
 
 /// <summary>
 /// Inspects where a message is in the integration pipeline by querying
-/// the <see cref="IMessageStateStore"/> and optionally sending the results
+/// the isolated <see cref="IObservabilityEventLog"/> (NOT the production
+/// <see cref="IMessageStateStore"/>) and optionally sending the results
 /// to <see cref="ITraceAnalyzer"/> (backed by Ollama) for AI-powered diagnostics.
 /// <para>
 /// This is the primary entry point for operators asking
-/// "where is my shipment for order 02?" or
-/// "what happened to the invoice with reference INV-2026-0042?".
+/// "where is my shipment for order 02?" via OpenClaw.
+/// Observability queries are always served from the isolated observability
+/// storage (backed by Prometheus for metrics + event log for lifecycle events).
 /// </para>
 /// </summary>
-/// <example>
-/// <code>
-/// // Look up by business key (e.g. order number)
-/// var result = await inspector.WhereIsAsync("order-02");
-///
-/// // Look up by correlation ID
-/// var result = await inspector.WhereIsByCorrelationAsync(correlationId);
-/// </code>
-/// </example>
 public sealed class MessageStateInspector
 {
-    private readonly IMessageStateStore _store;
+    private readonly IObservabilityEventLog _observabilityLog;
     private readonly ITraceAnalyzer _traceAnalyzer;
     private readonly ILogger<MessageStateInspector> _logger;
 
@@ -38,34 +31,32 @@ public sealed class MessageStateInspector
     /// <summary>
     /// Initialises a new instance of <see cref="MessageStateInspector"/>.
     /// </summary>
-    /// <param name="store">The message state store to query.</param>
+    /// <param name="observabilityLog">The isolated observability event log to query.</param>
     /// <param name="traceAnalyzer">The AI-backed trace analyser.</param>
     /// <param name="logger">Logger instance.</param>
     public MessageStateInspector(
-        IMessageStateStore store,
+        IObservabilityEventLog observabilityLog,
         ITraceAnalyzer traceAnalyzer,
         ILogger<MessageStateInspector> logger)
     {
-        _store = store;
+        _observabilityLog = observabilityLog;
         _traceAnalyzer = traceAnalyzer;
         _logger = logger;
     }
 
     /// <summary>
     /// Answers "where is my message?" by looking up the business key
-    /// (e.g. order number, shipment ID) in the state store, then sending
-    /// the full lifecycle history to Ollama for an AI-generated summary.
+    /// in the isolated observability event log, then sending the full
+    /// lifecycle history to Ollama for an AI-generated summary.
+    /// When Ollama is unavailable the result carries an explicit notification.
     /// </summary>
-    /// <param name="businessKey">The business key to search for (e.g. "order-02").</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>An <see cref="InspectionResult"/> with both raw state and AI summary.</returns>
     public async Task<InspectionResult> WhereIsAsync(
         string businessKey,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Looking up message state for business key: {BusinessKey}", businessKey);
+        _logger.LogInformation("Looking up observability data for business key: {BusinessKey}", businessKey);
 
-        var events = await _store.GetByBusinessKeyAsync(businessKey, cancellationToken);
+        var events = await _observabilityLog.GetByBusinessKeyAsync(businessKey, cancellationToken);
 
         if (events.Count == 0)
         {
@@ -83,18 +74,16 @@ public sealed class MessageStateInspector
 
     /// <summary>
     /// Answers "where is my message?" by looking up a correlation identifier
-    /// in the state store and sending the history to Ollama for analysis.
+    /// in the isolated observability event log and sending the history to Ollama.
+    /// When Ollama is unavailable the result carries an explicit notification.
     /// </summary>
-    /// <param name="correlationId">The correlation identifier.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>An <see cref="InspectionResult"/> with both raw state and AI summary.</returns>
     public async Task<InspectionResult> WhereIsByCorrelationAsync(
         Guid correlationId,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Looking up message state for CorrelationId={CorrelationId}", correlationId);
+        _logger.LogInformation("Looking up observability data for CorrelationId={CorrelationId}", correlationId);
 
-        var events = await _store.GetByCorrelationIdAsync(correlationId, cancellationToken);
+        var events = await _observabilityLog.GetByCorrelationIdAsync(correlationId, cancellationToken);
 
         if (events.Count == 0)
         {
@@ -111,14 +100,8 @@ public sealed class MessageStateInspector
     }
 
     /// <summary>
-    /// Builds a <see cref="MessageStateSnapshot"/> from an <see cref="IntegrationEnvelope{T}"/>
-    /// capturing its current known state.
+    /// Builds a <see cref="MessageStateSnapshot"/> from an <see cref="IntegrationEnvelope{T}"/>.
     /// </summary>
-    /// <typeparam name="T">Payload type.</typeparam>
-    /// <param name="envelope">The envelope to inspect.</param>
-    /// <param name="currentStage">The current processing stage name.</param>
-    /// <param name="deliveryStatus">The current delivery status.</param>
-    /// <returns>A snapshot of the message state.</returns>
     public MessageStateSnapshot CreateSnapshot<T>(
         IntegrationEnvelope<T> envelope,
         string currentStage,
@@ -151,8 +134,8 @@ public sealed class MessageStateInspector
         var latest = events[^1];
         var json = JsonSerializer.Serialize(events, JsonOptions);
 
-        // Ask the AI for a diagnostic summary
         string aiSummary;
+        bool ollamaAvailable = true;
         try
         {
             var correlationId = events[0].CorrelationId;
@@ -160,8 +143,11 @@ public sealed class MessageStateInspector
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "AI analysis unavailable; falling back to structured summary");
-            aiSummary = BuildFallbackSummary(query, events, latest);
+            _logger.LogWarning(ex, "Ollama is unavailable for AI analysis");
+            aiSummary = "⚠️ Ollama is unavailable. AI-powered analysis cannot be performed at this time. " +
+                        "Please ensure Ollama is running and accessible. " +
+                        "Lifecycle event data is still available below from the observability store.";
+            ollamaAvailable = false;
         }
 
         return new InspectionResult
@@ -169,27 +155,18 @@ public sealed class MessageStateInspector
             Query = query,
             Found = true,
             Summary = aiSummary,
+            OllamaAvailable = ollamaAvailable,
             Events = events,
             LatestStage = latest.Stage,
             LatestStatus = latest.Status,
         };
     }
-
-    private static string BuildFallbackSummary(
-        string query,
-        IReadOnlyList<MessageEvent> events,
-        MessageEvent latest)
-    {
-        return $"Message for '{query}' is currently in stage '{latest.Stage}' " +
-               $"with status '{latest.Status}'. " +
-               $"It has {events.Count} recorded lifecycle event(s). " +
-               $"First seen at {events[0].RecordedAt:O}, last update at {latest.RecordedAt:O}.";
-    }
 }
 
 /// <summary>
 /// The result of a message state inspection, including the full lifecycle
-/// event history and an AI-generated (or fallback) diagnostic summary.
+/// event history and an AI-generated diagnostic summary (or an explicit
+/// notification that Ollama is unavailable).
 /// </summary>
 public sealed class InspectionResult
 {
@@ -199,8 +176,18 @@ public sealed class InspectionResult
     /// <summary>Whether any matching events were found.</summary>
     public bool Found { get; init; }
 
-    /// <summary>AI-generated or fallback diagnostic summary.</summary>
+    /// <summary>
+    /// AI-generated diagnostic summary, or an explicit notification
+    /// that Ollama is unavailable.
+    /// </summary>
     public string Summary { get; init; } = string.Empty;
+
+    /// <summary>
+    /// <c>true</c> when the AI summary was generated by Ollama;
+    /// <c>false</c> when Ollama was unavailable and the summary
+    /// is a notification instead.
+    /// </summary>
+    public bool OllamaAvailable { get; init; } = true;
 
     /// <summary>The ordered list of lifecycle events.</summary>
     public IReadOnlyList<MessageEvent> Events { get; init; } = [];

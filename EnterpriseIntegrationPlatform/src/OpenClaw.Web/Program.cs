@@ -163,8 +163,9 @@ internal static class OpenClawHtml
             </div>
             <p class="hint">
                 Ask where your message is by entering an order number, shipment ID,
-                business key, or correlation ID. OpenClaw will query the state store
-                and use AI to tell you exactly where it is.
+                business key, or correlation ID. OpenClaw queries the isolated
+                observability store (backed by Prometheus metrics + event log)
+                and uses AI (Ollama) to tell you exactly where it is.
             </p>
             <div class="spinner" id="spinner">⏳ Searching…</div>
             <div id="result"></div>
@@ -215,11 +216,19 @@ internal static class OpenClawHtml
 
                 let html = '';
 
-                // Summary card
-                html += `<div class="card">
-                    <h2>AI Diagnostic Summary</h2>
-                    <div class="summary">${esc(data.summary)}</div>
-                </div>`;
+                // Ollama unavailable notification
+                if (data.ollamaAvailable === false) {
+                    html += `<div class="card" style="border-color:var(--yellow)">
+                        <h2 style="color:var(--yellow)">⚠️ Ollama Unavailable</h2>
+                        <div class="summary">${esc(data.summary)}</div>
+                    </div>`;
+                } else {
+                    // AI Summary card
+                    html += `<div class="card">
+                        <h2>AI Diagnostic Summary</h2>
+                        <div class="summary">${esc(data.summary)}</div>
+                    </div>`;
+                }
 
                 // Current status card
                 if (data.latestStage) {

@@ -10,14 +10,14 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
 public class MessageStateInspectorTests
 {
-    private readonly InMemoryMessageStateStore _store = new();
+    private readonly InMemoryObservabilityEventLog _observabilityLog = new();
     private readonly ITraceAnalyzer _analyzer = Substitute.For<ITraceAnalyzer>();
     private readonly MessageStateInspector _inspector;
 
     public MessageStateInspectorTests()
     {
         _inspector = new MessageStateInspector(
-            _store,
+            _observabilityLog,
             _analyzer,
             NullLogger<MessageStateInspector>.Instance);
     }
@@ -33,10 +33,10 @@ public class MessageStateInspectorTests
     }
 
     [Fact]
-    public async Task WhereIsAsync_ReturnsFound_WithAiSummary()
+    public async Task WhereIsAsync_QueriesObservabilityLog_NotProductionStore()
     {
         var correlationId = Guid.NewGuid();
-        await _store.RecordAsync(new MessageEvent
+        await _observabilityLog.RecordAsync(new MessageEvent
         {
             MessageId = Guid.NewGuid(),
             CorrelationId = correlationId,
@@ -46,7 +46,7 @@ public class MessageStateInspectorTests
             Status = DeliveryStatus.Pending,
             BusinessKey = "order-02",
         });
-        await _store.RecordAsync(new MessageEvent
+        await _observabilityLog.RecordAsync(new MessageEvent
         {
             MessageId = Guid.NewGuid(),
             CorrelationId = correlationId,
@@ -63,6 +63,7 @@ public class MessageStateInspectorTests
         var result = await _inspector.WhereIsAsync("order-02");
 
         result.Found.Should().BeTrue();
+        result.OllamaAvailable.Should().BeTrue();
         result.Events.Should().HaveCount(2);
         result.LatestStage.Should().Be("Routing");
         result.LatestStatus.Should().Be(DeliveryStatus.InFlight);
@@ -70,10 +71,10 @@ public class MessageStateInspectorTests
     }
 
     [Fact]
-    public async Task WhereIsAsync_ReturnsFallbackSummary_WhenAiFails()
+    public async Task WhereIsAsync_NotifiesOllamaUnavailable_WhenAiFails()
     {
         var correlationId = Guid.NewGuid();
-        await _store.RecordAsync(new MessageEvent
+        await _observabilityLog.RecordAsync(new MessageEvent
         {
             MessageId = Guid.NewGuid(),
             CorrelationId = correlationId,
@@ -90,15 +91,16 @@ public class MessageStateInspectorTests
         var result = await _inspector.WhereIsAsync("order-03");
 
         result.Found.Should().BeTrue();
-        result.Summary.Should().Contain("order-03");
-        result.Summary.Should().Contain("Delivery");
+        result.OllamaAvailable.Should().BeFalse();
+        result.Summary.Should().Contain("Ollama is unavailable");
+        result.Events.Should().ContainSingle();
     }
 
     [Fact]
-    public async Task WhereIsByCorrelationAsync_ReturnsEventsForCorrelationId()
+    public async Task WhereIsByCorrelationAsync_ReturnsEventsFromObservabilityLog()
     {
         var correlationId = Guid.NewGuid();
-        await _store.RecordAsync(new MessageEvent
+        await _observabilityLog.RecordAsync(new MessageEvent
         {
             MessageId = Guid.NewGuid(),
             CorrelationId = correlationId,
@@ -114,6 +116,7 @@ public class MessageStateInspectorTests
         var result = await _inspector.WhereIsByCorrelationAsync(correlationId);
 
         result.Found.Should().BeTrue();
+        result.OllamaAvailable.Should().BeTrue();
         result.Events.Should().ContainSingle();
     }
 

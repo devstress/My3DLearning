@@ -5,25 +5,34 @@ using Microsoft.Extensions.Logging;
 namespace EnterpriseIntegrationPlatform.Observability;
 
 /// <summary>
-/// Records message lifecycle events into the <see cref="IMessageStateStore"/>
-/// and simultaneously emits OpenTelemetry traces and metrics.
-/// This is the single entry point that services should call as messages
-/// move through the pipeline, ensuring that both the queryable state store
-/// and the telemetry pipeline stay in sync.
+/// Records message lifecycle events into the production <see cref="IMessageStateStore"/>
+/// and simultaneously emits them to the isolated <see cref="IObservabilityEventLog"/>
+/// plus OpenTelemetry traces and metrics.
+/// <para>
+/// Production storage (<see cref="IMessageStateStore"/>) is used by the message
+/// processing pipeline. Observability storage (<see cref="IObservabilityEventLog"/>
+/// + Prometheus metrics) is queried by operators via OpenClaw.
+/// </para>
 /// </summary>
 public sealed class MessageLifecycleRecorder
 {
-    private readonly IMessageStateStore _store;
+    private readonly IMessageStateStore _productionStore;
+    private readonly IObservabilityEventLog _observabilityLog;
     private readonly ILogger<MessageLifecycleRecorder> _logger;
 
     /// <summary>
     /// Initialises a new instance of <see cref="MessageLifecycleRecorder"/>.
     /// </summary>
-    /// <param name="store">The backing state store.</param>
+    /// <param name="productionStore">The production message state store.</param>
+    /// <param name="observabilityLog">The isolated observability event log.</param>
     /// <param name="logger">Logger instance.</param>
-    public MessageLifecycleRecorder(IMessageStateStore store, ILogger<MessageLifecycleRecorder> logger)
+    public MessageLifecycleRecorder(
+        IMessageStateStore productionStore,
+        IObservabilityEventLog observabilityLog,
+        ILogger<MessageLifecycleRecorder> logger)
     {
-        _store = store;
+        _productionStore = productionStore;
+        _observabilityLog = observabilityLog;
         _logger = logger;
     }
 
@@ -212,6 +221,10 @@ public sealed class MessageLifecycleRecorder
                      ?? Activity.Current?.SpanId.ToString(),
         };
 
-        await _store.RecordAsync(messageEvent, cancellationToken);
+        // Write to production store (message processing pipeline)
+        await _productionStore.RecordAsync(messageEvent, cancellationToken);
+
+        // Write to isolated observability store (operator queries via OpenClaw)
+        await _observabilityLog.RecordAsync(messageEvent, cancellationToken);
     }
 }
