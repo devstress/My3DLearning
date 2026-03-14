@@ -4,6 +4,22 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 002 – GitHub Actions CI pipeline
+
+- **Date**: 2026-03-14
+- **Status**: done
+- **Goal**: Add automated CI pipeline to build and test the solution on every push and PR
+- **Files created**:
+  - `.github/workflows/ci.yml`
+- **Files modified**:
+  - `EnterpriseIntegrationPlatform/rules/milestones.md` — added resumption prompt at top, inserted Chunk 002, renumbered subsequent chunks
+  - `EnterpriseIntegrationPlatform/rules/completion-log.md` — this entry
+- **Notes**:
+  - Workflow triggers on push to `main` and `copilot/**` branches, and on PRs to `main`
+  - Uses `actions/setup-dotnet@v4` with .NET 10.x
+  - Builds in Release configuration, runs all test projects
+  - All 5 test projects (UnitTests, IntegrationTests, ContractTests, WorkflowTests, LoadTests) pass
+
 ## Chunk 001 – Repository scaffold
 
 - **Date**: 2026-03-14
