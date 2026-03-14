@@ -46,7 +46,7 @@ public sealed class LokiObservabilityEventLog : IObservabilityEventLog
     /// <inheritdoc />
     public async Task RecordAsync(MessageEvent messageEvent, CancellationToken cancellationToken = default)
     {
-        var timestampNs = messageEvent.RecordedAt.ToUnixTimeMilliseconds() * 1_000_000;
+        var timestampNs = checked(messageEvent.RecordedAt.ToUnixTimeMilliseconds() * 1_000_000);
         var logLine = JsonSerializer.Serialize(messageEvent, SerializerOptions);
 
         var labels = new Dictionary<string, string>
@@ -115,11 +115,12 @@ public sealed class LokiObservabilityEventLog : IObservabilityEventLog
         string logqlQuery,
         CancellationToken cancellationToken)
     {
-        // Use a wide time range (last 30 days) and large limit to cover all events
+        // Query the last 7 days by default; label selectors already filter to
+        // the exact correlation/business-key so data volume is bounded.
         var end = DateTimeOffset.UtcNow;
-        var start = end.AddDays(-30);
-        var startNs = start.ToUnixTimeMilliseconds() * 1_000_000;
-        var endNs = end.ToUnixTimeMilliseconds() * 1_000_000;
+        var start = end.AddDays(-7);
+        var startNs = checked(start.ToUnixTimeMilliseconds() * 1_000_000);
+        var endNs = checked(end.ToUnixTimeMilliseconds() * 1_000_000);
 
         var url = $"loki/api/v1/query_range?query={Uri.EscapeDataString(logqlQuery)}" +
                   $"&start={startNs}&end={endNs}&limit=5000&direction=forward";

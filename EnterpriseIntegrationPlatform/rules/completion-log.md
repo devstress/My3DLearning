@@ -4,6 +4,47 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 009 – Loki-backed observability storage with real integration tests
+
+- **Date**: 2026-03-14
+- **Status**: done
+- **Goal**: Replace in-memory-only observability tests with real Loki storage. InMemoryObservabilityEventLog should have only 1 test; all behavioural tests must use real storage via Testcontainers. Loki and its storage must be in Aspire's app.
+
+### Architecture (Loki integration)
+
+```
+Aspire AppHost containers:
+  loki (grafana/loki:3.4.2) → durable log storage for all lifecycle events, traces, status, metadata
+  ollama (ollama/ollama)     → local LLM inference
+  ragflow (infiniflow/ragflow) → RAG for integration docs
+
+Observability storage:
+  IObservabilityEventLog interface (unchanged)
+  ├── LokiObservabilityEventLog   → real storage via Loki HTTP push API + LogQL queries
+  └── InMemoryObservabilityEventLog → dev-only fallback (1 smoke test)
+
+OpenClaw.Web auto-selects:
+  Loki__BaseAddress env var set → uses LokiObservabilityEventLog
+  No Loki URL                  → falls back to InMemoryObservabilityEventLog
+```
+
+- **Files created**:
+  - `src/Observability/LokiObservabilityEventLog.cs` — full Loki HTTP push + LogQL query implementation
+  - `tests/IntegrationTests/LokiObservabilityEventLogTests.cs` — 8 integration tests with real Loki via Testcontainers
+- **Files modified**:
+  - `src/AppHost/Program.cs` — added Loki container (grafana/loki:3.4.2) with persistent volume, passed Loki__BaseAddress to OpenClaw
+  - `src/Observability/ObservabilityServiceExtensions.cs` — added overload `AddPlatformObservability(lokiBaseUrl)` for Loki-backed registration
+  - `src/OpenClaw.Web/Program.cs` — auto-selects Loki-backed storage when Loki__BaseAddress is available
+  - `tests/UnitTests/InMemoryObservabilityEventLogTests.cs` — reduced from 8 tests to 1 smoke test
+  - `tests/IntegrationTests/IntegrationTests.csproj` — added Testcontainers, Contracts, Observability references
+  - `Directory.Packages.props` — added Testcontainers 4.5.0
+  - `rules/milestones.md` — updated chunk 009 description
+- **Test counts**:
+  - UnitTests: 29 (was 36, -7 InMemory tests removed, +0)
+  - IntegrationTests: 9 (was 1, +8 Loki tests)
+  - Total across all projects: 82 tests, all passing
+  - Build: 0 warnings, 0 errors
+
 ## Chunk 009 enhancement – RagFlow in Aspire, demo data seeder, Ollama health, expanded tests
 
 - **Date**: 2026-03-14

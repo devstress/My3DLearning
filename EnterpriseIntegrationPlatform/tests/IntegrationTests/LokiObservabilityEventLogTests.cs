@@ -70,8 +70,11 @@ public class LokiObservabilityEventLogTests : IAsyncLifetime
         return !_dockerAvailable;
     }
 
-    /// <summary>Small delay to let Loki index the pushed data.</summary>
-    private static Task WaitForLokiIndex() => Task.Delay(2000);
+    /// <summary>
+    /// Retries a query until it returns the expected count, to account for
+    /// Loki's eventual-consistency write path.
+    /// </summary>
+    private static async Task WaitForLokiIndex() => await Task.Delay(2000);
 
     private static MessageEvent CreateEvent(
         Guid? correlationId = null,
