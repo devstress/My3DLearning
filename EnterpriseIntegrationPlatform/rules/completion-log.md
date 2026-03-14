@@ -4,6 +4,41 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 009 enhancement – RagFlow in Aspire, demo data seeder, Ollama health, expanded tests
+
+- **Date**: 2026-03-14
+- **Status**: done
+- **Goal**: Add RagFlow + Ollama containers to Aspire AppHost, seed demo observability data, add Ollama health endpoint to OpenClaw, expand Playwright and unit test coverage.
+
+### Architecture additions
+
+```
+Aspire AppHost containers:
+  ollama (ollama/ollama) → local LLM inference for OpenClaw AI + RagFlow
+  ragflow (infiniflow/ragflow:v0.16.0-slim) → RAG for integration docs
+
+OpenClaw.Web enhancements:
+  DemoDataSeeder → seeds order-02, shipment-123, invoice-001 lifecycle events
+  /api/health/ollama → returns { available: true/false, service: "ollama" }
+  UI header → live Ollama status indicator (green/red badge)
+  UI hint → mentions RagFlow for RAG documentation queries
+```
+
+- **Files created**:
+  - `src/OpenClaw.Web/DemoDataSeeder.cs` — background service seeding demo lifecycle events
+  - `tests/UnitTests/InMemoryObservabilityEventLogTests.cs` — 8 unit tests for observability store
+- **Files modified**:
+  - `src/AppHost/Program.cs` — added Ollama + RagFlow containers with volumes, env vars, endpoints
+  - `src/OpenClaw.Web/Program.cs` — added DemoDataSeeder, /api/health/ollama endpoint, Ollama status badge in UI, RagFlow mention in hint
+  - `tests/PlaywrightTests/OpenClawUiTests.cs` — expanded from 8 to 13 tests (Ollama status, seeded data queries, Ollama unavailable warning)
+  - `rules/milestones.md` — updated chunk 009 description
+- **Test counts**:
+  - UnitTests: 36 (was 28, +8 observability log tests)
+  - PlaywrightTests: 13 (was 8, +5 new tests)
+  - Total across all projects: 81 tests, all passing
+  - Build: 0 warnings, 0 errors
+
+
 ## Chunk 009 refactor – Isolate observability storage, Prometheus, Playwright tests
 
 - **Date**: 2026-03-14

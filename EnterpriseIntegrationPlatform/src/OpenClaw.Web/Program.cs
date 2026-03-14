@@ -1,17 +1,22 @@
 using EnterpriseIntegrationPlatform.AI.Ollama;
 using EnterpriseIntegrationPlatform.Observability;
+using OpenClaw.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
-// Register Ollama AI service
+// Register Ollama AI service — base address comes from Aspire's environment
+// variable (Ollama__BaseAddress) or config, with localhost fallback for local dev
 var ollamaBaseAddress = builder.Configuration["Ollama:BaseAddress"]
                         ?? OllamaServiceExtensions.DefaultBaseAddress;
 builder.Services.AddOllamaService(ollamaBaseAddress);
 
 // Register platform observability (state store, lifecycle recorder, trace analyser)
 builder.Services.AddPlatformObservability();
+
+// Seed demo data so "where is my message?" works out of the box
+builder.Services.AddHostedService<DemoDataSeeder>();
 
 var app = builder.Build();
 
@@ -50,6 +55,15 @@ api.MapPost("/ask", async (
     return Results.Ok(result);
 })
 .WithName("Ask");
+
+// ── Ollama health status endpoint ─────────────────────────────────────────────
+
+app.MapGet("/api/health/ollama", async (IOllamaService ollama, CancellationToken ct) =>
+{
+    var healthy = await ollama.IsHealthyAsync(ct);
+    return Results.Ok(new { available = healthy, service = "ollama" });
+})
+.WithName("OllamaHealth");
 
 // ── Serve the embedded HTML UI at root ────────────────────────────────────────
 
@@ -92,6 +106,13 @@ internal static class OpenClawHtml
             }
             header h1 { font-size: 1.25rem; font-weight: 600; }
             header span { color: var(--accent); font-size: 1.5rem; }
+            .ollama-status {
+                margin-left: auto; font-size: 0.8rem; padding: 0.3rem 0.7rem;
+                border-radius: 1rem; font-weight: 600;
+            }
+            .ollama-up { background: var(--green); color: #000; }
+            .ollama-down { background: var(--red); color: #fff; }
+            .ollama-checking { background: var(--muted); color: #000; }
             .container { max-width: 52rem; margin: 0 auto; padding: 1.5rem; width: 100%; flex: 1; }
             .search-box {
                 display: flex; gap: 0.5rem; margin-bottom: 1.5rem;
@@ -154,6 +175,7 @@ internal static class OpenClawHtml
         <header>
             <span>🔍</span>
             <h1>OpenClaw – Integration Observer</h1>
+            <span id="ollamaStatus" class="ollama-status ollama-checking">Ollama: checking…</span>
         </header>
         <div class="container">
             <div class="search-box">
@@ -166,6 +188,7 @@ internal static class OpenClawHtml
                 business key, or correlation ID. OpenClaw queries the isolated
                 observability store (backed by Prometheus metrics + event log)
                 and uses AI (Ollama) to tell you exactly where it is.
+                RagFlow is available in Aspire for RAG-based documentation queries.
             </p>
             <div class="spinner" id="spinner">⏳ Searching…</div>
             <div id="result"></div>
@@ -173,6 +196,28 @@ internal static class OpenClawHtml
         <script>
             const input = document.getElementById('query');
             input.addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
+
+            // Check Ollama health on page load
+            checkOllamaHealth();
+            setInterval(checkOllamaHealth, 30000);
+
+            async function checkOllamaHealth() {
+                const el = document.getElementById('ollamaStatus');
+                try {
+                    const res = await fetch('/api/health/ollama');
+                    const data = await res.json();
+                    if (data.available) {
+                        el.textContent = 'Ollama: connected';
+                        el.className = 'ollama-status ollama-up';
+                    } else {
+                        el.textContent = '⚠️ Ollama: unavailable';
+                        el.className = 'ollama-status ollama-down';
+                    }
+                } catch {
+                    el.textContent = '⚠️ Ollama: unavailable';
+                    el.className = 'ollama-status ollama-down';
+                }
+            }
 
             async function ask() {
                 const q = input.value.trim();

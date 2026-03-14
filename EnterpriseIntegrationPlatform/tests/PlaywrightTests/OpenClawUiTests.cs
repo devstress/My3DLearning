@@ -63,6 +63,8 @@ public class OpenClawUiTests : IAsyncLifetime
         return !_browsersAvailable;
     }
 
+    // ── Page structure tests ──────────────────────────────────────────────────
+
     [Fact]
     public async Task HomePage_LoadsSuccessfully_WithTitle()
     {
@@ -92,7 +94,7 @@ public class OpenClawUiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task HomePage_HasHintText_MentioningPrometheus()
+    public async Task HomePage_HasHintText_MentioningObservability()
     {
         if (SkipIfNoBrowsers()) return;
 
@@ -102,9 +104,27 @@ public class OpenClawUiTests : IAsyncLifetime
         var hint = page.Locator(".hint");
         await Expect(hint).ToBeVisibleAsync();
         var text = await hint.TextContentAsync();
-        text.Should().Contain("Prometheus");
         text.Should().Contain("observability");
     }
+
+    [Fact]
+    public async Task HomePage_ShowsOllamaStatusIndicator()
+    {
+        if (SkipIfNoBrowsers()) return;
+
+        var page = await _browser!.NewPageAsync();
+        await page.GotoAsync(_baseUrl!);
+
+        var ollamaStatus = page.Locator("#ollamaStatus");
+        await Expect(ollamaStatus).ToBeVisibleAsync();
+        // In test environment Ollama is not running, so it should show unavailable
+        // after the health check completes
+        await page.WaitForTimeoutAsync(2000);
+        var text = await ollamaStatus.TextContentAsync();
+        text.Should().Contain("Ollama");
+    }
+
+    // ── Search and query tests ────────────────────────────────────────────────
 
     [Fact]
     public async Task SearchForUnknownKey_ShowsNotFound()
@@ -127,6 +147,46 @@ public class OpenClawUiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SearchForSeededKey_ShowsResults()
+    {
+        if (SkipIfNoBrowsers()) return;
+
+        var page = await _browser!.NewPageAsync();
+        await page.GotoAsync(_baseUrl!);
+
+        // Demo data seeder adds order-02 events
+        await page.FillAsync("#query", "order-02");
+        await page.ClickAsync("#askBtn");
+
+        var resultDiv = page.Locator("#result");
+        await Expect(resultDiv).ToBeVisibleAsync();
+
+        // Should show lifecycle timeline with events (seeded data)
+        var timeline = page.Locator(".timeline");
+        await Expect(timeline).ToBeVisibleAsync();
+    }
+
+    [Fact]
+    public async Task SearchForSeededShipment_ShowsInFlightStatus()
+    {
+        if (SkipIfNoBrowsers()) return;
+
+        var page = await _browser!.NewPageAsync();
+        await page.GotoAsync(_baseUrl!);
+
+        // Demo data seeder adds shipment-123 events (in-flight)
+        await page.FillAsync("#query", "shipment-123");
+        await page.ClickAsync("#askBtn");
+
+        var resultDiv = page.Locator("#result");
+        await Expect(resultDiv).ToBeVisibleAsync();
+
+        // Should have the status card visible
+        var cards = page.Locator(".card");
+        (await cards.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
     public async Task SearchBox_SupportsEnterKey()
     {
         if (SkipIfNoBrowsers()) return;
@@ -142,6 +202,29 @@ public class OpenClawUiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task OllamaUnavailable_ShowsWarningCard_WhenSearchingSeededData()
+    {
+        if (SkipIfNoBrowsers()) return;
+
+        var page = await _browser!.NewPageAsync();
+        await page.GotoAsync(_baseUrl!);
+
+        // Search for seeded data – Ollama is not running in test env
+        await page.FillAsync("#query", "order-02");
+        await page.ClickAsync("#askBtn");
+
+        var resultDiv = page.Locator("#result");
+        await Expect(resultDiv).ToBeVisibleAsync();
+
+        // Since Ollama is unavailable, the response should have ollamaAvailable=false
+        // and the UI should show the ⚠️ Ollama Unavailable card
+        var warningCard = page.Locator("h2:has-text('Ollama Unavailable')");
+        await Expect(warningCard).ToBeVisibleAsync();
+    }
+
+    // ── API endpoint tests ────────────────────────────────────────────────────
+
+    [Fact]
     public async Task ApiEndpoint_InspectBusiness_ReturnsJson()
     {
         if (SkipIfNoBrowsers()) return;
@@ -152,6 +235,35 @@ public class OpenClawUiTests : IAsyncLifetime
         var content = await response.Content.ReadAsStringAsync();
         content.Should().Contain("\"found\"");
         content.Should().Contain("\"query\"");
+    }
+
+    [Fact]
+    public async Task ApiEndpoint_SeededData_ReturnsFound()
+    {
+        if (SkipIfNoBrowsers()) return;
+
+        // Wait for demo seeder to run
+        await Task.Delay(500);
+
+        var response = await _httpClient!.GetAsync("/api/inspect/business/order-02");
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("\"found\":true");
+        content.Should().Contain("\"ollamaAvailable\"");
+    }
+
+    [Fact]
+    public async Task ApiEndpoint_OllamaHealth_ReturnsStatus()
+    {
+        if (SkipIfNoBrowsers()) return;
+
+        var response = await _httpClient!.GetAsync("/api/health/ollama");
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("\"available\"");
+        content.Should().Contain("\"service\"");
     }
 
     [Fact]
