@@ -4,11 +4,11 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
-## Chunk 006 – Temporal workflow host + BizTalk/EIP patterns
+## Chunk 006 – Temporal workflow host + BizTalk/EIP patterns + Reality Filter enforcement
 
 - **Date**: 2026-03-15
 - **Status**: done
-- **Goal**: Set up Temporal workflow worker, implement all BizTalk and Enterprise Integration Patterns (EIP), and create a dedicated test project demonstrating each pattern.
+- **Goal**: Set up Temporal workflow worker, implement all BizTalk and Enterprise Integration Patterns (EIP), create a dedicated test project demonstrating each pattern, and enforce Reality Filter rules (no stubs, no speculative content, no empty interfaces).
 
 ### Architecture
 
