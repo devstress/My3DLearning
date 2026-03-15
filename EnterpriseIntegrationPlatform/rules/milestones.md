@@ -55,7 +55,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 004 | Contracts and canonical message envelope | Define shared message contracts | done |
 | 005 | Configurable message broker ingestion | Implement broker abstraction with Kafka, NATS JetStream (default), and Pulsar (Key_Shared) providers for message ingestion | done |
 | 006 | Temporal workflow host | Set up Temporal worker and workflow definitions with validation activities | done |
-| 007 | Cassandra storage module | Implement Cassandra repository and data access | not-started |
+| 007 | Cassandra storage module | Implement Cassandra repository and data access | done |
 | 008 | Ollama AI integration | Integrate Ollama for AI-assisted operations | done |
 | 009 | OpenTelemetry observability | Configure distributed tracing, metrics (Prometheus), isolated observability storage (Loki), OpenClaw web UI with Playwright tests, RagFlow + Ollama in Aspire, AI.RagFlow client, OpenClaw generation endpoints (POST /api/generate/integration, POST /api/generate/chat), non-common Aspire ports (15xxx range) | done |
 | 010 | Admin API | Build administration API for platform management | not-started |
@@ -95,7 +95,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-Chunk 007 – Cassandra storage module
+Chunk 010 – Admin API
 
 ---
 
