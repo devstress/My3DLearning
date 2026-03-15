@@ -25,7 +25,7 @@ public sealed class OllamaService : IOllamaService
     /// </summary>
     /// <param name="httpClient">
     /// An <see cref="HttpClient"/> whose <see cref="HttpClient.BaseAddress"/>
-    /// points to the Ollama API (e.g. <c>http://localhost:11434</c>).
+    /// points to the Ollama API (e.g. <c>http://localhost:15434</c>).
     /// </param>
     /// <param name="logger">Logger instance.</param>
     public OllamaService(HttpClient httpClient, ILogger<OllamaService> logger)

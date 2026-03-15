@@ -20,10 +20,13 @@ dotnet run
 
 Aspire automatically starts and configures:
 - Kafka (single broker, port 9092)
-- NATS JetStream (single node, port 4222)
-- Temporal (dev server, port 7233)
+- NATS JetStream (single node, host port 15222)
+- Temporal (dev server, host port 15233)
+- Temporal UI (host port 15280)
 - Cassandra (single node, port 9042)
-- Ollama (port 11434)
+- Ollama (host port 15434)
+- RagFlow (UI host port 15080, API host port 15380)
+- Loki (host port 15100)
 - All platform services
 
 ### Production Startup Order

@@ -16,6 +16,16 @@ Build a modern AI-driven Enterprise Integration Platform to replace Microsoft Bi
 The platform uses .NET 10, .NET Aspire, a configurable message broker layer, Temporal.io, CassandraDB, OpenTelemetry, and Ollama (configurable AI provider).  
 It implements Enterprise Integration Patterns in a cloud-native, horizontally scalable architecture.
 
+**AI-Driven Integration Generation** — The framework focuses on few lines of code. An operator writes a minimal specification and asks AI to auto-generate a complete, production-ready integration. Example prompt: "Generate an integration that maps a message (XML/JSON/flat file) to another format, obtains an auth token from a web API (cached with expiry), and submits the message to another web API with the token."
+
+**Ack/Nack Notification Loopback** — Every integration implements atomic notification semantics: all-or-nothing. On success, publish an Ack. On any failure, publish a Nack. Downstream systems subscribe to Ack/Nack queues to trigger rollback or send notifications back to the sender.
+
+**Zero Message Loss** — Even after restart or outage of full or partial system offline. Every accepted message is either delivered or routed to DLQ. No silent drops.
+
+**11 Quality Pillars** — All design and implementation decisions are guided by the 11 architectural quality pillars defined in `rules/quality-pillars.md`: Reliability, Security, Scalability, Maintainability, Availability, Resilience, Supportability, Observability, Operational Excellence, Testability, Performance.
+
+**Self-Hosted GraphRAG** — The platform includes a self-hosted RAG system (RagFlow + Ollama) running as Aspire containers. The repository's docs, rules, and source code are indexed as the knowledge base. Developers on any client machine can ask OpenClaw to generate new integrations — RagFlow retrieves relevant context and Ollama generates production-ready code. All inference runs on-premises; no data leaves the infrastructure.
+
 ## Architecture Decisions
 
 - Replace BizTalk orchestration with Temporal workflows
@@ -27,9 +37,11 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 - Use Cassandra for scalable distributed persistence
 - Use Aspire AppHost to orchestrate the platform locally
 - Integrate Ollama for AI-assisted development and autonomous code generation
+- Self-hosted GraphRAG via RagFlow + Ollama — index docs, rules, and source code; OpenClaw generates integrations from any client machine
 - OpenTelemetry for end-to-end observability
 - Saga-based distributed transactions via Temporal
 - Target .NET 10 (C# 14) with .NET Aspire 13.1.2
+- Non-common Aspire host ports (15xxx range) to avoid conflicts with existing services
 
 ## Phases
 
@@ -42,10 +54,10 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 003 | Aspire AppHost infrastructure | Configure Aspire AppHost with service defaults | done |
 | 004 | Contracts and canonical message envelope | Define shared message contracts | done |
 | 005 | Configurable message broker ingestion | Implement broker abstraction with Kafka, NATS JetStream (default), and Pulsar (Key_Shared) providers for message ingestion | done |
-| 006 | Temporal workflow host | Set up Temporal worker and basic workflow definitions | not-started |
+| 006 | Temporal workflow host | Set up Temporal worker and workflow definitions with validation activities | done |
 | 007 | Cassandra storage module | Implement Cassandra repository and data access | not-started |
 | 008 | Ollama AI integration | Integrate Ollama for AI-assisted operations | done |
-| 009 | OpenTelemetry observability | Configure distributed tracing, metrics (Prometheus), isolated observability storage (Loki), OpenClaw web UI with Playwright tests, RagFlow + Ollama in Aspire | done |
+| 009 | OpenTelemetry observability | Configure distributed tracing, metrics (Prometheus), isolated observability storage (Loki), OpenClaw web UI with Playwright tests, RagFlow + Ollama in Aspire, AI.RagFlow client, OpenClaw generation endpoints (POST /api/generate/integration, POST /api/generate/chat), non-common Aspire ports (15xxx range) | done |
 | 010 | Admin API | Build administration API for platform management | not-started |
 | 011 | End-to-end demo pipeline | Wire all components into a working demo pipeline | not-started |
 
@@ -83,7 +95,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-Chunk 006 – Temporal workflow host
+Chunk 007 – Cassandra storage module
 
 ---
 

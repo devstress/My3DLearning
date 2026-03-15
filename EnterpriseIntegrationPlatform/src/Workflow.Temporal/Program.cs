@@ -1,8 +1,10 @@
+using EnterpriseIntegrationPlatform.Workflow.Temporal;
+
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.AddServiceDefaults();
 
-// Temporal worker will be configured in subsequent chunks
+builder.Services.AddTemporalWorkflows(builder.Configuration);
 
 var host = builder.Build();
 host.Run();

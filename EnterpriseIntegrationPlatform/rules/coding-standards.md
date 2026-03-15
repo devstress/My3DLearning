@@ -7,6 +7,20 @@
 - Implicit usings enabled
 - File-scoped namespaces required
 
+## All Code Must Be Production-Ready
+
+All code must satisfy the 11 Quality Pillars defined in `rules/quality-pillars.md`. No exceptions.
+
+- **No pretend code.** Do not create code that looks like it works but does not. Every class must have a real, production-quality implementation with proper error handling, thread safety, logging, and input validation.
+- **No demo or toy code.** Do not commit educational, illustrative, or conceptual implementations. If it cannot run in production under load, it does not belong in this repository.
+- **No hacky code.** Do not use workarounds, shortcuts, or fragile patterns. Use battle-tested libraries (e.g. Polly for retry/circuit-breaker) instead of hand-rolled replacements.
+- **No interface-only projects.** Do not commit an interface without a working implementation in the same project. An interface with no implementation is speculative scaffolding.
+- **No empty interfaces.** Every interface must define at least one method or property.
+- **Every class must have a working implementation.** No stubs, skeletons, or placeholder classes.
+- **No speculative comments.** Do not reference "future", "will be", "TODO", "placeholder", or "subsequent chunks" in code comments. If the code is not implemented, do not commit it.
+- **No symbolic code.** Every file in the repository must compile and provide real functionality.
+- **No stub Program.cs files.** A service project must have real endpoints, middleware, and DI registration — not just a health check.
+
 ## Naming Conventions
 
 - PascalCase for public members, types, namespaces

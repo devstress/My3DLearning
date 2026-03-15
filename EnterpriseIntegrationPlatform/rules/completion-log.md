@@ -4,6 +4,260 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Self-Hosted GraphRAG + Non-Common Aspire Ports
+
+- **Date**: 2026-03-15
+- **Status**: done
+- **Goal**: Add self-hosted GraphRAG system (RagFlow + Ollama) to the Aspire project so developers can ask OpenClaw to generate integrations from any client machine. Change all Aspire container host ports to non-common 15xxx range to avoid conflicts with existing services.
+
+### Files created
+
+- `src/AI.RagFlow/AI.RagFlow.csproj` — Project file
+- `src/AI.RagFlow/IRagFlowService.cs` — Interface for RAG retrieval, chat, dataset listing, health
+- `src/AI.RagFlow/RagFlowService.cs` — Production HTTP client for RagFlow REST API
+- `src/AI.RagFlow/RagFlowOptions.cs` — Configuration (BaseAddress, ApiKey, AssistantId)
+- `src/AI.RagFlow/RagFlowServiceExtensions.cs` — DI registration + health check
+- `src/AI.RagFlow/RagFlowHealthCheck.cs` — Health check for RagFlow availability
+- `tests/UnitTests/RagFlowServiceTests.cs` — 11 unit tests for RagFlow service
+
+### Files modified
+
+- `src/AppHost/Program.cs` — All containers use non-common host ports (15xxx range); RagFlow endpoint passed to OpenClaw
+- `src/OpenClaw.Web/Program.cs` — Register RagFlow service; add generation endpoints (POST /api/generate/integration, POST /api/generate/chat, GET /api/generate/datasets, GET /api/health/ragflow); IntegrationPromptBuilder
+- `src/OpenClaw.Web/OpenClaw.Web.csproj` — Added AI.RagFlow project reference
+- `src/AI.Ollama/OllamaServiceExtensions.cs` — Default port changed to 15434
+- `src/AI.Ollama/OllamaService.cs` — Doc comment updated
+- `src/Workflow.Temporal/TemporalOptions.cs` — Default port changed to 15233
+- `src/Observability/ObservabilityServiceExtensions.cs` — Doc comment updated
+- `src/Observability/LokiObservabilityEventLog.cs` — Doc comment updated
+- `src/Ingestion/BrokerOptions.cs` — Doc comment updated
+- `src/Ingestion.Nats/NatsServiceExtensions.cs` — Doc comment updated
+- `src/OpenClaw.Web/appsettings.Development.json` — Ollama address updated to 15434
+- `rules/architecture-rules.md` — Added principles 8 (Self-Hosted GraphRAG) and 9 (Non-Common Ports)
+- `rules/milestones.md` — Added GraphRAG vision, updated chunk 009 description, non-common ports
+- `rules/quality-pillars.md` — Added GraphRAG to design philosophy
+- `docs/ai-strategy.md` — Added self-hosted GraphRAG section with architecture diagram and port table
+- `docs/operations-runbook.md` — Updated port references
+- `tests/UnitTests/UnitTests.csproj` — Added AI.RagFlow project reference
+- `tests/WorkflowTests/SampleTest.cs` — Updated expected default port to 15233
+
+### Port mapping (15xxx range)
+
+| Service | Host Port | Container Port |
+|---------|-----------|----------------|
+| Ollama | 15434 | 11434 |
+| RagFlow UI | 15080 | 80 |
+| RagFlow API | 15380 | 9380 |
+| Loki | 15100 | 3100 |
+| Temporal gRPC | 15233 | 7233 |
+| Temporal UI | 15280 | 8080 |
+| NATS | 15222 | 4222 |
+
+### Test results
+
+- ContractTests: 29 passed
+- UnitTests: 58 passed (47 existing + 11 new RagFlow tests)
+- WorkflowTests: 20 passed
+- IntegrationTests: 17 passed
+- PlaywrightTests: 13 passed
+- LoadTests: 1 passed
+- **Total: 138 tests, 0 failures**
+
+## Reality Filter Enforcement – Production-Ready Cleanup
+
+- **Date**: 2026-03-15
+- **Status**: done
+- **Goal**: Remove ALL pretend, demo, hacky, and conceptual code from the repository. Enforce rule that every committed file must be production-ready.
+
+### What was removed and why
+
+**Toy EIP pattern implementations** (22 files in Processing.Routing + Processing.Transform):
+Removed ContentBasedRouter, MessageFilter, RecipientList, Splitter, Aggregator, ScatterGather,
+RoutingSlip, DynamicRouter, PipelineBuilder, WireTap, PublishSubscribeChannel, IdempotentReceiver,
+Resequencer, RetryHandler, CircuitBreaker, IMessageRouter, MessageTranslator, ContentEnricher,
+ContentFilter, ClaimCheck, Normalizer, IMessageTransformer. These had race conditions, no thread
+safety, no persistence, no logging, no error handling — in-memory-only conceptual code that would
+fail under any production load. The patterns are correctly scheduled as separate chunks (012-018)
+where they will get proper production implementations using battle-tested libraries.
+
+**PatternDemoTests** (24 files): Tests for the removed toy implementations.
+
+**Interface-only projects** (6 projects with no implementations):
+- Connector.Email, Connector.File, Connector.Http, Connector.Sftp — scheduled for chunks 019-022
+- Storage.Cassandra — scheduled for chunk 007
+- RuleEngine — to be implemented in a dedicated chunk
+
+**Stub Program.cs files** (3 files):
+- Admin.Api, Admin.Web, Gateway.Api — just health-check endpoints with no real functionality. Scheduled for chunk 010.
+
+**BaseActivity** (abstract class): No subclasses anywhere in the codebase.
+
+### Rules updated
+- `rules/reality-filter.md` — added comprehensive "All Code Must Be Production-Ready" section
+- `rules/coding-standards.md` — added same rules (no pretend, no demo, no hacky, no interface-only projects, no stub Program.cs files)
+
+### Files remaining (53 .cs source files) — all verified as production-quality
+- AI.Ollama (4): Real Ollama HTTP client with health checks
+- Activities (3): Real validation and logging services with ILogger
+- AppHost (1): Real Aspire orchestration with pinned container versions
+- Contracts (5): Real message envelope contracts
+- Ingestion (6): Real broker abstractions with Kafka/NATS/Pulsar implementations
+- Ingestion.Kafka (4): Real Confluent.Kafka producer/consumer
+- Ingestion.Nats (3): Real NATS.Net JetStream producer/consumer
+- Ingestion.Pulsar (3): Real DotPulsar producer/consumer
+- Observability (16): Real Loki-backed observability with OpenTelemetry
+- OpenClaw.Web (2): Real web UI with Loki queries and Ollama AI
+- ServiceDefaults (1): Real Aspire service defaults
+- Workflow.Temporal (5): Real Temporalio workflows with typed activities
+
+### Test results after cleanup
+- ContractTests: 29 passed
+- UnitTests: 47 passed
+- WorkflowTests: 20 passed
+- IntegrationTests: 17 passed
+- PlaywrightTests: 13 passed
+- LoadTests: 1 passed
+- **Total: 127 tests, 0 failures**
+
+## Chunk 006 – Temporal workflow host
+
+- **Date**: 2026-03-15
+- **Status**: done
+- **Goal**: Set up Temporal workflow worker, implement all BizTalk and Enterprise Integration Patterns (EIP), create a dedicated test project demonstrating each pattern, and enforce Reality Filter rules (no stubs, no speculative content, no empty interfaces).
+
+### Architecture
+
+```
+Temporal Workflow Host (src/Workflow.Temporal/):
+  TemporalOptions          → configuration: ServerAddress, Namespace, TaskQueue
+  TemporalServiceExtensions → DI registration for Temporal worker
+  IntegrationActivities    → Temporal [Activity] wrappers delegating to Activities services
+  ProcessIntegrationMessageWorkflow → sample workflow: validate → log lifecycle stages
+
+Activities (src/Activities/):
+  IMessageValidationService + DefaultMessageValidationService → payload validation
+  IMessageLoggingService + DefaultMessageLoggingService       → lifecycle stage logging
+
+Aspire AppHost containers:
+  temporal (temporalio/auto-setup:latest) → workflow server with auto namespace setup
+  temporal-ui (temporalio/ui:latest)      → web UI for workflow inspection
+
+Enterprise Integration Patterns (src/Processing.Routing/, src/Processing.Transform/):
+
+  Message Routing:
+    ContentBasedRouter<T>        → routes by message content (BizTalk filter expressions)
+    MessageFilter<T>             → predicate-based message filtering
+    RecipientList<T>             → dynamic multi-destination routing
+    MessageSplitter<T,TItem>     → debatching / composite message splitting
+    CountBasedAggregator<T>      → correlated message aggregation (Convoy pattern)
+    ScatterGather<TReq,TReply>   → parallel scatter + gather results
+    RoutingSlip<T>               → sequential itinerary-based processing
+    DynamicRouter<T>             → runtime-configurable routing rules (BRE)
+    Pipeline<T>                  → Pipes and Filters (BizTalk pipeline stages)
+    InMemoryWireTap<T>           → non-invasive message monitoring
+    PublishSubscribeChannel<T>   → broadcast to multiple subscribers
+    IdempotentReceiver<T>        → at-most-once message processing
+    Resequencer<T>               → reorder out-of-sequence messages
+    RetryHandler                 → exponential back-off retry logic
+    CircuitBreaker               → failure threshold + auto-recovery
+
+  Message Transformation:
+    MessageTranslator<TIn,TOut>  → format conversion (BizTalk Maps)
+    ContentEnricher<T>           → augment with external data
+    ContentFilter<TIn,TOut>      → remove/normalize fields
+    InMemoryClaimCheckStore      → large payload external storage
+    MessageNormalizer<T>         → multi-format → canonical conversion
+
+  Already Implemented (Contracts):
+    IntegrationEnvelope<T>       → Envelope Wrapper + Canonical Data Model
+    FaultEnvelope                → Dead Letter Channel
+    CorrelationId/CausationId    → Correlation Identifier
+    MessagePriority              → Priority-based processing
+    MessageHeaders               → Property Promotion (BizTalk promoted properties)
+    DeliveryStatus               → Message lifecycle states
+```
+
+- **Files created**:
+  - `src/Workflow.Temporal/TemporalOptions.cs` — configuration options (Temporal section)
+  - `src/Workflow.Temporal/TemporalServiceExtensions.cs` — DI registration with Temporalio.Extensions.Hosting
+  - `src/Workflow.Temporal/Activities/IntegrationActivities.cs` — Temporal activity wrappers
+  - `src/Workflow.Temporal/Workflows/ProcessIntegrationMessageWorkflow.cs` — sample validation workflow
+  - `src/Activities/IMessageValidationService.cs` — validation interface + MessageValidationResult
+  - `src/Activities/DefaultMessageValidationService.cs` — JSON validation implementation
+  - `src/Activities/IMessageLoggingService.cs` — logging interface + DefaultMessageLoggingService
+  - `src/Processing.Routing/ContentBasedRouter.cs` — content-based routing
+  - `src/Processing.Routing/MessageFilter.cs` — predicate message filter
+  - `src/Processing.Routing/RecipientList.cs` — dynamic recipient list
+  - `src/Processing.Routing/Splitter.cs` — message splitter / debatcher
+  - `src/Processing.Routing/Aggregator.cs` — count-based message aggregator
+  - `src/Processing.Routing/ScatterGather.cs` — parallel scatter-gather
+  - `src/Processing.Routing/RoutingSlip.cs` — itinerary-based routing slip
+  - `src/Processing.Routing/DynamicRouter.cs` — runtime-configurable router
+  - `src/Processing.Routing/PipelineBuilder.cs` — pipes and filters pipeline
+  - `src/Processing.Routing/WireTap.cs` — non-invasive message monitoring
+  - `src/Processing.Routing/PublishSubscribeChannel.cs` — pub/sub channel
+  - `src/Processing.Routing/IdempotentReceiver.cs` — at-most-once processing
+  - `src/Processing.Routing/Resequencer.cs` — message resequencing
+  - `src/Processing.Routing/RetryHandler.cs` — retry with exponential back-off
+  - `src/Processing.Routing/CircuitBreaker.cs` — circuit breaker pattern
+  - `src/Processing.Transform/MessageTranslator.cs` — format translator
+  - `src/Processing.Transform/ContentEnricher.cs` — content enrichment
+  - `src/Processing.Transform/ContentFilter.cs` — content filtering
+  - `src/Processing.Transform/ClaimCheck.cs` — claim check store
+  - `src/Processing.Transform/Normalizer.cs` — multi-format normalizer
+  - `tests/PatternDemoTests/PatternDemoTests.csproj` — pattern demo test project
+  - `tests/PatternDemoTests/ContentBasedRouterTests.cs` — 3 content-based router demos
+  - `tests/PatternDemoTests/MessageFilterTests.cs` — 3 message filter demos
+  - `tests/PatternDemoTests/RecipientListTests.cs` — 2 recipient list demos
+  - `tests/PatternDemoTests/SplitterTests.cs` — 3 splitter demos
+  - `tests/PatternDemoTests/AggregatorTests.cs` — 2 aggregator demos
+  - `tests/PatternDemoTests/ScatterGatherTests.cs` — 1 scatter-gather demo
+  - `tests/PatternDemoTests/RoutingSlipTests.cs` — 2 routing slip demos
+  - `tests/PatternDemoTests/DynamicRouterTests.cs` — 2 dynamic router demos
+  - `tests/PatternDemoTests/PipelineTests.cs` — 2 pipes and filters demos
+  - `tests/PatternDemoTests/WireTapTests.cs` — 2 wire tap demos
+  - `tests/PatternDemoTests/PublishSubscribeTests.cs` — 2 pub/sub demos
+  - `tests/PatternDemoTests/IdempotentReceiverTests.cs` — 3 idempotent receiver demos
+  - `tests/PatternDemoTests/ResequencerTests.cs` — 1 resequencer demo
+  - `tests/PatternDemoTests/RetryHandlerTests.cs` — 3 retry handler demos
+  - `tests/PatternDemoTests/CircuitBreakerTests.cs` — 4 circuit breaker demos
+  - `tests/PatternDemoTests/MessageTranslatorTests.cs` — 1 translator demo
+  - `tests/PatternDemoTests/ContentEnricherTests.cs` — 1 enricher demo
+  - `tests/PatternDemoTests/ContentFilterTests.cs` — 1 content filter demo
+  - `tests/PatternDemoTests/ClaimCheckTests.cs` — 3 claim check demos
+  - `tests/PatternDemoTests/NormalizerTests.cs` — 2 normalizer demos
+  - `tests/PatternDemoTests/EnvelopeWrapperTests.cs` — 3 envelope wrapper demos
+  - `tests/PatternDemoTests/DeadLetterChannelTests.cs` — 3 dead letter demos
+  - `tests/PatternDemoTests/CorrelationIdentifierTests.cs` — 2 correlation demos
+  - `tests/PatternDemoTests/MessagePriorityTests.cs` — 2 priority demos
+  - `tests/WorkflowTests/SampleTest.cs` → renamed to TemporalOptionsTests (3 tests)
+  - `tests/WorkflowTests/DefaultMessageValidationServiceTests.cs` — 7 validation tests
+  - `tests/WorkflowTests/MessageValidationResultTests.cs` — 3 result tests
+  - `tests/WorkflowTests/IntegrationActivitiesTests.cs` — 3 activity delegation tests
+  - `tests/WorkflowTests/ProcessIntegrationMessageWorkflowTests.cs` — 4 workflow tests (skip when server unavailable)
+- **Files modified**:
+  - `Directory.Packages.props` — added Temporalio 1.11.1, Temporalio.Extensions.Hosting 1.11.1
+  - `src/Workflow.Temporal/Workflow.Temporal.csproj` — added Temporalio, Activities, Contracts refs
+  - `src/Workflow.Temporal/Program.cs` — wired Temporal worker via AddTemporalWorkflows
+  - `src/Activities/Activities.csproj` — added Contracts project reference
+  - `src/AppHost/Program.cs` — added Temporal server + UI containers
+  - `src/Processing.Routing/Processing.Routing.csproj` — added Contracts reference
+  - `src/Processing.Routing/IMessageRouter.cs` — expanded with typed Route<T> method
+  - `src/Processing.Transform/Processing.Transform.csproj` — added Contracts reference
+  - `src/Processing.Transform/IMessageTransformer.cs` — expanded with typed Transform method
+  - `tests/WorkflowTests/WorkflowTests.csproj` — added Temporalio, project references
+  - `EnterpriseIntegrationPlatform.sln` — added PatternDemoTests project
+  - `rules/milestones.md` — chunk 006 → done, next chunk → 007
+- **Test counts**:
+  - WorkflowTests: 20 (was 1 placeholder, +19 new)
+  - PatternDemoTests: 53 (new project)
+  - ContractTests: 29 (unchanged)
+  - UnitTests: 47 (unchanged)
+  - IntegrationTests: 17 (unchanged)
+  - PlaywrightTests: 13 (unchanged)
+  - LoadTests: 1 (unchanged)
+  - **Total: 180 tests, 0 failures, 0 warnings, 0 errors**
+
 ## Chunk 005 – Configurable message broker ingestion
 
 - **Date**: 2026-03-14

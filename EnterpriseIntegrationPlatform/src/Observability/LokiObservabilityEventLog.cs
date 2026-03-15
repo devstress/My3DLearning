@@ -34,7 +34,7 @@ public sealed class LokiObservabilityEventLog : IObservabilityEventLog
     /// </summary>
     /// <param name="httpClient">
     /// An <see cref="HttpClient"/> whose <see cref="HttpClient.BaseAddress"/>
-    /// points to the Loki HTTP API (e.g. <c>http://localhost:3100</c>).
+    /// points to the Loki HTTP API (e.g. <c>http://localhost:15100</c>).
     /// </param>
     /// <param name="logger">Logger instance.</param>
     public LokiObservabilityEventLog(HttpClient httpClient, ILogger<LokiObservabilityEventLog> logger)

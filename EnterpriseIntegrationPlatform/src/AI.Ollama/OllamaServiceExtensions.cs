@@ -8,8 +8,8 @@ namespace EnterpriseIntegrationPlatform.AI.Ollama;
 /// </summary>
 public static class OllamaServiceExtensions
 {
-    /// <summary>Default base address for a local Ollama instance.</summary>
-    public const string DefaultBaseAddress = "http://localhost:11434";
+    /// <summary>Default base address for the Aspire-managed Ollama instance.</summary>
+    public const string DefaultBaseAddress = "http://localhost:15434";
 
     /// <summary>
     /// Registers <see cref="IOllamaService"/> as a singleton backed by
@@ -17,7 +17,7 @@ public static class OllamaServiceExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="baseAddress">
-    /// Base URL of the Ollama API. Defaults to <c>http://localhost:11434</c>.
+    /// Base URL of the Ollama API. Defaults to <c>http://localhost:15434</c>.
     /// </param>
     /// <returns>The same <paramref name="services"/> for chaining.</returns>
     public static IServiceCollection AddOllamaService(
