@@ -10,7 +10,8 @@ namespace EnterpriseIntegrationPlatform.Workflow.Temporal.Activities;
 /// with the Temporal worker and can be invoked from workflow code.
 /// </summary>
 /// <remarks>
-/// Business logic is delegated to services defined in the Activities project
+/// Requires <see cref="IMessageValidationService"/> and <see cref="IMessageLoggingService"/>
+/// to be registered in the DI container. Business logic is delegated to these services
 /// so that it can be tested independently of Temporal infrastructure.
 /// </remarks>
 public sealed class IntegrationActivities
