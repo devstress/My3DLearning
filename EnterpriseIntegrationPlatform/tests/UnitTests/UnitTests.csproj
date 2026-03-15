@@ -18,5 +18,6 @@
     <ProjectReference Include="..\..\src\Ingestion\Ingestion.csproj" />
     <ProjectReference Include="..\..\src\Storage.Cassandra\Storage.Cassandra.csproj" />
     <ProjectReference Include="..\..\src\Admin.Api\Admin.Api.csproj" />
+    <ProjectReference Include="..\..\src\Demo.Pipeline\Demo.Pipeline.csproj" />
   </ItemGroup>
 </Project>
