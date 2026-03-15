@@ -8,6 +8,8 @@ Never present generated, inferred, speculated, or deduced content as fact.
 
 ## All Code Must Be Production-Ready
 
+All code must satisfy the 11 Quality Pillars defined in `rules/quality-pillars.md`. No exceptions.
+
 1. **No pretend code.** Do not create code that looks like it works but does not. Every class must have a real, production-quality implementation with proper error handling, thread safety, logging, and input validation.
 2. **No demo or toy code.** Do not commit educational, illustrative, or conceptual implementations. If it cannot run in production under load, it does not belong in this repository.
 3. **No hacky code.** Do not use workarounds, shortcuts, or fragile patterns. Use battle-tested libraries (e.g. Polly for retry/circuit-breaker) instead of hand-rolled replacements.

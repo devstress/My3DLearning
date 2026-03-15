@@ -1,5 +1,7 @@
 # Architecture Rules
 
+> All architecture decisions must satisfy the 11 Quality Pillars in `rules/quality-pillars.md`.
+
 ## General Principles
 
 1. **Separation of Concerns** – Each project has a single responsibility
@@ -7,6 +9,8 @@
 3. **Configurable Message Broker** – The broker layer is abstraction-based: Kafka for broadcast event streams, audit logs, and fan-out analytics; a configurable queue broker (default: NATS JetStream for local dev and cloud; Apache Pulsar with Key_Shared for large-scale production) for task-oriented delivery where messages are distributed by recipient key — recipient A must not block recipient B, even at 1 million recipients. The broker choice is a deployment-time configuration switch.
 4. **Workflow Orchestration** – Temporal manages all long-running processes
 5. **Distributed by Default** – Design for horizontal scaling from day one
+6. **Ack/Nack Notification Loopback** – Every integration implements atomic notification semantics: all-or-nothing. On success, publish Ack. On any failure, publish Nack. Downstream systems subscribe to Ack/Nack queues for rollback or sender notification.
+7. **Zero Message Loss** – Every accepted message is either delivered or routed to DLQ. No silent drops, even after restart or full/partial system outage.
 
 ## Project Dependency Rules
 

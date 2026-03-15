@@ -43,6 +43,7 @@ The agent must:
 - Generate working, compilable code
 - Follow coding standards in `coding-standards.md`
 - Follow architecture rules in `architecture-rules.md`
+- Satisfy the relevant quality pillars in `quality-pillars.md`
 - Include XML documentation on public APIs
 - Include unit tests for new logic
 
