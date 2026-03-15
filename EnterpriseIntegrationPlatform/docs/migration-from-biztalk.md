@@ -96,13 +96,13 @@ This guide provides a structured approach for migrating integration solutions fr
 - Transformation activities with JSON-based mapping definitions
 - Support for JSON↔XML, CSV, and custom formats
 - Programmatic transformations for complex logic
-- AI-assisted mapping generation from schema pairs
+- RAG-assisted mapping generation from schema pairs (use your own AI provider with platform context)
 
 **Migration Steps:**
 1. Export BizTalk map source and target schemas.
 2. Convert XSD schemas to JSON Schema (where applicable).
 3. Recreate mappings using the platform's transformation definitions.
-4. Use AI code generation to accelerate complex mapping creation.
+4. Use the RAG knowledge API with your preferred AI provider to accelerate complex mapping creation.
 5. Validate with test cases comparing BizTalk output to platform output.
 
 ## Migration Steps
@@ -179,7 +179,7 @@ During migration, BizTalk and the platform run in parallel:
 
 | Challenge                          | Mitigation                                                 |
 |------------------------------------|------------------------------------------------------------|
-| Complex XSLT maps                  | Use AI-assisted mapping; break into smaller transformations|
+| Complex XSLT maps                  | Use RAG context with your AI provider; break into smaller transformations|
 | Custom pipeline components         | Reimplement as activities; most logic maps directly        |
 | BRE rules                          | Convert to platform rule definitions; test thoroughly      |
 | BAM tracking profiles              | Map to OpenTelemetry spans and custom metrics              |

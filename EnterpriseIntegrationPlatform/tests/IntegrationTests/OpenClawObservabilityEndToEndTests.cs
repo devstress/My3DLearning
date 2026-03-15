@@ -18,7 +18,7 @@ namespace EnterpriseIntegrationPlatform.Tests.Integration;
 /// <para>
 /// These tests verify the complete "where is my message?" flow through the
 /// OpenClaw web application — recording lifecycle events, querying via the
-/// REST API, and using AI-powered analysis to confirm message delivery status.
+/// REST API, and using trace analysis to confirm message delivery status.
 /// </para>
 /// <para>
 /// Tests are skipped when Docker is not available.

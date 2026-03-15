@@ -8,7 +8,7 @@
 
 This framework should focus on **few lines of code** — an operator writes a minimal specification and asks AI to auto-generate a complete, production-ready integration.
 
-The platform includes a **self-hosted GraphRAG** system (RagFlow + Ollama) as part of the Aspire project. The repository's own docs, rules, and source code are indexed as the knowledge base. Developers on any client machine can ask OpenClaw to generate new integrations — no cloud AI dependency, all inference runs on-premises.
+The platform includes a **self-hosted GraphRAG** system (RagFlow + Ollama) as part of the Aspire project. The repository's own docs, rules, and source code are indexed as the knowledge base. Ollama provides embeddings and retrieval within RagFlow. Developers on any client machine use their own preferred AI provider (Copilot, Codex, Claude Code) connecting to this self-hosted RAG system — the platform retrieves relevant context, and the developer's AI provider generates the code. All data stays on-premises; no cloud AI dependency.
 
 ### Example Prompt
 
@@ -106,7 +106,7 @@ Every integration must implement atomic notification loopback:
 | Visible architecture | Architecture is explicit in project structure, dependency rules, and documentation. Any developer can understand the system by reading `rules/` and `docs/`. |
 | Modifiability & extensibility | Dependency inversion, abstraction-based design. Adding a new connector or broker provider requires implementing one interface — no core changes. |
 | Backward compatibility | Contract versioning. Schema evolution with backward-compatible changes. API versioning. |
-| Analyzability & debuggability | OpenTelemetry tracing across all boundaries. Structured logging with correlation IDs. OpenClaw AI-powered "where is my message?" diagnostics. |
+| Analyzability & debuggability | OpenTelemetry tracing across all boundaries. Structured logging with correlation IDs. OpenClaw "where is my message?" trace analysis. |
 | CI/CD | GitHub Actions pipeline. Automated build, test, static analysis on every push/PR. Zero-warning enforcement. |
 | Ownership | Clear project ownership. Repository history with conventional commits. Automated commit descriptions. |
 | Development lifecycle | Chunk-based incremental delivery. Each chunk is self-contained, testable, and resumable by any developer or AI agent. |
@@ -160,7 +160,7 @@ Every integration must implement atomic notification loopback:
 |---------|----------|
 | Observability tooling | Logging (Loki), metrics (Prometheus), traces (OpenTelemetry). Standardized across all services. |
 | Monitoring | Health checks, alerts (PagerDuty/OpsGenie integration), visualization (Grafana dashboards). |
-| Internal tools | OpenClaw web UI for message tracing and AI-powered diagnostics. Admin API for configuration management. |
+| Internal tools | OpenClaw web UI for message tracing and knowledge retrieval. Admin API for configuration management. |
 | Incident response | Clear processes, runbooks (`docs/operations-runbook.md`), escalation procedures, and shared knowledge. |
 | DLQ observability | Kafka/NATS/Pulsar DLQ tools with standardized resubmission mechanisms. Reduce operational complexity and learning curves. |
 | Automation rule | **If it takes more than an hour and you'll need to do it more than once, automate it.** |
@@ -181,7 +181,7 @@ Every integration must implement atomic notification loopback:
 | Three pillars of monitoring | **Health Checks** (liveness, readiness, startup), **Alerts** (threshold-based, anomaly detection), **Visualization** (Grafana dashboards, real-time). |
 | Monitoring purpose | Track **known** issues → visualization. Watch for expected failure modes. |
 | Tooling | Prometheus (metrics + data storage) + Grafana (real-time monitoring + dashboards). OpenTelemetry (instrumentation). Loki (log aggregation). |
-| Platform-specific | OpenClaw AI-powered diagnostics. "Where is my message?" natural language queries. Temporal workflow visibility. |
+| Platform-specific | OpenClaw trace analysis. "Where is my message?" natural language queries. Temporal workflow visibility. |
 
 **Chunked delivery:** Observability in chunk 009 (done). Enhanced monitoring in chunks 027 (operational tooling).
 

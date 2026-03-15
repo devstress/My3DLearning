@@ -1,9 +1,10 @@
 namespace EnterpriseIntegrationPlatform.AI.Ollama;
 
 /// <summary>
-/// Interface for AI-assisted operations using Ollama.
-/// Provides methods for natural-language analysis of message state,
-/// integration health, and trace diagnostics.
+/// Interface for Ollama LLM operations.
+/// Ollama powers the self-hosted RAG system (RagFlow) by providing
+/// embedding and retrieval capabilities. It also provides trace analysis
+/// for the OpenClaw "where is my message?" feature.
 /// </summary>
 public interface IOllamaService
 {

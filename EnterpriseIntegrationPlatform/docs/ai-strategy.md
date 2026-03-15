@@ -1,25 +1,28 @@
-# AI Strategy — Ollama Integration
+# AI Strategy — Self-Hosted RAG + External AI Providers
 
 ## Overview
 
-The Enterprise Integration Platform integrates Ollama as a local AI runtime to accelerate development, improve documentation, and assist operations. All AI processing runs on-premises, ensuring that sensitive code and business data never leave the organization's infrastructure.
+The Enterprise Integration Platform integrates a self-hosted RAG (Retrieval-Augmented Generation) system to accelerate development. RagFlow + Ollama index the platform's source code, rules, and documentation as a knowledge base. Ollama provides embeddings and retrieval within RagFlow. Developers use their own preferred AI provider (Copilot, Codex, Claude Code) connecting to the platform's RAG API to retrieve relevant platform context, then use that context to generate production-ready integrations. All data stays on-premises.
 
-## Why Local AI
+## Why Self-Hosted RAG
 
-| Concern               | Cloud AI               | Local AI (Ollama)           |
-|------------------------|------------------------|-----------------------------|
-| Data privacy           | Data sent externally   | Data stays on-premises      |
-| Latency                | Network round-trip     | Local inference, low latency|
-| Cost                   | Per-token billing      | Fixed infrastructure cost   |
-| Availability           | Internet dependency    | Fully offline capable       |
-| Customization          | Limited fine-tuning    | Full model control          |
+| Concern               | Cloud AI               | Self-Hosted RAG (RagFlow + Ollama) |
+|------------------------|------------------------|------------------------------------|
+| Data privacy           | Data sent externally   | Data stays on-premises             |
+| Latency                | Network round-trip     | Local retrieval, low latency       |
+| Cost                   | Per-token billing      | Fixed infrastructure cost          |
+| Availability           | Internet dependency    | Fully offline capable              |
+| Customization          | Limited fine-tuning    | Full model and index control       |
 
 ## Ollama Runtime
 
-Ollama runs as a local HTTP service providing LLM inference. The AI provider is configurable — Ollama is the default for on-premises deployment, but the platform supports switching to other AI providers (e.g., Azure OpenAI, AWS Bedrock, or self-hosted alternatives) via the AI service configuration:
+Ollama runs as a local HTTP service providing LLM inference to power the RagFlow knowledge base:
+- **Embedding and retrieval** — Ollama generates embeddings for the indexed knowledge base so that RagFlow can perform similarity search and return relevant platform context.
+
+Ollama is **not** used for code generation or integration generation. Developers use their own preferred AI provider (e.g., GitHub Copilot, OpenAI Codex, Claude Code) for code generation, connecting to the self-hosted RAG API to retrieve relevant platform context.
 
 - **Endpoint:** `http://localhost:15434` (Aspire host port; container-internal port 11434)
-- **Models:** Code-focused models (e.g., CodeLlama, DeepSeek Coder, StarCoder)
+- **Models:** Embedding models for RAG retrieval and similarity search
 - **API:** REST API for generation, chat, and embeddings
 - **Resource Requirements:** 8–16 GB RAM for 7B–13B parameter models; GPU acceleration recommended
 
@@ -44,7 +47,7 @@ The AI system indexes the platform's source code and documentation to provide co
 
 ## Self-Hosted GraphRAG
 
-The platform includes a self-hosted RAG (Retrieval-Augmented Generation) system that indexes the repository's own documentation, rules, and source code. This enables any developer on any client machine to generate production-ready integrations without relying on cloud AI services.
+The platform includes a self-hosted RAG (Retrieval-Augmented Generation) system that indexes the repository's own documentation, rules, and source code. Ollama provides embeddings and retrieval within RagFlow. Developers on any client machine use their own preferred AI provider (Copilot, Codex, Claude Code) connecting to this self-hosted RAG system — the platform retrieves relevant context, and the developer's AI provider generates production-ready integrations.
 
 ### Architecture
 
@@ -54,10 +57,10 @@ The platform includes a self-hosted RAG (Retrieval-Augmented Generation) system 
 │                                                             │
 │  ┌──────────┐     ┌──────────────┐     ┌────────────────┐  │
 │  │ OpenClaw │────▶│   RagFlow    │────▶│    Ollama      │  │
-│  │ Web UI   │     │ (RAG Engine) │     │ (LLM Inference)│  │
-│  │ :openclaw│     │ :15080/:15380│     │    :15434      │  │
-│  └──────────┘     └──────┬───────┘     └────────────────┘  │
-│       │                  │                                  │
+│  │ Web UI   │     │ (RAG Engine) │     │ (Embeddings +  │  │
+│  │ :openclaw│     │ :15080/:15380│     │  Retrieval)    │  │
+│  └──────────┘     └──────┬───────┘     │    :15434      │  │
+│       │                  │             └────────────────┘  │
 │       │           ┌──────┴───────┐                          │
 │       │           │  Knowledge   │                          │
 │       │           │    Base      │                          │
@@ -66,25 +69,35 @@ The platform includes a self-hosted RAG (Retrieval-Augmented Generation) system 
 │       │           └──────────────┘                          │
 │       │                                                     │
 │       ▼                                                     │
-│  POST /api/generate/integration                             │
-│  POST /api/generate/chat                                    │
-│  GET  /api/generate/datasets                                │
-└─────────────────────────────────────────────────────────────┘
+│  POST /api/generate/integration ── context retrieval        │
+│  POST /api/generate/chat        ── RAG-based chat           │
+│  GET  /api/generate/datasets    ── list knowledge bases     │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         │  Developer's AI provider connects
+                         │  to RAG endpoints for context
+                         ▼
+              ┌──────────────────────┐
+              │ External AI Provider │
+              │ (Copilot / Codex /   │
+              │  Claude Code / etc.) │
+              └──────────────────────┘
 ```
 
 ### How It Works
 
-1. **Index the repo** — Upload `docs/`, `rules/`, and `src/` to RagFlow via its UI (http://localhost:15080). RagFlow chunks, embeds, and stores the content automatically.
+1. **Index the repo** — Upload `docs/`, `rules/`, and `src/` to RagFlow via its UI (http://localhost:15080). RagFlow chunks, embeds (via Ollama), and stores the content automatically.
 2. **Create an assistant** — In RagFlow UI, create a chat assistant linked to the platform datasets. Note the assistant ID.
 3. **Configure OpenClaw** — Set `RagFlow:AssistantId` in configuration (user secrets or environment variable).
-4. **Generate integrations** — Call `POST /api/generate/integration` with a natural-language description. OpenClaw retrieves relevant context from RagFlow and generates code via Ollama.
+4. **Retrieve context** — Call `POST /api/generate/integration` with a natural-language description. OpenClaw retrieves relevant context from RagFlow's knowledge base.
+5. **Generate code with your AI provider** — Use the retrieved context with your preferred AI provider (Copilot, Codex, Claude Code) to generate production-ready integration code following platform conventions.
 
-### OpenClaw Generation Endpoints
+### OpenClaw RAG Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/generate/integration` | POST | Generate integration code from a natural-language description. Uses RagFlow for context + Ollama for generation. |
-| `/api/generate/chat` | POST | Multi-turn chat with the platform knowledge base. RagFlow handles retrieval + LLM generation. |
+| `/api/generate/integration` | POST | Retrieve relevant platform context from RagFlow for a natural-language integration description. Developers use the returned context with their own AI provider for code generation. |
+| `/api/generate/chat` | POST | Multi-turn chat with the platform knowledge base. RagFlow handles retrieval + response generation. |
 | `/api/generate/datasets` | GET | List available RagFlow knowledge base datasets. |
 | `/api/health/ragflow` | GET | Check RagFlow service availability. |
 
@@ -103,6 +116,8 @@ All containers use non-common host ports in the 15xxx range to avoid conflicts:
 | NATS | 15222 | 4222 | Message broker |
 
 ## Code Generation Capabilities
+
+The following describes what developers can generate using their own AI provider (Copilot, Codex, Claude Code) with context retrieved from the self-hosted RAG system.
 
 ### Connector Generation
 
@@ -243,30 +258,41 @@ AI Generation → Syntax Check → Compilation → Static Analysis → Unit Test
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                  AI Service                      │
+│              Self-Hosted RAG System              │
 │                                                  │
 │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
-│  │ Prompt   │  │ Context  │  │ Validation   │  │
-│  │ Builder  │──│ Retriever│──│ Pipeline     │  │
-│  └──────────┘  └──────────┘  └──────────────┘  │
-│       │              │               │           │
-│       ▼              ▼               ▼           │
+│  │ RagFlow  │  │ Ollama   │  │ Knowledge    │  │
+│  │ (RAG     │──│ (Embed + │  │ Base         │  │
+│  │ Engine)  │  │ Retrieve)│  │ docs/rules/  │  │
+│  └──────────┘  └──────────┘  │ src/         │  │
+│       │                      └──────────────┘  │
+│       │                                         │
 │  ┌──────────────────────────────────────────┐   │
-│  │           Ollama HTTP Client             │   │
+│  │       OpenClaw RAG API Endpoints         │   │
+│  │  POST /api/generate/integration          │   │
+│  │  POST /api/generate/chat                 │   │
 │  └──────────────────────────────────────────┘   │
 └─────────────────────┬───────────────────────────┘
                       │
+                      │  Context retrieval
                       ▼
-              ┌──────────────┐
-              │ Ollama Server│
-              │ (localhost)  │
-              └──────────────┘
+          ┌──────────────────────┐
+          │ Developer's AI       │
+          │ Provider (Copilot /  │
+          │ Codex / Claude Code) │
+          └──────────┬───────────┘
+                     │
+                     ▼
+          ┌──────────────────────┐
+          │ Production-ready     │
+          │ integration code     │
+          └──────────────────────┘
 ```
 
 ## Limitations and Guardrails
 
 - **No production execution** — AI-generated code is never executed in production without human review.
-- **No secret handling** — AI prompts never include credentials, connection strings, or sensitive data.
-- **Model limitations** — Local models may produce lower quality output than large cloud models; validation pipeline catches errors.
-- **Hallucination risk** — Generated code may reference non-existent APIs; compilation and testing catch these issues.
+- **No secret handling** — RAG retrieval never includes credentials, connection strings, or sensitive data.
+- **Retrieval quality** — Local embedding models may produce lower quality retrieval than large cloud models; developers should verify returned context is relevant.
 - **Context window** — Limited context window size requires careful chunking and retrieval strategies.
+- **External AI dependency** — Code generation quality depends on the developer's chosen AI provider; the platform only provides context.

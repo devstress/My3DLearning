@@ -99,7 +99,7 @@ Operations and support personnel who manage and monitor the platform.
 - Durable workflow orchestration for multi-step processing
 - Reliable delivery to target systems with retry and compensation
 - Full observability with distributed tracing and metrics
-- AI-assisted connector and workflow generation
+- RAG-powered knowledge retrieval for integration development
 
 ## External Dependencies
 
@@ -137,11 +137,11 @@ Cassandra stores message payloads, deduplication keys, workflow metadata, and au
 
 ### Ollama
 
-**Role:** Local AI inference runtime
+**Role:** Local AI runtime for RAG retrieval within RagFlow
 
-Ollama runs large language models locally for code generation, documentation summarization, and development assistance. It indexes platform source code and documentation.
+Ollama provides embedding models that power RagFlow's knowledge base retrieval. The platform's docs, rules, and source code are indexed via RagFlow, and Ollama generates the embeddings for similarity search. Developers use their own preferred AI provider (Copilot, Codex, Claude Code) for code generation, connecting to the self-hosted RAG API for platform context.
 
-**Dependency Type:** Optional — the platform operates fully without Ollama. AI features degrade gracefully when unavailable.
+**Dependency Type:** Optional — the platform operates fully without Ollama. RAG retrieval features degrade gracefully when unavailable.
 
 ## Communication Protocols
 

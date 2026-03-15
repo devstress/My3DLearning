@@ -28,7 +28,7 @@ The Enterprise Integration Platform is a workflow-orchestrated integration syste
 │  ▼                                                                      │
 │  ┌──────────────┐    ┌──────────────────┐    ┌────────────────────────┐ │
 │  │  Cassandra   │    │  OpenTelemetry   │    │   Ollama AI Runtime   │ │
-│  │  (Storage)   │    │  (Observability) │    │   (Code Generation)   │ │
+│  │  (Storage)   │    │  (Observability) │    │   (RAG Retrieval)     │ │
 │  └──────────────┘    └──────────────────┘    └────────────────────────┘ │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -43,10 +43,10 @@ The Enterprise Integration Platform is a workflow-orchestrated integration syste
 │  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  ┌────────┐ │
 │  │ Ingress.API │  │ Admin.API   │  │ Worker.Svc │  │ AI.Svc │ │
 │  │             │  │             │  │            │  │        │ │
-│  │ • HTTP Recv │  │ • Routes    │  │ • Temporal │  │ • Code │ │
-│  │ • SFTP Poll │  │ • Tenants   │  │   Workers  │  │   Gen  │ │
-│  │ • Email Mon │  │ • Config    │  │ • Broker   │  │ • Docs │ │
-│  │ • File Watch│  │ • Monitor   │  │   Consumer │  │   Gen  │ │
+│  │ • HTTP Recv │  │ • Routes    │  │ • Temporal │  │ • RAG  │ │
+│  │ • SFTP Poll │  │ • Tenants   │  │   Workers  │  │  Retrv │ │
+│  │ • Email Mon │  │ • Config    │  │ • Broker   │  │ • Know │ │
+│  │ • File Watch│  │ • Monitor   │  │   Consumer │  │  ledge │ │
 │  └──────┬──────┘  └──────┬──────┘  └─────┬──────┘  └───┬────┘ │
 │         │                │               │              │      │
 │         ▼                ▼               ▼              ▼      │
@@ -96,9 +96,9 @@ Apache Cassandra provides the distributed, highly-available storage layer. It st
 
 OpenTelemetry is embedded in every layer, providing distributed tracing that follows a message from ingress through the message broker, Temporal workflows, activities, and connector delivery. Structured logs are correlated with trace and span IDs. Metrics cover throughput, latency percentiles, error rates, and resource utilization.
 
-### AI Runtime (Ollama)
+### AI Runtime (Ollama + RagFlow)
 
-Ollama runs locally to provide AI-powered code generation. It indexes the platform's source code, documentation, and rules to generate new connectors, workflow definitions, transformation logic, and documentation summaries — accelerating development while keeping all data on-premises.
+Ollama runs locally to power the self-hosted RAG (Retrieval-Augmented Generation) system. It provides embedding models used by RagFlow to index and retrieve content from the platform's source code, documentation, and rules. Developers use their own preferred AI provider (Copilot, Codex, Claude Code) connecting to the RAG API to get relevant platform context, then use that context to generate integrations. All data stays on-premises — no data leaves the infrastructure.
 
 ## Data Flow Summary
 
