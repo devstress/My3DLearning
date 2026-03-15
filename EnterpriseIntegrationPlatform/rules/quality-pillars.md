@@ -8,7 +8,7 @@
 
 This framework should focus on **few lines of code** — an operator writes a minimal specification and asks AI to auto-generate a complete, production-ready integration.
 
-The platform includes a **self-hosted GraphRAG** system (RagFlow + Ollama) as part of the Aspire project. The repository's own docs, rules, and source code are indexed as the knowledge base. Developers on any client machine can ask OpenClaw to generate new integrations — no cloud AI dependency, all inference runs on-premises.
+The platform includes a **self-hosted GraphRAG** system (RagFlow + Ollama) as part of the Aspire project. The repository's own docs, rules, and source code are indexed as the knowledge base. Ollama provides embeddings and retrieval within RagFlow. Developers on any client machine use their own preferred AI provider (Copilot, Codex, Claude Code) connecting to this self-hosted RAG system — the platform retrieves relevant context, and the developer's AI provider generates the code. All data stays on-premises; no cloud AI dependency.
 
 ### Example Prompt
 

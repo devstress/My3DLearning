@@ -34,7 +34,7 @@ A modern, AI-driven enterprise integration platform built on .NET 10, replacing 
 │  ▼                                                                      │
 │  ┌──────────────┐    ┌──────────────────┐    ┌────────────────────────┐ │
 │  │  Cassandra   │    │  OpenTelemetry   │    │   Ollama AI Runtime   │ │
-│  │  (Storage)   │    │  (Observability) │    │   (Code Generation)   │ │
+│  │  (Storage)   │    │  (Observability) │    │   (RAG + Diagnostics) │ │
 │  └──────────────┘    └──────────────────┘    └────────────────────────┘ │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -126,7 +126,7 @@ EnterpriseIntegrationPlatform/
 | Workflow engine | Temporal over Durable Functions | Portable, language-agnostic, mature saga/compensation support |
 | Broker strategy | Kafka + NATS/Pulsar | Kafka for streaming; NATS/Pulsar for task delivery without head-of-line blocking |
 | Observability store | Grafana Loki | LogQL queries, lightweight, pairs with OpenTelemetry |
-| AI provider | Ollama (configurable) | On-premises inference, no data leaves the network |
+| AI provider | Self-hosted RAG (RagFlow + Ollama) | Context retrieval on-premises; developers use their own AI provider (Copilot, Codex, Claude Code) for code generation |
 
 See [`docs/adr/`](docs/adr/) for full Architecture Decision Records.
 

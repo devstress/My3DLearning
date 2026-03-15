@@ -137,9 +137,9 @@ Cassandra stores message payloads, deduplication keys, workflow metadata, and au
 
 ### Ollama
 
-**Role:** Local AI inference runtime
+**Role:** Local AI runtime for RAG retrieval and operational diagnostics
 
-Ollama runs large language models locally for code generation, documentation summarization, and development assistance. It indexes platform source code and documentation.
+Ollama provides embedding models for RagFlow's knowledge base retrieval and powers AI-assisted operational diagnostics in the OpenClaw web UI. Developers use their own preferred AI provider (Copilot, Codex, Claude Code) for code generation, connecting to the self-hosted RAG system for context.
 
 **Dependency Type:** Optional — the platform operates fully without Ollama. AI features degrade gracefully when unavailable.
 

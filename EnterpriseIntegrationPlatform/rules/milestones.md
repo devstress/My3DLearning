@@ -24,7 +24,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 **11 Quality Pillars** — All design and implementation decisions are guided by the 11 architectural quality pillars defined in `rules/quality-pillars.md`: Reliability, Security, Scalability, Maintainability, Availability, Resilience, Supportability, Observability, Operational Excellence, Testability, Performance.
 
-**Self-Hosted GraphRAG** — The platform includes a self-hosted RAG system (RagFlow + Ollama) running as Aspire containers. The repository's docs, rules, and source code are indexed as the knowledge base. Developers on any client machine can ask OpenClaw to generate new integrations — RagFlow retrieves relevant context and Ollama generates production-ready code. All inference runs on-premises; no data leaves the infrastructure.
+**Self-Hosted GraphRAG** — The platform includes a self-hosted RAG system (RagFlow + Ollama) running as Aspire containers. The repository's docs, rules, and source code are indexed as the knowledge base. Ollama provides embeddings and retrieval within RagFlow. Developers on any client machine use their own preferred AI provider (Copilot, Codex, Claude Code) connecting to this self-hosted RAG system — the platform retrieves relevant context, and the developer's AI provider generates production-ready code. All data stays on-premises; no data leaves the infrastructure.
 
 ## Architecture Decisions
 
@@ -36,8 +36,8 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
   - The broker choice between Kafka and the queue broker is a deployment-time configuration switch per message flow category.
 - Use Cassandra for scalable distributed persistence
 - Use Aspire AppHost to orchestrate the platform locally
-- Integrate Ollama for AI-assisted development and autonomous code generation
-- Self-hosted GraphRAG via RagFlow + Ollama — index docs, rules, and source code; OpenClaw generates integrations from any client machine
+- Integrate Ollama for AI-assisted diagnostics; self-hosted RAG via RagFlow + Ollama for context retrieval
+- Self-hosted GraphRAG via RagFlow + Ollama — index docs, rules, and source code; developers connect their own AI provider to retrieve context from any client machine
 - OpenTelemetry for end-to-end observability
 - Saga-based distributed transactions via Temporal
 - Target .NET 10 (C# 14) with .NET Aspire 13.1.2

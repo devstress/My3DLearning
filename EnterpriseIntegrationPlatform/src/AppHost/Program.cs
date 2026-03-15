@@ -2,7 +2,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 // ── AI Infrastructure ─────────────────────────────────────────────────────────
 // Ollama provides local LLM inference for AI-assisted observability (OpenClaw)
-// and RAG-based document retrieval (RagFlow).
+// and embedding/retrieval within RagFlow. Developers use their own AI provider
+// (Copilot, Codex, Claude Code) for code generation.
 // Host port 15434 avoids conflict with any existing Ollama instance on 11434.
 var ollama = builder.AddContainer("ollama", "ollama/ollama")
     .WithHttpEndpoint(port: 15434, targetPort: 11434, name: "ollama-api")
@@ -11,9 +12,9 @@ var ollama = builder.AddContainer("ollama", "ollama/ollama")
 
 // RagFlow provides RAG (Retrieval-Augmented Generation) for chunking and
 // querying integration framework documentation via Ollama.
-// Users can ask OpenClaw to generate integrations — RagFlow retrieves
-// relevant context from the platform's indexed docs, rules, and source code,
-// and Ollama generates the integration code.
+// Users can ask OpenClaw to retrieve relevant context from the platform's
+// indexed docs, rules, and source code. Developers then use their own
+// preferred AI provider (Copilot, Codex, Claude Code) for code generation.
 // Host ports 15080 (UI) and 15380 (API) avoid conflicts with common ports.
 var ragflow = builder.AddContainer("ragflow", "infiniflow/ragflow", "v0.16.0-slim")
     .WithHttpEndpoint(port: 15080, targetPort: 80, name: "ragflow-ui")
@@ -74,8 +75,10 @@ var ingestionKafka = builder.AddProject<Projects.Ingestion_Kafka>("ingestion-kaf
 
 var workflowTemporal = builder.AddProject<Projects.Workflow_Temporal>("workflow-temporal");
 
-// OpenClaw – the observability + code generation web UI – talks to Ollama for
-// AI-powered diagnostics and RagFlow for RAG-based integration generation.
+// OpenClaw – the observability + context retrieval web UI – talks to Ollama for
+// AI-powered diagnostics and RagFlow for RAG-based context retrieval.
+// Developers connect their own AI provider (Copilot, Codex, Claude Code)
+// to the RAG endpoints for integration code generation.
 // Loki provides real storage for all event logs, traces, status, and metadata.
 var openClaw = builder.AddProject<Projects.OpenClaw_Web>("openclaw")
     .WithExternalHttpEndpoints()
