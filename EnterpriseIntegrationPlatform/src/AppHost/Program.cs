@@ -30,12 +30,12 @@ var loki = builder.AddContainer("loki", "grafana/loki", "3.4.2")
 // ── Workflow Orchestration ────────────────────────────────────────────────────
 // Temporal provides durable, fault-tolerant workflow orchestration.
 // The auto-setup image creates the default namespace on first start.
-var temporal = builder.AddContainer("temporal", "temporalio/auto-setup", "latest")
+var temporal = builder.AddContainer("temporal", "temporalio/auto-setup", "1.29.4")
     .WithEndpoint(targetPort: 7233, name: "temporal-grpc", scheme: "http")
     .WithLifetime(ContainerLifetime.Persistent);
 
 // Temporal Web UI for inspecting workflows, activities, and task queues.
-var temporalUi = builder.AddContainer("temporal-ui", "temporalio/ui", "latest")
+var temporalUi = builder.AddContainer("temporal-ui", "temporalio/ui", "2.47.3")
     .WithHttpEndpoint(targetPort: 8080, name: "temporal-ui-http")
     .WithEnvironment("TEMPORAL_ADDRESS", "temporal:7233")
     .WithLifetime(ContainerLifetime.Persistent);
