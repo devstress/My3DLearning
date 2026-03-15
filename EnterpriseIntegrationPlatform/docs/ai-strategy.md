@@ -39,8 +39,68 @@ The AI system indexes the platform's source code and documentation to provide co
 
 1. **Chunking** — Source files are split into semantic chunks (functions, classes, sections).
 2. **Embedding** — Each chunk is converted to a vector embedding using Ollama's embedding model.
-3. **Storage** — Embeddings are stored in a local vector index for similarity search.
+3. **Storage** — Embeddings are stored in RagFlow's internal vector index (Milvus-based) for similarity search.
 4. **Retrieval** — When generating code, relevant chunks are retrieved and included as context.
+
+## Self-Hosted GraphRAG
+
+The platform includes a self-hosted RAG (Retrieval-Augmented Generation) system that indexes the repository's own documentation, rules, and source code. This enables any developer on any client machine to generate production-ready integrations without relying on cloud AI services.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Aspire AppHost                            │
+│                                                             │
+│  ┌──────────┐     ┌──────────────┐     ┌────────────────┐  │
+│  │ OpenClaw │────▶│   RagFlow    │────▶│    Ollama      │  │
+│  │ Web UI   │     │ (RAG Engine) │     │ (LLM Inference)│  │
+│  │ :openclaw│     │ :15080/:15380│     │    :15434      │  │
+│  └──────────┘     └──────┬───────┘     └────────────────┘  │
+│       │                  │                                  │
+│       │           ┌──────┴───────┐                          │
+│       │           │  Knowledge   │                          │
+│       │           │    Base      │                          │
+│       │           │ docs/ rules/ │                          │
+│       │           │    src/      │                          │
+│       │           └──────────────┘                          │
+│       │                                                     │
+│       ▼                                                     │
+│  POST /api/generate/integration                             │
+│  POST /api/generate/chat                                    │
+│  GET  /api/generate/datasets                                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### How It Works
+
+1. **Index the repo** — Upload `docs/`, `rules/`, and `src/` to RagFlow via its UI (http://localhost:15080). RagFlow chunks, embeds, and stores the content automatically.
+2. **Create an assistant** — In RagFlow UI, create a chat assistant linked to the platform datasets. Note the assistant ID.
+3. **Configure OpenClaw** — Set `RagFlow:AssistantId` in configuration (user secrets or environment variable).
+4. **Generate integrations** — Call `POST /api/generate/integration` with a natural-language description. OpenClaw retrieves relevant context from RagFlow and generates code via Ollama.
+
+### OpenClaw Generation Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/generate/integration` | POST | Generate integration code from a natural-language description. Uses RagFlow for context + Ollama for generation. |
+| `/api/generate/chat` | POST | Multi-turn chat with the platform knowledge base. RagFlow handles retrieval + LLM generation. |
+| `/api/generate/datasets` | GET | List available RagFlow knowledge base datasets. |
+| `/api/health/ragflow` | GET | Check RagFlow service availability. |
+
+### Aspire Port Assignments
+
+All containers use non-common host ports in the 15xxx range to avoid conflicts:
+
+| Service | Host Port | Container Port | Purpose |
+|---------|-----------|----------------|---------|
+| Ollama | 15434 | 11434 | LLM inference |
+| RagFlow UI | 15080 | 80 | Knowledge base management |
+| RagFlow API | 15380 | 9380 | RAG retrieval and chat |
+| Loki | 15100 | 3100 | Observability log storage |
+| Temporal gRPC | 15233 | 7233 | Workflow orchestration |
+| Temporal UI | 15280 | 8080 | Workflow inspection |
+| NATS | 15222 | 4222 | Message broker |
 
 ## Code Generation Capabilities
 

@@ -4,6 +4,65 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Self-Hosted GraphRAG + Non-Common Aspire Ports
+
+- **Date**: 2026-03-15
+- **Status**: done
+- **Goal**: Add self-hosted GraphRAG system (RagFlow + Ollama) to the Aspire project so developers can ask OpenClaw to generate integrations from any client machine. Change all Aspire container host ports to non-common 15xxx range to avoid conflicts with existing services.
+
+### Files created
+
+- `src/AI.RagFlow/AI.RagFlow.csproj` — Project file
+- `src/AI.RagFlow/IRagFlowService.cs` — Interface for RAG retrieval, chat, dataset listing, health
+- `src/AI.RagFlow/RagFlowService.cs` — Production HTTP client for RagFlow REST API
+- `src/AI.RagFlow/RagFlowOptions.cs` — Configuration (BaseAddress, ApiKey, AssistantId)
+- `src/AI.RagFlow/RagFlowServiceExtensions.cs` — DI registration + health check
+- `src/AI.RagFlow/RagFlowHealthCheck.cs` — Health check for RagFlow availability
+- `tests/UnitTests/RagFlowServiceTests.cs` — 11 unit tests for RagFlow service
+
+### Files modified
+
+- `src/AppHost/Program.cs` — All containers use non-common host ports (15xxx range); RagFlow endpoint passed to OpenClaw
+- `src/OpenClaw.Web/Program.cs` — Register RagFlow service; add generation endpoints (POST /api/generate/integration, POST /api/generate/chat, GET /api/generate/datasets, GET /api/health/ragflow); IntegrationPromptBuilder
+- `src/OpenClaw.Web/OpenClaw.Web.csproj` — Added AI.RagFlow project reference
+- `src/AI.Ollama/OllamaServiceExtensions.cs` — Default port changed to 15434
+- `src/AI.Ollama/OllamaService.cs` — Doc comment updated
+- `src/Workflow.Temporal/TemporalOptions.cs` — Default port changed to 15233
+- `src/Observability/ObservabilityServiceExtensions.cs` — Doc comment updated
+- `src/Observability/LokiObservabilityEventLog.cs` — Doc comment updated
+- `src/Ingestion/BrokerOptions.cs` — Doc comment updated
+- `src/Ingestion.Nats/NatsServiceExtensions.cs` — Doc comment updated
+- `src/OpenClaw.Web/appsettings.Development.json` — Ollama address updated to 15434
+- `rules/architecture-rules.md` — Added principles 8 (Self-Hosted GraphRAG) and 9 (Non-Common Ports)
+- `rules/milestones.md` — Added GraphRAG vision, updated chunk 009 description, non-common ports
+- `rules/quality-pillars.md` — Added GraphRAG to design philosophy
+- `docs/ai-strategy.md` — Added self-hosted GraphRAG section with architecture diagram and port table
+- `docs/operations-runbook.md` — Updated port references
+- `tests/UnitTests/UnitTests.csproj` — Added AI.RagFlow project reference
+- `tests/WorkflowTests/SampleTest.cs` — Updated expected default port to 15233
+
+### Port mapping (15xxx range)
+
+| Service | Host Port | Container Port |
+|---------|-----------|----------------|
+| Ollama | 15434 | 11434 |
+| RagFlow UI | 15080 | 80 |
+| RagFlow API | 15380 | 9380 |
+| Loki | 15100 | 3100 |
+| Temporal gRPC | 15233 | 7233 |
+| Temporal UI | 15280 | 8080 |
+| NATS | 15222 | 4222 |
+
+### Test results
+
+- ContractTests: 29 passed
+- UnitTests: 58 passed (47 existing + 11 new RagFlow tests)
+- WorkflowTests: 20 passed
+- IntegrationTests: 17 passed
+- PlaywrightTests: 13 passed
+- LoadTests: 1 passed
+- **Total: 138 tests, 0 failures**
+
 ## Reality Filter Enforcement – Production-Ready Cleanup
 
 - **Date**: 2026-03-15

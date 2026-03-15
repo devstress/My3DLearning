@@ -11,6 +11,8 @@
 5. **Distributed by Default** – Design for horizontal scaling from day one
 6. **Ack/Nack Notification Loopback** – Every integration implements atomic notification semantics: all-or-nothing. On success, publish Ack. On any failure, publish Nack. Downstream systems subscribe to Ack/Nack queues for rollback or sender notification.
 7. **Zero Message Loss** – Every accepted message is either delivered or routed to DLQ. No silent drops, even after restart or full/partial system outage.
+8. **Self-Hosted GraphRAG** – The platform includes a self-hosted RAG (Retrieval-Augmented Generation) system via RagFlow + Ollama, both running as Aspire containers. The repository's own docs, rules, and source code are indexed as the knowledge base. Any developer on any client machine can ask OpenClaw to generate a new integration — RagFlow retrieves relevant platform context and Ollama generates production-ready code following platform conventions. No data leaves the infrastructure.
+9. **Non-Common Ports** – All Aspire container host ports use the 15xxx range (Ollama 15434, RagFlow 15080/15380, Loki 15100, Temporal 15233/15280, NATS 15222) to avoid conflicts with existing services.
 
 ## Project Dependency Rules
 
@@ -24,6 +26,7 @@
 - `Processing.*` projects depend on `Contracts`
 - `Connector.*` projects depend on `Contracts`
 - `AI.Ollama` depends on `Contracts`
+- `AI.RagFlow` has ZERO project dependencies (standalone RAG client)
 - `RuleEngine` depends on `Contracts`
 - `Admin.Api` depends on `Contracts`
 - `AppHost` references all service projects for orchestration
