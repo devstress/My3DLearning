@@ -4,7 +4,72 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
-## Chunk 012 – Content-Based Router
+## Chunk 013 – Message Translator
+
+- **Date**: 2026-03-15
+- **Status**: done
+- **Goal**: Implement the Message Translator EIP pattern in a new `Processing.Translator` project, advancing Quality Pillars 1 (Reliability — causation chain preserved), 4 (Maintainability — composable transform abstraction), and 10 (Testability — pure unit-testable transform logic).
+
+### Architecture
+
+The Message Translator is a standalone class library (`Processing.Translator`) that transforms `IntegrationEnvelope<TIn>` messages into `IntegrationEnvelope<TOut>` using a pluggable `IPayloadTransform<TIn, TOut>` and publishes the translated envelope to a configured target topic via `IMessageBrokerProducer`.
+
+**Translation flow:**
+1. The `MessageTranslator<TIn, TOut>` receives a source envelope and validates the `TargetTopic` configuration.
+2. The injected `IPayloadTransform<TIn, TOut>` performs the domain-specific payload transformation.
+3. A new envelope is created, preserving `CorrelationId`, `Priority`, `SchemaVersion`, and `Metadata` from the source. `CausationId` is set to `source.MessageId` to maintain the full causation chain.
+4. `MessageType` and `Source` on the translated envelope are overridden when `TranslatorOptions.TargetMessageType` / `TargetSource` are configured; otherwise they are inherited from the source.
+5. The translated envelope is published to `TranslatorOptions.TargetTopic` via `IMessageBrokerProducer`.
+6. A `TranslationResult<TOut>` record is returned containing the translated envelope, source message ID, and target topic for observability and downstream use.
+
+**Provided `IPayloadTransform<TIn, TOut>` implementations:**
+- `FuncPayloadTransform<TIn, TOut>` — Wraps a caller-supplied `Func<TIn, TOut>` delegate. Use for inline or lambda-based transformations.
+- `JsonFieldMappingTransform` — Maps fields from a source `JsonElement` to a new `JsonElement` using a list of `FieldMapping` records from `TranslatorOptions.FieldMappings`. Supports dot-separated source and target paths (nested objects created automatically), static value injection, and graceful handling of missing source fields (key omitted from target).
+
+**`TranslatorOptions`** (bound from `MessageTranslator` configuration section):
+- `TargetTopic` — Required. Topic to publish the translated envelope to.
+- `TargetMessageType` — Optional. Overrides the translated envelope's `MessageType`; when absent, the source `MessageType` is preserved.
+- `TargetSource` — Optional. Overrides the translated envelope's `Source`; when absent, the source `Source` is preserved.
+- `FieldMappings` — List of `FieldMapping` records used by `JsonFieldMappingTransform`.
+
+**DI registration (`TranslatorServiceExtensions`):**
+- `AddMessageTranslator<TIn, TOut>(IServiceCollection, IConfiguration, Func<TIn, TOut>)` — Registers with a delegate transform.
+- `AddJsonMessageTranslator(IServiceCollection, IConfiguration)` — Registers a `JsonFieldMappingTransform`-backed JSON-to-JSON translator.
+
+Both overloads require an `IMessageBrokerProducer` to already be registered (e.g. via `AddNatsJetStreamBroker`).
+
+### Files created
+
+- `src/Processing.Translator/Processing.Translator.csproj` — Class library; depends on `Contracts` and `Ingestion`
+- `src/Processing.Translator/IPayloadTransform.cs` — Interface: `Transform(TIn) → TOut`
+- `src/Processing.Translator/IMessageTranslator.cs` — Interface: `TranslateAsync(IntegrationEnvelope<TIn>) → TranslationResult<TOut>`
+- `src/Processing.Translator/TranslationResult.cs` — Result record: `TranslatedEnvelope`, `SourceMessageId`, `TargetTopic`
+- `src/Processing.Translator/FieldMapping.cs` — Record: `SourcePath`, `TargetPath`, `StaticValue`
+- `src/Processing.Translator/TranslatorOptions.cs` — Options: `TargetTopic`, `TargetMessageType`, `TargetSource`, `FieldMappings`
+- `src/Processing.Translator/MessageTranslator.cs` — Production implementation; preserves causation chain; configurable type/source override
+- `src/Processing.Translator/JsonFieldMappingTransform.cs` — JSON field mapping implementation; dot-path navigation; nested target creation; static value injection
+- `src/Processing.Translator/FuncPayloadTransform.cs` — Delegate-based payload transform
+- `src/Processing.Translator/TranslatorServiceExtensions.cs` — DI extensions `AddMessageTranslator` and `AddJsonMessageTranslator`
+- `tests/UnitTests/TranslatorOptionsTests.cs` — 8 tests for `TranslatorOptions` defaults and values
+- `tests/UnitTests/MessageTranslatorTests.cs` — 14 tests covering payload transform, envelope header propagation, MessageType/Source override, broker publish, result record, and guard clauses
+- `tests/UnitTests/JsonFieldMappingTransformTests.cs` — 10 tests covering flat mapping, nested source/target paths, static value, missing source field, multiple mappings, numeric/boolean values, and empty mapping list
+
+### Files modified
+
+- `tests/UnitTests/UnitTests.csproj` — Added `<ProjectReference>` to `Processing.Translator`
+- `EnterpriseIntegrationPlatform.sln` — Added `Processing.Translator` project with GUID `{B1000017-0000-0000-0000-000000000001}`
+- `rules/milestones.md` — Marked chunk 013 as done, updated Next Chunk to 014
+- `rules/completion-log.md` — This entry
+
+### Notes
+
+- All 183 unit tests pass (32 new + 151 pre-existing). Build: 0 warnings, 0 errors.
+- `MessageTranslator<TIn, TOut>` is fully generic — any payload type pair is supported. The `JsonFieldMappingTransform` specialises for `JsonElement → JsonElement` scenarios common in HTTP connector integrations.
+- `JsonFieldMappingTransform` creates intermediate JSON objects along multi-segment target paths automatically, so callers do not need to pre-create the target object hierarchy.
+- Missing source path segments are silently skipped (key omitted from target), preventing `null` injection. Static values can be used to inject constants (e.g. schema version, tenant ID) into the target document without requiring a source field.
+- `TranslatorServiceExtensions.AddMessageTranslator` and `AddJsonMessageTranslator` require an `IMessageBrokerProducer` to already be registered — consistent with the dependency inversion pattern used by `AddContentBasedRouter`.
+
+
 
 - **Date**: 2026-03-15
 - **Status**: done
