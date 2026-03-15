@@ -4,6 +4,61 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 013 – Message Translator
+
+- **Date**: 2026-03-15
+- **Status**: done
+- **Goal**: Implement the Message Translator EIP pattern in a new `Processing.Transform` project, advancing Quality Pillars 1 (Reliability — deterministic payload conversion), 4 (Maintainability — converter-strategy pattern), and 10 (Testability — full unit test coverage for all converters and the translator).
+
+### Architecture
+
+The Message Translator is a standalone class library (`Processing.Transform`) that transforms the payload of an `IntegrationEnvelope<TIn>` into an `IntegrationEnvelope<TOut>` using a pluggable `IPayloadConverter<TIn, TOut>`. The translated envelope preserves the full message lineage from the source envelope.
+
+**Translation flow:**
+1. `IMessageTranslator.TranslateAsync` validates that neither the envelope nor the converter is null.
+2. The converter's `ConvertAsync` is invoked with the source payload.
+3. A new `IntegrationEnvelope<TOut>` is constructed, preserving `CorrelationId`, `Source`, `MessageType`, `SchemaVersion`, `Priority`, and `Metadata` from the source envelope. A fresh `MessageId` is generated and `CausationId` is set to the source `MessageId` for lineage tracing.
+4. Both entry and exit are logged at `Debug` level.
+
+**Built-in converters:**
+
+| Converter | In | Out | Notes |
+|---|---|---|---|
+| `JsonToXmlConverter` | `JsonElement` | `string` (XML) | Root element `<root>`; arrays expand as sibling elements; null values carry `nil="true"` attribute |
+| `XmlToJsonConverter` | `string` (XML) | `JsonElement` | Root element unwrapped; sibling elements with the same name become JSON arrays; attributes prefixed with `@` |
+| `CsvToJsonConverter` | `string` (CSV) | `JsonElement` | First row = headers; quoted fields and `""` escape supported; returns JSON array of objects |
+
+**Supported field names:** N/A (payload conversion, not field extraction).
+
+### Files created
+
+- `src/Processing.Transform/Processing.Transform.csproj` — Class library; depends on `Contracts` and `Microsoft.Extensions.Hosting`
+- `src/Processing.Transform/IPayloadConverter.cs` — Generic interface `IPayloadConverter<TIn, TOut>` with `ConvertAsync(TIn, CancellationToken)` method
+- `src/Processing.Transform/IMessageTranslator.cs` — Interface `IMessageTranslator` with `TranslateAsync<TIn, TOut>` method
+- `src/Processing.Transform/MessageTranslator.cs` — Production implementation; preserves message lineage; structured logging
+- `src/Processing.Transform/Converters/JsonToXmlConverter.cs` — Converts `JsonElement` to XML string; handles nested objects, arrays, booleans, and null values
+- `src/Processing.Transform/Converters/XmlToJsonConverter.cs` — Converts XML string to `JsonElement`; unwraps root; sibling-to-array promotion; attribute support
+- `src/Processing.Transform/Converters/CsvToJsonConverter.cs` — Converts CSV string (with header row) to `JsonElement` JSON array; handles quoted fields and `""` escaping
+- `src/Processing.Transform/TransformServiceExtensions.cs` — DI extension `AddMessageTranslator(IServiceCollection)` registering `IMessageTranslator` as singleton and converters as transient services
+- `tests/UnitTests/MessageTranslatorTests.cs` — 13 tests: null guards, lineage preservation (CorrelationId, CausationId, MessageId, Source, MessageType, Metadata, Priority), converter delegation, propagation of converter exceptions, type conversion
+- `tests/UnitTests/PayloadConverterTests.cs` — 20 tests covering all three converters: flat/nested objects, arrays, booleans, null values, invalid input, cancellation, empty input, quoted CSV fields, escaped quotes
+
+### Files modified
+
+- `tests/UnitTests/UnitTests.csproj` — Added `<ProjectReference>` to `Processing.Transform`
+- `EnterpriseIntegrationPlatform.sln` — Added `Processing.Transform` project with GUID `{B1000017-0000-0000-0000-000000000001}`
+- `rules/milestones.md` — Marked chunk 013 as done, updated Next Chunk to 014
+- `rules/completion-log.md` — This entry
+
+### Notes
+
+- All 184 unit tests pass (33 new + 151 pre-existing). Build: 0 warnings, 0 errors.
+- `JsonToXmlConverter` expands JSON array properties as sibling XML elements (e.g. `{"items":[…]}` → `<items>…</items><items>…</items>`) rather than a wrapper element, following the standard XML serialisation pattern for arrays.
+- `XmlToJsonConverter` promotes sibling elements with the same local name to a JSON array automatically, making the converter naturally reversible for homogeneous collections.
+- `CsvToJsonConverter` supports RFC 4180-style double-quote delimited fields with `""` escape sequences; all field values are emitted as JSON strings.
+- `TransformServiceExtensions.AddMessageTranslator` registers converters as transient; callers may override with their own `IPayloadConverter<TIn, TOut>` implementations without changing the translator itself.
+
+
 ## Chunk 012 – Content-Based Router
 
 - **Date**: 2026-03-15

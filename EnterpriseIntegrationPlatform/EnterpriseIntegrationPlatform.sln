@@ -53,6 +53,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Demo.Pipeline", "src\Demo.P
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Processing.Routing", "src\Processing.Routing\Processing.Routing.csproj", "{B1000016-0000-0000-0000-000000000001}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Processing.Transform", "src\Processing.Transform\Processing.Transform.csproj", "{B1000017-0000-0000-0000-000000000001}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -355,5 +357,6 @@ Global
 		{B1000014-0000-0000-0000-000000000001} = {A1B2C3D4-0001-0001-0001-000000000001}
 		{B1000015-0000-0000-0000-000000000001} = {A1B2C3D4-0001-0001-0001-000000000001}
 		{B1000016-0000-0000-0000-000000000001} = {A1B2C3D4-0001-0001-0001-000000000001}
+		{B1000017-0000-0000-0000-000000000001} = {A1B2C3D4-0001-0001-0001-000000000001}
 	EndGlobalSection
 EndGlobal

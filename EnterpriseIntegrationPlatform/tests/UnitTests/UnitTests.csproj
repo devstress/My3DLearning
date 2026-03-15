@@ -20,5 +20,6 @@
     <ProjectReference Include="..\..\src\Admin.Api\Admin.Api.csproj" />
     <ProjectReference Include="..\..\src\Demo.Pipeline\Demo.Pipeline.csproj" />
     <ProjectReference Include="..\..\src\Processing.Routing\Processing.Routing.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Transform\Processing.Transform.csproj" />
   </ItemGroup>
 </Project>
