@@ -4,6 +4,145 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 006 – Temporal workflow host + BizTalk/EIP patterns
+
+- **Date**: 2026-03-15
+- **Status**: done
+- **Goal**: Set up Temporal workflow worker, implement all BizTalk and Enterprise Integration Patterns (EIP), and create a dedicated test project demonstrating each pattern.
+
+### Architecture
+
+```
+Temporal Workflow Host (src/Workflow.Temporal/):
+  TemporalOptions          → configuration: ServerAddress, Namespace, TaskQueue
+  TemporalServiceExtensions → DI registration for Temporal worker
+  IntegrationActivities    → Temporal [Activity] wrappers delegating to Activities services
+  ProcessIntegrationMessageWorkflow → sample workflow: validate → log lifecycle stages
+
+Activities (src/Activities/):
+  IMessageValidationService + DefaultMessageValidationService → payload validation
+  IMessageLoggingService + DefaultMessageLoggingService       → lifecycle stage logging
+
+Aspire AppHost containers:
+  temporal (temporalio/auto-setup:latest) → workflow server with auto namespace setup
+  temporal-ui (temporalio/ui:latest)      → web UI for workflow inspection
+
+Enterprise Integration Patterns (src/Processing.Routing/, src/Processing.Transform/):
+
+  Message Routing:
+    ContentBasedRouter<T>        → routes by message content (BizTalk filter expressions)
+    MessageFilter<T>             → predicate-based message filtering
+    RecipientList<T>             → dynamic multi-destination routing
+    MessageSplitter<T,TItem>     → debatching / composite message splitting
+    CountBasedAggregator<T>      → correlated message aggregation (Convoy pattern)
+    ScatterGather<TReq,TReply>   → parallel scatter + gather results
+    RoutingSlip<T>               → sequential itinerary-based processing
+    DynamicRouter<T>             → runtime-configurable routing rules (BRE)
+    Pipeline<T>                  → Pipes and Filters (BizTalk pipeline stages)
+    InMemoryWireTap<T>           → non-invasive message monitoring
+    PublishSubscribeChannel<T>   → broadcast to multiple subscribers
+    IdempotentReceiver<T>        → at-most-once message processing
+    Resequencer<T>               → reorder out-of-sequence messages
+    RetryHandler                 → exponential back-off retry logic
+    CircuitBreaker               → failure threshold + auto-recovery
+
+  Message Transformation:
+    MessageTranslator<TIn,TOut>  → format conversion (BizTalk Maps)
+    ContentEnricher<T>           → augment with external data
+    ContentFilter<TIn,TOut>      → remove/normalize fields
+    InMemoryClaimCheckStore      → large payload external storage
+    MessageNormalizer<T>         → multi-format → canonical conversion
+
+  Already Implemented (Contracts):
+    IntegrationEnvelope<T>       → Envelope Wrapper + Canonical Data Model
+    FaultEnvelope                → Dead Letter Channel
+    CorrelationId/CausationId    → Correlation Identifier
+    MessagePriority              → Priority-based processing
+    MessageHeaders               → Property Promotion (BizTalk promoted properties)
+    DeliveryStatus               → Message lifecycle states
+```
+
+- **Files created**:
+  - `src/Workflow.Temporal/TemporalOptions.cs` — configuration options (Temporal section)
+  - `src/Workflow.Temporal/TemporalServiceExtensions.cs` — DI registration with Temporalio.Extensions.Hosting
+  - `src/Workflow.Temporal/Activities/IntegrationActivities.cs` — Temporal activity wrappers
+  - `src/Workflow.Temporal/Workflows/ProcessIntegrationMessageWorkflow.cs` — sample validation workflow
+  - `src/Activities/IMessageValidationService.cs` — validation interface + MessageValidationResult
+  - `src/Activities/DefaultMessageValidationService.cs` — JSON validation implementation
+  - `src/Activities/IMessageLoggingService.cs` — logging interface + DefaultMessageLoggingService
+  - `src/Processing.Routing/ContentBasedRouter.cs` — content-based routing
+  - `src/Processing.Routing/MessageFilter.cs` — predicate message filter
+  - `src/Processing.Routing/RecipientList.cs` — dynamic recipient list
+  - `src/Processing.Routing/Splitter.cs` — message splitter / debatcher
+  - `src/Processing.Routing/Aggregator.cs` — count-based message aggregator
+  - `src/Processing.Routing/ScatterGather.cs` — parallel scatter-gather
+  - `src/Processing.Routing/RoutingSlip.cs` — itinerary-based routing slip
+  - `src/Processing.Routing/DynamicRouter.cs` — runtime-configurable router
+  - `src/Processing.Routing/PipelineBuilder.cs` — pipes and filters pipeline
+  - `src/Processing.Routing/WireTap.cs` — non-invasive message monitoring
+  - `src/Processing.Routing/PublishSubscribeChannel.cs` — pub/sub channel
+  - `src/Processing.Routing/IdempotentReceiver.cs` — at-most-once processing
+  - `src/Processing.Routing/Resequencer.cs` — message resequencing
+  - `src/Processing.Routing/RetryHandler.cs` — retry with exponential back-off
+  - `src/Processing.Routing/CircuitBreaker.cs` — circuit breaker pattern
+  - `src/Processing.Transform/MessageTranslator.cs` — format translator
+  - `src/Processing.Transform/ContentEnricher.cs` — content enrichment
+  - `src/Processing.Transform/ContentFilter.cs` — content filtering
+  - `src/Processing.Transform/ClaimCheck.cs` — claim check store
+  - `src/Processing.Transform/Normalizer.cs` — multi-format normalizer
+  - `tests/PatternDemoTests/PatternDemoTests.csproj` — pattern demo test project
+  - `tests/PatternDemoTests/ContentBasedRouterTests.cs` — 3 content-based router demos
+  - `tests/PatternDemoTests/MessageFilterTests.cs` — 3 message filter demos
+  - `tests/PatternDemoTests/RecipientListTests.cs` — 2 recipient list demos
+  - `tests/PatternDemoTests/SplitterTests.cs` — 3 splitter demos
+  - `tests/PatternDemoTests/AggregatorTests.cs` — 2 aggregator demos
+  - `tests/PatternDemoTests/ScatterGatherTests.cs` — 1 scatter-gather demo
+  - `tests/PatternDemoTests/RoutingSlipTests.cs` — 2 routing slip demos
+  - `tests/PatternDemoTests/DynamicRouterTests.cs` — 2 dynamic router demos
+  - `tests/PatternDemoTests/PipelineTests.cs` — 2 pipes and filters demos
+  - `tests/PatternDemoTests/WireTapTests.cs` — 2 wire tap demos
+  - `tests/PatternDemoTests/PublishSubscribeTests.cs` — 2 pub/sub demos
+  - `tests/PatternDemoTests/IdempotentReceiverTests.cs` — 3 idempotent receiver demos
+  - `tests/PatternDemoTests/ResequencerTests.cs` — 1 resequencer demo
+  - `tests/PatternDemoTests/RetryHandlerTests.cs` — 3 retry handler demos
+  - `tests/PatternDemoTests/CircuitBreakerTests.cs` — 4 circuit breaker demos
+  - `tests/PatternDemoTests/MessageTranslatorTests.cs` — 1 translator demo
+  - `tests/PatternDemoTests/ContentEnricherTests.cs` — 1 enricher demo
+  - `tests/PatternDemoTests/ContentFilterTests.cs` — 1 content filter demo
+  - `tests/PatternDemoTests/ClaimCheckTests.cs` — 3 claim check demos
+  - `tests/PatternDemoTests/NormalizerTests.cs` — 2 normalizer demos
+  - `tests/PatternDemoTests/EnvelopeWrapperTests.cs` — 3 envelope wrapper demos
+  - `tests/PatternDemoTests/DeadLetterChannelTests.cs` — 3 dead letter demos
+  - `tests/PatternDemoTests/CorrelationIdentifierTests.cs` — 2 correlation demos
+  - `tests/PatternDemoTests/MessagePriorityTests.cs` — 2 priority demos
+  - `tests/WorkflowTests/SampleTest.cs` → renamed to TemporalOptionsTests (3 tests)
+  - `tests/WorkflowTests/DefaultMessageValidationServiceTests.cs` — 7 validation tests
+  - `tests/WorkflowTests/MessageValidationResultTests.cs` — 3 result tests
+  - `tests/WorkflowTests/IntegrationActivitiesTests.cs` — 3 activity delegation tests
+  - `tests/WorkflowTests/ProcessIntegrationMessageWorkflowTests.cs` — 4 workflow tests (skip when server unavailable)
+- **Files modified**:
+  - `Directory.Packages.props` — added Temporalio 1.11.1, Temporalio.Extensions.Hosting 1.11.1
+  - `src/Workflow.Temporal/Workflow.Temporal.csproj` — added Temporalio, Activities, Contracts refs
+  - `src/Workflow.Temporal/Program.cs` — wired Temporal worker via AddTemporalWorkflows
+  - `src/Activities/Activities.csproj` — added Contracts project reference
+  - `src/AppHost/Program.cs` — added Temporal server + UI containers
+  - `src/Processing.Routing/Processing.Routing.csproj` — added Contracts reference
+  - `src/Processing.Routing/IMessageRouter.cs` — expanded with typed Route<T> method
+  - `src/Processing.Transform/Processing.Transform.csproj` — added Contracts reference
+  - `src/Processing.Transform/IMessageTransformer.cs` — expanded with typed Transform method
+  - `tests/WorkflowTests/WorkflowTests.csproj` — added Temporalio, project references
+  - `EnterpriseIntegrationPlatform.sln` — added PatternDemoTests project
+  - `rules/milestones.md` — chunk 006 → done, next chunk → 007
+- **Test counts**:
+  - WorkflowTests: 20 (was 1 placeholder, +19 new)
+  - PatternDemoTests: 53 (new project)
+  - ContractTests: 29 (unchanged)
+  - UnitTests: 47 (unchanged)
+  - IntegrationTests: 17 (unchanged)
+  - PlaywrightTests: 13 (unchanged)
+  - LoadTests: 1 (unchanged)
+  - **Total: 180 tests, 0 failures, 0 warnings, 0 errors**
+
 ## Chunk 005 – Configurable message broker ingestion
 
 - **Date**: 2026-03-14
