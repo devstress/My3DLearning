@@ -4,6 +4,60 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 007 – Cassandra Storage Module
+
+- **Date**: 2026-03-15
+- **Status**: done
+- **Goal**: Implement Cassandra repository and data access layer for scalable distributed persistence. Provides durable storage for message records, fault envelopes, and delivery status tracking. Satisfies Quality Pillar 1 (Reliability) with RF=3, Pillar 3 (Scalability) with distributed NoSQL storage, and Pillar 11 (Performance) with denormalised tables and TTL-based cleanup.
+
+### Files created
+
+- `src/Storage.Cassandra/Storage.Cassandra.csproj` — Project file (depends on Contracts, CassandraCSharpDriver 3.22.0, OpenTelemetry)
+- `src/Storage.Cassandra/CassandraOptions.cs` — Configuration (ContactPoints, Port 15042, Keyspace, RF=3, TTL 30d)
+- `src/Storage.Cassandra/ICassandraSessionFactory.cs` — Factory interface for Cassandra session lifecycle
+- `src/Storage.Cassandra/CassandraSessionFactory.cs` — Manages Cluster/ISession with lazy thread-safe initialisation
+- `src/Storage.Cassandra/SchemaManager.cs` — Idempotent keyspace and table creation (messages_by_correlation_id, messages_by_id, faults_by_correlation_id)
+- `src/Storage.Cassandra/MessageRecord.cs` — Denormalised message record for Cassandra storage
+- `src/Storage.Cassandra/IMessageRepository.cs` — Repository interface for message/fault persistence and queries
+- `src/Storage.Cassandra/CassandraMessageRepository.cs` — Production Cassandra implementation with batch writes and OpenTelemetry traces
+- `src/Storage.Cassandra/CassandraDiagnostics.cs` — Dedicated ActivitySource and Meter for storage telemetry
+- `src/Storage.Cassandra/CassandraHealthCheck.cs` — Health check verifying Cassandra connectivity
+- `src/Storage.Cassandra/CassandraServiceExtensions.cs` — DI registration (session factory, repository, health check, OTel)
+- `tests/UnitTests/CassandraOptionsTests.cs` — 8 tests for configuration defaults and binding
+- `tests/UnitTests/MessageRecordTests.cs` — 6 tests for record defaults and property assignment
+- `tests/UnitTests/CassandraDiagnosticsTests.cs` — 6 tests for OpenTelemetry source/meter configuration
+- `tests/UnitTests/CassandraHealthCheckTests.cs` — 3 tests for healthy/unhealthy scenarios
+- `tests/UnitTests/CassandraServiceExtensionsTests.cs` — 4 tests for DI registration and options binding
+- `tests/UnitTests/CassandraMessageRepositoryTests.cs` — 7 tests for repository operations with mocked session
+
+### Files modified
+
+- `Directory.Packages.props` — Added CassandraCSharpDriver 3.22.0 and Newtonsoft.Json 13.0.4 (override for GHSA-5crp-9r3c-p9vr)
+- `EnterpriseIntegrationPlatform.sln` — Added Storage.Cassandra project
+- `src/AppHost/Program.cs` — Added Cassandra container (cassandra:5.0, host port 15042, target 9042)
+- `tests/UnitTests/UnitTests.csproj` — Added Storage.Cassandra project reference
+- `rules/milestones.md` — Chunk 007 → done, Next Chunk → 010
+- `rules/completion-log.md` — This entry
+
+### Port mapping (updated)
+
+| Service | Host Port | Container Port |
+|---------|-----------|----------------|
+| Cassandra CQL | 15042 | 9042 |
+
+### Cassandra table design
+
+- `messages_by_correlation_id` — Partition: correlation_id, Clustering: recorded_at ASC, message_id ASC
+- `messages_by_id` — Partition: message_id (single-row lookup)
+- `faults_by_correlation_id` — Partition: correlation_id, Clustering: faulted_at DESC, fault_id ASC
+
+### Test results
+
+- ContractTests: 29 passed
+- UnitTests: 92 passed (58 existing + 34 new Cassandra tests)
+- WorkflowTests: 20 passed
+- Total: 141 passed, 0 failed
+
 ## Self-Hosted GraphRAG + Non-Common Aspire Ports
 
 - **Date**: 2026-03-15

@@ -31,6 +31,11 @@
     <PackageVersion Include="NATS.Net" Version="2.7.3" />
     <PackageVersion Include="DotPulsar" Version="5.2.2" />
     <PackageVersion Include="Confluent.Kafka" Version="2.13.2" />
+    <!-- Cassandra distributed persistence -->
+    <PackageVersion Include="CassandraCSharpDriver" Version="3.22.0" />
+    <!-- Override Newtonsoft.Json transitive dependency from CassandraCSharpDriver
+         to resolve known high-severity vulnerability in 9.0.1 (GHSA-5crp-9r3c-p9vr) -->
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <!-- Integration testing with real containers -->
     <PackageVersion Include="Testcontainers" Version="4.5.0" />
     <!-- Temporal workflow orchestration -->

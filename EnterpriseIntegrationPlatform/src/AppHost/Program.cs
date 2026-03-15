@@ -47,6 +47,15 @@ var temporalUi = builder.AddContainer("temporal-ui", "temporalio/ui", "2.47.3")
     .WithEnvironment("TEMPORAL_ADDRESS", "temporal:7233")
     .WithLifetime(ContainerLifetime.Persistent);
 
+// ── Distributed Persistence ───────────────────────────────────────────────────
+// Cassandra provides scalable, distributed storage for message state, faults,
+// and audit data. SimpleStrategy RF=3 satisfies Quality Pillar 1 (Reliability).
+// Host port 15042 avoids conflict with any existing Cassandra on 9042.
+var cassandra = builder.AddContainer("cassandra", "cassandra", "5.0")
+    .WithEndpoint(port: 15042, targetPort: 9042, name: "cassandra-cql", scheme: "tcp")
+    .WithVolume("cassandra-data", "/var/lib/cassandra")
+    .WithLifetime(ContainerLifetime.Persistent);
+
 // ── Platform Services ─────────────────────────────────────────────────────────
 
 // NATS JetStream — default queue broker for task-oriented message delivery.
