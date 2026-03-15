@@ -25,7 +25,7 @@ public record DynamicRoutingRule<T>(
     int Priority = 0);
 
 /// <summary>
-/// In-memory dynamic router with hot-swappable rules.
+/// In-memory dynamic router with runtime-updatable rules.
 /// </summary>
 public sealed class DynamicRouter<T> : IDynamicRouter<T>
 {

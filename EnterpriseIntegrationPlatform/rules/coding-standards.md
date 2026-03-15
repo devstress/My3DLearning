@@ -7,6 +7,13 @@
 - Implicit usings enabled
 - File-scoped namespaces required
 
+## No Conceptual or Abstract Code
+
+- **Every interface must define at least one method or property.** No empty interfaces.
+- **Every class must have a working implementation.** No stubs, skeletons, or placeholder classes.
+- **No speculative comments.** Do not reference "future", "will be", "TODO", "placeholder", or "subsequent chunks" in code comments. If the code is not implemented, do not commit it.
+- **No symbolic code.** Every file in the repository must compile and provide real functionality.
+
 ## Naming Conventions
 
 - PascalCase for public members, types, namespaces

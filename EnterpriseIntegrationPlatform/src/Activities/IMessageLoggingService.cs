@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace EnterpriseIntegrationPlatform.Activities;
 
 /// <summary>
@@ -16,18 +18,22 @@ public interface IMessageLoggingService
 }
 
 /// <summary>
-/// Default message logging service that writes to console/structured logging.
+/// Message logging service that writes structured log entries via <see cref="ILogger"/>.
 /// </summary>
 public sealed class DefaultMessageLoggingService : IMessageLoggingService
 {
+    private readonly ILogger<DefaultMessageLoggingService> _logger;
+
+    public DefaultMessageLoggingService(ILogger<DefaultMessageLoggingService> logger)
+    {
+        _logger = logger;
+    }
+
     /// <inheritdoc />
     public Task LogAsync(Guid messageId, string messageType, string stage)
     {
-        // In production this would write to ILogger<T>.
-        // Kept simple for the initial chunk; will be enhanced with
-        // MessageLifecycleRecorder integration in a future chunk.
-        Console.WriteLine(
-            "[Workflow] Message {0} ({1}) — stage: {2}",
+        _logger.LogInformation(
+            "[Workflow] Message {MessageId} ({MessageType}) — stage: {Stage}",
             messageId,
             messageType,
             stage);

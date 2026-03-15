@@ -28,11 +28,8 @@ public record ProcessIntegrationMessageResult(
     string? FailureReason = null);
 
 /// <summary>
-/// Sample Temporal workflow that validates and logs an integration message.
-/// This is the first concrete workflow in the platform and demonstrates:
-///   1. Invoking typed activities with retry policies
-///   2. Conditional branching based on activity results
-///   3. Compensation-ready structure for future saga patterns
+/// Temporal workflow that validates and logs an integration message.
+/// Steps: receive → validate → log outcome.
 /// </summary>
 [Workflow]
 public class ProcessIntegrationMessageWorkflow
