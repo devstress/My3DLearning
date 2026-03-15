@@ -4,6 +4,66 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 011 – End-to-end demo pipeline
+
+- **Date**: 2026-03-15
+- **Status**: done
+- **Goal**: Wire all platform components into a working end-to-end demo pipeline, advancing Quality Pillars 1 (Reliability — zero message loss), 6 (Resilience — Ack/Nack loopback), 8 (Observability — lifecycle recording), and 10 (Testability — unit-testable orchestrator).
+
+### Architecture
+
+The demo pipeline is a standalone .NET Worker Service (`Demo.Pipeline`) that subscribes to an inbound NATS JetStream subject and routes each message through the full platform stack. The pipeline implements the Ack/Nack notification loopback pattern required by the architecture rules: every accepted message is either delivered (Ack) or permanently recorded as a fault (Nack) — no silent drops.
+
+**Pipeline flow (per message):**
+1. **Persist** — Save `MessageRecord` to Cassandra as `DeliveryStatus.Pending`.
+2. **Record Received** — Emit a lifecycle event to `MessageLifecycleRecorder` (Loki + OTel).
+3. **Dispatch** — Start `ProcessIntegrationMessageWorkflow` via the Temporal client using the string-based API; await the result.
+4. **On success** — Update Cassandra status to `Delivered`, record `Delivered` event, publish Ack envelope to `integration.ack`.
+5. **On validation failure** — Update Cassandra status to `Failed`, persist `FaultEnvelope`, record `Failed` event, publish Nack envelope to `integration.nack`.
+6. **On exception** — Same as failure path; internal try/catch ensures the worker stays alive for subsequent messages.
+
+**Workflow input/output records moved to `Activities`:** `ProcessIntegrationMessageInput` and `ProcessIntegrationMessageResult` were moved from `Workflow.Temporal` to `Activities` so that both the Temporal worker and the pipeline client can reference them without a circular project dependency. `Workflow.Temporal` and `Demo.Pipeline` both reference `Activities`.
+
+### Files created
+
+- `src/Activities/ProcessIntegrationMessageInput.cs` — Workflow input record (moved from Workflow.Temporal; now in the shared Activities contract assembly)
+- `src/Activities/ProcessIntegrationMessageResult.cs` — Workflow result record (moved from Workflow.Temporal)
+- `src/Demo.Pipeline/Demo.Pipeline.csproj` — Worker SDK project; references ServiceDefaults, Contracts, Activities, Ingestion, Ingestion.Nats, Storage.Cassandra, Observability, Temporalio
+- `src/Demo.Pipeline/PipelineOptions.cs` — Configuration record: NatsUrl, InboundSubject, AckSubject, NackSubject, ConsumerGroup, TemporalServerAddress, TemporalNamespace, TemporalTaskQueue, WorkflowTimeout
+- `src/Demo.Pipeline/IPipelineOrchestrator.cs` — Interface for single-message pipeline processing
+- `src/Demo.Pipeline/PipelineOrchestrator.cs` — Production orchestrator: persist → dispatch → Ack/Nack → update status; fault-safe with internal try/catch on every external call
+- `src/Demo.Pipeline/ITemporalWorkflowDispatcher.cs` — Interface for Temporal workflow dispatch
+- `src/Demo.Pipeline/TemporalWorkflowDispatcher.cs` — Lazy-connected singleton Temporal client; uses string-based workflow dispatch; thread-safe via SemaphoreSlim
+- `src/Demo.Pipeline/IntegrationPipelineWorker.cs` — BackgroundService that subscribes to NATS JetStream and delegates to IPipelineOrchestrator; stays alive after orchestrator errors
+- `src/Demo.Pipeline/NotificationPayloads.cs` — `AckPayload` and `NackPayload` records for Ack/Nack envelope payloads
+- `src/Demo.Pipeline/PipelineServiceExtensions.cs` — DI extension `AddDemoPipeline`: registers NATS, Cassandra, Observability, Temporal dispatcher, orchestrator, and hosted worker
+- `src/Demo.Pipeline/Program.cs` — Worker host; calls `AddDemoPipeline`
+- `src/Demo.Pipeline/appsettings.json` — Default config (all Pipeline, Cassandra, and Loki settings)
+- `src/Demo.Pipeline/appsettings.Development.json` — Debug log level override
+- `src/Demo.Pipeline/Properties/launchSettings.json` — Local dev profile
+- `tests/UnitTests/PipelineOptionsTests.cs` — 11 tests for all PipelineOptions defaults and custom values
+- `tests/UnitTests/PipelineOrchestratorTests.cs` — 9 tests: valid/invalid/exception paths; verifies Cassandra saves, status updates, Ack/Nack publishing, fault persistence, workflow input
+- `tests/UnitTests/ProcessIntegrationMessageContractTests.cs` — 5 tests for moved contract types and notification payloads
+
+### Files modified
+
+- `src/Workflow.Temporal/Workflows/ProcessIntegrationMessageWorkflow.cs` — Removed inline record definitions (moved to Activities); uses `EnterpriseIntegrationPlatform.Activities` namespace
+- `src/AppHost/AppHost.csproj` — Added `<ProjectReference>` to Demo.Pipeline
+- `src/AppHost/Program.cs` — Registered `Projects.Demo_Pipeline` as `demo-pipeline` with NATS, Temporal, Loki, and Cassandra environment injection
+- `tests/UnitTests/UnitTests.csproj` — Added `<ProjectReference>` to Demo.Pipeline
+- `EnterpriseIntegrationPlatform.sln` — Added Demo.Pipeline project with GUID `{B1000015-0000-0000-0000-000000000001}`
+- `rules/milestones.md` — Marked chunk 011 as done, updated Next Chunk to 012
+- `rules/completion-log.md` — This entry
+
+### Notes
+
+- All 132 unit tests pass (26 new + 106 pre-existing). All 20 workflow tests pass. Build: 0 warnings, 0 errors.
+- The `ProcessIntegrationMessageWorkflow` is dispatched using the Temporal string-based API (`"ProcessIntegrationMessageWorkflow"` as workflow type name) — avoids a project reference from `Demo.Pipeline` to `Workflow.Temporal`.
+- `TemporalWorkflowDispatcher` creates a lazy singleton `TemporalClient`; re-uses the same connection for all messages; protected by `SemaphoreSlim` for thread safety.
+- All external calls in `PipelineOrchestrator` (Cassandra, Loki, NATS) are wrapped in try/catch so a single-component failure does not prevent Nack publishing or fault recording.
+- `IntegrationPipelineWorker` catches non-cancellation exceptions from the orchestrator and logs them without crashing — the worker continues consuming subsequent messages.
+- `AckPayload` and `NackPayload` are published as `IntegrationEnvelope<T>` with the correlation and causation IDs set, satisfying the Ack/Nack notification loopback requirement.
+
 ## Chunk 010 – Admin API
 
 - **Date**: 2026-03-15

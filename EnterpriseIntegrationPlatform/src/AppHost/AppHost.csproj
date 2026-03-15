@@ -8,5 +8,6 @@
     <ProjectReference Include="..\Workflow.Temporal\Workflow.Temporal.csproj" />
     <ProjectReference Include="..\OpenClaw.Web\OpenClaw.Web.csproj" />
     <ProjectReference Include="..\Admin.Api\Admin.Api.csproj" />
+    <ProjectReference Include="..\Demo.Pipeline\Demo.Pipeline.csproj" />
   </ItemGroup>
 </Project>

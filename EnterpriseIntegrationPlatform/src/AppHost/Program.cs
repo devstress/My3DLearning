@@ -97,4 +97,15 @@ var adminApi = builder.AddProject<Projects.Admin_Api>("admin-api")
     .WithEnvironment("Cassandra__ContactPoints__0", "localhost")
     .WithEnvironment("Cassandra__Port", "15042");
 
+// Demo.Pipeline – end-to-end integration pipeline that wires all platform
+// components together: NATS JetStream inbound consumer → Temporal workflow
+// (validate + log) → Cassandra persistence → NATS Ack/Nack notification.
+// This demonstrates the full message lifecycle: receive → process → persist → notify.
+builder.AddProject<Projects.Demo_Pipeline>("demo-pipeline")
+    .WithEnvironment("Pipeline__NatsUrl", nats.GetEndpoint("nats-client"))
+    .WithEnvironment("Pipeline__TemporalServerAddress", "temporal:7233")
+    .WithEnvironment("Loki__BaseAddress", loki.GetEndpoint("loki-api"))
+    .WithEnvironment("Cassandra__ContactPoints__0", "localhost")
+    .WithEnvironment("Cassandra__Port", "15042");
+
 builder.Build().Run();

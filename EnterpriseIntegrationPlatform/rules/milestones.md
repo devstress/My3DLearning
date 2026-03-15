@@ -59,7 +59,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 008 | Ollama AI integration | Integrate Ollama for RAG retrieval within RagFlow and trace analysis | done |
 | 009 | OpenTelemetry observability | Configure distributed tracing, metrics (Prometheus), isolated observability storage (Loki), OpenClaw web UI with Playwright tests, RagFlow + Ollama in Aspire, AI.RagFlow client, OpenClaw generation endpoints (POST /api/generate/integration, POST /api/generate/chat), non-common Aspire ports (15xxx range) | done |
 | 010 | Admin API | Build administration API for platform management | done |
-| 011 | End-to-end demo pipeline | Wire all components into a working demo pipeline | not-started |
+| 011 | End-to-end demo pipeline | Wire all components into a working demo pipeline | done |
 
 ### Phase 2 – Integration Patterns
 
@@ -95,7 +95,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-Chunk 011 – End-to-end demo pipeline
+Chunk 012 – Content-Based Router
 
 ---
 
