@@ -17,7 +17,7 @@ public sealed class BrokerOptions
 
     /// <summary>
     /// Connection string or URL for the broker.
-    /// For NATS: <c>nats://localhost:4222</c>.
+    /// For NATS: <c>nats://localhost:15222</c>.
     /// For Kafka: <c>localhost:9092</c>.
     /// For Pulsar: <c>pulsar://localhost:6650</c>.
     /// </summary>

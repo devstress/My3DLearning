@@ -1,4 +1,5 @@
 using EnterpriseIntegrationPlatform.AI.Ollama;
+using EnterpriseIntegrationPlatform.AI.RagFlow;
 using EnterpriseIntegrationPlatform.Observability;
 using OpenClaw.Web;
 
@@ -14,8 +15,12 @@ builder.Services.AddOllamaService(ollamaBaseAddress);
 
 // Register platform observability — Loki URL is injected by Aspire (Loki__BaseAddress)
 var lokiBaseAddress = builder.Configuration["Loki:BaseAddress"]
-                      ?? "http://localhost:3100";
+                      ?? "http://localhost:15100";
 builder.Services.AddPlatformObservability(lokiBaseAddress);
+
+// Register RagFlow RAG service — base address comes from Aspire's environment
+// variable (RagFlow__BaseAddress) or config, with localhost fallback for local dev
+builder.Services.AddRagFlowService(builder.Configuration);
 
 // Seed demo data so "where is my message?" works out of the box
 builder.Services.AddHostedService<DemoDataSeeder>();
@@ -67,6 +72,65 @@ app.MapGet("/api/health/ollama", async (IOllamaService ollama, CancellationToken
 })
 .WithName("OllamaHealth");
 
+// ── RagFlow health status endpoint ────────────────────────────────────────────
+
+app.MapGet("/api/health/ragflow", async (IRagFlowService ragFlow, CancellationToken ct) =>
+{
+    var healthy = await ragFlow.IsHealthyAsync(ct);
+    return Results.Ok(new { available = healthy, service = "ragflow" });
+})
+.WithName("RagFlowHealth");
+
+// ── Integration generation endpoints ──────────────────────────────────────────
+
+var generate = app.MapGroup("/api/generate");
+
+generate.MapPost("/integration", async (
+    GenerateIntegrationRequest request,
+    IRagFlowService ragFlow,
+    IOllamaService ollama,
+    CancellationToken ct) =>
+{
+    // Step 1: Retrieve relevant context from the platform knowledge base via RagFlow
+    var context = await ragFlow.RetrieveAsync(request.Description, cancellationToken: ct);
+
+    // Step 2: Build a prompt with the retrieved context + user request
+    var prompt = IntegrationPromptBuilder.Build(request.Description, context);
+
+    // Step 3: Generate the integration code using Ollama
+    var generatedCode = await ollama.GenerateAsync(prompt, request.Model ?? "llama3.2", ct);
+
+    return Results.Ok(new GenerateIntegrationResponse(
+        GeneratedCode: generatedCode,
+        ContextUsed: !string.IsNullOrEmpty(context),
+        Model: request.Model ?? "llama3.2"));
+})
+.WithName("GenerateIntegration");
+
+generate.MapPost("/chat", async (
+    GenerateChatRequest request,
+    IRagFlowService ragFlow,
+    CancellationToken ct) =>
+{
+    // Use RagFlow's chat completion — combines retrieval + generation in one call
+    var response = await ragFlow.ChatAsync(request.Question, request.ConversationId, ct);
+
+    return Results.Ok(new GenerateChatResponse(
+        Answer: response.Answer,
+        ConversationId: response.ConversationId,
+        ReferenceCount: response.References.Count));
+})
+.WithName("GenerateChat");
+
+generate.MapGet("/datasets", async (
+    IRagFlowService ragFlow,
+    CancellationToken ct) =>
+{
+    var datasets = await ragFlow.ListDatasetsAsync(ct);
+    return Results.Ok(datasets);
+})
+.WithName("ListDatasets");
+
 // ── Serve the embedded HTML UI at root ────────────────────────────────────────
 
 app.MapGet("/", () => Results.Content(OpenClawHtml.Page, "text/html"))
@@ -76,6 +140,83 @@ app.Run();
 
 /// <summary>Request body for the /api/inspect/ask endpoint.</summary>
 public sealed record AskRequest(string Query);
+
+/// <summary>Request body for the /api/generate/integration endpoint.</summary>
+/// <param name="Description">Natural-language description of the integration to generate.</param>
+/// <param name="Model">Optional Ollama model name (default: "llama3.2").</param>
+public sealed record GenerateIntegrationRequest(string Description, string? Model = null);
+
+/// <summary>Response from the /api/generate/integration endpoint.</summary>
+/// <param name="GeneratedCode">The AI-generated integration code.</param>
+/// <param name="ContextUsed">Whether RagFlow context was available and used.</param>
+/// <param name="Model">The Ollama model that generated the code.</param>
+public sealed record GenerateIntegrationResponse(string GeneratedCode, bool ContextUsed, string Model);
+
+/// <summary>Request body for the /api/generate/chat endpoint.</summary>
+/// <param name="Question">The question or generation request.</param>
+/// <param name="ConversationId">Optional conversation ID for multi-turn follow-up.</param>
+public sealed record GenerateChatRequest(string Question, string? ConversationId = null);
+
+/// <summary>Response from the /api/generate/chat endpoint.</summary>
+/// <param name="Answer">The AI-generated answer.</param>
+/// <param name="ConversationId">Conversation ID for follow-up questions.</param>
+/// <param name="ReferenceCount">Number of source references used.</param>
+public sealed record GenerateChatResponse(string Answer, string? ConversationId, int ReferenceCount);
+
+/// <summary>
+/// Builds structured prompts for AI-driven integration code generation.
+/// Combines retrieved context from RagFlow with user specifications and
+/// platform conventions (coding standards, patterns, quality pillars).
+/// </summary>
+internal static class IntegrationPromptBuilder
+{
+    /// <summary>
+    /// Builds a code generation prompt from a user description and retrieved context.
+    /// </summary>
+    /// <param name="userDescription">The natural-language integration description.</param>
+    /// <param name="retrievedContext">Context retrieved from RagFlow (may be empty).</param>
+    /// <returns>A structured prompt ready for Ollama inference.</returns>
+    internal static string Build(string userDescription, string retrievedContext)
+    {
+        var contextSection = string.IsNullOrWhiteSpace(retrievedContext)
+            ? "No additional context available from the knowledge base."
+            : $"""
+              Relevant platform context (from RagFlow knowledge base):
+
+              {retrievedContext}
+              """;
+
+        return $$"""
+            You are a senior .NET developer generating production-ready C# code for the
+            Enterprise Integration Platform. Follow these rules strictly:
+
+            Platform rules:
+            - Target .NET 10 (C# 14) with file-scoped namespaces
+            - Use Temporal workflows for orchestration with saga compensation
+            - Use the canonical IntegrationEnvelope<T> message format
+            - Implement Ack/Nack notification loopback (atomic, all-or-nothing)
+            - Zero message loss — persist before acknowledge
+            - Use Polly for retry and circuit breaker policies
+            - Include OpenTelemetry ActivitySource for distributed tracing
+            - Use IOptions<T> for configuration binding
+            - Use constructor injection for dependencies
+            - Include XML documentation on all public APIs
+            - Follow Arrange-Act-Assert pattern in tests
+            - Use xUnit, FluentAssertions, and NSubstitute for testing
+
+            {{contextSection}}
+
+            User request:
+            {{userDescription}}
+
+            Generate complete, compilable, production-ready code including:
+            1. Implementation class(es)
+            2. Configuration model (if needed)
+            3. DI registration extension method
+            4. xUnit tests
+            """;
+    }
+}
 
 /// <summary>
 /// Contains the embedded HTML page for the OpenClaw web UI.

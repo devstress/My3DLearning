@@ -14,7 +14,7 @@ public static class NatsServiceExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="connectionString">
-    /// NATS server URL, e.g. <c>nats://localhost:4222</c>.
+    /// NATS server URL, e.g. <c>nats://localhost:15222</c>.
     /// </param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddNatsJetStreamBroker(

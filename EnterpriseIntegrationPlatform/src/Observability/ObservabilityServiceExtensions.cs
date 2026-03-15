@@ -28,7 +28,7 @@ public static class ObservabilityServiceExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="lokiBaseUrl">
-    /// Base URL of the Loki HTTP API (e.g. <c>http://localhost:3100</c>).
+    /// Base URL of the Loki HTTP API (e.g. <c>http://localhost:15100</c>).
     /// </param>
     public static IServiceCollection AddPlatformObservability(
         this IServiceCollection services,

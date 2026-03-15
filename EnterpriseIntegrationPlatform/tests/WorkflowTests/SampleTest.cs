@@ -12,7 +12,7 @@ public class TemporalOptionsTests
     {
         var options = new TemporalOptions();
 
-        options.ServerAddress.Should().Be("localhost:7233");
+        options.ServerAddress.Should().Be("localhost:15233");
         options.Namespace.Should().Be("default");
         options.TaskQueue.Should().Be("integration-workflows");
     }

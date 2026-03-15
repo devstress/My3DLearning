@@ -18,7 +18,7 @@ The Enterprise Integration Platform integrates Ollama as a local AI runtime to a
 
 Ollama runs as a local HTTP service providing LLM inference. The AI provider is configurable — Ollama is the default for on-premises deployment, but the platform supports switching to other AI providers (e.g., Azure OpenAI, AWS Bedrock, or self-hosted alternatives) via the AI service configuration:
 
-- **Endpoint:** `http://localhost:11434`
+- **Endpoint:** `http://localhost:15434` (Aspire host port; container-internal port 11434)
 - **Models:** Code-focused models (e.g., CodeLlama, DeepSeek Coder, StarCoder)
 - **API:** REST API for generation, chat, and embeddings
 - **Resource Requirements:** 8–16 GB RAM for 7B–13B parameter models; GPU acceleration recommended

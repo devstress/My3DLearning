@@ -9,8 +9,8 @@ public sealed class TemporalOptions
     /// <summary>Configuration section name.</summary>
     public const string SectionName = "Temporal";
 
-    /// <summary>Temporal server gRPC address (e.g. "localhost:7233").</summary>
-    public string ServerAddress { get; set; } = "localhost:7233";
+    /// <summary>Temporal server gRPC address (e.g. "localhost:15233").</summary>
+    public string ServerAddress { get; set; } = "localhost:15233";
 
     /// <summary>Temporal namespace for this worker.</summary>
     public string Namespace { get; set; } = "default";
