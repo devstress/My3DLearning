@@ -9,5 +9,11 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Temporalio" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Activities\Activities.csproj" />
+    <ProjectReference Include="..\..\src\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Workflow.Temporal\Workflow.Temporal.csproj" />
   </ItemGroup>
 </Project>

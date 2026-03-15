@@ -27,6 +27,19 @@ var loki = builder.AddContainer("loki", "grafana/loki", "3.4.2")
     .WithVolume("loki-data", "/loki")
     .WithLifetime(ContainerLifetime.Persistent);
 
+// ── Workflow Orchestration ────────────────────────────────────────────────────
+// Temporal provides durable, fault-tolerant workflow orchestration.
+// The auto-setup image creates the default namespace on first start.
+var temporal = builder.AddContainer("temporal", "temporalio/auto-setup", "latest")
+    .WithEndpoint(targetPort: 7233, name: "temporal-grpc", scheme: "http")
+    .WithLifetime(ContainerLifetime.Persistent);
+
+// Temporal Web UI for inspecting workflows, activities, and task queues.
+var temporalUi = builder.AddContainer("temporal-ui", "temporalio/ui", "latest")
+    .WithHttpEndpoint(targetPort: 8080, name: "temporal-ui-http")
+    .WithEnvironment("TEMPORAL_ADDRESS", "temporal:7233")
+    .WithLifetime(ContainerLifetime.Persistent);
+
 // ── Platform Services ─────────────────────────────────────────────────────────
 
 // NATS JetStream — default queue broker for task-oriented message delivery.
