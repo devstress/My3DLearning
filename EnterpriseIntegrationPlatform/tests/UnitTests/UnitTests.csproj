@@ -19,5 +19,6 @@
     <ProjectReference Include="..\..\src\Storage.Cassandra\Storage.Cassandra.csproj" />
     <ProjectReference Include="..\..\src\Admin.Api\Admin.Api.csproj" />
     <ProjectReference Include="..\..\src\Demo.Pipeline\Demo.Pipeline.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Routing\Processing.Routing.csproj" />
   </ItemGroup>
 </Project>
