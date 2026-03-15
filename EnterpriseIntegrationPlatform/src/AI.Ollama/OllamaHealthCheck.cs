@@ -27,6 +27,6 @@ public sealed class OllamaHealthCheck : IHealthCheck
         var healthy = await _ollama.IsHealthyAsync(cancellationToken);
         return healthy
             ? HealthCheckResult.Healthy("Ollama is reachable.")
-            : HealthCheckResult.Degraded("Ollama is not reachable. AI-assisted features are unavailable.");
+            : HealthCheckResult.Degraded("Ollama is not reachable. RAG retrieval and trace analysis are unavailable.");
     }
 }

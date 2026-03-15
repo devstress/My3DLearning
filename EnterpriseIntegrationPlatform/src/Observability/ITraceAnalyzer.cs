@@ -1,8 +1,8 @@
 namespace EnterpriseIntegrationPlatform.Observability;
 
 /// <summary>
-/// Provides AI-assisted analysis of message traces and integration state.
-/// Implementations use an LLM (such as Ollama) to reason about
+/// Provides trace analysis of message flow and integration state.
+/// Implementations use the Ollama LLM to reason about
 /// where a message is in the pipeline and whether processing is healthy.
 /// </summary>
 public interface ITraceAnalyzer
@@ -14,7 +14,7 @@ public interface ITraceAnalyzer
     /// A JSON string containing trace spans, message metadata, and delivery status.
     /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>An AI-generated diagnostic summary.</returns>
+    /// <returns>A trace analysis summary.</returns>
     Task<string> AnalyseTraceAsync(string traceContextJson, CancellationToken cancellationToken = default);
 
     /// <summary>

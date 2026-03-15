@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Enterprise Integration Platform (EIP) is a cloud-native integration system designed to replace legacy middleware such as BizTalk Server. It provides reliable, scalable message processing with workflow orchestration, multi-protocol connectivity, and AI-assisted development capabilities.
+The Enterprise Integration Platform (EIP) is a cloud-native integration system designed to replace legacy middleware such as BizTalk Server. It provides reliable, scalable message processing with workflow orchestration, multi-protocol connectivity, and a self-hosted RAG knowledge system for developers.
 
 The platform follows a layered, loosely coupled architecture where each layer communicates through well-defined contracts. Messages flow through an immutable pipeline from ingestion to delivery, with full observability at every stage. The message broker layer is configurable — Kafka handles broadcast event streams and audit logs while a configurable queue broker (default: NATS JetStream; Apache Pulsar with Key_Shared for large-scale production) handles task-oriented delivery where recipient A must not block recipient B, even at 1 million recipients.
 
@@ -12,7 +12,7 @@ The platform follows a layered, loosely coupled architecture where each layer co
 2. **Durability Over Speed** — Every message is persisted before acknowledgment. At-least-once delivery with idempotent processing guarantees no data loss.
 3. **Separation of Concerns** — Ingestion, routing, transformation, delivery, and orchestration are independent, deployable units.
 4. **Observable by Default** — OpenTelemetry is integrated at every layer. Every message carries a correlation ID for end-to-end tracing.
-5. **AI-Augmented Development** — Ollama provides local AI capabilities for code generation, workflow scaffolding, and documentation summarization.
+5. **Self-Hosted RAG Knowledge Base** — RagFlow + Ollama provide a self-hosted knowledge retrieval system. Ollama powers the embedding and retrieval within RagFlow. Developers use their own preferred AI provider (Copilot, Codex, Claude Code) to generate integrations, connecting to the RAG API for platform context.
 6. **Multi-Tenant Ready** — Tenant isolation is enforced at the data and processing layers through partition strategies and namespace separation.
 7. **Cloud-Native Orchestration** — .NET Aspire manages service composition, health checks, and local development orchestration.
 
@@ -28,7 +28,7 @@ The platform follows a layered, loosely coupled architecture where each layer co
 | Workflow Engine    | Temporal.io        | Durable workflow orchestration               |
 | Primary Storage    | Apache Cassandra   | Distributed, highly-available data store     |
 | Observability      | OpenTelemetry      | Distributed tracing, metrics, and logging    |
-| AI Runtime         | Ollama (configurable) | Local LLM inference for code generation; switchable to other AI providers |
+| AI Runtime         | Ollama + RagFlow      | Self-hosted RAG retrieval; Ollama provides embeddings within RagFlow. Developers use their own AI provider for code generation. |
 | API Gateway        | ASP.NET Core       | RESTful admin and ingestion APIs             |
 
 ## Layered Architecture

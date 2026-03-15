@@ -14,7 +14,7 @@ public static class ObservabilityServiceExtensions
     /// Registers the platform's custom <see cref="DiagnosticsConfig.ActivitySource"/>
     /// and <see cref="DiagnosticsConfig.Meter"/> with the OpenTelemetry pipeline,
     /// plus the separated production store, observability event log, lifecycle
-    /// recorder, and AI-powered inspector.
+    /// recorder, and Ollama-backed trace analyzer.
     /// <para>
     /// <b>Production storage</b> (<see cref="IMessageStateStore"/>) is used by the
     /// message processing pipeline only.<br/>
@@ -57,7 +57,7 @@ public static class ObservabilityServiceExtensions
         // ── Lifecycle recorder (writes to BOTH production + observability) ─────
         services.AddSingleton<MessageLifecycleRecorder>();
 
-        // ── AI-powered analysis (queries observability store, not production) ──
+        // ── Trace analysis (queries observability store, not production) ──
         services.AddSingleton<ITraceAnalyzer, TraceAnalyzer>();
         services.AddSingleton<MessageStateInspector>();
 

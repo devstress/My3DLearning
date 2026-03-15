@@ -3,8 +3,9 @@ namespace EnterpriseIntegrationPlatform.AI.RagFlow;
 /// <summary>
 /// Interface for Retrieval-Augmented Generation (RAG) operations using
 /// a self-hosted RagFlow instance. RagFlow chunks and indexes the platform's
-/// source code, rules, and documentation so that AI code generation requests
-/// receive relevant context automatically.
+/// source code, rules, and documentation so that developers can retrieve
+/// relevant platform context via the API. Developers then use their own
+/// preferred AI provider (Copilot, Codex, Claude Code) for code generation.
 /// </summary>
 public interface IRagFlowService
 {

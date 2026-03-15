@@ -272,9 +272,10 @@ internal static class OpenClawHtml
                 Ask where your message is by entering an order number, shipment ID,
                 business key, or correlation ID. OpenClaw queries the isolated
                 observability store (backed by Prometheus metrics + event log)
-                and uses AI (Ollama) to tell you exactly where it is.
-                RagFlow provides RAG-based context retrieval — developers use their
-                own AI provider (Copilot, Codex, Claude Code) for code generation.
+                and provides trace analysis to tell you exactly where it is.
+                The platform's RAG API (powered by RagFlow + Ollama) provides
+                knowledge retrieval — developers use their own AI provider
+                (Copilot, Codex, Claude Code) for code generation.
             </p>
             <div class="spinner" id="spinner">⏳ Searching…</div>
             <div id="result"></div>
@@ -356,7 +357,7 @@ internal static class OpenClawHtml
                 } else {
                     // AI Summary card
                     html += `<div class="card">
-                        <h2>AI Diagnostic Summary</h2>
+                        <h2>Trace Analysis Summary</h2>
                         <div class="summary">${esc(data.summary)}</div>
                     </div>`;
                 }

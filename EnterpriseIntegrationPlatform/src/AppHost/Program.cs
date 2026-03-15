@@ -1,9 +1,9 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 // ── AI Infrastructure ─────────────────────────────────────────────────────────
-// Ollama provides local LLM inference for AI-assisted observability (OpenClaw)
-// and embedding/retrieval within RagFlow. Developers use their own AI provider
-// (Copilot, Codex, Claude Code) for code generation.
+// Ollama powers the self-hosted RAG system by providing embedding and retrieval
+// capabilities within RagFlow. Developers use their own AI provider (Copilot,
+// Codex, Claude Code) for code generation, connecting to the RAG API for context.
 // Host port 15434 avoids conflict with any existing Ollama instance on 11434.
 var ollama = builder.AddContainer("ollama", "ollama/ollama")
     .WithHttpEndpoint(port: 15434, targetPort: 11434, name: "ollama-api")
@@ -75,10 +75,11 @@ var ingestionKafka = builder.AddProject<Projects.Ingestion_Kafka>("ingestion-kaf
 
 var workflowTemporal = builder.AddProject<Projects.Workflow_Temporal>("workflow-temporal");
 
-// OpenClaw – the observability + context retrieval web UI – talks to Ollama for
-// AI-powered diagnostics and RagFlow for RAG-based context retrieval.
-// Developers connect their own AI provider (Copilot, Codex, Claude Code)
-// to the RAG endpoints for integration code generation.
+// OpenClaw – the observability + knowledge retrieval web UI – provides
+// "where is my message?" trace analysis and RAG-based context retrieval
+// via RagFlow. Developers connect their own AI provider (Copilot, Codex,
+// Claude Code) to the RAG endpoints to get platform context for generating
+// integrations.
 // Loki provides real storage for all event logs, traces, status, and metadata.
 var openClaw = builder.AddProject<Projects.OpenClaw_Web>("openclaw")
     .WithExternalHttpEndpoints()

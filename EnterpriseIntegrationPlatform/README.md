@@ -1,6 +1,6 @@
 # Enterprise Integration Platform
 
-A modern, AI-driven enterprise integration platform built on .NET 10, replacing legacy middleware (BizTalk Server) with a cloud-native, horizontally scalable architecture. It implements [Enterprise Integration Patterns](https://www.enterpriseintegrationpatterns.com/) using configurable message brokers, durable workflow orchestration, and AI-assisted observability.
+A modern, AI-driven enterprise integration platform built on .NET 10, replacing legacy middleware (BizTalk Server) with a cloud-native, horizontally scalable architecture. It implements [Enterprise Integration Patterns](https://www.enterpriseintegrationpatterns.com/) using configurable message brokers, durable workflow orchestration, and a self-hosted RAG knowledge system.
 
 ---
 
@@ -8,7 +8,7 @@ A modern, AI-driven enterprise integration platform built on .NET 10, replacing 
 
 - **Configurable Message Brokers** — Kafka for event streaming and audit; NATS JetStream (default) or Apache Pulsar Key_Shared for task delivery. Recipient A never blocks Recipient B, even at 1 million recipients.
 - **Temporal Workflow Orchestration** — Long-running, stateful workflows with automatic retry, compensation, and saga support via [Temporal.io](https://temporal.io/).
-- **AI-Powered Observability (OpenClaw)** — Ask "where is my message?" in natural language. Backed by Grafana Loki and Ollama for on-premises AI inference.
+- **AI-Powered Observability (OpenClaw)** — Ask "where is my message?" in natural language. Backed by Grafana Loki for event storage. Self-hosted RAG (RagFlow + Ollama) provides knowledge retrieval for developers.
 - **.NET Aspire** — Single-command local orchestration of all services, brokers, and infrastructure containers.
 - **OpenTelemetry** — Distributed tracing, Prometheus metrics, and structured logging across every layer.
 
@@ -34,7 +34,7 @@ A modern, AI-driven enterprise integration platform built on .NET 10, replacing 
 │  ▼                                                                      │
 │  ┌──────────────┐    ┌──────────────────┐    ┌────────────────────────┐ │
 │  │  Cassandra   │    │  OpenTelemetry   │    │   Ollama AI Runtime   │ │
-│  │  (Storage)   │    │  (Observability) │    │   (RAG + Diagnostics) │ │
+│  │  (Storage)   │    │  (Observability) │    │   (RAG Retrieval)     │ │
 │  └──────────────┘    └──────────────────┘    └────────────────────────┘ │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -105,7 +105,7 @@ EnterpriseIntegrationPlatform/
 │   ├── RuleEngine/               # Business rules engine
 │   ├── AI.Ollama/                # Ollama AI integration
 │   ├── Observability/            # Lifecycle recording, Loki storage, OpenClaw API
-│   ├── OpenClaw.Web/             # "Where is my message?" web UI & AI diagnostics
+│   ├── OpenClaw.Web/             # "Where is my message?" web UI & RAG knowledge API
 │   ├── Admin.Api/                # Administration REST API
 │   └── Admin.Web/                # Administration web UI
 ├── tests/

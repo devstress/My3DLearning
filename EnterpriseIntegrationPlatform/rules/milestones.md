@@ -13,7 +13,7 @@
 ## Vision
 
 Build a modern AI-driven Enterprise Integration Platform to replace Microsoft BizTalk Server.  
-The platform uses .NET 10, .NET Aspire, a configurable message broker layer, Temporal.io, CassandraDB, OpenTelemetry, and Ollama (configurable AI provider).  
+The platform uses .NET 10, .NET Aspire, a configurable message broker layer, Temporal.io, CassandraDB, OpenTelemetry, and a self-hosted RAG system (RagFlow + Ollama).  
 It implements Enterprise Integration Patterns in a cloud-native, horizontally scalable architecture.
 
 **AI-Driven Integration Generation** — The framework focuses on few lines of code. An operator writes a minimal specification and asks AI to auto-generate a complete, production-ready integration. Example prompt: "Generate an integration that maps a message (XML/JSON/flat file) to another format, obtains an auth token from a web API (cached with expiry), and submits the message to another web API with the token."
@@ -36,7 +36,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
   - The broker choice between Kafka and the queue broker is a deployment-time configuration switch per message flow category.
 - Use Cassandra for scalable distributed persistence
 - Use Aspire AppHost to orchestrate the platform locally
-- Integrate Ollama for AI-assisted diagnostics; self-hosted RAG via RagFlow + Ollama for context retrieval
+- Integrate Ollama for RAG retrieval within RagFlow; self-hosted knowledge API for developers
 - Self-hosted GraphRAG via RagFlow + Ollama — index docs, rules, and source code; developers connect their own AI provider to retrieve context from any client machine
 - OpenTelemetry for end-to-end observability
 - Saga-based distributed transactions via Temporal
@@ -56,7 +56,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 005 | Configurable message broker ingestion | Implement broker abstraction with Kafka, NATS JetStream (default), and Pulsar (Key_Shared) providers for message ingestion | done |
 | 006 | Temporal workflow host | Set up Temporal worker and workflow definitions with validation activities | done |
 | 007 | Cassandra storage module | Implement Cassandra repository and data access | done |
-| 008 | Ollama AI integration | Integrate Ollama for AI-assisted operations | done |
+| 008 | Ollama AI integration | Integrate Ollama for RAG retrieval within RagFlow and trace analysis | done |
 | 009 | OpenTelemetry observability | Configure distributed tracing, metrics (Prometheus), isolated observability storage (Loki), OpenClaw web UI with Playwright tests, RagFlow + Ollama in Aspire, AI.RagFlow client, OpenClaw generation endpoints (POST /api/generate/integration, POST /api/generate/chat), non-common Aspire ports (15xxx range) | done |
 | 010 | Admin API | Build administration API for platform management | not-started |
 | 011 | End-to-end demo pipeline | Wire all components into a working demo pipeline | not-started |

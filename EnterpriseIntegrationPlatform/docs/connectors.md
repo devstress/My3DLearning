@@ -233,4 +233,4 @@ To add a new connector type:
 7. Add integration tests with a mock target system.
 8. Document the connector configuration in this guide.
 
-The AI code generation system can scaffold new connectors from natural language descriptions, producing the implementation, configuration model, tests, and documentation.
+Developers can use the platform's RAG knowledge API with their own AI provider to scaffold new connectors from natural language descriptions, producing the implementation, configuration model, tests, and documentation.

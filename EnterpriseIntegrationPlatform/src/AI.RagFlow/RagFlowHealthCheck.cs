@@ -27,6 +27,6 @@ public sealed class RagFlowHealthCheck : IHealthCheck
         var healthy = await _ragFlow.IsHealthyAsync(cancellationToken);
         return healthy
             ? HealthCheckResult.Healthy("RagFlow is reachable.")
-            : HealthCheckResult.Degraded("RagFlow is not reachable. RAG-assisted code generation is unavailable.");
+            : HealthCheckResult.Degraded("RagFlow is not reachable. RAG knowledge retrieval is unavailable.");
     }
 }

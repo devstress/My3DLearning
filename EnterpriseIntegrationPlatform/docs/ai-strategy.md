@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Enterprise Integration Platform integrates a self-hosted RAG (Retrieval-Augmented Generation) system to accelerate development, improve documentation, and assist operations. RagFlow + Ollama index the platform's source code, rules, and documentation as a knowledge base. Developers use their own preferred AI provider (Copilot, Codex, Claude Code) connecting to this self-hosted RAG system to generate production-ready integrations. Additionally, Ollama provides AI-assisted operational diagnostics (e.g., "where is my message?") within the OpenClaw web UI. All data stays on-premises.
+The Enterprise Integration Platform integrates a self-hosted RAG (Retrieval-Augmented Generation) system to accelerate development. RagFlow + Ollama index the platform's source code, rules, and documentation as a knowledge base. Ollama provides embeddings and retrieval within RagFlow. Developers use their own preferred AI provider (Copilot, Codex, Claude Code) connecting to the platform's RAG API to retrieve relevant platform context, then use that context to generate production-ready integrations. All data stays on-premises.
 
 ## Why Self-Hosted RAG
 
@@ -16,14 +16,13 @@ The Enterprise Integration Platform integrates a self-hosted RAG (Retrieval-Augm
 
 ## Ollama Runtime
 
-Ollama runs as a local HTTP service providing LLM inference for two purposes:
-1. **Embedding and retrieval** within RagFlow — Ollama generates embeddings for the indexed knowledge base so that RagFlow can perform similarity search.
-2. **Operational diagnostics** — Ollama powers AI-assisted "where is my message?" queries in the OpenClaw web UI.
+Ollama runs as a local HTTP service providing LLM inference to power the RagFlow knowledge base:
+- **Embedding and retrieval** — Ollama generates embeddings for the indexed knowledge base so that RagFlow can perform similarity search and return relevant platform context.
 
-Ollama is **not** used for code generation. Developers use their own preferred AI provider (e.g., GitHub Copilot, OpenAI Codex, Claude Code) for code generation, connecting to the self-hosted RAG API to retrieve relevant platform context.
+Ollama is **not** used for code generation or integration generation. Developers use their own preferred AI provider (e.g., GitHub Copilot, OpenAI Codex, Claude Code) for code generation, connecting to the self-hosted RAG API to retrieve relevant platform context.
 
 - **Endpoint:** `http://localhost:15434` (Aspire host port; container-internal port 11434)
-- **Models:** Embedding models for RAG retrieval; code-focused models (e.g., CodeLlama) for operational diagnostics
+- **Models:** Embedding models for RAG retrieval and similarity search
 - **API:** REST API for generation, chat, and embeddings
 - **Resource Requirements:** 8–16 GB RAM for 7B–13B parameter models; GPU acceleration recommended
 

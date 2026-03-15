@@ -62,7 +62,7 @@ See `milestones.md` for current phase status and next chunk.
 
 - **Date**: 2026-03-15
 - **Status**: done
-- **Goal**: Add self-hosted GraphRAG system (RagFlow + Ollama) to the Aspire project so developers can ask OpenClaw to generate integrations from any client machine. Change all Aspire container host ports to non-common 15xxx range to avoid conflicts with existing services.
+- **Goal**: Add self-hosted GraphRAG system (RagFlow + Ollama) to the Aspire project so developers can retrieve platform knowledge from any client machine and use their own AI provider for code generation. Change all Aspire container host ports to non-common 15xxx range to avoid conflicts with existing services.
 
 ### Files created
 
