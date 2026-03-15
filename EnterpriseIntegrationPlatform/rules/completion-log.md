@@ -4,7 +4,64 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
-## Chunk 011 – End-to-end demo pipeline
+## Chunk 012 – Content-Based Router
+
+- **Date**: 2026-03-15
+- **Status**: done
+- **Goal**: Implement the Content-Based Router EIP pattern in a new `Processing.Routing` project, advancing Quality Pillars 1 (Reliability — deterministic routing), 4 (Maintainability — rule-driven extensibility), and 11 (Performance — pre-sorted rule list evaluated at O(n)).
+
+### Architecture
+
+The Content-Based Router is a standalone class library (`Processing.Routing`) that evaluates `IntegrationEnvelope<T>` messages against a prioritised list of `RoutingRule` objects and publishes the envelope to the selected topic via `IMessageBrokerProducer`.
+
+**Routing flow:**
+1. Rules are pre-sorted in ascending `Priority` order at construction time (one allocation, zero per-message sort).
+2. For each rule the router extracts the configured field value from the envelope.
+3. The field value is tested against the rule's `Operator` and `Value`.
+4. The first matching rule determines the `TargetTopic`; the envelope is published there.
+5. If no rule matches and `RouterOptions.DefaultTopic` is set, the message is routed to the default topic.
+6. If no rule matches and no default is configured, `InvalidOperationException` is thrown (prevents silent message loss).
+
+**Supported field names:**
+- `MessageType` — the envelope's `MessageType` header
+- `Source` — the envelope's `Source` header
+- `Priority` — string representation of the envelope's `Priority` enum value
+- `Metadata.{key}` — a value from the envelope's `Metadata` dictionary
+- `Payload.{dot.path}` — a value from the JSON payload (dot-separated path; only for `JsonElement` payloads)
+
+**Supported operators:** `Equals`, `Contains`, `StartsWith`, `Regex` — all case-insensitive.
+
+**Result:** `RoutingDecision` record carrying `TargetTopic`, `MatchedRule` (nullable), and `IsDefault` for observability and diagnostics.
+
+### Files created
+
+- `src/Processing.Routing/Processing.Routing.csproj` — Class library; depends on `Contracts` and `Ingestion`
+- `src/Processing.Routing/RoutingOperator.cs` — Enum: `Equals`, `Contains`, `StartsWith`, `Regex`
+- `src/Processing.Routing/RoutingRule.cs` — Record: `Priority`, `FieldName`, `Operator`, `Value`, `TargetTopic`, `Name`
+- `src/Processing.Routing/RouterOptions.cs` — Options: `Rules`, `DefaultTopic`; bound from `ContentBasedRouter` config section
+- `src/Processing.Routing/RoutingDecision.cs` — Result record: `TargetTopic`, `MatchedRule`, `IsDefault`
+- `src/Processing.Routing/IContentBasedRouter.cs` — Interface: `RouteAsync<T>`
+- `src/Processing.Routing/ContentBasedRouter.cs` — Production implementation; pre-sorted rules; JSON path navigation; structured logging of routing decisions
+- `src/Processing.Routing/RoutingServiceExtensions.cs` — DI extension `AddContentBasedRouter(IServiceCollection, IConfiguration)`
+- `tests/UnitTests/RouterOptionsTests.cs` — 4 tests for `RouterOptions` defaults and values
+- `tests/UnitTests/ContentBasedRouterTests.cs` — 15 tests covering all operators, priority ordering, default fallback, metadata routing, payload JSON routing, producer called, and null guard
+
+### Files modified
+
+- `tests/UnitTests/UnitTests.csproj` — Added `<ProjectReference>` to `Processing.Routing`
+- `EnterpriseIntegrationPlatform.sln` — Added `Processing.Routing` project with GUID `{B1000016-0000-0000-0000-000000000001}`
+- `rules/milestones.md` — Marked chunk 012 as done, updated Next Chunk to 013
+- `rules/completion-log.md` — This entry
+
+### Notes
+
+- All 151 unit tests pass (19 new + 132 pre-existing). Build: 0 warnings, 0 errors.
+- `ContentBasedRouter` sorts rules once at construction (`_sortedRules`) — no per-message allocation or LINQ sort on the hot path.
+- Regex patterns are compiled each invocation via `Regex.IsMatch` with `RegexOptions.IgnoreCase | RegexOptions.CultureInvariant`. For high-throughput deployments, callers may pre-compile patterns by caching `Regex` instances in `RoutingRule.Name` or a future extension.
+- `Payload.{path}` field extraction returns `null` (non-matching) for non-`JsonElement` payloads, so rules that target payload fields are safely ignored for non-JSON messages.
+- `RoutingServiceExtensions.AddContentBasedRouter` requires an `IMessageBrokerProducer` to already be registered (e.g., via `AddNatsJetStreamBroker`) — this matches the dependency inversion pattern used across the platform.
+
+
 
 - **Date**: 2026-03-15
 - **Status**: done
