@@ -50,19 +50,12 @@ var nats = builder.AddContainer("nats", "nats", "latest")
     .WithVolume("nats-data", "/data")
     .WithLifetime(ContainerLifetime.Persistent);
 
-var gatewayApi = builder.AddProject<Projects.Gateway_Api>("gateway-api");
-
 // Ingestion.Kafka handles Kafka streaming workloads (audit, analytics).
 // Task-oriented delivery (ingestion, routing, DLQ) uses the configurable
 // queue broker — NATS JetStream (default) or Apache Pulsar (Key_Shared).
 var ingestionKafka = builder.AddProject<Projects.Ingestion_Kafka>("ingestion-kafka");
 
 var workflowTemporal = builder.AddProject<Projects.Workflow_Temporal>("workflow-temporal");
-
-var adminApi = builder.AddProject<Projects.Admin_Api>("admin-api");
-
-var adminWeb = builder.AddProject<Projects.Admin_Web>("admin-web")
-    .WithReference(adminApi);
 
 // OpenClaw – the observability web UI – talks to Ollama for AI-powered
 // message state diagnostics. Loki provides real storage for all event logs,
