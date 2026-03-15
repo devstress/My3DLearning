@@ -17,5 +17,6 @@
     <ProjectReference Include="..\..\src\AI.RagFlow\AI.RagFlow.csproj" />
     <ProjectReference Include="..\..\src\Ingestion\Ingestion.csproj" />
     <ProjectReference Include="..\..\src\Storage.Cassandra\Storage.Cassandra.csproj" />
+    <ProjectReference Include="..\..\src\Admin.Api\Admin.Api.csproj" />
   </ItemGroup>
 </Project>

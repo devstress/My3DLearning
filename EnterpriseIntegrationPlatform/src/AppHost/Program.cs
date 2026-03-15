@@ -87,4 +87,14 @@ var openClaw = builder.AddProject<Projects.OpenClaw_Web>("openclaw")
     .WithEnvironment("Loki__BaseAddress", loki.GetEndpoint("loki-api"))
     .WithEnvironment("RagFlow__BaseAddress", ragflow.GetEndpoint("ragflow-api"));
 
+// Admin.Api – administration API for platform management.
+// Provides authenticated, rate-limited endpoints for querying messages,
+// inspecting faults, updating delivery status, and monitoring platform health.
+// Protect with AdminApi:ApiKeys in configuration or Aspire secrets — never in source.
+var adminApi = builder.AddProject<Projects.Admin_Api>("admin-api")
+    .WithExternalHttpEndpoints()
+    .WithEnvironment("Loki__BaseAddress", loki.GetEndpoint("loki-api"))
+    .WithEnvironment("Cassandra__ContactPoints__0", "localhost")
+    .WithEnvironment("Cassandra__Port", "15042");
+
 builder.Build().Run();
