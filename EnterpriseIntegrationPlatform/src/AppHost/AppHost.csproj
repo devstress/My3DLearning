@@ -7,5 +7,6 @@
     <ProjectReference Include="..\Ingestion.Kafka\Ingestion.Kafka.csproj" />
     <ProjectReference Include="..\Workflow.Temporal\Workflow.Temporal.csproj" />
     <ProjectReference Include="..\OpenClaw.Web\OpenClaw.Web.csproj" />
+    <ProjectReference Include="..\Admin.Api\Admin.Api.csproj" />
   </ItemGroup>
 </Project>

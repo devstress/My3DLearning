@@ -4,6 +4,69 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 010 – Admin API
+
+- **Date**: 2026-03-15
+- **Status**: done
+- **Goal**: Build a production-ready administration API for platform management, advancing Quality Pillars 2 (Security) and 7 (Supportability).
+
+### Architecture
+
+The Admin API is a standalone ASP.NET Core Web API registered in Aspire AppHost alongside OpenClaw.Web. It is protected by API key authentication and per-key rate limiting, and exposes endpoints for:
+
+1. **Platform status** — runs all registered health checks (including Cassandra) and returns an aggregated `Healthy / Degraded / Unhealthy` summary.
+2. **Message queries** — look up `MessageRecord`s from Cassandra by correlation ID or message ID.
+3. **Message status update** — change the `DeliveryStatus` of a message in Cassandra (e.g. force-DLQ or re-queue).
+4. **Fault queries** — retrieve `FaultEnvelope`s from Cassandra by correlation ID.
+5. **Observability event queries** — query the Loki-backed `IObservabilityEventLog` by correlation ID or business key.
+
+All endpoints require the `X-Api-Key` header. API keys are stored in configuration (`AdminApi:ApiKeys`) — never in source code. A development convenience key is set in `appsettings.Development.json`.
+
+**Security measures implemented:**
+- API key authentication (`ApiKeyAuthenticationHandler`) with ordinal key comparison.
+- API keys are masked (first 4 chars + `****`) in all audit log entries.
+- Fixed-window rate limiting (per API key, or per IP as fallback) with HTTP 429 on excess.
+- All admin operations are logged to the structured audit trail (flows to Loki for compliance).
+
+### Endpoint Summary
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/status` | Aggregated platform health |
+| GET | `/api/admin/messages/correlation/{correlationId}` | Messages by correlation ID |
+| GET | `/api/admin/messages/{messageId}` | Single message by ID |
+| PATCH | `/api/admin/messages/{messageId}/status` | Update delivery status |
+| GET | `/api/admin/faults/correlation/{correlationId}` | Faults by correlation ID |
+| GET | `/api/admin/events/correlation/{correlationId}` | Observability events by correlation ID |
+| GET | `/api/admin/events/business/{businessKey}` | Observability events by business key |
+
+- **Files created**:
+  - `src/Admin.Api/Admin.Api.csproj` — ASP.NET Core Web project; references ServiceDefaults, Observability, Storage.Cassandra
+  - `src/Admin.Api/AdminApiOptions.cs` — configuration record (`AdminApi:ApiKeys`, `AdminApi:RateLimitPerMinute`)
+  - `src/Admin.Api/Authentication/ApiKeyAuthenticationHandler.cs` — custom `AuthenticationHandler<AuthenticationSchemeOptions>`; validates `X-Api-Key` header; grants `Admin` role
+  - `src/Admin.Api/Services/PlatformStatusService.cs` — aggregates `HealthCheckService.CheckHealthAsync`; returns `PlatformStatusResult` + `ComponentStatus` records
+  - `src/Admin.Api/Services/AdminAuditLogger.cs` — structured audit log via `ILogger<T>`; masks API key prefix; flows to Loki
+  - `src/Admin.Api/Program.cs` — full API host: 7 admin endpoints, authentication, rate limiting, Cassandra + Loki integration
+  - `src/Admin.Api/appsettings.json` — default config with empty ApiKeys list and Cassandra/Loki defaults
+  - `src/Admin.Api/appsettings.Development.json` — development convenience key + elevated rate limit
+  - `src/Admin.Api/Properties/launchSettings.json` — local dev profile on port 5200
+  - `tests/UnitTests/AdminApiOptionsTests.cs` — 5 tests for options defaults and key list semantics
+  - `tests/UnitTests/AdminAuditLoggerTests.cs` — 4 tests for audit logging with various principal states
+  - `tests/UnitTests/PlatformStatusServiceTests.cs` — 5 tests for status aggregation, exception handling, and field population
+- **Files modified**:
+  - `EnterpriseIntegrationPlatform.sln` — added Admin.Api project with GUID `{B1000014-0000-0000-0000-000000000001}`
+  - `src/AppHost/AppHost.csproj` — added `<ProjectReference>` to Admin.Api
+  - `src/AppHost/Program.cs` — registered `Projects.Admin_Api` as `admin-api` with `WithExternalHttpEndpoints()`, Loki + Cassandra environment injection
+  - `tests/UnitTests/UnitTests.csproj` — added `<ProjectReference>` to Admin.Api
+  - `rules/milestones.md` — marked chunk 010 as done, updated Next Chunk to 011
+  - `rules/completion-log.md` — this entry
+- **Notes**:
+  - All 106 unit tests pass (14 new + 92 pre-existing). Build: 0 warnings, 0 errors.
+  - Rate limiting uses `System.Threading.RateLimiting` (built-in, no extra NuGet package) with `PartitionedRateLimiter.Create` keyed by API key or remote IP.
+  - `HealthCheckService.CheckHealthAsync(null, cancellationToken)` is called directly (abstract overload) to enable NSubstitute mocking in unit tests.
+  - Admin.Api is intentionally decoupled from AI.Ollama and AI.RagFlow — those are OpenClaw concerns. Admin focuses on operational management.
+  - `/health` and `/alive` endpoints (from `MapDefaultEndpoints`) remain public; only `/api/admin/*` endpoints require authentication.
+
 ## Chunk 007 – Cassandra Storage Module
 
 - **Date**: 2026-03-15
