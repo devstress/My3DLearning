@@ -4,6 +4,80 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 015 – Aggregator
+
+- **Date**: 2026-03-16
+- **Status**: done
+- **Goal**: Implement the Aggregator EIP pattern in a new `Processing.Aggregator` project, advancing Quality Pillars 1 (Reliability — zero message loss across multi-message correlation groups), 4 (Maintainability — composable aggregation and completion strategy abstractions), and 10 (Testability — pure unit-testable aggregation logic with in-memory store).
+
+### Architecture
+
+The Aggregator is a standalone class library (`Processing.Aggregator`) that collects individual `IntegrationEnvelope<TItem>` messages sharing the same `CorrelationId`, evaluates a pluggable completion condition, and when the group is complete, combines all payloads using a pluggable `IAggregationStrategy<TItem, TAggregate>` and publishes a single `IntegrationEnvelope<TAggregate>` via `IMessageBrokerProducer`.
+
+**Aggregation flow:**
+1. The `MessageAggregator<TItem, TAggregate>` receives an individual envelope and validates the `TargetTopic` configuration.
+2. The envelope is appended to its correlation group in the injected `IMessageAggregateStore<TItem>`, keyed by `CorrelationId`.
+3. The injected `ICompletionStrategy<TItem>` is evaluated against the current group.
+4. If not complete: an `AggregateResult<TAggregate>` with `IsComplete = false` and no envelope is returned.
+5. If complete: the injected `IAggregationStrategy<TItem, TAggregate>` combines all payloads into an aggregate. A new envelope is created preserving `CorrelationId`, merging all `Metadata` (last-write wins on key conflicts), and adopting the highest `Priority` in the group. `CausationId` is not set because the aggregate has multiple causal messages. The group is removed from the store, the aggregate is published to `AggregatorOptions.TargetTopic`, and a complete `AggregateResult<TAggregate>` is returned.
+
+**Provided `ICompletionStrategy<TItem>` implementations:**
+- `CountCompletionStrategy<T>` — Completes when the group reaches a configured `ExpectedCount`. Guard: `expectedCount > 0` enforced in constructor.
+- `FuncCompletionStrategy<T>` — Wraps a caller-supplied `Func<IReadOnlyList<IntegrationEnvelope<T>>, bool>` predicate for arbitrary completion logic (e.g., payload-content-based completion).
+
+**Provided `IAggregationStrategy<TItem, TAggregate>` implementations:**
+- `FuncAggregationStrategy<TItem, TAggregate>` — Wraps a caller-supplied `Func<IReadOnlyList<TItem>, TAggregate>` delegate for inline or lambda-based aggregation.
+
+**`IMessageAggregateStore<T>` and `InMemoryMessageAggregateStore<T>`:**
+- Thread-safe in-memory store using `ConcurrentDictionary<Guid, List<T>>` with `lock` on each list for safe concurrent adds to the same group.
+- `AddAsync` appends and returns an immutable snapshot; `RemoveGroupAsync` clears the group.
+- Not durable across restarts; intended for development, testing, and Temporal-backed workflows. Replace with Cassandra-backed store for durable production deployments.
+
+**`AggregatorOptions`** (bound from `MessageAggregator` configuration section):
+- `TargetTopic` — Required. Topic to publish the aggregate envelope to.
+- `TargetMessageType` — Optional. Overrides the aggregate envelope's `MessageType`; when absent, the first received envelope's `MessageType` is used.
+- `TargetSource` — Optional. Overrides the aggregate envelope's `Source`; when absent, the first received envelope's `Source` is used.
+- `ExpectedCount` — Used by `CountCompletionStrategy<T>` when no custom completion predicate is provided.
+
+**DI registration (`AggregatorServiceExtensions`):**
+- `AddMessageAggregator<TItem, TAggregate>(IServiceCollection, IConfiguration, Func<IReadOnlyList<TItem>, TAggregate>, Func<...>?)` — Registers with a delegate aggregation strategy. When `completionPredicate` is `null`, a `CountCompletionStrategy<TItem>` using `AggregatorOptions.ExpectedCount` is used. Always registers `InMemoryMessageAggregateStore<TItem>`.
+
+### Files created
+
+- `src/Processing.Aggregator/Processing.Aggregator.csproj` — Class library; depends on `Contracts` and `Ingestion`
+- `src/Processing.Aggregator/IAggregationStrategy.cs` — Interface: `Aggregate(IReadOnlyList<TItem>) → TAggregate`
+- `src/Processing.Aggregator/ICompletionStrategy.cs` — Interface: `IsComplete(IReadOnlyList<IntegrationEnvelope<T>>) → bool`
+- `src/Processing.Aggregator/IMessageAggregateStore.cs` — Interface: `AddAsync`, `RemoveGroupAsync`
+- `src/Processing.Aggregator/InMemoryMessageAggregateStore.cs` — Thread-safe ConcurrentDictionary + lock store
+- `src/Processing.Aggregator/IMessageAggregator.cs` — Interface: `AggregateAsync(IntegrationEnvelope<TItem>) → AggregateResult<TAggregate>`
+- `src/Processing.Aggregator/AggregateResult.cs` — Result record: `IsComplete`, `AggregateEnvelope`, `CorrelationId`, `ReceivedCount`
+- `src/Processing.Aggregator/AggregatorOptions.cs` — Options: `TargetTopic`, `TargetMessageType`, `TargetSource`, `ExpectedCount`
+- `src/Processing.Aggregator/MessageAggregator.cs` — Production implementation; highest-priority adoption; metadata merge; group cleanup before publish
+- `src/Processing.Aggregator/FuncAggregationStrategy.cs` — Delegate-based aggregation strategy
+- `src/Processing.Aggregator/FuncCompletionStrategy.cs` — Delegate-based completion predicate
+- `src/Processing.Aggregator/CountCompletionStrategy.cs` — Count-based completion; constructor guard for ≤0
+- `src/Processing.Aggregator/AggregatorServiceExtensions.cs` — DI extensions `AddMessageAggregator`
+- `tests/UnitTests/AggregatorOptionsTests.cs` — 8 tests for `AggregatorOptions` defaults and values
+- `tests/UnitTests/InMemoryMessageAggregateStoreTests.cs` — 8 tests: add/retrieve, multi-add, isolation, remove, fresh-start, non-existent remove, thread safety
+- `tests/UnitTests/MessageAggregatorTests.cs` — 23 tests covering incomplete group, complete group, payload aggregation, envelope headers (CorrelationId, CausationId null, new MessageId, highest priority, merged metadata), MessageType/Source override, broker publish, guard clauses, group isolation, group cleared after completion, custom completion predicate, CorrelationId on incomplete result
+
+### Files modified
+
+- `tests/UnitTests/UnitTests.csproj` — Added `<ProjectReference>` to `Processing.Aggregator`
+- `EnterpriseIntegrationPlatform.sln` — Added `Processing.Aggregator` project
+- `rules/milestones.md` — Marked chunk 015 as done, updated Next Chunk to 016
+- `rules/completion-log.md` — This entry
+
+### Notes
+
+- All 260 unit tests pass (39 new + 221 pre-existing). Build: 0 warnings, 0 errors.
+- `MessageAggregator<TItem, TAggregate>` uses two type parameters for full type safety — items and aggregate can be different types (e.g. `TItem=string, TAggregate=string` joining, or `TItem=JsonElement, TAggregate=JsonElement` merging into an array).
+- The aggregate envelope's `CausationId` is deliberately `null` — unlike the Splitter (one cause → many) or Translator (one cause → one), the Aggregator combines many messages into one; there is no single causal message.
+- `InMemoryMessageAggregateStore<T>` uses `ConcurrentDictionary.GetOrAdd` plus a `lock` on the list for safe concurrent adds within the same correlation group. This avoids TOCTOU races.
+- After a group is aggregated, `RemoveGroupAsync` is called before `PublishAsync` to prevent re-aggregation if a late-arriving message triggers the store again — the group is clean before the downstream consumer sees the aggregate.
+- `CountCompletionStrategy<T>` uses `>=` (not `==`) so that groups receiving more messages than expected still complete — defensive against at-least-once delivery.
+
+
 ## Chunk 014 – Splitter
 
 - **Date**: 2026-03-16
