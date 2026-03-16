@@ -66,7 +66,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | Chunk | Name | Status |
 |-------|------|--------|
 | 012 | Content-Based Router | done |
-| 013 | Message Translator | not-started |
+| 013 | Message Translator | done |
 | 014 | Splitter | not-started |
 | 015 | Aggregator | not-started |
 | 016 | Dead Letter Queue | not-started |
@@ -95,7 +95,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-Chunk 013 – Message Translator
+Chunk 014 – Splitter
 
 ---
 
