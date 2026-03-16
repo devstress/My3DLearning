@@ -4,6 +4,73 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 014 – Splitter
+
+- **Date**: 2026-03-16
+- **Status**: done
+- **Goal**: Implement the Splitter EIP pattern in a new `Processing.Splitter` project, advancing Quality Pillars 1 (Reliability — no message loss during split), 4 (Maintainability — composable split strategy abstraction), and 10 (Testability — pure unit-testable split logic).
+
+### Architecture
+
+The Splitter is a standalone class library (`Processing.Splitter`) that decomposes a composite `IntegrationEnvelope<T>` into individual `IntegrationEnvelope<T>` messages using a pluggable `ISplitStrategy<T>` and publishes each to a configured target topic via `IMessageBrokerProducer`.
+
+**Splitting flow:**
+1. The `MessageSplitter<T>` receives a source envelope and validates the `TargetTopic` configuration.
+2. The injected `ISplitStrategy<T>` decomposes the payload into individual items.
+3. For each item, a new envelope is created, preserving `CorrelationId`, `Priority`, `SchemaVersion`, and `Metadata` from the source. `CausationId` is set to `source.MessageId` to maintain the full causation chain.
+4. `MessageType` and `Source` on each split envelope are overridden when `SplitterOptions.TargetMessageType` / `TargetSource` are configured; otherwise they are inherited from the source.
+5. Each split envelope is published to `SplitterOptions.TargetTopic` via `IMessageBrokerProducer`.
+6. A `SplitResult<T>` record is returned containing the split envelopes, source message ID, target topic, and item count for observability and downstream use.
+7. When the split produces zero items, a warning is logged and no messages are published — the result contains an empty list with `ItemCount = 0`.
+
+**Provided `ISplitStrategy<T>` implementations:**
+- `FuncSplitStrategy<T>` — Wraps a caller-supplied `Func<T, IReadOnlyList<T>>` delegate. Use for inline or lambda-based split logic.
+- `JsonArraySplitStrategy` — Splits a `JsonElement` containing a JSON array into individual `JsonElement` items. Supports both top-level arrays and named array properties within JSON objects (via `SplitterOptions.ArrayPropertyName`). Each element is cloned to ensure independence from the source `JsonDocument` lifetime.
+
+**`SplitterOptions`** (bound from `MessageSplitter` configuration section):
+- `TargetTopic` — Required. Topic to publish split envelopes to.
+- `TargetMessageType` — Optional. Overrides the split envelopes' `MessageType`; when absent, the source `MessageType` is preserved.
+- `TargetSource` — Optional. Overrides the split envelopes' `Source`; when absent, the source `Source` is preserved.
+- `ArrayPropertyName` — Optional. Used by `JsonArraySplitStrategy` to specify which property in a JSON object contains the array to split. When absent, the payload is expected to be a top-level JSON array.
+
+**DI registration (`SplitterServiceExtensions`):**
+- `AddMessageSplitter<T>(IServiceCollection, IConfiguration, Func<T, IReadOnlyList<T>>)` — Registers with a delegate strategy.
+- `AddJsonMessageSplitter(IServiceCollection, IConfiguration)` — Registers a `JsonArraySplitStrategy`-backed JSON splitter.
+
+Both overloads require an `IMessageBrokerProducer` to already be registered (e.g. via `AddNatsJetStreamBroker`).
+
+### Files created
+
+- `src/Processing.Splitter/Processing.Splitter.csproj` — Class library; depends on `Contracts` and `Ingestion`
+- `src/Processing.Splitter/ISplitStrategy.cs` — Interface: `Split(T) → IReadOnlyList<T>`
+- `src/Processing.Splitter/IMessageSplitter.cs` — Interface: `SplitAsync(IntegrationEnvelope<T>) → SplitResult<T>`
+- `src/Processing.Splitter/SplitResult.cs` — Result record: `SplitEnvelopes`, `SourceMessageId`, `TargetTopic`, `ItemCount`
+- `src/Processing.Splitter/SplitterOptions.cs` — Options: `TargetTopic`, `TargetMessageType`, `TargetSource`, `ArrayPropertyName`
+- `src/Processing.Splitter/MessageSplitter.cs` — Production implementation; preserves causation chain; configurable type/source override
+- `src/Processing.Splitter/FuncSplitStrategy.cs` — Delegate-based split strategy
+- `src/Processing.Splitter/JsonArraySplitStrategy.cs` — JSON array split implementation; top-level and named property; element cloning
+- `src/Processing.Splitter/SplitterServiceExtensions.cs` — DI extensions `AddMessageSplitter` and `AddJsonMessageSplitter`
+- `tests/UnitTests/SplitterOptionsTests.cs` — 8 tests for `SplitterOptions` defaults and values
+- `tests/UnitTests/MessageSplitterTests.cs` — 20 tests covering payload split, envelope header propagation, MessageType/Source override, broker publish, result record, guard clauses, metadata isolation, and zero-item split
+- `tests/UnitTests/JsonArraySplitStrategyTests.cs` — 10 tests covering top-level array, named array property, scalar arrays, empty arrays, error cases, and element independence
+
+### Files modified
+
+- `tests/UnitTests/UnitTests.csproj` — Added `<ProjectReference>` to `Processing.Splitter`
+- `EnterpriseIntegrationPlatform.sln` — Added `Processing.Splitter` project
+- `rules/milestones.md` — Marked chunk 014 as done, updated Next Chunk to 015
+- `rules/completion-log.md` — This entry
+
+### Notes
+
+- All 221 unit tests pass (38 new + 183 pre-existing). Build: 0 warnings, 0 errors.
+- `MessageSplitter<T>` is fully generic — any payload type is supported. The `JsonArraySplitStrategy` specialises for `JsonElement` scenarios common in HTTP connector integrations.
+- Each split envelope gets its own deep copy of `Metadata` to prevent mutation side effects between split items.
+- `JsonArraySplitStrategy` clones each array element via `JsonSerializer.SerializeToElement` to ensure elements are independent of the source `JsonDocument` lifetime.
+- Zero-item splits produce a warning log and return an empty result — no messages are published. This prevents accidental silent drops while providing diagnostics.
+- `SplitterServiceExtensions.AddMessageSplitter` and `AddJsonMessageSplitter` require an `IMessageBrokerProducer` to already be registered — consistent with the dependency inversion pattern used by `AddContentBasedRouter` and `AddMessageTranslator`.
+
+
 ## Chunk 013 – Message Translator
 
 - **Date**: 2026-03-15
