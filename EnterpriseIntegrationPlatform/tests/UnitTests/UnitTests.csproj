@@ -21,5 +21,6 @@
     <ProjectReference Include="..\..\src\Demo.Pipeline\Demo.Pipeline.csproj" />
     <ProjectReference Include="..\..\src\Processing.Routing\Processing.Routing.csproj" />
     <ProjectReference Include="..\..\src\Processing.Translator\Processing.Translator.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Splitter\Processing.Splitter.csproj" />
   </ItemGroup>
 </Project>
