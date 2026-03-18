@@ -23,5 +23,8 @@
     <ProjectReference Include="..\..\src\Processing.Translator\Processing.Translator.csproj" />
     <ProjectReference Include="..\..\src\Processing.Splitter\Processing.Splitter.csproj" />
     <ProjectReference Include="..\..\src\Processing.Aggregator\Processing.Aggregator.csproj" />
+    <ProjectReference Include="..\..\src\Processing.DeadLetter\Processing.DeadLetter.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Retry\Processing.Retry.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Replay\Processing.Replay.csproj" />
   </ItemGroup>
 </Project>
