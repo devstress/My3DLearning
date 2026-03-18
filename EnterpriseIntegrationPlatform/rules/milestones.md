@@ -68,7 +68,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 012 | Content-Based Router | done |
 | 013 | Message Translator | done |
 | 014 | Splitter | done |
-| 015 | Aggregator | not-started |
+| 015 | Aggregator | done |
 | 016 | Dead Letter Queue | not-started |
 | 017 | Retry framework | not-started |
 | 018 | Replay framework | not-started |
@@ -95,7 +95,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-Chunk 015 – Aggregator
+Chunk 016 – Dead Letter Queue
 
 ---
 

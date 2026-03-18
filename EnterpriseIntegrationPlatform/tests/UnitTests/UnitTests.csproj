@@ -22,5 +22,6 @@
     <ProjectReference Include="..\..\src\Processing.Routing\Processing.Routing.csproj" />
     <ProjectReference Include="..\..\src\Processing.Translator\Processing.Translator.csproj" />
     <ProjectReference Include="..\..\src\Processing.Splitter\Processing.Splitter.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Aggregator\Processing.Aggregator.csproj" />
   </ItemGroup>
 </Project>
