@@ -26,5 +26,9 @@
     <ProjectReference Include="..\..\src\Processing.DeadLetter\Processing.DeadLetter.csproj" />
     <ProjectReference Include="..\..\src\Processing.Retry\Processing.Retry.csproj" />
     <ProjectReference Include="..\..\src\Processing.Replay\Processing.Replay.csproj" />
+    <ProjectReference Include="..\..\src\Connector.Http\Connector.Http.csproj" />
+    <ProjectReference Include="..\..\src\Connector.Sftp\Connector.Sftp.csproj" />
+    <ProjectReference Include="..\..\src\Connector.Email\Connector.Email.csproj" />
+    <ProjectReference Include="..\..\src\Connector.File\Connector.File.csproj" />
   </ItemGroup>
 </Project>
