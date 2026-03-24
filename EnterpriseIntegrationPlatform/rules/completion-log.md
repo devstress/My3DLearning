@@ -4,6 +4,411 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 028 – AI-Assisted Code Generation
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Extend OpenClaw.Web with two new AI context-retrieval endpoints (`/api/generate/connector` and `/api/generate/schema`) that give developers' own AI providers (Copilot, Codex, Claude Code) structured RAG context for generating connectors and message schemas, advancing Quality Pillar 9 (Operational Excellence — reduce time to generate new integrations) and Pillar 4 (Maintainability — standardized prompt patterns).
+
+### Architecture
+
+- `/api/generate/connector` (POST) — accepts `GenerateConnectorRequest` (connector type, target description, auth type, related patterns), builds a structured query, retrieves context from RagFlow, returns `GenerateConnectorResponse`.
+- `/api/generate/schema` (POST) — accepts `GenerateSchemaRequest` (message type, format, optional example payload), retrieves schema-related context from RagFlow, returns `GenerateSchemaResponse`.
+- Both endpoints follow the same RAG-retrieval-only pattern established in chunks 009 and earlier: the platform retrieves context; the developer's AI provider generates the code.
+
+### Files modified
+
+- `src/OpenClaw.Web/Program.cs` — added `generate.MapPost("/connector")`, `generate.MapPost("/schema")`, and the four supporting record types.
+
+---
+
+## Chunk 027 – Operational Tooling
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Add DLQ resubmission endpoint to the Admin API, wiring `DlqManagementService` → `IMessageReplayer`, advancing Quality Pillar 7 (Supportability — operators can resubmit failed messages via a single API call) and Pillar 9 (Operational Excellence — reduce MTTR for poison message incidents).
+
+### Architecture
+
+- `DlqManagementService` — thin orchestration service in Admin.Api that delegates to `IMessageReplayer.ReplayAsync`, logs start/completion, and returns `ReplayResult`.
+- `POST /api/admin/dlq/resubmit` — accepts `DlqResubmitRequest` (optional CorrelationId, MessageType, FromTimestamp, ToTimestamp filters), calls `DlqManagementService.ResubmitAsync`, returns `ReplayResult`. Protected by `X-Api-Key` authentication with Admin role.
+- `AddMessageReplay` from `Processing.Replay` registered in Admin.Api DI.
+
+### Files created
+
+- `src/Admin.Api/Services/DlqManagementService.cs`
+
+### Files modified
+
+- `src/Admin.Api/Admin.Api.csproj` — added `Processing.DeadLetter` and `Processing.Replay` project references
+- `src/Admin.Api/Program.cs` — added `AddMessageReplay`, `DlqManagementService` DI registration, `POST /api/admin/dlq/resubmit` endpoint, and `DlqResubmitRequest` record
+
+---
+
+## Chunk 026 – Load Testing
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Add in-process throughput load tests measuring platform component performance under concurrent load, advancing Quality Pillar 10 (Testability — performance regressions are caught by automated tests) and Pillar 11 (Performance — measured throughput baselines).
+
+### Architecture
+
+`ThroughputLoadTests` in the existing `LoadTests` project uses `Task.WhenAll` and `Parallel.For` to exercise real implementations with in-memory state (no external infrastructure). Tests measure elapsed time against generous thresholds (5 s for 1000 concurrent messages, 2 s for 10,000 payload validations) to catch catastrophic regressions in CI without flakiness.
+
+Four tests:
+1. `DeadLetterPublisher_1000ConcurrentPublishes_CompletesWithin5Seconds`
+2. `InMemoryReplayStore_500ConcurrentStores_CompletesWithin5Seconds`
+3. `ExponentialBackoffRetryPolicy_200ConcurrentSucceedingOperations_CompletesWithin5Seconds`
+4. `PayloadSizeGuard_10000ConcurrentValidations_CompletesWithin2Seconds`
+
+### Files created
+
+- `tests/LoadTests/ThroughputLoadTests.cs` — 4 throughput load tests
+
+### Files modified
+
+- `tests/LoadTests/LoadTests.csproj` — added project references for Contracts, DeadLetter, Retry, Replay, Ingestion, Security, MultiTenancy
+
+---
+
+## Chunk 025 – Saga Compensation
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Implement the Saga compensation workflow in Temporal, advancing Quality Pillar 1 (Reliability — all-or-nothing saga semantics with explicit compensation) and Pillar 6 (Resilience — partial compensation continues on failure rather than aborting).
+
+### Architecture
+
+**New types in `Activities`:**
+- `SagaCompensationInput` — record: `CorrelationId`, `OriginalMessageId`, `MessageType`, `CompensationSteps` (forward-ordered), `FailureReason`.
+- `SagaCompensationResult` — record: `CorrelationId`, `CompensatedSteps`, `FailedSteps`, `IsFullyCompensated`.
+- `ICompensationActivityService` / `DefaultCompensationActivityService` — interface + logging default for executing named compensation steps. Production deployments replace with real rollback logic per step name.
+
+**New types in `Workflow.Temporal`:**
+- `SagaCompensationActivities` — Temporal activities that call `ICompensationActivityService.CompensateAsync` and log each step's start/success/failure stage.
+- `SagaCompensationWorkflow` — Temporal workflow that reverses `CompensationSteps` (last-to-first) and executes each via `SagaCompensationActivities.CompensateStepAsync`. Continues past failed steps (records in `FailedSteps`) to maximise partial compensation.
+
+**Updated `TemporalServiceExtensions`:** registers `ICompensationActivityService`, `SagaCompensationWorkflow`, and `SagaCompensationActivities`.
+
+### Files created
+
+- `src/Activities/SagaCompensationInput.cs`
+- `src/Activities/SagaCompensationResult.cs`
+- `src/Activities/ICompensationActivityService.cs`
+- `src/Activities/DefaultCompensationActivityService.cs`
+- `src/Workflow.Temporal/Activities/SagaCompensationActivities.cs`
+- `src/Workflow.Temporal/Workflows/SagaCompensationWorkflow.cs`
+- `tests/WorkflowTests/SagaCompensationActivitiesTests.cs` — 4 tests
+
+### Files modified
+
+- `src/Workflow.Temporal/TemporalServiceExtensions.cs` — registered saga types
+
+---
+
+## Chunk 024 – Multi-Tenancy
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Implement tenant resolution and tenant isolation guard in a new `MultiTenancy` project, advancing Quality Pillar 2 (Security — cross-tenant data access prevented at envelope boundaries) and Pillar 3 (Scalability — tenant-keyed metadata enables per-tenant routing and partitioning).
+
+### Architecture
+
+- `TenantContext` — record: `TenantId`, `TenantName?`, `IsResolved`. Static `Anonymous` sentinel.
+- `ITenantResolver` / `TenantResolver` — resolves tenant from `IReadOnlyDictionary<string, string>` metadata (key `tenantId`) or from a raw string. Returns `TenantContext.Anonymous` when absent.
+- `ITenantIsolationGuard` / `TenantIsolationGuard` — validates that an `IntegrationEnvelope<T>` belongs to the expected tenant; throws `TenantIsolationException` on mismatch or missing tenant ID.
+- `TenantIsolationException` — exposes `MessageId`, `ActualTenantId`, `ExpectedTenantId`.
+- `MultiTenancyServiceExtensions` — `AddMultiTenancy(IServiceCollection)`.
+
+### Files created
+
+- `src/MultiTenancy/MultiTenancy.csproj`
+- `src/MultiTenancy/TenantContext.cs`
+- `src/MultiTenancy/ITenantResolver.cs`
+- `src/MultiTenancy/TenantResolver.cs`
+- `src/MultiTenancy/ITenantIsolationGuard.cs`
+- `src/MultiTenancy/TenantIsolationGuard.cs`
+- `src/MultiTenancy/TenantIsolationException.cs`
+- `src/MultiTenancy/MultiTenancyServiceExtensions.cs`
+- `tests/UnitTests/TenantResolverTests.cs` — 7 tests
+- `tests/UnitTests/TenantIsolationGuardTests.cs` — 7 tests
+
+### Files modified
+
+- `EnterpriseIntegrationPlatform.sln` — added `MultiTenancy` project
+- `tests/UnitTests/UnitTests.csproj` — added `MultiTenancy` project reference
+
+---
+
+## Chunk 023 – Security
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Implement the Security library with JWT bearer authentication, payload size enforcement, and input sanitization, advancing Quality Pillar 2 (Security — JWT authentication, CRLF injection prevention, oversized payload rejection) and Pillar 4 (Maintainability — reusable security services across all API projects).
+
+### Architecture
+
+- `JwtOptions` — bound from `Jwt` config section: `Issuer`, `Audience`, `SigningKey`, `ValidateLifetime`, `ClockSkew`.
+- `SecurityServiceExtensions.AddPlatformJwtAuthentication` — registers `JwtBearerDefaults.AuthenticationScheme` with `TokenValidationParameters` built from `JwtOptions`. Guards: throws `InvalidOperationException` if `SigningKey` is empty.
+- `PayloadSizeOptions` — `MaxPayloadBytes` (default 1 MB). `IPayloadSizeGuard` / `PayloadSizeGuard` — checks byte count of string (UTF-8) or byte array; throws `PayloadTooLargeException` on excess.
+- `PayloadTooLargeException` — exposes `ActualBytes` and `MaxBytes`.
+- `IInputSanitizer` / `InputSanitizer` — `Sanitize` removes CRLF and null bytes; `IsClean` validates input is free of dangerous characters.
+- `SecurityServiceExtensions.AddPayloadSizeGuard` / `AddInputSanitizer` — DI registration helpers.
+
+### Files created
+
+- `src/Security/Security.csproj`
+- `src/Security/JwtOptions.cs`
+- `src/Security/SecurityServiceExtensions.cs`
+- `src/Security/PayloadSizeOptions.cs`
+- `src/Security/IPayloadSizeGuard.cs`
+- `src/Security/PayloadSizeGuard.cs`
+- `src/Security/PayloadTooLargeException.cs`
+- `src/Security/IInputSanitizer.cs`
+- `src/Security/InputSanitizer.cs`
+- `tests/UnitTests/PayloadSizeGuardTests.cs` — 8 tests
+- `tests/UnitTests/InputSanitizerTests.cs` — 9 tests
+
+### Files modified
+
+- `Directory.Packages.props` — added `Microsoft.AspNetCore.Authentication.JwtBearer` 10.0.5
+- `EnterpriseIntegrationPlatform.sln` — added `Security` project
+- `tests/UnitTests/UnitTests.csproj` — added `Security` and `MultiTenancy` project references
+
+---
+
+## Chunk 022 – File Connector
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Implement the File connector for reading and writing files on the local or network file system, advancing Quality Pillar 6 (Resilience — metadata sidecar preserves correlation context for recovery) and Pillar 11 (Performance — async I/O via IFileSystem abstraction).
+
+### Architecture
+
+`Connector.File` is a standalone class library in namespace `EnterpriseIntegrationPlatform.Connector.FileSystem` (to avoid conflict with `System.IO.File`).
+
+- `FileConnectorOptions` — `RootDirectory` (required), `Encoding` (default `"utf-8"`), `CreateDirectoryIfNotExists` (default `true`), `OverwriteExisting` (default `false`), `FilenamePattern` (default `"{MessageId}-{MessageType}.json"`).
+- `IFileSystem` / `PhysicalFileSystem` — abstraction over `System.IO.File` and `Directory` for testability.
+- `IFileConnector` / `FileConnector` — `WriteAsync<T>` expands the filename pattern (`{MessageId}`, `{MessageType}`, `{CorrelationId}`, `{Timestamp:yyyyMMddHHmmss}`), writes payload bytes and a `.meta.json` sidecar with envelope metadata, honours `OverwriteExisting`. `ReadAsync` returns raw bytes. `ListFilesAsync` lists files matching a search pattern.
+- `FileConnectorServiceExtensions` — `AddFileConnector(IServiceCollection, IConfiguration)`.
+
+### Files created
+
+- `src/Connector.File/Connector.File.csproj`
+- `src/Connector.File/FileConnectorOptions.cs`
+- `src/Connector.File/IFileSystem.cs`
+- `src/Connector.File/PhysicalFileSystem.cs`
+- `src/Connector.File/IFileConnector.cs`
+- `src/Connector.File/FileConnector.cs`
+- `src/Connector.File/FileConnectorServiceExtensions.cs`
+- `tests/UnitTests/FileConnectorTests.cs` — 10 tests
+
+### Files modified
+
+- `tests/UnitTests/UnitTests.csproj` — added `Connector.File` project reference
+- `EnterpriseIntegrationPlatform.sln` — added `Connector.File` project
+
+---
+
+## Chunk 021 – Email Connector
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Implement the Email connector using MailKit/MimeKit, advancing Quality Pillar 6 (Resilience — always-disconnect SMTP finally block) and Pillar 2 (Security — MimeKit 4.15.1 overrides vulnerable 4.12.0 transitive dep for GHSA-g7hc-96xr-gvvx).
+
+### Architecture
+
+- `EmailConnectorOptions` — `SmtpHost`, `SmtpPort` (587), `UseTls` (true), `Username`, `Password`, `DefaultFrom`, `DefaultSubjectTemplate` (`"{MessageType} notification"`).
+- `ISmtpClientWrapper` / `MailKitSmtpClientWrapper` — thin wrapper around `MailKit.Net.Smtp.SmtpClient` for testability.
+- `IEmailConnector` / `EmailConnector` — builds `MimeMessage`, adds `X-Correlation-Id` and `X-Message-Id` headers, connects/authenticates/sends/disconnects (always in finally). Two overloads: single address and list of addresses.
+- `EmailConnectorServiceExtensions` — `AddEmailConnector(IServiceCollection, IConfiguration)`.
+- `Directory.Packages.props` updated: `MailKit` → 4.15.1, explicit `MimeKit` 4.15.1 override for GHSA-g7hc-96xr-gvvx.
+
+### Files created
+
+- `src/Connector.Email/Connector.Email.csproj`
+- `src/Connector.Email/EmailConnectorOptions.cs`
+- `src/Connector.Email/ISmtpClientWrapper.cs`
+- `src/Connector.Email/MailKitSmtpClientWrapper.cs`
+- `src/Connector.Email/IEmailConnector.cs`
+- `src/Connector.Email/EmailConnector.cs`
+- `src/Connector.Email/EmailConnectorServiceExtensions.cs`
+- `tests/UnitTests/EmailConnectorTests.cs` — 10 tests
+
+### Files modified
+
+- `Directory.Packages.props` — upgraded MailKit to 4.15.1, added MimeKit 4.15.1 override
+- `tests/UnitTests/UnitTests.csproj` — added `Connector.Email` project reference
+- `EnterpriseIntegrationPlatform.sln` — added `Connector.Email` project
+
+---
+
+## Chunk 020 – SFTP Connector
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Implement the SFTP connector using SSH.NET, advancing Quality Pillar 6 (Resilience — always-disconnect finally block) and Pillar 7 (Supportability — correlation metadata sidecar for every upload).
+
+### Architecture
+
+- `SftpConnectorOptions` — `Host`, `Port` (22), `Username`, `Password`, `RootPath` ("/"), `TimeoutMs` (10000).
+- `ISftpClient` / `SshNetSftpClient` — thin wrapper around `Renci.SshNet.SftpClient` for testability.
+- `ISftpConnector` / `SftpConnector` — `UploadAsync` writes data file + `.meta` sidecar with correlation JSON, always disconnects. `DownloadAsync` returns raw bytes. `ListFilesAsync` returns file list.
+- `SftpConnectorServiceExtensions` — `AddSftpConnector(IServiceCollection, IConfiguration)`.
+
+### Files created
+
+- `src/Connector.Sftp/Connector.Sftp.csproj`
+- `src/Connector.Sftp/SftpConnectorOptions.cs`
+- `src/Connector.Sftp/ISftpClient.cs`
+- `src/Connector.Sftp/SshNetSftpClient.cs`
+- `src/Connector.Sftp/ISftpConnector.cs`
+- `src/Connector.Sftp/SftpConnector.cs`
+- `src/Connector.Sftp/SftpConnectorServiceExtensions.cs`
+- `tests/UnitTests/SftpConnectorTests.cs` — 10 tests
+
+### Files modified
+
+- `Directory.Packages.props` — added `SSH.NET` 2024.2.0
+- `tests/UnitTests/UnitTests.csproj` — added `Connector.Sftp` project reference
+- `EnterpriseIntegrationPlatform.sln` — added `Connector.Sftp` project
+
+---
+
+## Chunk 019 – HTTP Connector
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Implement the HTTP connector with bearer-token caching, advancing Quality Pillar 6 (Resilience — retry via `Microsoft.Extensions.Http.Resilience`), Pillar 11 (Performance — token cache avoids repeated round-trips), and Pillar 2 (Security — cached token with configurable expiry).
+
+### Architecture
+
+- `HttpConnectorOptions` — `BaseUrl`, `TimeoutSeconds` (30), `MaxRetryAttempts` (3), `RetryDelayMs` (1000), `CacheTokenExpirySeconds` (300), `DefaultHeaders`.
+- `ITokenCache` / `InMemoryTokenCache` — thread-safe `ConcurrentDictionary`-backed cache with per-entry expiry.
+- `IHttpConnector` / `HttpConnector` — `SendAsync` adds `X-Correlation-Id`/`X-Message-Id` headers, serializes body for POST/PUT, deserializes response. `SendWithTokenAsync` resolves (or fetches+caches) bearer token before sending.
+- `HttpConnectorServiceExtensions` — `AddHttpConnector(IServiceCollection, IConfiguration)`.
+
+### Files created
+
+- `src/Connector.Http/Connector.Http.csproj`
+- `src/Connector.Http/HttpConnectorOptions.cs`
+- `src/Connector.Http/ITokenCache.cs`
+- `src/Connector.Http/InMemoryTokenCache.cs`
+- `src/Connector.Http/IHttpConnector.cs`
+- `src/Connector.Http/HttpConnector.cs`
+- `src/Connector.Http/HttpConnectorServiceExtensions.cs`
+- `tests/UnitTests/HttpConnectorTests.cs` — 10 tests
+- `tests/UnitTests/InMemoryTokenCacheTests.cs` — 6 tests
+
+### Files modified
+
+- `tests/UnitTests/UnitTests.csproj` — added `Connector.Http` project reference
+- `EnterpriseIntegrationPlatform.sln` — added `Connector.Http` project
+
+---
+
+## Chunk 018 – Replay Framework
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Implement the Replay EIP pattern in a new `Processing.Replay` project, advancing Quality Pillar 1 (Reliability — replay lost or failed messages) and Pillar 6 (Resilience — recover from partial failures by replaying to a target topic).
+
+### Architecture
+
+- `ReplayOptions` — `SourceTopic` (required), `TargetTopic` (required), `MaxMessages` (1000), `BatchSize` (100).
+- `ReplayFilter` — record: `CorrelationId?`, `MessageType?`, `FromTimestamp?`, `ToTimestamp?`.
+- `ReplayResult` — record: `ReplayedCount`, `SkippedCount`, `FailedCount`, `StartedAt`, `CompletedAt`.
+- `IMessageReplayStore` / `InMemoryMessageReplayStore` — thread-safe `ConcurrentDictionary<string, ConcurrentQueue<…>>`, supports filter-aware `IAsyncEnumerable` retrieval.
+- `IMessageReplayer` / `MessageReplayer` — reads from store using source topic + filter, republishes to target topic with new `MessageId` and `CausationId` = original `MessageId`, counts replayed/failed.
+- `ReplayServiceExtensions` — `AddMessageReplay(IServiceCollection, IConfiguration)`.
+
+### Files created
+
+- `src/Processing.Replay/Processing.Replay.csproj`
+- `src/Processing.Replay/ReplayOptions.cs`
+- `src/Processing.Replay/ReplayFilter.cs`
+- `src/Processing.Replay/ReplayResult.cs`
+- `src/Processing.Replay/IMessageReplayStore.cs`
+- `src/Processing.Replay/InMemoryMessageReplayStore.cs`
+- `src/Processing.Replay/IMessageReplayer.cs`
+- `src/Processing.Replay/MessageReplayer.cs`
+- `src/Processing.Replay/ReplayServiceExtensions.cs`
+- `tests/UnitTests/ReplayOptionsTests.cs` — 5 tests
+- `tests/UnitTests/InMemoryMessageReplayStoreTests.cs` — 8 tests
+- `tests/UnitTests/MessageReplayerTests.cs` — 10 tests
+
+### Files modified
+
+- `tests/UnitTests/UnitTests.csproj` — added `Processing.Replay` project reference
+- `EnterpriseIntegrationPlatform.sln` — added `Processing.Replay` project
+
+---
+
+## Chunk 017 – Retry Framework
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Implement the Retry framework in a new `Processing.Retry` project, advancing Quality Pillar 6 (Resilience — exponential backoff with jitter, bounded retries) and Pillar 1 (Reliability — classify transient vs permanent failures).
+
+### Architecture
+
+- `RetryOptions` — `MaxAttempts` (3), `InitialDelayMs` (1000), `MaxDelayMs` (30000), `BackoffMultiplier` (2.0), `UseJitter` (true).
+- `RetryResult<T>` — record: `IsSucceeded`, `Attempts`, `LastException?`, `Result?`.
+- `IRetryPolicy` — `ExecuteAsync<T>(Func<CancellationToken, Task<T>>, CancellationToken)` and `ExecuteAsync(Func<CancellationToken, Task>, CancellationToken)`.
+- `ExponentialBackoffRetryPolicy` — real exponential backoff: `delay = min(InitialDelayMs × BackoffMultiplier^(attempt-1), MaxDelayMs)`. Jitter adds ±20% random variation. `OperationCanceledException` propagates immediately; all other exceptions are retried up to `MaxAttempts`.
+- `RetryServiceExtensions` — `AddRetryPolicy(IServiceCollection, IConfiguration)`.
+
+### Files created
+
+- `src/Processing.Retry/Processing.Retry.csproj`
+- `src/Processing.Retry/RetryOptions.cs`
+- `src/Processing.Retry/RetryResult.cs`
+- `src/Processing.Retry/IRetryPolicy.cs`
+- `src/Processing.Retry/ExponentialBackoffRetryPolicy.cs`
+- `src/Processing.Retry/RetryServiceExtensions.cs`
+- `tests/UnitTests/RetryOptionsTests.cs` — 6 tests
+- `tests/UnitTests/ExponentialBackoffRetryPolicyTests.cs` — 12 tests (adjusted to avoid real delays: zero-delay config)
+
+### Files modified
+
+- `tests/UnitTests/UnitTests.csproj` — added `Processing.Retry` project reference
+- `EnterpriseIntegrationPlatform.sln` — added `Processing.Retry` project
+
+---
+
+## Chunk 016 – Dead Letter Queue
+
+- **Date**: 2026-03-24
+- **Status**: done
+- **Goal**: Implement the Dead Letter Queue pattern in a new `Processing.DeadLetter` project, advancing Quality Pillar 1 (Reliability — zero message loss: every unprocessable message is routed to DLQ), Pillar 6 (Resilience — DLQ as last resort for poison messages and max-retry exhaustion), and Pillar 7 (Supportability — DLQ envelopes carry full error context for operator inspection).
+
+### Architecture
+
+- `DeadLetterOptions` — `DeadLetterTopic` (required), `MaxRetryAttempts` (3), `Source` (optional override), `MessageType` (optional override, defaults to `"DeadLetter"`).
+- `DeadLetterReason` — enum: `MaxRetriesExceeded`, `PoisonMessage`, `ProcessingTimeout`, `ValidationFailed`, `UnroutableMessage`.
+- `DeadLetterEnvelope<T>` — record wrapping `OriginalEnvelope`, `Reason`, `ErrorMessage`, `FailedAt`, `AttemptCount`.
+- `IDeadLetterPublisher<T>` / `DeadLetterPublisher<T>` — wraps the original envelope in `DeadLetterEnvelope<T>`, creates a new `IntegrationEnvelope<DeadLetterEnvelope<T>>` preserving `CorrelationId` with `CausationId = original.MessageId`, and publishes to `DeadLetterOptions.DeadLetterTopic` via `IMessageBrokerProducer`. Guards: `ArgumentNullException` if envelope null; `InvalidOperationException` if `DeadLetterTopic` is empty.
+- `DeadLetterServiceExtensions` — `AddDeadLetterPublisher<T>(IServiceCollection, IConfiguration)`.
+
+### Files created
+
+- `src/Processing.DeadLetter/Processing.DeadLetter.csproj`
+- `src/Processing.DeadLetter/DeadLetterOptions.cs`
+- `src/Processing.DeadLetter/DeadLetterReason.cs`
+- `src/Processing.DeadLetter/DeadLetterEnvelope.cs`
+- `src/Processing.DeadLetter/IDeadLetterPublisher.cs`
+- `src/Processing.DeadLetter/DeadLetterPublisher.cs`
+- `src/Processing.DeadLetter/DeadLetterServiceExtensions.cs`
+- `tests/UnitTests/DeadLetterOptionsTests.cs` — 5 tests
+- `tests/UnitTests/DeadLetterPublisherTests.cs` — 12 tests
+
+### Files modified
+
+- `tests/UnitTests/UnitTests.csproj` — added `Processing.DeadLetter` project reference
+- `EnterpriseIntegrationPlatform.sln` — added `Processing.DeadLetter` project
+
+---
+
 ## Chunk 015 – Aggregator
 
 - **Date**: 2026-03-16

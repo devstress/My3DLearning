@@ -4,6 +4,7 @@ using EnterpriseIntegrationPlatform.Admin.Api.Authentication;
 using EnterpriseIntegrationPlatform.Admin.Api.Services;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
+using EnterpriseIntegrationPlatform.Processing.Replay;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -65,6 +66,8 @@ builder.Services.AddPlatformObservability(lokiBaseAddress);
 // ── Admin Services ────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<PlatformStatusService>();
 builder.Services.AddSingleton<AdminAuditLogger>();
+builder.Services.AddMessageReplay(builder.Configuration);
+builder.Services.AddSingleton<DlqManagementService>();
 
 var app = builder.Build();
 
@@ -191,6 +194,31 @@ app.MapGet("/api/admin/events/business/{businessKey}", async (
 .WithName("AdminGetEventsByBusinessKey")
 .RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
 
+// ── DLQ Management ────────────────────────────────────────────────────────────
+
+app.MapPost("/api/admin/dlq/resubmit", async (
+    DlqResubmitRequest request,
+    DlqManagementService dlqService,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("DlqResubmit", request.CorrelationId?.ToString(), http.User);
+
+    var filter = new ReplayFilter
+    {
+        CorrelationId = request.CorrelationId,
+        MessageType = request.MessageType,
+        FromTimestamp = request.FromTimestamp,
+        ToTimestamp = request.ToTimestamp,
+    };
+
+    var result = await dlqService.ResubmitAsync(filter, ct);
+    return Results.Ok(result);
+})
+.WithName("AdminDlqResubmit")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
 app.Run();
 
 // ── Request models ────────────────────────────────────────────────────────────
@@ -205,3 +233,18 @@ public sealed record UpdateMessageStatusRequest(
     Guid CorrelationId,
     DateTimeOffset RecordedAt,
     DeliveryStatus Status);
+
+/// <summary>
+/// Request body for resubmitting messages from the Dead Letter Queue.
+/// All filter fields are optional; omitting all fields resubmits all DLQ messages up to the
+/// platform's configured <c>Replay:MaxMessages</c> limit.
+/// </summary>
+/// <param name="CorrelationId">Optional correlation ID to filter which messages to resubmit.</param>
+/// <param name="MessageType">Optional message type filter.</param>
+/// <param name="FromTimestamp">Optional lower bound for the message timestamp range.</param>
+/// <param name="ToTimestamp">Optional upper bound for the message timestamp range.</param>
+public sealed record DlqResubmitRequest(
+    Guid? CorrelationId,
+    string? MessageType,
+    DateTimeOffset? FromTimestamp,
+    DateTimeOffset? ToTimestamp);

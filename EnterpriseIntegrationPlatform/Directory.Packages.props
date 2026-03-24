@@ -43,6 +43,12 @@
     <PackageVersion Include="Temporalio.Extensions.Hosting" Version="1.11.1" />
     <!-- Connectors -->
     <PackageVersion Include="SSH.NET" Version="2024.2.0" />
-    <PackageVersion Include="MailKit" Version="4.12.0" />
+    <PackageVersion Include="MailKit" Version="4.15.1" />
+    <!-- Override MimeKit transitive dependency from MailKit
+         to resolve CRLF injection vulnerability (GHSA-g7hc-96xr-gvvx / CVE-2026-30227).
+         Fixed in MimeKit 4.15.1. -->
+    <PackageVersion Include="MimeKit" Version="4.15.1" />
+    <!-- Security -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
   </ItemGroup>
 </Project>

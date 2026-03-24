@@ -95,7 +95,7 @@ public sealed class HttpConnector : IHttpConnector
         string? extraHeaderValue,
         CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(method, relativeUrl);
+        var request = new HttpRequestMessage(method, relativeUrl);
 
         request.Headers.TryAddWithoutValidation(CorrelationIdHeader, envelope.CorrelationId.ToString());
         request.Headers.TryAddWithoutValidation(MessageIdHeader, envelope.MessageId.ToString());

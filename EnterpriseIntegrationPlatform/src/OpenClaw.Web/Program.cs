@@ -130,6 +130,49 @@ generate.MapGet("/datasets", async (
 })
 .WithName("ListDatasets");
 
+generate.MapPost("/connector", async (
+    GenerateConnectorRequest request,
+    IRagFlowService ragFlow,
+    CancellationToken ct) =>
+{
+    // Build a structured connector generation prompt and retrieve platform context.
+    // The developer's AI provider uses the returned context to generate
+    // a production-ready connector implementing IHttpConnector / ISftpConnector / etc.
+    var query = $"Generate a {request.ConnectorType} connector. " +
+                $"Target: {request.TargetDescription}. " +
+                $"Authentication: {request.AuthenticationType ?? "none"}. " +
+                $"Existing platform patterns: {string.Join(", ", request.RelatedPatterns ?? [])}";
+
+    var context = await ragFlow.RetrieveAsync(query, cancellationToken: ct);
+
+    return Results.Ok(new GenerateConnectorResponse(
+        ConnectorType: request.ConnectorType,
+        RetrievedContext: context,
+        ContextFound: !string.IsNullOrEmpty(context)));
+})
+.WithName("GenerateConnector");
+
+generate.MapPost("/schema", async (
+    GenerateSchemaRequest request,
+    IRagFlowService ragFlow,
+    CancellationToken ct) =>
+{
+    // Retrieve schema-related context from the platform knowledge base.
+    var query = $"Message schema for {request.MessageType}. " +
+                $"Format: {request.Format}. " +
+                (request.ExamplePayload is not null
+                    ? $"Example payload: {request.ExamplePayload}"
+                    : string.Empty);
+
+    var context = await ragFlow.RetrieveAsync(query, cancellationToken: ct);
+
+    return Results.Ok(new GenerateSchemaResponse(
+        MessageType: request.MessageType,
+        RetrievedContext: context,
+        ContextFound: !string.IsNullOrEmpty(context)));
+})
+.WithName("GenerateSchema");
+
 // ── Serve the embedded HTML UI at root ────────────────────────────────────────
 
 app.MapGet("/", () => Results.Content(OpenClawHtml.Page, "text/html"))
@@ -159,6 +202,44 @@ public sealed record GenerateChatRequest(string Question, string? ConversationId
 /// <param name="ConversationId">Conversation ID for follow-up questions.</param>
 /// <param name="ReferenceCount">Number of source references used.</param>
 public sealed record GenerateChatResponse(string Answer, string? ConversationId, int ReferenceCount);
+
+/// <summary>Request body for the /api/generate/connector endpoint.</summary>
+/// <param name="ConnectorType">Connector type: "http", "sftp", "email", or "file".</param>
+/// <param name="TargetDescription">Description of the target system (e.g. "Acme REST API v2").</param>
+/// <param name="AuthenticationType">Optional authentication type (e.g. "OAuth2", "ApiKey", "Basic").</param>
+/// <param name="RelatedPatterns">Optional list of EIP patterns the connector should integrate with.</param>
+public sealed record GenerateConnectorRequest(
+    string ConnectorType,
+    string TargetDescription,
+    string? AuthenticationType = null,
+    IReadOnlyList<string>? RelatedPatterns = null);
+
+/// <summary>Response from the /api/generate/connector endpoint.</summary>
+/// <param name="ConnectorType">The requested connector type.</param>
+/// <param name="RetrievedContext">Context retrieved from the platform knowledge base.</param>
+/// <param name="ContextFound">Whether relevant context was found.</param>
+public sealed record GenerateConnectorResponse(
+    string ConnectorType,
+    string RetrievedContext,
+    bool ContextFound);
+
+/// <summary>Request body for the /api/generate/schema endpoint.</summary>
+/// <param name="MessageType">Logical message type name (e.g. "OrderCreated").</param>
+/// <param name="Format">Payload format: "json", "xml", or "flat".</param>
+/// <param name="ExamplePayload">Optional example payload to guide schema generation.</param>
+public sealed record GenerateSchemaRequest(
+    string MessageType,
+    string Format,
+    string? ExamplePayload = null);
+
+/// <summary>Response from the /api/generate/schema endpoint.</summary>
+/// <param name="MessageType">The requested message type.</param>
+/// <param name="RetrievedContext">Context retrieved from the platform knowledge base.</param>
+/// <param name="ContextFound">Whether relevant context was found.</param>
+public sealed record GenerateSchemaResponse(
+    string MessageType,
+    string RetrievedContext,
+    bool ContextFound);
 
 /// <summary>
 /// Contains the embedded HTML page for the OpenClaw web UI.
