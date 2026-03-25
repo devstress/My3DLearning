@@ -10,4 +10,13 @@
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="NSubstitute" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Processing.DeadLetter\Processing.DeadLetter.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Retry\Processing.Retry.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Replay\Processing.Replay.csproj" />
+    <ProjectReference Include="..\..\src\Ingestion\Ingestion.csproj" />
+    <ProjectReference Include="..\..\src\Security\Security.csproj" />
+    <ProjectReference Include="..\..\src\MultiTenancy\MultiTenancy.csproj" />
+  </ItemGroup>
 </Project>

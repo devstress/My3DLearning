@@ -29,6 +29,7 @@ public static class TemporalServiceExtensions
         // Register activity business-logic services
         services.AddSingleton<IMessageValidationService, DefaultMessageValidationService>();
         services.AddSingleton<IMessageLoggingService, DefaultMessageLoggingService>();
+        services.AddSingleton<ICompensationActivityService, DefaultCompensationActivityService>();
 
         // Register Temporal hosted worker with workflows and scoped activities
         services
@@ -42,7 +43,9 @@ public static class TemporalServiceExtensions
                 };
             })
             .AddWorkflow<ProcessIntegrationMessageWorkflow>()
-            .AddScopedActivities<IntegrationActivities>();
+            .AddWorkflow<SagaCompensationWorkflow>()
+            .AddScopedActivities<IntegrationActivities>()
+            .AddScopedActivities<SagaCompensationActivities>();
 
         return services;
     }

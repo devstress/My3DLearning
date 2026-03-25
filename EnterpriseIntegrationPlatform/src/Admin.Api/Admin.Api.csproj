@@ -3,5 +3,7 @@
     <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
     <ProjectReference Include="..\Observability\Observability.csproj" />
     <ProjectReference Include="..\Storage.Cassandra\Storage.Cassandra.csproj" />
+    <ProjectReference Include="..\Processing.DeadLetter\Processing.DeadLetter.csproj" />
+    <ProjectReference Include="..\Processing.Replay\Processing.Replay.csproj" />
   </ItemGroup>
 </Project>
