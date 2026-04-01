@@ -8,12 +8,16 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
 public class ExponentialBackoffRetryPolicyTests
 {
-    private ExponentialBackoffRetryPolicy BuildPolicy(RetryOptions? options = null)
+    private static readonly Func<int, CancellationToken, Task> FastDelay =
+        (ms, ct) => Task.Delay(Math.Min(ms, 10), ct);
+
+    private ExponentialBackoffRetryPolicy BuildPolicy(RetryOptions? options = null, Func<int, CancellationToken, Task>? delayFunc = null)
     {
         options ??= new RetryOptions { MaxAttempts = 3, InitialDelayMs = 0, MaxDelayMs = 0, UseJitter = false };
         return new ExponentialBackoffRetryPolicy(
             Options.Create(options),
-            NullLogger<ExponentialBackoffRetryPolicy>.Instance);
+            NullLogger<ExponentialBackoffRetryPolicy>.Instance,
+            delayFunc);
     }
 
     [Fact]
@@ -102,23 +106,30 @@ public class ExponentialBackoffRetryPolicyTests
     [Fact]
     public async Task ExecuteAsync_MaxDelayCapApplied_DelayDoesNotExceedMaxDelayMs()
     {
-        var policy = BuildPolicy(new RetryOptions { MaxAttempts = 2, InitialDelayMs = 100, MaxDelayMs = 200, BackoffMultiplier = 100.0, UseJitter = false });
-        var start = DateTimeOffset.UtcNow;
+        var recordedDelays = new List<int>();
+        Func<int, CancellationToken, Task> captureDelay = (ms, ct) =>
+        {
+            recordedDelays.Add(ms);
+            return Task.CompletedTask;
+        };
+        var policy = BuildPolicy(
+            new RetryOptions { MaxAttempts = 3, InitialDelayMs = 100, MaxDelayMs = 200, BackoffMultiplier = 100.0, UseJitter = false },
+            captureDelay);
         var callCount = 0;
         await policy.ExecuteAsync<int>(_ =>
         {
             callCount++;
-            if (callCount < 2) throw new Exception("fail");
+            if (callCount < 3) throw new Exception("fail");
             return Task.FromResult(1);
         }, CancellationToken.None);
-        var elapsed = DateTimeOffset.UtcNow - start;
-        elapsed.TotalMilliseconds.Should().BeLessThan(1000);
+        recordedDelays.Should().HaveCount(2);
+        recordedDelays.Should().Equal(100, 200);
     }
 
     [Fact]
     public async Task ExecuteAsync_WithJitter_DelayIsNonNegative()
     {
-        var policy = BuildPolicy(new RetryOptions { MaxAttempts = 2, InitialDelayMs = 10, MaxDelayMs = 100, UseJitter = true });
+        var policy = BuildPolicy(new RetryOptions { MaxAttempts = 2, InitialDelayMs = 10, MaxDelayMs = 100, UseJitter = true }, FastDelay);
         var callCount = 0;
         var result = await policy.ExecuteAsync<int>(_ =>
         {
