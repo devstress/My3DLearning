@@ -8,14 +8,17 @@ public sealed class ExponentialBackoffRetryPolicy : IRetryPolicy
     private readonly RetryOptions _options;
     private readonly ILogger<ExponentialBackoffRetryPolicy> _logger;
     private readonly Random _random;
+    private readonly Func<int, CancellationToken, Task> _delayFunc;
 
     public ExponentialBackoffRetryPolicy(
         IOptions<RetryOptions> options,
-        ILogger<ExponentialBackoffRetryPolicy> logger)
+        ILogger<ExponentialBackoffRetryPolicy> logger,
+        Func<int, CancellationToken, Task>? delayFunc = null)
     {
         _options = options.Value;
         _logger = logger;
         _random = new Random();
+        _delayFunc = delayFunc ?? ((ms, ct) => Task.Delay(ms, ct));
     }
 
     public async Task<RetryResult<T>> ExecuteAsync<T>(
@@ -44,7 +47,7 @@ public sealed class ExponentialBackoffRetryPolicy : IRetryPolicy
                 {
                     var delay = ComputeDelay(attempt);
                     if (delay > 0)
-                        await Task.Delay(delay, ct);
+                        await _delayFunc(delay, ct);
                 }
             }
         }
