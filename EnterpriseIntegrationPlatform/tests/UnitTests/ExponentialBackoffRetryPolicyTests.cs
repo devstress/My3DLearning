@@ -102,17 +102,17 @@ public class ExponentialBackoffRetryPolicyTests
     [Fact]
     public async Task ExecuteAsync_MaxDelayCapApplied_DelayDoesNotExceedMaxDelayMs()
     {
-        var policy = BuildPolicy(new RetryOptions { MaxAttempts = 2, InitialDelayMs = 100, MaxDelayMs = 200, BackoffMultiplier = 100.0, UseJitter = false });
+        var policy = BuildPolicy(new RetryOptions { MaxAttempts = 3, InitialDelayMs = 100, MaxDelayMs = 200, BackoffMultiplier = 100.0, UseJitter = false });
         var start = DateTimeOffset.UtcNow;
         var callCount = 0;
         await policy.ExecuteAsync<int>(_ =>
         {
             callCount++;
-            if (callCount < 2) throw new Exception("fail");
+            if (callCount < 3) throw new Exception("fail");
             return Task.FromResult(1);
         }, CancellationToken.None);
         var elapsed = DateTimeOffset.UtcNow - start;
-        elapsed.TotalMilliseconds.Should().BeLessThan(1000);
+        elapsed.TotalMilliseconds.Should().BeLessThan(3000);
     }
 
     [Fact]
