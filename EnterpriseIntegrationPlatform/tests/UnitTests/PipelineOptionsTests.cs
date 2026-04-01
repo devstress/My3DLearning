@@ -1,90 +1,90 @@
 using EnterpriseIntegrationPlatform.Demo.Pipeline;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class PipelineOptionsTests
 {
-    [Fact]
+    [Test]
     public void NatsUrl_DefaultsToLocalhost()
     {
         var options = new PipelineOptions();
 
-        options.NatsUrl.Should().Be("nats://localhost:15222");
+        Assert.That(options.NatsUrl, Is.EqualTo("nats://localhost:15222"));
     }
 
-    [Fact]
+    [Test]
     public void InboundSubject_DefaultsToIntegrationInbound()
     {
         var options = new PipelineOptions();
 
-        options.InboundSubject.Should().Be("integration.inbound");
+        Assert.That(options.InboundSubject, Is.EqualTo("integration.inbound"));
     }
 
-    [Fact]
+    [Test]
     public void AckSubject_DefaultsToIntegrationAck()
     {
         var options = new PipelineOptions();
 
-        options.AckSubject.Should().Be("integration.ack");
+        Assert.That(options.AckSubject, Is.EqualTo("integration.ack"));
     }
 
-    [Fact]
+    [Test]
     public void NackSubject_DefaultsToIntegrationNack()
     {
         var options = new PipelineOptions();
 
-        options.NackSubject.Should().Be("integration.nack");
+        Assert.That(options.NackSubject, Is.EqualTo("integration.nack"));
     }
 
-    [Fact]
+    [Test]
     public void ConsumerGroup_DefaultsToDemoPipeline()
     {
         var options = new PipelineOptions();
 
-        options.ConsumerGroup.Should().Be("demo-pipeline");
+        Assert.That(options.ConsumerGroup, Is.EqualTo("demo-pipeline"));
     }
 
-    [Fact]
+    [Test]
     public void TemporalServerAddress_DefaultsToLocalhost()
     {
         var options = new PipelineOptions();
 
-        options.TemporalServerAddress.Should().Be("localhost:15233");
+        Assert.That(options.TemporalServerAddress, Is.EqualTo("localhost:15233"));
     }
 
-    [Fact]
+    [Test]
     public void TemporalNamespace_DefaultsToDefault()
     {
         var options = new PipelineOptions();
 
-        options.TemporalNamespace.Should().Be("default");
+        Assert.That(options.TemporalNamespace, Is.EqualTo("default"));
     }
 
-    [Fact]
+    [Test]
     public void TemporalTaskQueue_DefaultsToIntegrationWorkflows()
     {
         var options = new PipelineOptions();
 
-        options.TemporalTaskQueue.Should().Be("integration-workflows");
+        Assert.That(options.TemporalTaskQueue, Is.EqualTo("integration-workflows"));
     }
 
-    [Fact]
+    [Test]
     public void WorkflowTimeout_DefaultsToFiveMinutes()
     {
         var options = new PipelineOptions();
 
-        options.WorkflowTimeout.Should().Be(TimeSpan.FromMinutes(5));
+        Assert.That(options.WorkflowTimeout, Is.EqualTo(TimeSpan.FromMinutes(5)));
     }
 
-    [Fact]
+    [Test]
     public void SectionName_IsConstant()
     {
-        PipelineOptions.SectionName.Should().Be("Pipeline");
+        Assert.That(PipelineOptions.SectionName, Is.EqualTo("Pipeline"));
     }
 
-    [Fact]
+    [Test]
     public void AllProperties_AcceptCustomValues()
     {
         var options = new PipelineOptions
@@ -100,14 +100,14 @@ public class PipelineOptionsTests
             WorkflowTimeout = TimeSpan.FromMinutes(10),
         };
 
-        options.NatsUrl.Should().Be("nats://custom:4222");
-        options.InboundSubject.Should().Be("custom.inbound");
-        options.AckSubject.Should().Be("custom.ack");
-        options.NackSubject.Should().Be("custom.nack");
-        options.ConsumerGroup.Should().Be("custom-group");
-        options.TemporalServerAddress.Should().Be("temporal:7233");
-        options.TemporalNamespace.Should().Be("production");
-        options.TemporalTaskQueue.Should().Be("production-workflows");
-        options.WorkflowTimeout.Should().Be(TimeSpan.FromMinutes(10));
+        Assert.That(options.NatsUrl, Is.EqualTo("nats://custom:4222"));
+        Assert.That(options.InboundSubject, Is.EqualTo("custom.inbound"));
+        Assert.That(options.AckSubject, Is.EqualTo("custom.ack"));
+        Assert.That(options.NackSubject, Is.EqualTo("custom.nack"));
+        Assert.That(options.ConsumerGroup, Is.EqualTo("custom-group"));
+        Assert.That(options.TemporalServerAddress, Is.EqualTo("temporal:7233"));
+        Assert.That(options.TemporalNamespace, Is.EqualTo("production"));
+        Assert.That(options.TemporalTaskQueue, Is.EqualTo("production-workflows"));
+        Assert.That(options.WorkflowTimeout, Is.EqualTo(TimeSpan.FromMinutes(10)));
     }
 }

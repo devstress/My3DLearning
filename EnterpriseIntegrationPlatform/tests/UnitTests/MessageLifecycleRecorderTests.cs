@@ -1,12 +1,12 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class MessageLifecycleRecorderTests
 {
     private readonly InMemoryMessageStateStore _productionStore = new();
@@ -35,7 +35,7 @@ public class MessageLifecycleRecorderTests
             messageType: messageType);
     }
 
-    [Fact]
+    [Test]
     public async Task RecordReceivedAsync_WritesToBothStores()
     {
         var envelope = CreateEnvelope();
@@ -44,16 +44,16 @@ public class MessageLifecycleRecorderTests
 
         // Production store receives the event
         var prodEvents = await _productionStore.GetByBusinessKeyAsync("order-02");
-        prodEvents.Should().ContainSingle();
-        prodEvents[0].Stage.Should().Be(MessageTracer.StageIngestion);
-        prodEvents[0].Status.Should().Be(DeliveryStatus.Pending);
+        Assert.That(prodEvents, Has.Count.EqualTo(1));
+        Assert.That(prodEvents[0].Stage, Is.EqualTo(MessageTracer.StageIngestion));
+        Assert.That(prodEvents[0].Status, Is.EqualTo(DeliveryStatus.Pending));
 
         // Observability store also receives the event
-        _capturedObsEvents.Should().ContainSingle();
-        _capturedObsEvents[0].Stage.Should().Be(MessageTracer.StageIngestion);
+        Assert.That(_capturedObsEvents, Has.Count.EqualTo(1));
+        Assert.That(_capturedObsEvents[0].Stage, Is.EqualTo(MessageTracer.StageIngestion));
     }
 
-    [Fact]
+    [Test]
     public async Task RecordProcessingAsync_WritesToBothStores()
     {
         var envelope = CreateEnvelope();
@@ -61,14 +61,14 @@ public class MessageLifecycleRecorderTests
         await _recorder.RecordProcessingAsync(envelope, MessageTracer.StageRouting, "order-02");
 
         var prodEvents = await _productionStore.GetByBusinessKeyAsync("order-02");
-        prodEvents.Should().ContainSingle();
-        prodEvents[0].Status.Should().Be(DeliveryStatus.InFlight);
+        Assert.That(prodEvents, Has.Count.EqualTo(1));
+        Assert.That(prodEvents[0].Status, Is.EqualTo(DeliveryStatus.InFlight));
 
-        _capturedObsEvents.Should().ContainSingle();
-        _capturedObsEvents[0].Status.Should().Be(DeliveryStatus.InFlight);
+        Assert.That(_capturedObsEvents, Has.Count.EqualTo(1));
+        Assert.That(_capturedObsEvents[0].Status, Is.EqualTo(DeliveryStatus.InFlight));
     }
 
-    [Fact]
+    [Test]
     public async Task RecordDeliveredAsync_WritesToBothStores()
     {
         var envelope = CreateEnvelope();
@@ -76,14 +76,14 @@ public class MessageLifecycleRecorderTests
         await _recorder.RecordDeliveredAsync(envelope, activity: null, durationMs: 42.5, businessKey: "order-02");
 
         var prodEvents = await _productionStore.GetByBusinessKeyAsync("order-02");
-        prodEvents.Should().ContainSingle();
-        prodEvents[0].Status.Should().Be(DeliveryStatus.Delivered);
+        Assert.That(prodEvents, Has.Count.EqualTo(1));
+        Assert.That(prodEvents[0].Status, Is.EqualTo(DeliveryStatus.Delivered));
 
-        _capturedObsEvents.Should().ContainSingle();
-        _capturedObsEvents[0].Status.Should().Be(DeliveryStatus.Delivered);
+        Assert.That(_capturedObsEvents, Has.Count.EqualTo(1));
+        Assert.That(_capturedObsEvents[0].Status, Is.EqualTo(DeliveryStatus.Delivered));
     }
 
-    [Fact]
+    [Test]
     public async Task RecordFailedAsync_WritesToBothStores()
     {
         var envelope = CreateEnvelope();
@@ -93,14 +93,14 @@ public class MessageLifecycleRecorderTests
             envelope, activity: null, exception, MessageTracer.StageDelivery, "order-02");
 
         var prodEvents = await _productionStore.GetByBusinessKeyAsync("order-02");
-        prodEvents.Should().ContainSingle();
-        prodEvents[0].Status.Should().Be(DeliveryStatus.Failed);
+        Assert.That(prodEvents, Has.Count.EqualTo(1));
+        Assert.That(prodEvents[0].Status, Is.EqualTo(DeliveryStatus.Failed));
 
-        _capturedObsEvents.Should().ContainSingle();
-        _capturedObsEvents[0].Details.Should().Contain("Connection refused");
+        Assert.That(_capturedObsEvents, Has.Count.EqualTo(1));
+        Assert.That(_capturedObsEvents[0].Details, Does.Contain("Connection refused"));
     }
 
-    [Fact]
+    [Test]
     public async Task RecordRetryAsync_WritesToBothStores()
     {
         var envelope = CreateEnvelope();
@@ -108,14 +108,14 @@ public class MessageLifecycleRecorderTests
         await _recorder.RecordRetryAsync(envelope, retryCount: 3, MessageTracer.StageDelivery, "order-02");
 
         var prodEvents = await _productionStore.GetByBusinessKeyAsync("order-02");
-        prodEvents.Should().ContainSingle();
-        prodEvents[0].Status.Should().Be(DeliveryStatus.Retrying);
+        Assert.That(prodEvents, Has.Count.EqualTo(1));
+        Assert.That(prodEvents[0].Status, Is.EqualTo(DeliveryStatus.Retrying));
 
-        _capturedObsEvents.Should().ContainSingle();
-        _capturedObsEvents[0].Details.Should().Contain("#3");
+        Assert.That(_capturedObsEvents, Has.Count.EqualTo(1));
+        Assert.That(_capturedObsEvents[0].Details, Does.Contain("#3"));
     }
 
-    [Fact]
+    [Test]
     public async Task RecordDeadLetteredAsync_WritesToBothStores()
     {
         var envelope = CreateEnvelope();
@@ -123,14 +123,14 @@ public class MessageLifecycleRecorderTests
         await _recorder.RecordDeadLetteredAsync(envelope, "Max retries exceeded", "order-02");
 
         var prodEvents = await _productionStore.GetByBusinessKeyAsync("order-02");
-        prodEvents.Should().ContainSingle();
-        prodEvents[0].Status.Should().Be(DeliveryStatus.DeadLettered);
+        Assert.That(prodEvents, Has.Count.EqualTo(1));
+        Assert.That(prodEvents[0].Status, Is.EqualTo(DeliveryStatus.DeadLettered));
 
-        _capturedObsEvents.Should().ContainSingle();
-        _capturedObsEvents[0].Details.Should().Contain("Max retries exceeded");
+        Assert.That(_capturedObsEvents, Has.Count.EqualTo(1));
+        Assert.That(_capturedObsEvents[0].Details, Does.Contain("Max retries exceeded"));
     }
 
-    [Fact]
+    [Test]
     public async Task FullLifecycle_AllEventsRecorded_InBothStores()
     {
         var envelope = CreateEnvelope();
@@ -143,11 +143,11 @@ public class MessageLifecycleRecorderTests
 
         // Production store has all events
         var prodEvents = await _productionStore.GetByCorrelationIdAsync(correlationId);
-        prodEvents.Should().HaveCount(4);
+        Assert.That(prodEvents, Has.Count.EqualTo(4));
 
         // Observability store also receives all events
-        _capturedObsEvents.Should().HaveCount(4);
-        _capturedObsEvents[0].Status.Should().Be(DeliveryStatus.Pending);
-        _capturedObsEvents[3].Status.Should().Be(DeliveryStatus.Delivered);
+        Assert.That(_capturedObsEvents, Has.Count.EqualTo(4));
+        Assert.That(_capturedObsEvents[0].Status, Is.EqualTo(DeliveryStatus.Pending));
+        Assert.That(_capturedObsEvents[3].Status, Is.EqualTo(DeliveryStatus.Delivered));
     }
 }

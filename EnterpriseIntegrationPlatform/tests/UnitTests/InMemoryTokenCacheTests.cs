@@ -1,23 +1,23 @@
 using EnterpriseIntegrationPlatform.Connector.Http;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class InMemoryTokenCacheTests
 {
-    [Fact]
+    [Test]
     public void TryGetToken_NonExistentKey_ReturnsFalse()
     {
         var cache = new InMemoryTokenCache();
 
         var result = cache.TryGetToken("missing-key", out var token);
 
-        result.Should().BeFalse();
-        token.Should().BeNull();
+        Assert.That(result, Is.False);
+        Assert.That(token, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void SetToken_ValidKeyAndToken_TryGetTokenReturnsToken()
     {
         var cache = new InMemoryTokenCache();
@@ -25,11 +25,11 @@ public class InMemoryTokenCacheTests
 
         var result = cache.TryGetToken("my-endpoint", out var token);
 
-        result.Should().BeTrue();
-        token.Should().Be("abc123");
+        Assert.That(result, Is.True);
+        Assert.That(token, Is.EqualTo("abc123"));
     }
 
-    [Fact]
+    [Test]
     public void TryGetToken_ExpiredEntry_ReturnsFalse()
     {
         var cache = new InMemoryTokenCache();
@@ -39,11 +39,11 @@ public class InMemoryTokenCacheTests
 
         var result = cache.TryGetToken("expiring-key", out var token);
 
-        result.Should().BeFalse();
-        token.Should().BeNull();
+        Assert.That(result, Is.False);
+        Assert.That(token, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void SetToken_ExistingKey_OverridesValue()
     {
         var cache = new InMemoryTokenCache();
@@ -52,10 +52,10 @@ public class InMemoryTokenCacheTests
 
         cache.TryGetToken("endpoint", out var token);
 
-        token.Should().Be("second-token");
+        Assert.That(token, Is.EqualTo("second-token"));
     }
 
-    [Fact]
+    [Test]
     public void MultipleKeys_AreIsolated()
     {
         var cache = new InMemoryTokenCache();
@@ -65,11 +65,11 @@ public class InMemoryTokenCacheTests
         cache.TryGetToken("key-a", out var tokenA);
         cache.TryGetToken("key-b", out var tokenB);
 
-        tokenA.Should().Be("token-a");
-        tokenB.Should().Be("token-b");
+        Assert.That(tokenA, Is.EqualTo("token-a"));
+        Assert.That(tokenB, Is.EqualTo("token-b"));
     }
 
-    [Fact]
+    [Test]
     public void ConcurrentSetGet_DoesNotThrow()
     {
         var cache = new InMemoryTokenCache();
@@ -82,6 +82,6 @@ public class InMemoryTokenCacheTests
 
         var act = () => Task.WhenAll(tasks).GetAwaiter().GetResult();
 
-        act.Should().NotThrow();
+        Assert.DoesNotThrow(() => act());
     }
 }

@@ -1,15 +1,15 @@
 using EnterpriseIntegrationPlatform.Connector.FileSystem;
 using EnterpriseIntegrationPlatform.Contracts;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using System.Text;
 using System.Text.Json;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class FileConnectorTests
 {
     private readonly IFileSystem _fileSystem = Substitute.For<IFileSystem>();
@@ -31,7 +31,7 @@ public class FileConnectorTests
 
     private static byte[] Utf8Bytes(string s) => Encoding.UTF8.GetBytes(s);
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_ValidEnvelope_ReturnsCorrectPath()
     {
         var connector = BuildConnector();
@@ -40,10 +40,10 @@ public class FileConnectorTests
         var result = await connector.WriteAsync(envelope, Utf8Bytes, CancellationToken.None);
 
         var expectedFilename = $"{envelope.MessageId}-OrderPlaced.json";
-        result.Should().Be(Path.Combine("/data/files", expectedFilename));
+        Assert.That(result, Is.EqualTo(Path.Combine("/data/files", expectedFilename)));
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_ValidEnvelope_ExpandsFilenamePattern()
     {
         var connector = BuildConnector(new FileConnectorOptions
@@ -60,12 +60,12 @@ public class FileConnectorTests
 
         await connector.WriteAsync(envelope, Utf8Bytes, CancellationToken.None);
 
-        capturedPath.Should().Contain(envelope.CorrelationId.ToString());
-        capturedPath.Should().Contain("OrderPlaced");
-        capturedPath.Should().Contain(envelope.Timestamp.ToString("yyyyMMddHHmmss"));
+        Assert.That(capturedPath, Does.Contain(envelope.CorrelationId.ToString()));
+        Assert.That(capturedPath, Does.Contain("OrderPlaced"));
+        Assert.That(capturedPath, Does.Contain(envelope.Timestamp.ToString("yyyyMMddHHmmss")));
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_ValidEnvelope_WritesMetadataSidecar()
     {
         var connector = BuildConnector();
@@ -78,10 +78,10 @@ public class FileConnectorTests
 
         await connector.WriteAsync(envelope, Utf8Bytes, CancellationToken.None);
 
-        writtenPaths.Should().Contain(p => p.EndsWith(".meta.json"));
+        Assert.That(writtenPaths.Any(p => p.EndsWith(".meta.json")), Is.True);
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_FileExistsAndOverwriteFalse_ThrowsInvalidOperationException()
     {
         var opts = new FileConnectorOptions
@@ -95,10 +95,10 @@ public class FileConnectorTests
 
         var act = async () => await connector.WriteAsync(envelope, Utf8Bytes, CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_FileExistsAndOverwriteTrue_WritesFile()
     {
         var opts = new FileConnectorOptions
@@ -112,12 +112,12 @@ public class FileConnectorTests
 
         var act = async () => await connector.WriteAsync(envelope, Utf8Bytes, CancellationToken.None);
 
-        await act.Should().NotThrowAsync();
+        Assert.DoesNotThrowAsync(async () => await act());
         await _fileSystem.Received().WriteAllBytesAsync(
             Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_NullEnvelope_ThrowsArgumentNullException()
     {
         var connector = BuildConnector();
@@ -125,10 +125,10 @@ public class FileConnectorTests
         var act = async () =>
             await connector.WriteAsync<string>(null!, Utf8Bytes, CancellationToken.None);
 
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        Assert.ThrowsAsync<ArgumentNullException>(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_CreateDirectoryIfNotExists_True_CreatesDirectory()
     {
         var opts = new FileConnectorOptions
@@ -143,7 +143,7 @@ public class FileConnectorTests
         _fileSystem.Received(1).CreateDirectory("/new/dir");
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_ValidPath_ReturnsBytes()
     {
         var expected = new byte[] { 1, 2, 3 };
@@ -153,10 +153,10 @@ public class FileConnectorTests
 
         var result = await connector.ReadAsync("/data/file.json", CancellationToken.None);
 
-        result.Should().Equal(expected);
+        Assert.That(result, Is.EqualTo(expected));
     }
 
-    [Fact]
+    [Test]
     public async Task ListFilesAsync_CallsGetFilesWithSearchPattern()
     {
         var connector = BuildConnector();
@@ -165,11 +165,11 @@ public class FileConnectorTests
 
         var result = await connector.ListFilesAsync(null, "*.json", CancellationToken.None);
 
-        result.Should().BeEquivalentTo("/data/files/a.json", "/data/files/b.json");
+        Assert.That(result, Is.EquivalentTo(new[] { "/data/files/a.json", "/data/files/b.json" }));
         _fileSystem.Received(1).GetFiles("/data/files", "*.json");
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_EmptyRootDirectory_ThrowsArgumentException()
     {
         var opts = new FileConnectorOptions { RootDirectory = "" };
@@ -177,6 +177,6 @@ public class FileConnectorTests
 
         var act = async () => await connector.WriteAsync(BuildEnvelope(), Utf8Bytes, CancellationToken.None);
 
-        await act.Should().ThrowAsync<ArgumentException>();
+        Assert.ThrowsAsync<ArgumentException>(async () => await act());
     }
 }

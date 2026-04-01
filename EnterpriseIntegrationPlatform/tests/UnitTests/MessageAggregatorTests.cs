@@ -1,14 +1,14 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Aggregator;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class MessageAggregatorTests
 {
     private readonly IMessageBrokerProducer _producer;
@@ -64,7 +64,7 @@ public class MessageAggregatorTests
     // Incomplete group
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_IncompletedGroup_ReturnsIsCompleteFalse()
     {
         var options = new AggregatorOptions { TargetTopic = "orders.aggregated" };
@@ -72,10 +72,10 @@ public class MessageAggregatorTests
 
         var result = await sut.AggregateAsync(BuildEnvelope(payload: "a"));
 
-        result.IsComplete.Should().BeFalse();
+        Assert.That(result.IsComplete, Is.False);
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_IncompleteGroup_AggregateEnvelopeIsNull()
     {
         var options = new AggregatorOptions { TargetTopic = "orders.aggregated" };
@@ -83,10 +83,10 @@ public class MessageAggregatorTests
 
         var result = await sut.AggregateAsync(BuildEnvelope());
 
-        result.AggregateEnvelope.Should().BeNull();
+        Assert.That(result.AggregateEnvelope, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_IncompleteGroup_ReceivedCountReflectsCurrentGroupSize()
     {
         var options = new AggregatorOptions { TargetTopic = "orders.aggregated" };
@@ -96,10 +96,10 @@ public class MessageAggregatorTests
         await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
         var result = await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
 
-        result.ReceivedCount.Should().Be(2);
+        Assert.That(result.ReceivedCount, Is.EqualTo(2));
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_IncompleteGroup_DoesNotPublish()
     {
         var options = new AggregatorOptions { TargetTopic = "orders.aggregated" };
@@ -118,7 +118,7 @@ public class MessageAggregatorTests
     // Complete group
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_CompleteGroup_ReturnsIsCompleteTrue()
     {
         var correlationId = Guid.NewGuid();
@@ -128,10 +128,10 @@ public class MessageAggregatorTests
         await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
         var result = await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
 
-        result.IsComplete.Should().BeTrue();
+        Assert.That(result.IsComplete, Is.True);
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_CompleteGroup_AggregatesPayloads()
     {
         var correlationId = Guid.NewGuid();
@@ -143,10 +143,10 @@ public class MessageAggregatorTests
         await sut.AggregateAsync(BuildEnvelope(payload: "b", correlationId: correlationId));
         var result = await sut.AggregateAsync(BuildEnvelope(payload: "c", correlationId: correlationId));
 
-        result.AggregateEnvelope!.Payload.Should().Be("a-b-c");
+        Assert.That(result.AggregateEnvelope!.Payload, Is.EqualTo("a-b-c"));
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_CompleteGroup_PublishesToTargetTopic()
     {
         var correlationId = Guid.NewGuid();
@@ -162,7 +162,7 @@ public class MessageAggregatorTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_CompleteGroup_ReceivedCountEqualsGroupSize()
     {
         var correlationId = Guid.NewGuid();
@@ -173,14 +173,14 @@ public class MessageAggregatorTests
         await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
         var result = await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
 
-        result.ReceivedCount.Should().Be(3);
+        Assert.That(result.ReceivedCount, Is.EqualTo(3));
     }
 
     // ------------------------------------------------------------------ //
     // Envelope headers on aggregate
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_CompleteGroup_PreservesCorrelationId()
     {
         var correlationId = Guid.NewGuid();
@@ -190,10 +190,10 @@ public class MessageAggregatorTests
         await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
         var result = await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
 
-        result.AggregateEnvelope!.CorrelationId.Should().Be(correlationId);
+        Assert.That(result.AggregateEnvelope!.CorrelationId, Is.EqualTo(correlationId));
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_CompleteGroup_CausationIdIsNull()
     {
         var correlationId = Guid.NewGuid();
@@ -203,10 +203,10 @@ public class MessageAggregatorTests
         await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
         var result = await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
 
-        result.AggregateEnvelope!.CausationId.Should().BeNull();
+        Assert.That(result.AggregateEnvelope!.CausationId, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_CompleteGroup_AssignsNewMessageId()
     {
         var correlationId = Guid.NewGuid();
@@ -218,11 +218,11 @@ public class MessageAggregatorTests
         await sut.AggregateAsync(env1);
         var result = await sut.AggregateAsync(env2);
 
-        result.AggregateEnvelope!.MessageId.Should().NotBe(env1.MessageId);
-        result.AggregateEnvelope.MessageId.Should().NotBe(env2.MessageId);
+        Assert.That(result.AggregateEnvelope!.MessageId, Is.Not.EqualTo(env1.MessageId));
+        Assert.That(result.AggregateEnvelope.MessageId, Is.Not.EqualTo(env2.MessageId));
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_CompleteGroup_UsesHighestPriority()
     {
         var correlationId = Guid.NewGuid();
@@ -234,10 +234,10 @@ public class MessageAggregatorTests
         var result = await sut.AggregateAsync(BuildEnvelope(
             priority: MessagePriority.High, correlationId: correlationId));
 
-        result.AggregateEnvelope!.Priority.Should().Be(MessagePriority.High);
+        Assert.That(result.AggregateEnvelope!.Priority, Is.EqualTo(MessagePriority.High));
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_CompleteGroup_MergesMetadataFromAllEnvelopes()
     {
         var correlationId = Guid.NewGuid();
@@ -251,15 +251,15 @@ public class MessageAggregatorTests
             metadata: new Dictionary<string, string> { ["key2"] = "value2" },
             correlationId: correlationId));
 
-        result.AggregateEnvelope!.Metadata.Should().ContainKey("key1");
-        result.AggregateEnvelope.Metadata.Should().ContainKey("key2");
+        Assert.That(result.AggregateEnvelope!.Metadata.ContainsKey("key1"), Is.True);
+        Assert.That(result.AggregateEnvelope.Metadata.ContainsKey("key2"), Is.True);
     }
 
     // ------------------------------------------------------------------ //
     // MessageType overriding
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_OverridesMessageType_WhenTargetMessageTypeConfigured()
     {
         var correlationId = Guid.NewGuid();
@@ -275,10 +275,10 @@ public class MessageAggregatorTests
         var result = await sut.AggregateAsync(BuildEnvelope(
             messageType: "ItemCreated", correlationId: correlationId));
 
-        result.AggregateEnvelope!.MessageType.Should().Be("OrderAggregated");
+        Assert.That(result.AggregateEnvelope!.MessageType, Is.EqualTo("OrderAggregated"));
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_PreservesMessageType_WhenTargetMessageTypeNotConfigured()
     {
         var correlationId = Guid.NewGuid();
@@ -290,14 +290,14 @@ public class MessageAggregatorTests
         var result = await sut.AggregateAsync(BuildEnvelope(
             messageType: "ItemCreated", correlationId: correlationId));
 
-        result.AggregateEnvelope!.MessageType.Should().Be("ItemCreated");
+        Assert.That(result.AggregateEnvelope!.MessageType, Is.EqualTo("ItemCreated"));
     }
 
     // ------------------------------------------------------------------ //
     // Source overriding
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_OverridesSource_WhenTargetSourceConfigured()
     {
         var correlationId = Guid.NewGuid();
@@ -313,10 +313,10 @@ public class MessageAggregatorTests
         var result = await sut.AggregateAsync(BuildEnvelope(
             source: "ItemService", correlationId: correlationId));
 
-        result.AggregateEnvelope!.Source.Should().Be("Aggregator");
+        Assert.That(result.AggregateEnvelope!.Source, Is.EqualTo("Aggregator"));
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_PreservesSource_WhenTargetSourceNotConfigured()
     {
         var correlationId = Guid.NewGuid();
@@ -328,14 +328,14 @@ public class MessageAggregatorTests
         var result = await sut.AggregateAsync(BuildEnvelope(
             source: "ItemService", correlationId: correlationId));
 
-        result.AggregateEnvelope!.Source.Should().Be("ItemService");
+        Assert.That(result.AggregateEnvelope!.Source, Is.EqualTo("ItemService"));
     }
 
     // ------------------------------------------------------------------ //
     // Guard clauses
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_NullEnvelope_ThrowsArgumentNullException()
     {
         var options = new AggregatorOptions { TargetTopic = "orders.aggregated" };
@@ -343,10 +343,10 @@ public class MessageAggregatorTests
 
         var act = () => sut.AggregateAsync(null!);
 
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        Assert.ThrowsAsync<ArgumentNullException>(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_EmptyTargetTopic_ThrowsInvalidOperationException()
     {
         var options = new AggregatorOptions { TargetTopic = string.Empty };
@@ -354,14 +354,14 @@ public class MessageAggregatorTests
 
         var act = () => sut.AggregateAsync(BuildEnvelope());
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await act());
     }
 
     // ------------------------------------------------------------------ //
     // Group isolation between different correlation IDs
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_TwoCorrelationGroups_AreProcessedIndependently()
     {
         var corr1 = Guid.NewGuid();
@@ -375,17 +375,17 @@ public class MessageAggregatorTests
         var result1 = await sut.AggregateAsync(BuildEnvelope(payload: "c", correlationId: corr1));
         var result2 = await sut.AggregateAsync(BuildEnvelope(payload: "d", correlationId: corr2));
 
-        result1.IsComplete.Should().BeTrue();
-        result2.IsComplete.Should().BeTrue();
-        result1.AggregateEnvelope!.Payload.Should().Be("a,c");
-        result2.AggregateEnvelope!.Payload.Should().Be("b,d");
+        Assert.That(result1.IsComplete, Is.True);
+        Assert.That(result2.IsComplete, Is.True);
+        Assert.That(result1.AggregateEnvelope!.Payload, Is.EqualTo("a,c"));
+        Assert.That(result2.AggregateEnvelope!.Payload, Is.EqualTo("b,d"));
     }
 
     // ------------------------------------------------------------------ //
     // Group cleared after aggregation
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_AfterGroupComplete_GroupIsCleared_NextMessageStartsFreshGroup()
     {
         var correlationId = Guid.NewGuid();
@@ -399,15 +399,15 @@ public class MessageAggregatorTests
         // Second cycle with same correlationId — group should start fresh
         var result = await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
 
-        result.IsComplete.Should().BeFalse();
-        result.ReceivedCount.Should().Be(1);
+        Assert.That(result.IsComplete, Is.False);
+        Assert.That(result.ReceivedCount, Is.EqualTo(1));
     }
 
     // ------------------------------------------------------------------ //
     // Custom completion predicate
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_WithFuncCompletionStrategy_UsesCustomPredicate()
     {
         var correlationId = Guid.NewGuid();
@@ -421,14 +421,14 @@ public class MessageAggregatorTests
         await sut.AggregateAsync(BuildEnvelope(payload: "cd", correlationId: correlationId));
         var result = await sut.AggregateAsync(BuildEnvelope(payload: "ef", correlationId: correlationId));
 
-        result.IsComplete.Should().BeTrue();
+        Assert.That(result.IsComplete, Is.True);
     }
 
     // ------------------------------------------------------------------ //
     // CorrelationId on result
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AggregateAsync_IncompleteResult_CorrelationIdMatchesEnvelope()
     {
         var correlationId = Guid.NewGuid();
@@ -437,6 +437,6 @@ public class MessageAggregatorTests
 
         var result = await sut.AggregateAsync(BuildEnvelope(correlationId: correlationId));
 
-        result.CorrelationId.Should().Be(correlationId);
+        Assert.That(result.CorrelationId, Is.EqualTo(correlationId));
     }
 }

@@ -1,31 +1,31 @@
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 using EnterpriseIntegrationPlatform.AI.RagFlow;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class RagFlowOptionsTests
 {
-    [Fact]
+    [Test]
     public void Defaults_ShouldHaveExpectedValues()
     {
         var options = new RagFlowOptions();
 
-        options.BaseAddress.Should().Be("http://localhost:15380");
-        options.ApiKey.Should().BeNull();
-        options.AssistantId.Should().BeNull();
+        Assert.That(options.BaseAddress, Is.EqualTo("http://localhost:15380"));
+        Assert.That(options.ApiKey, Is.Null);
+        Assert.That(options.AssistantId, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void SectionName_ShouldBeRagFlow()
     {
-        RagFlowOptions.SectionName.Should().Be("RagFlow");
+        Assert.That(RagFlowOptions.SectionName, Is.EqualTo("RagFlow"));
     }
 
-    [Fact]
+    [Test]
     public void Properties_ShouldBeSettable()
     {
         var options = new RagFlowOptions
@@ -35,24 +35,26 @@ public class RagFlowOptionsTests
             AssistantId = "asst-123",
         };
 
-        options.BaseAddress.Should().Be("http://ragflow.prod:9380");
-        options.ApiKey.Should().Be("test-api-key");
-        options.AssistantId.Should().Be("asst-123");
+        Assert.That(options.BaseAddress, Is.EqualTo("http://ragflow.prod:9380"));
+        Assert.That(options.ApiKey, Is.EqualTo("test-api-key"));
+        Assert.That(options.AssistantId, Is.EqualTo("asst-123"));
     }
 }
 
+[TestFixture]
 public class RagFlowServiceExtensionsTests
 {
-    [Fact]
+    [Test]
     public void DefaultBaseAddress_ShouldBeLocalhost15380()
     {
-        RagFlowServiceExtensions.DefaultBaseAddress.Should().Be("http://localhost:15380");
+        Assert.That(RagFlowServiceExtensions.DefaultBaseAddress, Is.EqualTo("http://localhost:15380"));
     }
 }
 
+[TestFixture]
 public class RagFlowServiceTests
 {
-    [Fact]
+    [Test]
     public async Task IsHealthyAsync_WhenHttpFails_ShouldReturnFalse()
     {
         // Arrange — HttpClient with a handler that throws
@@ -66,10 +68,10 @@ public class RagFlowServiceTests
         var result = await service.IsHealthyAsync();
 
         // Assert
-        result.Should().BeFalse();
+        Assert.That(result, Is.False);
     }
 
-    [Fact]
+    [Test]
     public async Task RetrieveAsync_WhenHttpFails_ShouldReturnEmpty()
     {
         // Arrange
@@ -83,10 +85,10 @@ public class RagFlowServiceTests
         var result = await service.RetrieveAsync("test query");
 
         // Assert
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task ChatAsync_WhenNoAssistantId_ShouldReturnConfigurationMessage()
     {
         // Arrange
@@ -100,12 +102,12 @@ public class RagFlowServiceTests
         var result = await service.ChatAsync("generate something");
 
         // Assert
-        result.Answer.Should().Contain("not configured");
-        result.ConversationId.Should().BeNull();
-        result.References.Should().BeEmpty();
+        Assert.That(result.Answer, Does.Contain("not configured"));
+        Assert.That(result.ConversationId, Is.Null);
+        Assert.That(result.References, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task ChatAsync_WhenHttpFails_ShouldReturnErrorMessage()
     {
         // Arrange
@@ -119,12 +121,12 @@ public class RagFlowServiceTests
         var result = await service.ChatAsync("generate something");
 
         // Assert
-        result.Answer.Should().Contain("unavailable");
-        result.ConversationId.Should().BeNull();
-        result.References.Should().BeEmpty();
+        Assert.That(result.Answer, Does.Contain("unavailable"));
+        Assert.That(result.ConversationId, Is.Null);
+        Assert.That(result.References, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task ListDatasetsAsync_WhenHttpFails_ShouldReturnEmpty()
     {
         // Arrange
@@ -138,10 +140,10 @@ public class RagFlowServiceTests
         var result = await service.ListDatasetsAsync();
 
         // Assert
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public void RagFlowChatResponse_ShouldHoldValues()
     {
         var refs = new List<RagFlowReference>
@@ -150,22 +152,22 @@ public class RagFlowServiceTests
         };
         var response = new RagFlowChatResponse("answer text", "conv-123", refs);
 
-        response.Answer.Should().Be("answer text");
-        response.ConversationId.Should().Be("conv-123");
-        response.References.Should().HaveCount(1);
-        response.References[0].Content.Should().Be("chunk content");
-        response.References[0].DocumentName.Should().Be("doc.md");
-        response.References[0].Score.Should().Be(0.95);
+        Assert.That(response.Answer, Is.EqualTo("answer text"));
+        Assert.That(response.ConversationId, Is.EqualTo("conv-123"));
+        Assert.That(response.References, Has.Count.EqualTo(1));
+        Assert.That(response.References[0].Content, Is.EqualTo("chunk content"));
+        Assert.That(response.References[0].DocumentName, Is.EqualTo("doc.md"));
+        Assert.That(response.References[0].Score, Is.EqualTo(0.95));
     }
 
-    [Fact]
+    [Test]
     public void RagFlowDataset_ShouldHoldValues()
     {
         var dataset = new RagFlowDataset("ds-001", "platform-docs", 42);
 
-        dataset.Id.Should().Be("ds-001");
-        dataset.Name.Should().Be("platform-docs");
-        dataset.DocumentCount.Should().Be(42);
+        Assert.That(dataset.Id, Is.EqualTo("ds-001"));
+        Assert.That(dataset.Name, Is.EqualTo("platform-docs"));
+        Assert.That(dataset.DocumentCount, Is.EqualTo(42));
     }
 
     /// <summary>HTTP handler that always throws to simulate unavailable service.</summary>

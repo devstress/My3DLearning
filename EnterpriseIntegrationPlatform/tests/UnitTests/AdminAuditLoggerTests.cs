@@ -1,17 +1,17 @@
 using System.Security.Claims;
 using EnterpriseIntegrationPlatform.Admin.Api.Services;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class AdminAuditLoggerTests
 {
     private readonly ILogger<AdminAuditLogger> _logger = Substitute.For<ILogger<AdminAuditLogger>>();
 
-    [Fact]
+    [Test]
     public void LogAction_WithValidPrincipal_DoesNotThrow()
     {
         var auditLogger = new AdminAuditLogger(_logger);
@@ -19,20 +19,20 @@ public class AdminAuditLoggerTests
 
         var act = () => auditLogger.LogAction("QueryMessages", "corr-123", principal);
 
-        act.Should().NotThrow();
+        Assert.DoesNotThrow(() => act());
     }
 
-    [Fact]
+    [Test]
     public void LogAction_WithNullPrincipal_DoesNotThrow()
     {
         var auditLogger = new AdminAuditLogger(_logger);
 
         var act = () => auditLogger.LogAction("QueryMessages", null, null);
 
-        act.Should().NotThrow();
+        Assert.DoesNotThrow(() => act());
     }
 
-    [Fact]
+    [Test]
     public void LogAction_WithNullTargetId_DoesNotThrow()
     {
         var auditLogger = new AdminAuditLogger(_logger);
@@ -40,10 +40,10 @@ public class AdminAuditLoggerTests
 
         var act = () => auditLogger.LogAction("GetPlatformStatus", null, principal);
 
-        act.Should().NotThrow();
+        Assert.DoesNotThrow(() => act());
     }
 
-    [Fact]
+    [Test]
     public void LogAction_WithNoPrincipalClaim_DoesNotThrow()
     {
         var auditLogger = new AdminAuditLogger(_logger);
@@ -51,7 +51,7 @@ public class AdminAuditLoggerTests
 
         var act = () => auditLogger.LogAction("UpdateStatus", "msg-456", emptyPrincipal);
 
-        act.Should().NotThrow();
+        Assert.DoesNotThrow(() => act());
     }
 
     private static ClaimsPrincipal BuildPrincipal(string keyPrefix)

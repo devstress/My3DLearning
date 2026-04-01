@@ -1,13 +1,13 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.DeadLetter;
-using FluentAssertions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class DeadLetterPublisherTests
 {
     private readonly IMessageBrokerProducer _producer;
@@ -26,7 +26,7 @@ public class DeadLetterPublisherTests
     private static IntegrationEnvelope<string> BuildEnvelope(string payload = "test")
         => IntegrationEnvelope<string>.Create(payload, "TestService", "TestEvent");
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_ValidEnvelope_PublishesToCorrectTopic()
     {
         var publisher = BuildPublisher(new DeadLetterOptions { DeadLetterTopic = "dlq.orders" });
@@ -39,10 +39,10 @@ public class DeadLetterPublisherTests
 
         await publisher.PublishAsync(envelope, DeadLetterReason.PoisonMessage, "error", 1, CancellationToken.None);
 
-        capturedTopic.Should().Be("dlq.orders");
+        Assert.That(capturedTopic, Is.EqualTo("dlq.orders"));
     }
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_ValidEnvelope_WrapsOriginalEnvelope()
     {
         var publisher = BuildPublisher();
@@ -55,10 +55,10 @@ public class DeadLetterPublisherTests
 
         await publisher.PublishAsync(envelope, DeadLetterReason.MaxRetriesExceeded, "error", 1, CancellationToken.None);
 
-        captured!.Payload.OriginalEnvelope.Payload.Should().Be("original-payload");
+        Assert.That(captured!.Payload.OriginalEnvelope.Payload, Is.EqualTo("original-payload"));
     }
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_ValidEnvelope_PreservesCorrelationId()
     {
         var publisher = BuildPublisher();
@@ -71,10 +71,10 @@ public class DeadLetterPublisherTests
 
         await publisher.PublishAsync(envelope, DeadLetterReason.PoisonMessage, "error", 1, CancellationToken.None);
 
-        captured!.CorrelationId.Should().Be(envelope.CorrelationId);
+        Assert.That(captured!.CorrelationId, Is.EqualTo(envelope.CorrelationId));
     }
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_ValidEnvelope_SetsCausationIdToOriginalMessageId()
     {
         var publisher = BuildPublisher();
@@ -87,10 +87,10 @@ public class DeadLetterPublisherTests
 
         await publisher.PublishAsync(envelope, DeadLetterReason.PoisonMessage, "error", 1, CancellationToken.None);
 
-        captured!.CausationId.Should().Be(envelope.MessageId);
+        Assert.That(captured!.CausationId, Is.EqualTo(envelope.MessageId));
     }
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_ValidEnvelope_GeneratesNewMessageId()
     {
         var publisher = BuildPublisher();
@@ -103,11 +103,11 @@ public class DeadLetterPublisherTests
 
         await publisher.PublishAsync(envelope, DeadLetterReason.PoisonMessage, "error", 1, CancellationToken.None);
 
-        captured!.MessageId.Should().NotBe(envelope.MessageId);
-        captured!.MessageId.Should().NotBe(Guid.Empty);
+        Assert.That(captured!.MessageId, Is.Not.EqualTo(envelope.MessageId));
+        Assert.That(captured!.MessageId, Is.Not.EqualTo(Guid.Empty));
     }
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_OptionsHasSource_UsesOptionsSource()
     {
         var publisher = BuildPublisher(new DeadLetterOptions { DeadLetterTopic = "dlq", Source = "OverrideSource" });
@@ -120,10 +120,10 @@ public class DeadLetterPublisherTests
 
         await publisher.PublishAsync(envelope, DeadLetterReason.PoisonMessage, "error", 1, CancellationToken.None);
 
-        captured!.Source.Should().Be("OverrideSource");
+        Assert.That(captured!.Source, Is.EqualTo("OverrideSource"));
     }
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_OptionsHasMessageType_UsesOptionsMessageType()
     {
         var publisher = BuildPublisher(new DeadLetterOptions { DeadLetterTopic = "dlq", MessageType = "CustomDLQ" });
@@ -136,10 +136,10 @@ public class DeadLetterPublisherTests
 
         await publisher.PublishAsync(envelope, DeadLetterReason.PoisonMessage, "error", 1, CancellationToken.None);
 
-        captured!.MessageType.Should().Be("CustomDLQ");
+        Assert.That(captured!.MessageType, Is.EqualTo("CustomDLQ"));
     }
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_ValidEnvelope_SetsReasonAndErrorMessage()
     {
         var publisher = BuildPublisher();
@@ -152,11 +152,11 @@ public class DeadLetterPublisherTests
 
         await publisher.PublishAsync(envelope, DeadLetterReason.ValidationFailed, "validation error", 2, CancellationToken.None);
 
-        captured!.Payload.Reason.Should().Be(DeadLetterReason.ValidationFailed);
-        captured!.Payload.ErrorMessage.Should().Be("validation error");
+        Assert.That(captured!.Payload.Reason, Is.EqualTo(DeadLetterReason.ValidationFailed));
+        Assert.That(captured!.Payload.ErrorMessage, Is.EqualTo("validation error"));
     }
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_ValidEnvelope_FailedAtIsRecentUtc()
     {
         var publisher = BuildPublisher();
@@ -171,10 +171,10 @@ public class DeadLetterPublisherTests
         await publisher.PublishAsync(envelope, DeadLetterReason.PoisonMessage, "error", 1, CancellationToken.None);
         var after = DateTimeOffset.UtcNow;
 
-        captured!.Payload.FailedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+        Assert.That(captured!.Payload.FailedAt, Is.GreaterThanOrEqualTo(before).And.LessThanOrEqualTo(after));
     }
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_ValidEnvelope_SetsAttemptCount()
     {
         var publisher = BuildPublisher();
@@ -187,20 +187,20 @@ public class DeadLetterPublisherTests
 
         await publisher.PublishAsync(envelope, DeadLetterReason.MaxRetriesExceeded, "error", 5, CancellationToken.None);
 
-        captured!.Payload.AttemptCount.Should().Be(5);
+        Assert.That(captured!.Payload.AttemptCount, Is.EqualTo(5));
     }
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_NullEnvelope_ThrowsArgumentNullException()
     {
         var publisher = BuildPublisher();
 
         var act = async () => await publisher.PublishAsync(null!, DeadLetterReason.PoisonMessage, "error", 1, CancellationToken.None);
 
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        Assert.ThrowsAsync<ArgumentNullException>(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task PublishAsync_EmptyDeadLetterTopic_ThrowsInvalidOperationException()
     {
         var publisher = BuildPublisher(new DeadLetterOptions { DeadLetterTopic = "" });
@@ -208,15 +208,15 @@ public class DeadLetterPublisherTests
 
         var act = async () => await publisher.PublishAsync(envelope, DeadLetterReason.PoisonMessage, "error", 1, CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await act());
     }
 
-    [Theory]
-    [InlineData(DeadLetterReason.MaxRetriesExceeded)]
-    [InlineData(DeadLetterReason.PoisonMessage)]
-    [InlineData(DeadLetterReason.ProcessingTimeout)]
-    [InlineData(DeadLetterReason.ValidationFailed)]
-    [InlineData(DeadLetterReason.UnroutableMessage)]
+    [Test]
+    [TestCase(DeadLetterReason.MaxRetriesExceeded)]
+    [TestCase(DeadLetterReason.PoisonMessage)]
+    [TestCase(DeadLetterReason.ProcessingTimeout)]
+    [TestCase(DeadLetterReason.ValidationFailed)]
+    [TestCase(DeadLetterReason.UnroutableMessage)]
     public async Task PublishAsync_AllReasons_PublishSuccessfully(DeadLetterReason reason)
     {
         var publisher = BuildPublisher();
@@ -229,6 +229,6 @@ public class DeadLetterPublisherTests
 
         await publisher.PublishAsync(envelope, reason, "error", 1, CancellationToken.None);
 
-        captured!.Payload.Reason.Should().Be(reason);
+        Assert.That(captured!.Payload.Reason, Is.EqualTo(reason));
     }
 }

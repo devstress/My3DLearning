@@ -1,13 +1,13 @@
 using Cassandra;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class CassandraMessageRepositoryTests
 {
     private readonly ICassandraSessionFactory _sessionFactory = Substitute.For<ICassandraSessionFactory>();
@@ -21,7 +21,7 @@ public class CassandraMessageRepositoryTests
         _repository = new CassandraMessageRepository(_sessionFactory, _logger);
     }
 
-    [Fact]
+    [Test]
     public async Task SaveMessageAsync_ExecutesBatch()
     {
         // Arrange
@@ -36,7 +36,7 @@ public class CassandraMessageRepositoryTests
         await _session.Received(1).ExecuteAsync(Arg.Any<BatchStatement>());
     }
 
-    [Fact]
+    [Test]
     public async Task SaveFaultAsync_ExecutesStatement()
     {
         // Arrange
@@ -51,7 +51,7 @@ public class CassandraMessageRepositoryTests
         await _session.Received(1).ExecuteAsync(Arg.Any<SimpleStatement>());
     }
 
-    [Fact]
+    [Test]
     public async Task GetByCorrelationIdAsync_ReturnsEmptyList_WhenNoResults()
     {
         // Arrange
@@ -63,10 +63,10 @@ public class CassandraMessageRepositoryTests
         var result = await _repository.GetByCorrelationIdAsync(Guid.NewGuid());
 
         // Assert
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task GetByMessageIdAsync_ReturnsNull_WhenNotFound()
     {
         // Arrange
@@ -78,10 +78,10 @@ public class CassandraMessageRepositoryTests
         var result = await _repository.GetByMessageIdAsync(Guid.NewGuid());
 
         // Assert
-        result.Should().BeNull();
+        Assert.That(result, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task GetFaultsByCorrelationIdAsync_ReturnsEmptyList_WhenNoResults()
     {
         // Arrange
@@ -93,10 +93,10 @@ public class CassandraMessageRepositoryTests
         var result = await _repository.GetFaultsByCorrelationIdAsync(Guid.NewGuid());
 
         // Assert
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateDeliveryStatusAsync_ExecutesBatch()
     {
         // Arrange
@@ -111,7 +111,7 @@ public class CassandraMessageRepositoryTests
         await _session.Received(1).ExecuteAsync(Arg.Any<BatchStatement>());
     }
 
-    [Fact]
+    [Test]
     public async Task SaveMessageAsync_ObtainsSessionFromFactory()
     {
         // Arrange

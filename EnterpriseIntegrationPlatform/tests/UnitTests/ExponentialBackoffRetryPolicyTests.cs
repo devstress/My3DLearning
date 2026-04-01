@@ -1,11 +1,11 @@
 using EnterpriseIntegrationPlatform.Processing.Retry;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class ExponentialBackoffRetryPolicyTests
 {
     private static readonly Func<int, CancellationToken, Task> FastDelay =
@@ -20,17 +20,17 @@ public class ExponentialBackoffRetryPolicyTests
             delayFunc);
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_SucceedsOnFirstAttempt_ReturnsIsSucceededTrue()
     {
         var policy = BuildPolicy();
         var result = await policy.ExecuteAsync<string>(_ => Task.FromResult("ok"), CancellationToken.None);
-        result.IsSucceeded.Should().BeTrue();
-        result.Attempts.Should().Be(1);
-        result.Result.Should().Be("ok");
+        Assert.That(result.IsSucceeded, Is.True);
+        Assert.That(result.Attempts, Is.EqualTo(1));
+        Assert.That(result.Result, Is.EqualTo("ok"));
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_SucceedsOnSecondAttempt_ReturnsIsSucceededTrue()
     {
         var policy = BuildPolicy();
@@ -42,46 +42,46 @@ public class ExponentialBackoffRetryPolicyTests
             return Task.FromResult(42);
         }, CancellationToken.None);
 
-        result.IsSucceeded.Should().BeTrue();
-        result.Attempts.Should().Be(2);
-        result.Result.Should().Be(42);
+        Assert.That(result.IsSucceeded, Is.True);
+        Assert.That(result.Attempts, Is.EqualTo(2));
+        Assert.That(result.Result, Is.EqualTo(42));
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_FailsAllAttempts_ReturnsIsSucceededFalse()
     {
         var policy = BuildPolicy(new RetryOptions { MaxAttempts = 3, InitialDelayMs = 0, MaxDelayMs = 0, UseJitter = false });
         var result = await policy.ExecuteAsync<int>(_ => throw new Exception("always fails"), CancellationToken.None);
-        result.IsSucceeded.Should().BeFalse();
+        Assert.That(result.IsSucceeded, Is.False);
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_FailsAllAttempts_ReturnsCorrectAttemptCount()
     {
         var policy = BuildPolicy(new RetryOptions { MaxAttempts = 3, InitialDelayMs = 0, MaxDelayMs = 0, UseJitter = false });
         var result = await policy.ExecuteAsync<int>(_ => throw new Exception("always fails"), CancellationToken.None);
-        result.Attempts.Should().Be(3);
+        Assert.That(result.Attempts, Is.EqualTo(3));
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_FailsAllAttempts_SetsLastException()
     {
         var policy = BuildPolicy(new RetryOptions { MaxAttempts = 2, InitialDelayMs = 0, MaxDelayMs = 0, UseJitter = false });
         var result = await policy.ExecuteAsync<int>(_ => throw new InvalidOperationException("last error"), CancellationToken.None);
-        result.LastException.Should().BeOfType<InvalidOperationException>();
-        result.LastException!.Message.Should().Be("last error");
+        Assert.That(result.LastException, Is.InstanceOf<InvalidOperationException>());
+        Assert.That(result.LastException!.Message, Is.EqualTo("last error"));
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_NullReturnValue_PropagatesNullResult()
     {
         var policy = BuildPolicy();
         var result = await policy.ExecuteAsync<string?>(_ => Task.FromResult<string?>(null), CancellationToken.None);
-        result.IsSucceeded.Should().BeTrue();
-        result.Result.Should().BeNull();
+        Assert.That(result.IsSucceeded, Is.True);
+        Assert.That(result.Result, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_CancellationRequested_ThrowsOperationCanceledException()
     {
         var policy = BuildPolicy(new RetryOptions { MaxAttempts = 5, InitialDelayMs = 0, MaxDelayMs = 0, UseJitter = false });
@@ -90,20 +90,20 @@ public class ExponentialBackoffRetryPolicyTests
 
         var act = async () => await policy.ExecuteAsync<int>(_ => Task.FromResult(1), cts.Token);
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        Assert.ThrowsAsync<OperationCanceledException>(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_ZeroDelayConfigured_CompletesWithoutDelay()
     {
         var policy = BuildPolicy(new RetryOptions { MaxAttempts = 3, InitialDelayMs = 0, MaxDelayMs = 0, UseJitter = false });
         var start = DateTimeOffset.UtcNow;
         await policy.ExecuteAsync<int>(_ => throw new Exception("fail"), CancellationToken.None);
         var elapsed = DateTimeOffset.UtcNow - start;
-        elapsed.TotalMilliseconds.Should().BeLessThan(500);
+        Assert.That(elapsed.TotalMilliseconds, Is.LessThan(500));
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_MaxDelayCapApplied_DelayDoesNotExceedMaxDelayMs()
     {
         var recordedDelays = new List<int>();
@@ -122,11 +122,11 @@ public class ExponentialBackoffRetryPolicyTests
             if (callCount < 3) throw new Exception("fail");
             return Task.FromResult(1);
         }, CancellationToken.None);
-        recordedDelays.Should().HaveCount(2);
-        recordedDelays.Should().Equal(100, 200);
+        Assert.That(recordedDelays, Has.Count.EqualTo(2));
+        Assert.That(recordedDelays, Is.EqualTo(new[] { 100, 200 }));
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_WithJitter_DelayIsNonNegative()
     {
         var policy = BuildPolicy(new RetryOptions { MaxAttempts = 2, InitialDelayMs = 10, MaxDelayMs = 100, UseJitter = true }, FastDelay);
@@ -137,19 +137,19 @@ public class ExponentialBackoffRetryPolicyTests
             if (callCount < 2) throw new Exception("fail");
             return Task.FromResult(1);
         }, CancellationToken.None);
-        result.IsSucceeded.Should().BeTrue();
+        Assert.That(result.IsSucceeded, Is.True);
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_SuccessfulOperation_ReturnsOperationResult()
     {
         var policy = BuildPolicy();
         var result = await policy.ExecuteAsync<int>(_ => Task.FromResult(99), CancellationToken.None);
-        result.Result.Should().Be(99);
-        result.IsSucceeded.Should().BeTrue();
+        Assert.That(result.Result, Is.EqualTo(99));
+        Assert.That(result.IsSucceeded, Is.True);
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_AllExceptionsAreRetried_RetryCountMatchesMaxAttempts()
     {
         var policy = BuildPolicy(new RetryOptions { MaxAttempts = 3, InitialDelayMs = 0, MaxDelayMs = 0, UseJitter = false });
@@ -159,15 +159,15 @@ public class ExponentialBackoffRetryPolicyTests
             callCount++;
             throw new ArgumentException("any exception type");
         }, CancellationToken.None);
-        callCount.Should().Be(3);
+        Assert.That(callCount, Is.EqualTo(3));
     }
 
-    [Fact]
+    [Test]
     public async Task ExecuteAsync_VoidOperation_SucceedsOnFirstAttempt_ReturnsIsSucceededTrue()
     {
         var policy = BuildPolicy();
         var result = await policy.ExecuteAsync(_ => Task.CompletedTask, CancellationToken.None);
-        result.IsSucceeded.Should().BeTrue();
-        result.Result.Should().BeTrue();
+        Assert.That(result.IsSucceeded, Is.True);
+        Assert.That(result.Result, Is.True);
     }
 }

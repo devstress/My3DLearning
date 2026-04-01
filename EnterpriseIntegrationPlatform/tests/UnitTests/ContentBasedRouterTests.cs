@@ -2,14 +2,14 @@ using System.Text.Json;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Routing;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class ContentBasedRouterTests
 {
     private readonly IMessageBrokerProducer _producer;
@@ -46,7 +46,7 @@ public class ContentBasedRouterTests
     // MessageType routing
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_MessageTypeEquals_RoutesToMatchingTopic()
     {
         var options = new RouterOptions
@@ -69,12 +69,12 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.TargetTopic.Should().Be("orders.created");
-        decision.IsDefault.Should().BeFalse();
-        decision.MatchedRule.Should().NotBeNull();
+        Assert.That(decision.TargetTopic, Is.EqualTo("orders.created"));
+        Assert.That(decision.IsDefault, Is.False);
+        Assert.That(decision.MatchedRule, Is.Not.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_MessageTypeEquals_IsCaseInsensitive()
     {
         var options = new RouterOptions
@@ -97,10 +97,10 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.TargetTopic.Should().Be("orders.created");
+        Assert.That(decision.TargetTopic, Is.EqualTo("orders.created"));
     }
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_MessageTypeContains_RoutesToMatchingTopic()
     {
         var options = new RouterOptions
@@ -123,10 +123,10 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.TargetTopic.Should().Be("orders.topic");
+        Assert.That(decision.TargetTopic, Is.EqualTo("orders.topic"));
     }
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_MessageTypeStartsWith_RoutesToMatchingTopic()
     {
         var options = new RouterOptions
@@ -149,10 +149,10 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.TargetTopic.Should().Be("orders.topic");
+        Assert.That(decision.TargetTopic, Is.EqualTo("orders.topic"));
     }
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_MessageTypeRegex_RoutesToMatchingTopic()
     {
         var options = new RouterOptions
@@ -175,14 +175,14 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.TargetTopic.Should().Be("orders.topic");
+        Assert.That(decision.TargetTopic, Is.EqualTo("orders.topic"));
     }
 
     // ------------------------------------------------------------------ //
     // Priority ordering — first match wins
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_MultipleMatchingRules_SelectsHighestPriorityRule()
     {
         var options = new RouterOptions
@@ -215,15 +215,15 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.TargetTopic.Should().Be("orders.created");
-        decision.MatchedRule!.Name.Should().Be("HighPriority");
+        Assert.That(decision.TargetTopic, Is.EqualTo("orders.created"));
+        Assert.That(decision.MatchedRule!.Name, Is.EqualTo("HighPriority"));
     }
 
     // ------------------------------------------------------------------ //
     // Default topic fallback
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_NoRuleMatches_UsesDefaultTopic()
     {
         var options = new RouterOptions
@@ -246,12 +246,12 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.TargetTopic.Should().Be("integration.default");
-        decision.IsDefault.Should().BeTrue();
-        decision.MatchedRule.Should().BeNull();
+        Assert.That(decision.TargetTopic, Is.EqualTo("integration.default"));
+        Assert.That(decision.IsDefault, Is.True);
+        Assert.That(decision.MatchedRule, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_NoRuleMatchesAndNoDefaultTopic_ThrowsInvalidOperationException()
     {
         var options = new RouterOptions
@@ -273,14 +273,14 @@ public class ContentBasedRouterTests
 
         var act = () => sut.RouteAsync(envelope);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await act());
     }
 
     // ------------------------------------------------------------------ //
     // Source field routing
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_SourceEquals_RoutesToMatchingTopic()
     {
         var options = new RouterOptions
@@ -303,14 +303,14 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.TargetTopic.Should().Be("payments.topic");
+        Assert.That(decision.TargetTopic, Is.EqualTo("payments.topic"));
     }
 
     // ------------------------------------------------------------------ //
     // Metadata field routing
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_MetadataFieldEquals_RoutesToMatchingTopic()
     {
         var options = new RouterOptions
@@ -333,10 +333,10 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.TargetTopic.Should().Be("eu.topic");
+        Assert.That(decision.TargetTopic, Is.EqualTo("eu.topic"));
     }
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_MetadataFieldMissing_DoesNotMatch()
     {
         var options = new RouterOptions
@@ -359,15 +359,15 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.IsDefault.Should().BeTrue();
-        decision.TargetTopic.Should().Be("integration.default");
+        Assert.That(decision.IsDefault, Is.True);
+        Assert.That(decision.TargetTopic, Is.EqualTo("integration.default"));
     }
 
     // ------------------------------------------------------------------ //
     // Payload JSON field routing
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_PayloadFieldEquals_RoutesToMatchingTopic()
     {
         var options = new RouterOptions
@@ -390,10 +390,10 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.TargetTopic.Should().Be("orders.urgent");
+        Assert.That(decision.TargetTopic, Is.EqualTo("orders.urgent"));
     }
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_PayloadNestedFieldEquals_RoutesToMatchingTopic()
     {
         var options = new RouterOptions
@@ -416,14 +416,14 @@ public class ContentBasedRouterTests
 
         var decision = await sut.RouteAsync(envelope);
 
-        decision.TargetTopic.Should().Be("orders.high-priority");
+        Assert.That(decision.TargetTopic, Is.EqualTo("orders.high-priority"));
     }
 
     // ------------------------------------------------------------------ //
     // Producer called
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_MatchingRule_PublishesToSelectedTopic()
     {
         var options = new RouterOptions
@@ -455,7 +455,7 @@ public class ContentBasedRouterTests
     // Null guard
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task RouteAsync_NullEnvelope_ThrowsArgumentNullException()
     {
         var options = new RouterOptions { DefaultTopic = "integration.default" };
@@ -463,6 +463,6 @@ public class ContentBasedRouterTests
 
         var act = () => sut.RouteAsync<string>(null!);
 
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        Assert.ThrowsAsync<ArgumentNullException>(async () => await act());
     }
 }

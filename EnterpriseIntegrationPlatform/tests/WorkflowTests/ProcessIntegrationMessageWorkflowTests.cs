@@ -1,6 +1,5 @@
-using FluentAssertions;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 using Temporalio.Client;
 using Temporalio.Testing;
@@ -12,12 +11,14 @@ using EnterpriseIntegrationPlatform.Workflow.Temporal.Workflows;
 
 namespace EnterpriseIntegrationPlatform.Tests.Workflow;
 
-public class ProcessIntegrationMessageWorkflowTests : IAsyncLifetime
+[TestFixture]
+public class ProcessIntegrationMessageWorkflowTests 
 {
     private WorkflowEnvironment? _env;
     private bool _serverAvailable;
 
-    public async Task InitializeAsync()
+    [SetUp]
+    public async Task SetUp()
     {
         try
         {
@@ -32,7 +33,8 @@ public class ProcessIntegrationMessageWorkflowTests : IAsyncLifetime
         }
     }
 
-    public async Task DisposeAsync()
+    [TearDown]
+    public async Task TearDown()
     {
         if (_env is not null)
         {
@@ -42,7 +44,7 @@ public class ProcessIntegrationMessageWorkflowTests : IAsyncLifetime
 
     private bool SkipIfNoServer() => !_serverAvailable;
 
-    [Fact]
+    [Test]
     public async Task RunAsync_WithValidPayload_ReturnsSuccessResult()
     {
         if (SkipIfNoServer()) return;
@@ -68,12 +70,12 @@ public class ProcessIntegrationMessageWorkflowTests : IAsyncLifetime
                 (ProcessIntegrationMessageWorkflow wf) => wf.RunAsync(input),
                 new(id: $"test-valid-{Guid.NewGuid()}", taskQueue: "test-queue")));
 
-        result.MessageId.Should().Be(input.MessageId);
-        result.IsValid.Should().BeTrue();
-        result.FailureReason.Should().BeNull();
+        Assert.That(result.MessageId, Is.EqualTo(input.MessageId));
+        Assert.That(result.IsValid, Is.True);
+        Assert.That(result.FailureReason, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task RunAsync_WithInvalidPayload_ReturnsFailureResult()
     {
         if (SkipIfNoServer()) return;
@@ -99,12 +101,12 @@ public class ProcessIntegrationMessageWorkflowTests : IAsyncLifetime
                 (ProcessIntegrationMessageWorkflow wf) => wf.RunAsync(input),
                 new(id: $"test-invalid-{Guid.NewGuid()}", taskQueue: "test-queue")));
 
-        result.MessageId.Should().Be(input.MessageId);
-        result.IsValid.Should().BeFalse();
-        result.FailureReason.Should().Be("Payload is not valid JSON.");
+        Assert.That(result.MessageId, Is.EqualTo(input.MessageId));
+        Assert.That(result.IsValid, Is.False);
+        Assert.That(result.FailureReason, Is.EqualTo("Payload is not valid JSON."));
     }
 
-    [Fact]
+    [Test]
     public async Task RunAsync_LogsReceivedStage_BeforeValidation()
     {
         if (SkipIfNoServer()) return;
@@ -134,10 +136,10 @@ public class ProcessIntegrationMessageWorkflowTests : IAsyncLifetime
                 (ProcessIntegrationMessageWorkflow wf) => wf.RunAsync(input),
                 new(id: $"test-stages-{Guid.NewGuid()}", taskQueue: "test-queue")));
 
-        stages.Should().ContainInOrder("Received", "Validated");
+        Assert.That(stages, Is.EqualTo(new[] { "Received", "Validated" }));
     }
 
-    [Fact]
+    [Test]
     public async Task RunAsync_OnValidationFailure_LogsValidationFailedStage()
     {
         if (SkipIfNoServer()) return;
@@ -166,7 +168,7 @@ public class ProcessIntegrationMessageWorkflowTests : IAsyncLifetime
                 (ProcessIntegrationMessageWorkflow wf) => wf.RunAsync(input),
                 new(id: $"test-fail-stages-{Guid.NewGuid()}", taskQueue: "test-queue")));
 
-        stages.Should().ContainInOrder("Received", "ValidationFailed");
-        stages.Should().NotContain("Validated");
+        Assert.That(stages, Is.EqualTo(new[] { "Received", "ValidationFailed" }));
+        Assert.That(stages, Does.Not.Contain("Validated"));
     }
 }

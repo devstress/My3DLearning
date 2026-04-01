@@ -1,14 +1,14 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Splitter;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class MessageSplitterTests
 {
     private readonly IMessageBrokerProducer _producer;
@@ -53,7 +53,7 @@ public class MessageSplitterTests
     // Payload splitting
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_WithFuncStrategy_SplitsPayloadIntoItems()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -62,14 +62,14 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.ItemCount.Should().Be(3);
-        result.SplitEnvelopes.Should().HaveCount(3);
-        result.SplitEnvelopes[0].Payload.Should().Be("x");
-        result.SplitEnvelopes[1].Payload.Should().Be("y");
-        result.SplitEnvelopes[2].Payload.Should().Be("z");
+        Assert.That(result.ItemCount, Is.EqualTo(3));
+        Assert.That(result.SplitEnvelopes, Has.Count.EqualTo(3));
+        Assert.That(result.SplitEnvelopes[0].Payload, Is.EqualTo("x"));
+        Assert.That(result.SplitEnvelopes[1].Payload, Is.EqualTo("y"));
+        Assert.That(result.SplitEnvelopes[2].Payload, Is.EqualTo("z"));
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_SingleItem_ProducesOneEnvelope()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -78,12 +78,12 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.ItemCount.Should().Be(1);
-        result.SplitEnvelopes.Should().HaveCount(1);
-        result.SplitEnvelopes[0].Payload.Should().Be("single");
+        Assert.That(result.ItemCount, Is.EqualTo(1));
+        Assert.That(result.SplitEnvelopes, Has.Count.EqualTo(1));
+        Assert.That(result.SplitEnvelopes[0].Payload, Is.EqualTo("single"));
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_EmptyResult_ReturnsZeroItems()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -92,15 +92,15 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.ItemCount.Should().Be(0);
-        result.SplitEnvelopes.Should().BeEmpty();
+        Assert.That(result.ItemCount, Is.EqualTo(0));
+        Assert.That(result.SplitEnvelopes, Is.Empty);
     }
 
     // ------------------------------------------------------------------ //
     // Envelope header propagation
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_PreservesCorrelationId_FromSource()
     {
         var correlationId = Guid.NewGuid();
@@ -110,10 +110,10 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.SplitEnvelopes[0].CorrelationId.Should().Be(correlationId);
+        Assert.That(result.SplitEnvelopes[0].CorrelationId, Is.EqualTo(correlationId));
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_SetsCausationId_ToSourceMessageId()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -122,10 +122,10 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.SplitEnvelopes[0].CausationId.Should().Be(envelope.MessageId);
+        Assert.That(result.SplitEnvelopes[0].CausationId, Is.EqualTo(envelope.MessageId));
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_AssignsNewMessageId_ToEachSplitEnvelope()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -134,12 +134,12 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.SplitEnvelopes[0].MessageId.Should().NotBe(envelope.MessageId);
-        result.SplitEnvelopes[1].MessageId.Should().NotBe(envelope.MessageId);
-        result.SplitEnvelopes[0].MessageId.Should().NotBe(result.SplitEnvelopes[1].MessageId);
+        Assert.That(result.SplitEnvelopes[0].MessageId, Is.Not.EqualTo(envelope.MessageId));
+        Assert.That(result.SplitEnvelopes[1].MessageId, Is.Not.EqualTo(envelope.MessageId));
+        Assert.That(result.SplitEnvelopes[0].MessageId, Is.Not.EqualTo(result.SplitEnvelopes[1].MessageId));
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_PreservesMetadata_FromSource()
     {
         var metadata = new Dictionary<string, string> { ["region"] = "eu-west" };
@@ -149,11 +149,11 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.SplitEnvelopes[0].Metadata.Should().ContainKey("region")
-            .WhoseValue.Should().Be("eu-west");
+        Assert.That(result.SplitEnvelopes[0].Metadata.ContainsKey("region"), Is.True);
+        Assert.That(result.SplitEnvelopes[0].Metadata["region"], Is.EqualTo("eu-west"));
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_PreservesPriority_FromSource()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -162,10 +162,10 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.SplitEnvelopes[0].Priority.Should().Be(MessagePriority.High);
+        Assert.That(result.SplitEnvelopes[0].Priority, Is.EqualTo(MessagePriority.High));
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_PreservesSchemaVersion_FromSource()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -174,14 +174,14 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.SplitEnvelopes[0].SchemaVersion.Should().Be("2.0");
+        Assert.That(result.SplitEnvelopes[0].SchemaVersion, Is.EqualTo("2.0"));
     }
 
     // ------------------------------------------------------------------ //
     // MessageType overriding
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_OverridesMessageType_WhenTargetMessageTypeConfigured()
     {
         var options = new SplitterOptions
@@ -194,10 +194,10 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.SplitEnvelopes[0].MessageType.Should().Be("ItemSplit");
+        Assert.That(result.SplitEnvelopes[0].MessageType, Is.EqualTo("ItemSplit"));
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_PreservesMessageType_WhenTargetMessageTypeNotConfigured()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -206,14 +206,14 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.SplitEnvelopes[0].MessageType.Should().Be("BatchCreated");
+        Assert.That(result.SplitEnvelopes[0].MessageType, Is.EqualTo("BatchCreated"));
     }
 
     // ------------------------------------------------------------------ //
     // Source overriding
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_OverridesSource_WhenTargetSourceConfigured()
     {
         var options = new SplitterOptions
@@ -226,10 +226,10 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.SplitEnvelopes[0].Source.Should().Be("Splitter");
+        Assert.That(result.SplitEnvelopes[0].Source, Is.EqualTo("Splitter"));
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_PreservesSource_WhenTargetSourceNotConfigured()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -238,14 +238,14 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.SplitEnvelopes[0].Source.Should().Be("BatchService");
+        Assert.That(result.SplitEnvelopes[0].Source, Is.EqualTo("BatchService"));
     }
 
     // ------------------------------------------------------------------ //
     // Broker publish
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_PublishesEachItemToTargetTopic()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -260,7 +260,7 @@ public class MessageSplitterTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_EmptyResult_DoesNotPublish()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -279,7 +279,7 @@ public class MessageSplitterTests
     // Result record
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_ReturnsResult_WithSourceMessageId()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -288,10 +288,10 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.SourceMessageId.Should().Be(envelope.MessageId);
+        Assert.That(result.SourceMessageId, Is.EqualTo(envelope.MessageId));
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_ReturnsResult_WithTargetTopic()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -300,14 +300,14 @@ public class MessageSplitterTests
 
         var result = await sut.SplitAsync(envelope);
 
-        result.TargetTopic.Should().Be("items.split");
+        Assert.That(result.TargetTopic, Is.EqualTo("items.split"));
     }
 
     // ------------------------------------------------------------------ //
     // Guard clauses
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_NullEnvelope_ThrowsArgumentNullException()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
@@ -315,10 +315,10 @@ public class MessageSplitterTests
 
         var act = () => sut.SplitAsync(null!);
 
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        Assert.ThrowsAsync<ArgumentNullException>(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_EmptyTargetTopic_ThrowsInvalidOperationException()
     {
         var options = new SplitterOptions { TargetTopic = string.Empty };
@@ -327,14 +327,14 @@ public class MessageSplitterTests
 
         var act = () => sut.SplitAsync(envelope);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await act());
     }
 
     // ------------------------------------------------------------------ //
     // Metadata isolation between split envelopes
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task SplitAsync_MetadataIsCopied_NotSharedBetweenSplitEnvelopes()
     {
         var metadata = new Dictionary<string, string> { ["key"] = "value" };
@@ -348,6 +348,6 @@ public class MessageSplitterTests
         result.SplitEnvelopes[0].Metadata["extra"] = "added";
 
         // The other split envelope should not be affected
-        result.SplitEnvelopes[1].Metadata.Should().NotContainKey("extra");
+        Assert.That(result.SplitEnvelopes[1].Metadata.ContainsKey("extra"), Is.False);
     }
 }

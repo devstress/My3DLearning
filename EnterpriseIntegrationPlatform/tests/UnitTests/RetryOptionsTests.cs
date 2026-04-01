@@ -1,47 +1,47 @@
 using EnterpriseIntegrationPlatform.Processing.Retry;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class RetryOptionsTests
 {
-    [Fact]
+    [Test]
     public void MaxAttempts_Default_IsThree()
     {
         var options = new RetryOptions();
-        options.MaxAttempts.Should().Be(3);
+        Assert.That(options.MaxAttempts, Is.EqualTo(3));
     }
 
-    [Fact]
+    [Test]
     public void InitialDelayMs_Default_Is1000()
     {
         var options = new RetryOptions();
-        options.InitialDelayMs.Should().Be(1000);
+        Assert.That(options.InitialDelayMs, Is.EqualTo(1000));
     }
 
-    [Fact]
+    [Test]
     public void MaxDelayMs_Default_Is30000()
     {
         var options = new RetryOptions();
-        options.MaxDelayMs.Should().Be(30000);
+        Assert.That(options.MaxDelayMs, Is.EqualTo(30000));
     }
 
-    [Fact]
+    [Test]
     public void BackoffMultiplier_Default_IsTwo()
     {
         var options = new RetryOptions();
-        options.BackoffMultiplier.Should().Be(2.0);
+        Assert.That(options.BackoffMultiplier, Is.EqualTo(2.0));
     }
 
-    [Fact]
+    [Test]
     public void UseJitter_Default_IsTrue()
     {
         var options = new RetryOptions();
-        options.UseJitter.Should().BeTrue();
+        Assert.That(options.UseJitter, Is.True);
     }
 
-    [Fact]
+    [Test]
     public void Properties_SetValues_ReturnCorrectValues()
     {
         var options = new RetryOptions
@@ -53,10 +53,10 @@ public class RetryOptionsTests
             UseJitter = false
         };
 
-        options.MaxAttempts.Should().Be(5);
-        options.InitialDelayMs.Should().Be(500);
-        options.MaxDelayMs.Should().Be(60000);
-        options.BackoffMultiplier.Should().Be(1.5);
-        options.UseJitter.Should().BeFalse();
+        Assert.That(options.MaxAttempts, Is.EqualTo(5));
+        Assert.That(options.InitialDelayMs, Is.EqualTo(500));
+        Assert.That(options.MaxDelayMs, Is.EqualTo(60000));
+        Assert.That(options.BackoffMultiplier, Is.EqualTo(1.5));
+        Assert.That(options.UseJitter, Is.False);
     }
 }

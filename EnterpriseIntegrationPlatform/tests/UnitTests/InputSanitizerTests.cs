@@ -1,69 +1,69 @@
 using EnterpriseIntegrationPlatform.Security;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class InputSanitizerTests
 {
     private readonly InputSanitizer _sanitizer = new();
 
-    [Fact]
+    [Test]
     public void Sanitize_CleanInput_ReturnsUnchanged()
     {
         var result = _sanitizer.Sanitize("hello world");
-        result.Should().Be("hello world");
+        Assert.That(result, Is.EqualTo("hello world"));
     }
 
-    [Fact]
+    [Test]
     public void Sanitize_CrlfInjection_RemovesCrLf()
     {
         var result = _sanitizer.Sanitize("line1\r\nline2");
-        result.Should().NotContain("\r").And.NotContain("\n");
+        Assert.That(result, Does.Not.Contain("\r").And.Not.Contain("\n"));
     }
 
-    [Fact]
+    [Test]
     public void Sanitize_NullBytes_RemovesNullBytes()
     {
         var result = _sanitizer.Sanitize("hello\0world");
-        result.Should().NotContain("\0");
+        Assert.That(result, Does.Not.Contain("\0"));
     }
 
-    [Fact]
+    [Test]
     public void Sanitize_LeadingTrailingWhitespace_Trimmed()
     {
         var result = _sanitizer.Sanitize("  hello  ");
-        result.Should().Be("hello");
+        Assert.That(result, Is.EqualTo("hello"));
     }
 
-    [Fact]
+    [Test]
     public void Sanitize_NullInput_ThrowsArgumentNullException()
     {
         var act = () => _sanitizer.Sanitize(null!);
-        act.Should().Throw<ArgumentNullException>();
+        Assert.Throws<ArgumentNullException>(() => act());
     }
 
-    [Fact]
+    [Test]
     public void IsClean_CleanInput_ReturnsTrue()
     {
-        _sanitizer.IsClean("safe string").Should().BeTrue();
+        Assert.That(_sanitizer.IsClean("safe string"), Is.True);
     }
 
-    [Fact]
+    [Test]
     public void IsClean_InputWithNewline_ReturnsFalse()
     {
-        _sanitizer.IsClean("bad\ninput").Should().BeFalse();
+        Assert.That(_sanitizer.IsClean("bad\ninput"), Is.False);
     }
 
-    [Fact]
+    [Test]
     public void IsClean_InputWithCarriageReturn_ReturnsFalse()
     {
-        _sanitizer.IsClean("bad\rinput").Should().BeFalse();
+        Assert.That(_sanitizer.IsClean("bad\rinput"), Is.False);
     }
 
-    [Fact]
+    [Test]
     public void IsClean_InputWithNullByte_ReturnsFalse()
     {
-        _sanitizer.IsClean("bad\0input").Should().BeFalse();
+        Assert.That(_sanitizer.IsClean("bad\0input"), Is.False);
     }
 }

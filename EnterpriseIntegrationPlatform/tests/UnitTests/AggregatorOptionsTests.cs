@@ -1,64 +1,64 @@
 using EnterpriseIntegrationPlatform.Processing.Aggregator;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class AggregatorOptionsTests
 {
-    [Fact]
+    [Test]
     public void AggregatorOptions_DefaultTargetTopic_IsEmpty()
     {
         var options = new AggregatorOptions();
-        options.TargetTopic.Should().BeEmpty();
+        Assert.That(options.TargetTopic, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public void AggregatorOptions_DefaultTargetMessageType_IsNull()
     {
         var options = new AggregatorOptions();
-        options.TargetMessageType.Should().BeNull();
+        Assert.That(options.TargetMessageType, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void AggregatorOptions_DefaultTargetSource_IsNull()
     {
         var options = new AggregatorOptions();
-        options.TargetSource.Should().BeNull();
+        Assert.That(options.TargetSource, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void AggregatorOptions_DefaultExpectedCount_IsZero()
     {
         var options = new AggregatorOptions();
-        options.ExpectedCount.Should().Be(0);
+        Assert.That(options.ExpectedCount, Is.EqualTo(0));
     }
 
-    [Fact]
+    [Test]
     public void AggregatorOptions_CanSetTargetTopic()
     {
         var options = new AggregatorOptions { TargetTopic = "orders.aggregated" };
-        options.TargetTopic.Should().Be("orders.aggregated");
+        Assert.That(options.TargetTopic, Is.EqualTo("orders.aggregated"));
     }
 
-    [Fact]
+    [Test]
     public void AggregatorOptions_CanSetExpectedCount()
     {
         var options = new AggregatorOptions { ExpectedCount = 5 };
-        options.ExpectedCount.Should().Be(5);
+        Assert.That(options.ExpectedCount, Is.EqualTo(5));
     }
 
-    [Fact]
+    [Test]
     public void AggregatorOptions_CanSetTargetMessageType()
     {
         var options = new AggregatorOptions { TargetMessageType = "OrderAggregated" };
-        options.TargetMessageType.Should().Be("OrderAggregated");
+        Assert.That(options.TargetMessageType, Is.EqualTo("OrderAggregated"));
     }
 
-    [Fact]
+    [Test]
     public void AggregatorOptions_CanSetTargetSource()
     {
         var options = new AggregatorOptions { TargetSource = "Aggregator" };
-        options.TargetSource.Should().Be("Aggregator");
+        Assert.That(options.TargetSource, Is.EqualTo("Aggregator"));
     }
 }

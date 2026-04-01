@@ -5,15 +5,15 @@ using EnterpriseIntegrationPlatform.Demo.Pipeline;
 using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Observability;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class PipelineOrchestratorTests
 {
     private readonly IMessageRepository _repository;
@@ -54,7 +54,7 @@ public class PipelineOrchestratorTests
             messageType: "OrderCreated");
     }
 
-    [Fact]
+    [Test]
     public async Task ProcessAsync_ValidMessage_SavesMessageToCassandra()
     {
         var envelope = BuildEnvelope();
@@ -68,7 +68,7 @@ public class PipelineOrchestratorTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task ProcessAsync_ValidMessage_UpdatesStatusToDelivered()
     {
         var envelope = BuildEnvelope();
@@ -85,7 +85,7 @@ public class PipelineOrchestratorTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task ProcessAsync_ValidMessage_PublishesAckToCorrectSubject()
     {
         var envelope = BuildEnvelope();
@@ -100,7 +100,7 @@ public class PipelineOrchestratorTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task ProcessAsync_InvalidMessage_UpdatesStatusToFailed()
     {
         var envelope = BuildEnvelope();
@@ -117,7 +117,7 @@ public class PipelineOrchestratorTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task ProcessAsync_InvalidMessage_SavesFaultEnvelope()
     {
         var envelope = BuildEnvelope();
@@ -133,7 +133,7 @@ public class PipelineOrchestratorTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task ProcessAsync_InvalidMessage_PublishesNackToCorrectSubject()
     {
         var envelope = BuildEnvelope();
@@ -148,7 +148,7 @@ public class PipelineOrchestratorTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task ProcessAsync_DispatcherThrows_SavesFaultEnvelope()
     {
         var envelope = BuildEnvelope();
@@ -162,7 +162,7 @@ public class PipelineOrchestratorTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task ProcessAsync_DispatcherThrows_PublishesNack()
     {
         var envelope = BuildEnvelope();
@@ -177,7 +177,7 @@ public class PipelineOrchestratorTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task ProcessAsync_ValidMessage_DispatchesCorrectWorkflowInput()
     {
         var envelope = BuildEnvelope("""{"orderId":42}""");
@@ -190,17 +190,17 @@ public class PipelineOrchestratorTests
 
         await _sut.ProcessAsync(envelope);
 
-        capturedInput.Should().NotBeNull();
-        capturedInput!.MessageId.Should().Be(envelope.MessageId);
-        capturedInput.MessageType.Should().Be(envelope.MessageType);
-        capturedInput.PayloadJson.Should().Contain("42");
+        Assert.That(capturedInput, Is.Not.Null);
+        Assert.That(capturedInput!.MessageId, Is.EqualTo(envelope.MessageId));
+        Assert.That(capturedInput.MessageType, Is.EqualTo(envelope.MessageType));
+        Assert.That(capturedInput.PayloadJson, Does.Contain("42"));
     }
 
-    [Fact]
+    [Test]
     public async Task ProcessAsync_NullEnvelope_ThrowsArgumentNullException()
     {
         var act = () => _sut.ProcessAsync(null!);
 
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        Assert.ThrowsAsync<ArgumentNullException>(async () => await act());
     }
 }

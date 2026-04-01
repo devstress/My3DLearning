@@ -1,74 +1,74 @@
 using EnterpriseIntegrationPlatform.Processing.Translator;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class TranslatorOptionsTests
 {
-    [Fact]
+    [Test]
     public void TranslatorOptions_Defaults_TargetTopicIsEmpty()
     {
         var options = new TranslatorOptions();
 
-        options.TargetTopic.Should().BeEmpty();
+        Assert.That(options.TargetTopic, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public void TranslatorOptions_Defaults_TargetMessageTypeIsNull()
     {
         var options = new TranslatorOptions();
 
-        options.TargetMessageType.Should().BeNull();
+        Assert.That(options.TargetMessageType, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void TranslatorOptions_Defaults_TargetSourceIsNull()
     {
         var options = new TranslatorOptions();
 
-        options.TargetSource.Should().BeNull();
+        Assert.That(options.TargetSource, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void TranslatorOptions_Defaults_FieldMappingsIsEmpty()
     {
         var options = new TranslatorOptions();
 
-        options.FieldMappings.Should().BeEmpty();
+        Assert.That(options.FieldMappings, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public void TranslatorOptions_CanSetTargetTopic()
     {
         var options = new TranslatorOptions { TargetTopic = "orders.translated" };
 
-        options.TargetTopic.Should().Be("orders.translated");
+        Assert.That(options.TargetTopic, Is.EqualTo("orders.translated"));
     }
 
-    [Fact]
+    [Test]
     public void TranslatorOptions_CanSetTargetMessageType()
     {
         var options = new TranslatorOptions { TargetMessageType = "OrderV2" };
 
-        options.TargetMessageType.Should().Be("OrderV2");
+        Assert.That(options.TargetMessageType, Is.EqualTo("OrderV2"));
     }
 
-    [Fact]
+    [Test]
     public void TranslatorOptions_CanSetTargetSource()
     {
         var options = new TranslatorOptions { TargetSource = "Translator" };
 
-        options.TargetSource.Should().Be("Translator");
+        Assert.That(options.TargetSource, Is.EqualTo("Translator"));
     }
 
-    [Fact]
+    [Test]
     public void TranslatorOptions_CanAddFieldMappings()
     {
         var mapping = new FieldMapping { SourcePath = "id", TargetPath = "orderId" };
         var options = new TranslatorOptions { FieldMappings = [mapping] };
 
-        options.FieldMappings.Should().ContainSingle()
-            .Which.SourcePath.Should().Be("id");
+        Assert.That(options.FieldMappings, Has.Count.EqualTo(1));
+        Assert.That(options.FieldMappings[0].SourcePath, Is.EqualTo("id"));
     }
 }

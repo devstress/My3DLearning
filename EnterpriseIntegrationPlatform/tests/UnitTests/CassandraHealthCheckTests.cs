@@ -1,14 +1,14 @@
 using Cassandra;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
-using FluentAssertions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class CassandraHealthCheckTests
 {
     private readonly ICassandraSessionFactory _sessionFactory = Substitute.For<ICassandraSessionFactory>();
@@ -20,7 +20,7 @@ public class CassandraHealthCheckTests
         _healthCheck = new CassandraHealthCheck(_sessionFactory, _logger);
     }
 
-    [Fact]
+    [Test]
     public async Task CheckHealthAsync_ReturnsHealthy_WhenCassandraIsReachable()
     {
         // Arrange
@@ -38,11 +38,11 @@ public class CassandraHealthCheckTests
         var result = await _healthCheck.CheckHealthAsync(new HealthCheckContext());
 
         // Assert
-        result.Status.Should().Be(HealthStatus.Healthy);
-        result.Description.Should().Contain("5.0");
+        Assert.That(result.Status, Is.EqualTo(HealthStatus.Healthy));
+        Assert.That(result.Description, Does.Contain("5.0"));
     }
 
-    [Fact]
+    [Test]
     public async Task CheckHealthAsync_ReturnsUnhealthy_WhenCassandraIsNotReachable()
     {
         // Arrange
@@ -53,11 +53,11 @@ public class CassandraHealthCheckTests
         var result = await _healthCheck.CheckHealthAsync(new HealthCheckContext());
 
         // Assert
-        result.Status.Should().Be(HealthStatus.Unhealthy);
-        result.Description.Should().Contain("not reachable");
+        Assert.That(result.Status, Is.EqualTo(HealthStatus.Unhealthy));
+        Assert.That(result.Description, Does.Contain("not reachable"));
     }
 
-    [Fact]
+    [Test]
     public async Task CheckHealthAsync_ReturnsUnhealthy_WhenSessionThrows()
     {
         // Arrange
@@ -68,7 +68,7 @@ public class CassandraHealthCheckTests
         var result = await _healthCheck.CheckHealthAsync(new HealthCheckContext());
 
         // Assert
-        result.Status.Should().Be(HealthStatus.Unhealthy);
-        result.Exception.Should().BeOfType<InvalidOperationException>();
+        Assert.That(result.Status, Is.EqualTo(HealthStatus.Unhealthy));
+        Assert.That(result.Exception, Is.InstanceOf<InvalidOperationException>());
     }
 }

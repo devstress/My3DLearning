@@ -1,8 +1,7 @@
 using System.Text.RegularExpressions;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Playwright;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Playwright;
 
@@ -16,8 +15,8 @@ namespace EnterpriseIntegrationPlatform.Tests.Playwright;
 /// to install browsers locally.
 /// </para>
 /// </summary>
-[Collection("Playwright")]
-public class OpenClawUiTests : IAsyncLifetime
+[TestFixture]
+public class OpenClawUiTests 
 {
     private IPlaywright? _playwright;
     private IBrowser? _browser;
@@ -26,7 +25,8 @@ public class OpenClawUiTests : IAsyncLifetime
     private string? _baseUrl;
     private bool _browsersAvailable;
 
-    public async Task InitializeAsync()
+    [SetUp]
+    public async Task SetUp()
     {
         try
         {
@@ -49,7 +49,8 @@ public class OpenClawUiTests : IAsyncLifetime
         _baseUrl = _httpClient.BaseAddress!.ToString().TrimEnd('/');
     }
 
-    public async Task DisposeAsync()
+    [TearDown]
+    public async Task TearDown()
     {
         _httpClient?.Dispose();
         _factory?.Dispose();
@@ -65,7 +66,7 @@ public class OpenClawUiTests : IAsyncLifetime
 
     // ── Page structure tests ──────────────────────────────────────────────────
 
-    [Fact]
+    [Test]
     public async Task HomePage_LoadsSuccessfully_WithTitle()
     {
         if (SkipIfNoBrowsers()) return;
@@ -74,10 +75,10 @@ public class OpenClawUiTests : IAsyncLifetime
         await page.GotoAsync(_baseUrl!);
 
         var title = await page.TitleAsync();
-        title.Should().Contain("OpenClaw");
+        Assert.That(title, Does.Contain("OpenClaw"));
     }
 
-    [Fact]
+    [Test]
     public async Task HomePage_HasSearchBox_AndAskButton()
     {
         if (SkipIfNoBrowsers()) return;
@@ -90,10 +91,11 @@ public class OpenClawUiTests : IAsyncLifetime
 
         var button = page.Locator("#askBtn");
         await Expect(button).ToBeVisibleAsync();
-        (await button.TextContentAsync()).Should().Contain("Ask");
+        var buttonText = await button.TextContentAsync();
+        Assert.That(buttonText, Does.Contain("Ask"));
     }
 
-    [Fact]
+    [Test]
     public async Task HomePage_HasHintText_MentioningObservability()
     {
         if (SkipIfNoBrowsers()) return;
@@ -104,10 +106,10 @@ public class OpenClawUiTests : IAsyncLifetime
         var hint = page.Locator(".hint");
         await Expect(hint).ToBeVisibleAsync();
         var text = await hint.TextContentAsync();
-        text.Should().Contain("observability");
+        Assert.That(text, Does.Contain("observability"));
     }
 
-    [Fact]
+    [Test]
     public async Task HomePage_ShowsOllamaStatusIndicator()
     {
         if (SkipIfNoBrowsers()) return;
@@ -121,12 +123,12 @@ public class OpenClawUiTests : IAsyncLifetime
         // after the health check completes
         await page.WaitForTimeoutAsync(2000);
         var text = await ollamaStatus.TextContentAsync();
-        text.Should().Contain("Ollama");
+        Assert.That(text, Does.Contain("Ollama"));
     }
 
     // ── Search and query tests ────────────────────────────────────────────────
 
-    [Fact]
+    [Test]
     public async Task SearchForUnknownKey_ShowsNotFound()
     {
         if (SkipIfNoBrowsers()) return;
@@ -143,10 +145,11 @@ public class OpenClawUiTests : IAsyncLifetime
 
         var notFound = page.Locator(".not-found");
         await Expect(notFound).ToBeVisibleAsync();
-        (await notFound.TextContentAsync()).Should().Contain("No messages found");
+        var notFoundText = await notFound.TextContentAsync();
+        Assert.That(notFoundText, Does.Contain("No messages found"));
     }
 
-    [Fact]
+    [Test]
     public async Task SearchForSeededKey_ShowsResults()
     {
         if (SkipIfNoBrowsers()) return;
@@ -166,7 +169,7 @@ public class OpenClawUiTests : IAsyncLifetime
         await Expect(timeline).ToBeVisibleAsync();
     }
 
-    [Fact]
+    [Test]
     public async Task SearchForSeededShipment_ShowsInFlightStatus()
     {
         if (SkipIfNoBrowsers()) return;
@@ -183,10 +186,11 @@ public class OpenClawUiTests : IAsyncLifetime
 
         // Should have the status card visible
         var cards = page.Locator(".card");
-        (await cards.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
+        var cardCount = await cards.CountAsync();
+        Assert.That(cardCount, Is.GreaterThanOrEqualTo(2));
     }
 
-    [Fact]
+    [Test]
     public async Task SearchBox_SupportsEnterKey()
     {
         if (SkipIfNoBrowsers()) return;
@@ -201,7 +205,7 @@ public class OpenClawUiTests : IAsyncLifetime
         await Expect(resultDiv).ToBeVisibleAsync();
     }
 
-    [Fact]
+    [Test]
     public async Task OllamaUnavailable_ShowsWarningCard_WhenSearchingSeededData()
     {
         if (SkipIfNoBrowsers()) return;
@@ -224,20 +228,20 @@ public class OpenClawUiTests : IAsyncLifetime
 
     // ── API endpoint tests ────────────────────────────────────────────────────
 
-    [Fact]
+    [Test]
     public async Task ApiEndpoint_InspectBusiness_ReturnsJson()
     {
         if (SkipIfNoBrowsers()) return;
 
         var response = await _httpClient!.GetAsync("/api/inspect/business/order-test-01");
-        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("\"found\"");
-        content.Should().Contain("\"query\"");
+        Assert.That(content, Does.Contain("\"found\""));
+        Assert.That(content, Does.Contain("\"query\""));
     }
 
-    [Fact]
+    [Test]
     public async Task ApiEndpoint_SeededData_ReturnsFound()
     {
         if (SkipIfNoBrowsers()) return;
@@ -246,36 +250,36 @@ public class OpenClawUiTests : IAsyncLifetime
         await Task.Delay(500);
 
         var response = await _httpClient!.GetAsync("/api/inspect/business/order-02");
-        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("\"found\":true");
-        content.Should().Contain("\"ollamaAvailable\"");
+        Assert.That(content, Does.Contain("\"found\":true"));
+        Assert.That(content, Does.Contain("\"ollamaAvailable\""));
     }
 
-    [Fact]
+    [Test]
     public async Task ApiEndpoint_OllamaHealth_ReturnsStatus()
     {
         if (SkipIfNoBrowsers()) return;
 
         var response = await _httpClient!.GetAsync("/api/health/ollama");
-        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("\"available\"");
-        content.Should().Contain("\"service\"");
+        Assert.That(content, Does.Contain("\"available\""));
+        Assert.That(content, Does.Contain("\"service\""));
     }
 
-    [Fact]
+    [Test]
     public async Task MetricsEndpoint_IsAvailable()
     {
         if (SkipIfNoBrowsers()) return;
 
         var response = await _httpClient!.GetAsync("/metrics");
-        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().NotBeEmpty();
+        Assert.That(content, Is.Not.Empty);
     }
 
     private static ILocatorAssertions Expect(ILocator locator) =>

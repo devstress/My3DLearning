@@ -1,13 +1,13 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class MessageStateInspectorTests
 {
     private readonly IObservabilityEventLog _observabilityLog = Substitute.For<IObservabilityEventLog>();
@@ -22,7 +22,7 @@ public class MessageStateInspectorTests
             NullLogger<MessageStateInspector>.Instance);
     }
 
-    [Fact]
+    [Test]
     public async Task WhereIsAsync_ReturnsNotFound_WhenNoEventsExist()
     {
         _observabilityLog.GetByBusinessKeyAsync("order-99", Arg.Any<CancellationToken>())
@@ -30,12 +30,12 @@ public class MessageStateInspectorTests
 
         var result = await _inspector.WhereIsAsync("order-99");
 
-        result.Found.Should().BeFalse();
-        result.Query.Should().Be("order-99");
-        result.Summary.Should().Contain("No messages found");
+        Assert.That(result.Found, Is.False);
+        Assert.That(result.Query, Is.EqualTo("order-99"));
+        Assert.That(result.Summary, Does.Contain("No messages found"));
     }
 
-    [Fact]
+    [Test]
     public async Task WhereIsAsync_QueriesObservabilityLog_NotProductionStore()
     {
         var correlationId = Guid.NewGuid();
@@ -71,15 +71,15 @@ public class MessageStateInspectorTests
 
         var result = await _inspector.WhereIsAsync("order-02");
 
-        result.Found.Should().BeTrue();
-        result.OllamaAvailable.Should().BeTrue();
-        result.Events.Should().HaveCount(2);
-        result.LatestStage.Should().Be("Routing");
-        result.LatestStatus.Should().Be(DeliveryStatus.InFlight);
-        result.Summary.Should().Contain("Routing");
+        Assert.That(result.Found, Is.True);
+        Assert.That(result.OllamaAvailable, Is.True);
+        Assert.That(result.Events, Has.Count.EqualTo(2));
+        Assert.That(result.LatestStage, Is.EqualTo("Routing"));
+        Assert.That(result.LatestStatus, Is.EqualTo(DeliveryStatus.InFlight));
+        Assert.That(result.Summary, Does.Contain("Routing"));
     }
 
-    [Fact]
+    [Test]
     public async Task WhereIsAsync_NotifiesOllamaUnavailable_WhenAiFails()
     {
         var correlationId = Guid.NewGuid();
@@ -105,13 +105,13 @@ public class MessageStateInspectorTests
 
         var result = await _inspector.WhereIsAsync("order-03");
 
-        result.Found.Should().BeTrue();
-        result.OllamaAvailable.Should().BeFalse();
-        result.Summary.Should().Contain("Ollama is unavailable");
-        result.Events.Should().ContainSingle();
+        Assert.That(result.Found, Is.True);
+        Assert.That(result.OllamaAvailable, Is.False);
+        Assert.That(result.Summary, Does.Contain("Ollama is unavailable"));
+        Assert.That(result.Events, Has.Count.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task WhereIsByCorrelationAsync_ReturnsEventsFromObservabilityLog()
     {
         var correlationId = Guid.NewGuid();
@@ -136,12 +136,12 @@ public class MessageStateInspectorTests
 
         var result = await _inspector.WhereIsByCorrelationAsync(correlationId);
 
-        result.Found.Should().BeTrue();
-        result.OllamaAvailable.Should().BeTrue();
-        result.Events.Should().ContainSingle();
+        Assert.That(result.Found, Is.True);
+        Assert.That(result.OllamaAvailable, Is.True);
+        Assert.That(result.Events, Has.Count.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public void CreateSnapshot_BuildsCorrectSnapshot()
     {
         var envelope = IntegrationEnvelope<string>.Create(
@@ -151,10 +151,10 @@ public class MessageStateInspectorTests
 
         var snapshot = _inspector.CreateSnapshot(envelope, "Routing", DeliveryStatus.InFlight);
 
-        snapshot.MessageId.Should().Be(envelope.MessageId);
-        snapshot.CorrelationId.Should().Be(envelope.CorrelationId);
-        snapshot.MessageType.Should().Be("OrderShipment");
-        snapshot.CurrentStage.Should().Be("Routing");
-        snapshot.DeliveryStatus.Should().Be(DeliveryStatus.InFlight);
+        Assert.That(snapshot.MessageId, Is.EqualTo(envelope.MessageId));
+        Assert.That(snapshot.CorrelationId, Is.EqualTo(envelope.CorrelationId));
+        Assert.That(snapshot.MessageType, Is.EqualTo("OrderShipment"));
+        Assert.That(snapshot.CurrentStage, Is.EqualTo("Routing"));
+        Assert.That(snapshot.DeliveryStatus, Is.EqualTo(DeliveryStatus.InFlight));
     }
 }

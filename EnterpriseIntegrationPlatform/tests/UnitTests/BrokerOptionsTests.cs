@@ -1,59 +1,59 @@
 using EnterpriseIntegrationPlatform.Ingestion;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class BrokerOptionsTests
 {
-    [Fact]
+    [Test]
     public void DefaultBrokerType_IsNatsJetStream()
     {
         // Arrange & Act
         var options = new BrokerOptions();
 
         // Assert
-        options.BrokerType.Should().Be(BrokerType.NatsJetStream);
+        Assert.That(options.BrokerType, Is.EqualTo(BrokerType.NatsJetStream));
     }
 
-    [Fact]
+    [Test]
     public void DefaultConnectionString_IsEmpty()
     {
         // Arrange & Act
         var options = new BrokerOptions();
 
         // Assert
-        options.ConnectionString.Should().BeEmpty();
+        Assert.That(options.ConnectionString, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public void SectionName_IsBroker()
     {
         // Assert
-        BrokerOptions.SectionName.Should().Be("Broker");
+        Assert.That(BrokerOptions.SectionName, Is.EqualTo("Broker"));
     }
 
-    [Fact]
+    [Test]
     public void BrokerType_CanBeSetToKafka()
     {
         // Arrange & Act
         var options = new BrokerOptions { BrokerType = BrokerType.Kafka };
 
         // Assert
-        options.BrokerType.Should().Be(BrokerType.Kafka);
+        Assert.That(options.BrokerType, Is.EqualTo(BrokerType.Kafka));
     }
 
-    [Fact]
+    [Test]
     public void BrokerType_CanBeSetToPulsar()
     {
         // Arrange & Act
         var options = new BrokerOptions { BrokerType = BrokerType.Pulsar };
 
         // Assert
-        options.BrokerType.Should().Be(BrokerType.Pulsar);
+        Assert.That(options.BrokerType, Is.EqualTo(BrokerType.Pulsar));
     }
 
-    [Fact]
+    [Test]
     public void ConnectionString_CanBeSet()
     {
         // Arrange & Act
@@ -63,6 +63,6 @@ public class BrokerOptionsTests
         };
 
         // Assert
-        options.ConnectionString.Should().Be("nats://localhost:4222");
+        Assert.That(options.ConnectionString, Is.EqualTo("nats://localhost:4222"));
     }
 }

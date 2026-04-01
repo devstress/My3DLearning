@@ -4,11 +4,10 @@ using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Integration;
 
@@ -24,7 +23,8 @@ namespace EnterpriseIntegrationPlatform.Tests.Integration;
 /// Tests are skipped when Docker is not available.
 /// </para>
 /// </summary>
-public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
+[TestFixture]
+public class OpenClawObservabilityEndToEndTests 
 {
     private IContainer? _lokiContainer;
     private WebApplicationFactory<Program>? _factory;
@@ -38,7 +38,8 @@ public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
         PropertyNameCaseInsensitive = true,
     };
 
-    public async Task InitializeAsync()
+    [SetUp]
+    public async Task SetUp()
     {
         try
         {
@@ -79,7 +80,8 @@ public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
         }
     }
 
-    public async Task DisposeAsync()
+    [TearDown]
+    public async Task TearDown()
     {
         _client?.Dispose();
         _factory?.Dispose();
@@ -102,7 +104,7 @@ public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
             messageType: messageType);
     }
 
-    [Fact]
+    [Test]
     public async Task OpenClaw_InspectBusinessKey_AI_FindsDeliveredMessage()
     {
         if (SkipIfNoDocker()) return;
@@ -136,26 +138,26 @@ public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
         var response = await _client!.GetAsync($"/api/inspect/business/{businessKey}");
 
         // ── Assert: HTTP response is successful ──────────────────────────────
-        response.IsSuccessStatusCode.Should().BeTrue(
+        Assert.That(response.IsSuccessStatusCode, Is.True,
             $"OpenClaw API should return success for business key '{businessKey}'");
 
         var json = await response.Content.ReadAsStringAsync();
         var result = JsonSerializer.Deserialize<InspectionResultDto>(json, JsonOptions);
 
-        result.Should().NotBeNull();
-        result!.Found.Should().BeTrue("the message lifecycle was recorded in Loki");
-        result.LatestStatus.Should().Be(DeliveryStatus.Delivered);
-        result.LatestStage.Should().Be(MessageTracer.StageDelivery);
-        result.Events.Should().HaveCount(4);
-        result.OllamaAvailable.Should().BeTrue();
-        result.Summary.Should().Contain("delivered");
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Found, Is.True, "the message lifecycle was recorded in Loki");
+        Assert.That(result.LatestStatus, Is.EqualTo(DeliveryStatus.Delivered));
+        Assert.That(result.LatestStage, Is.EqualTo(MessageTracer.StageDelivery));
+        Assert.That(result.Events, Has.Count.EqualTo(4));
+        Assert.That(result.OllamaAvailable, Is.True);
+        Assert.That(result.Summary, Does.Contain("delivered"));
 
         // Verify AI was called with the correct correlation ID
         await _traceAnalyzer.Received(1)
             .WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task OpenClaw_InspectCorrelationId_AI_FindsDeliveredMessage()
     {
         if (SkipIfNoDocker()) return;
@@ -183,17 +185,17 @@ public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
         var response = await _client!.GetAsync($"/api/inspect/correlation/{correlationId}");
 
         // ── Assert ───────────────────────────────────────────────────────────
-        response.IsSuccessStatusCode.Should().BeTrue();
+        Assert.That(response.IsSuccessStatusCode, Is.True);
 
         var json = await response.Content.ReadAsStringAsync();
         var result = JsonSerializer.Deserialize<InspectionResultDto>(json, JsonOptions);
 
-        result.Should().NotBeNull();
-        result!.Found.Should().BeTrue();
-        result.LatestStatus.Should().Be(DeliveryStatus.Delivered);
-        result.LatestStage.Should().Be(MessageTracer.StageDelivery);
-        result.Events.Should().HaveCount(3);
-        result.Summary.Should().Contain("delivered");
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Found, Is.True);
+        Assert.That(result.LatestStatus, Is.EqualTo(DeliveryStatus.Delivered));
+        Assert.That(result.LatestStage, Is.EqualTo(MessageTracer.StageDelivery));
+        Assert.That(result.Events, Has.Count.EqualTo(3));
+        Assert.That(result.Summary, Does.Contain("delivered"));
     }
 
     /// <summary>

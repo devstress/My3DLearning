@@ -1,10 +1,10 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.MultiTenancy;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class TenantIsolationGuardTests
 {
     private readonly TenantIsolationGuard _guard = new(new TenantResolver());
@@ -27,62 +27,62 @@ public class TenantIsolationGuardTests
         };
     }
 
-    [Fact]
+    [Test]
     public void Enforce_MatchingTenant_DoesNotThrow()
     {
         var envelope = BuildEnvelope("tenant-a");
         var act = () => _guard.Enforce(envelope, "tenant-a");
-        act.Should().NotThrow();
+        Assert.DoesNotThrow(() => act());
     }
 
-    [Fact]
+    [Test]
     public void Enforce_WrongTenant_ThrowsTenantIsolationException()
     {
         var envelope = BuildEnvelope("tenant-a");
         var act = () => _guard.Enforce(envelope, "tenant-b");
-        act.Should().Throw<TenantIsolationException>()
-            .Which.ActualTenantId.Should().Be("tenant-a");
+        var ex = Assert.Throws<TenantIsolationException>(() => act());
+        Assert.That(ex!.ActualTenantId, Is.EqualTo("tenant-a"));
     }
 
-    [Fact]
+    [Test]
     public void Enforce_MissingTenant_ThrowsTenantIsolationException()
     {
         var envelope = BuildEnvelope(tenantId: null);
         var act = () => _guard.Enforce(envelope, "tenant-a");
-        act.Should().Throw<TenantIsolationException>()
-            .Which.ActualTenantId.Should().BeNull();
+        var ex = Assert.Throws<TenantIsolationException>(() => act());
+        Assert.That(ex!.ActualTenantId, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void Enforce_NullEnvelope_ThrowsArgumentNullException()
     {
         var act = () => _guard.Enforce((IntegrationEnvelope<string>)null!, "tenant-a");
-        act.Should().Throw<ArgumentNullException>();
+        Assert.Throws<ArgumentNullException>(() => act());
     }
 
-    [Fact]
+    [Test]
     public void Enforce_EmptyExpectedTenantId_ThrowsArgumentException()
     {
         var envelope = BuildEnvelope("tenant-a");
         var act = () => _guard.Enforce(envelope, "");
-        act.Should().Throw<ArgumentException>();
+        Assert.Throws<ArgumentException>(() => act());
     }
 
-    [Fact]
+    [Test]
     public void TenantIsolationException_ExposesExpectedTenantId()
     {
         var envelope = BuildEnvelope("actual-tenant");
         var act = () => _guard.Enforce(envelope, "expected-tenant");
-        act.Should().Throw<TenantIsolationException>()
-            .Which.ExpectedTenantId.Should().Be("expected-tenant");
+        var ex = Assert.Throws<TenantIsolationException>(() => act());
+        Assert.That(ex!.ExpectedTenantId, Is.EqualTo("expected-tenant"));
     }
 
-    [Fact]
+    [Test]
     public void TenantIsolationException_ExposesMessageId()
     {
         var envelope = BuildEnvelope("a");
         var act = () => _guard.Enforce(envelope, "b");
-        act.Should().Throw<TenantIsolationException>()
-            .Which.MessageId.Should().Be(envelope.MessageId);
+        var ex = Assert.Throws<TenantIsolationException>(() => act());
+        Assert.That(ex!.MessageId, Is.EqualTo(envelope.MessageId));
     }
 }

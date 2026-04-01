@@ -1,33 +1,35 @@
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 using EnterpriseIntegrationPlatform.Activities;
 
 namespace EnterpriseIntegrationPlatform.Tests.Workflow;
 
+[TestFixture]
 public class MessageValidationResultTests
 {
-    [Fact]
+    [Test]
     public void Success_ShouldBeValid()
     {
         var result = MessageValidationResult.Success;
 
-        result.IsValid.Should().BeTrue();
-        result.Reason.Should().BeNull();
+        Assert.That(result.IsValid, Is.True);
+        Assert.That(result.Reason, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void Failure_ShouldNotBeValid_AndIncludeReason()
     {
         var result = MessageValidationResult.Failure("bad payload");
 
-        result.IsValid.Should().BeFalse();
-        result.Reason.Should().Be("bad payload");
+        Assert.That(result.IsValid, Is.False);
+        Assert.That(result.Reason, Is.EqualTo("bad payload"));
     }
 
-    [Fact]
+    [Test]
     public void Success_ShouldBeSameInstance()
     {
-        MessageValidationResult.Success.Should().BeSameAs(MessageValidationResult.Success);
+        var first = MessageValidationResult.Success;
+        var second = MessageValidationResult.Success;
+        Assert.That(first, Is.SameAs(second));
     }
 }

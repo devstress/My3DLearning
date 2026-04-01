@@ -1,32 +1,32 @@
 using EnterpriseIntegrationPlatform.Contracts;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Contract;
 
+[TestFixture]
 public class MessageHeadersTests
 {
-    [Fact]
+    [Test]
     public void TraceId_HasExpectedValue() =>
-        MessageHeaders.TraceId.Should().Be("trace-id");
+        Assert.That(MessageHeaders.TraceId, Is.EqualTo("trace-id"));
 
-    [Fact]
+    [Test]
     public void SpanId_HasExpectedValue() =>
-        MessageHeaders.SpanId.Should().Be("span-id");
+        Assert.That(MessageHeaders.SpanId, Is.EqualTo("span-id"));
 
-    [Fact]
+    [Test]
     public void ContentType_HasExpectedValue() =>
-        MessageHeaders.ContentType.Should().Be("content-type");
+        Assert.That(MessageHeaders.ContentType, Is.EqualTo("content-type"));
 
-    [Fact]
+    [Test]
     public void SchemaVersion_HasExpectedValue() =>
-        MessageHeaders.SchemaVersion.Should().Be("schema-version");
+        Assert.That(MessageHeaders.SchemaVersion, Is.EqualTo("schema-version"));
 
-    [Fact]
+    [Test]
     public void RetryCount_HasExpectedValue() =>
-        MessageHeaders.RetryCount.Should().Be("retry-count");
+        Assert.That(MessageHeaders.RetryCount, Is.EqualTo("retry-count"));
 
-    [Fact]
+    [Test]
     public void AllConstantsAreNonEmpty()
     {
         var constants = new[]
@@ -41,6 +41,6 @@ public class MessageHeadersTests
             MessageHeaders.RetryCount,
         };
 
-        constants.Should().AllSatisfy(c => c.Should().NotBeNullOrWhiteSpace());
+        Assert.That(constants, Has.All.Not.Null.And.All.Not.Empty);
     }
 }
