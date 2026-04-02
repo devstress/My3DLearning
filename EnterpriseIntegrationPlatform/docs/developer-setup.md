@@ -131,26 +131,40 @@ EnterpriseIntegrationPlatform/
 ├── src/
 │   ├── AppHost/                 # .NET Aspire orchestrator
 │   ├── ServiceDefaults/         # Shared service configuration (OpenTelemetry, health checks)
-│   ├── Gateway.Api/             # HTTP ingress API
-│   ├── Ingestion.Kafka/         # Message broker ingestion service (Kafka streaming + NATS/Pulsar queuing)
 │   ├── Contracts/               # Shared message contracts and interfaces
+│   ├── Ingestion/               # Broker abstraction (IMessageBrokerProducer/Consumer)
+│   ├── Ingestion.Kafka/         # Kafka streaming provider
+│   ├── Ingestion.Nats/          # NATS JetStream provider (default)
+│   ├── Ingestion.Pulsar/        # Apache Pulsar Key_Shared provider
 │   ├── Workflow.Temporal/       # Temporal workflow worker
 │   ├── Activities/              # Workflow activity implementations
-│   ├── Connectors/              # Outbound connector plugins
-│   ├── Processing.Transform/    # Message transformation logic
 │   ├── Processing.Routing/      # Content-based routing logic
+│   ├── Processing.Translator/   # Message transformation logic
+│   ├── Processing.Splitter/     # Message splitter
+│   ├── Processing.Aggregator/   # Message aggregator
+│   ├── Processing.DeadLetter/   # Dead letter queue management
+│   ├── Processing.Retry/        # Retry framework
+│   ├── Processing.Replay/       # Replay framework
+│   ├── Connector.Http/          # HTTP connector
+│   ├── Connector.Sftp/          # SFTP connector
+│   ├── Connector.Email/         # Email connector
+│   ├── Connector.File/          # File connector
 │   ├── Storage.Cassandra/       # Cassandra data access layer
+│   ├── Security/                # Input sanitization, payload guards, encryption
+│   ├── MultiTenancy/            # Tenant resolution and isolation
 │   ├── AI.Ollama/               # Ollama AI integration
-│   ├── RuleEngine/              # Business rules engine
+│   ├── AI.RagFlow/              # RagFlow RAG client
+│   ├── Observability/           # OpenTelemetry configuration
+│   ├── OpenClaw.Web/            # "Where is my message?" web UI & RAG knowledge API
 │   ├── Admin.Api/               # Administration REST API
-│   ├── Admin.Web/               # Administration web UI
-│   └── Observability/           # OpenTelemetry configuration
+│   └── Demo.Pipeline/           # End-to-end demo pipeline
 ├── tests/
-│   ├── UnitTests/
-│   ├── IntegrationTests/
-│   ├── ContractTests/
-│   ├── WorkflowTests/
-│   └── LoadTests/
+│   ├── UnitTests/               # Fast, isolated unit tests (402 tests)
+│   ├── ContractTests/           # Contract verification tests (29 tests)
+│   ├── WorkflowTests/           # Temporal workflow tests (24 tests)
+│   ├── IntegrationTests/        # Testcontainers-based integration tests (17 tests)
+│   ├── PlaywrightTests/         # End-to-end browser tests for OpenClaw UI (13 tests)
+│   └── LoadTests/               # Performance and load tests (5 tests)
 ├── docs/                        # Architecture and design documentation
 └── rules/                       # Development standards and milestones
 ```
@@ -168,7 +182,7 @@ EnterpriseIntegrationPlatform/
 | Storage             | Apache Cassandra        | Latest    |
 | Observability       | OpenTelemetry           | 1.14.0    |
 | AI Runtime          | Ollama                  | Latest    |
-| Testing             | xUnit + FluentAssertions| Latest    |
+| Testing             | NUnit + NSubstitute    | 4.4.0 / 5.3.0 |
 
 ## Troubleshooting
 

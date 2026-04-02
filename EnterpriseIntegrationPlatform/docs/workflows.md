@@ -1,8 +1,10 @@
-# Temporal Workflow Documentation
+# Workflow Definitions and Patterns
 
 ## Overview
 
 Temporal.io is the workflow orchestration engine at the heart of the Enterprise Integration Platform. Every message processed by the platform flows through a Temporal workflow that coordinates validation, transformation, routing, and delivery as a durable, replayable sequence of activities.
+
+For Temporal infrastructure configuration (namespaces, task queues, timeouts, search attributes), see [Temporal Configuration](temporal-workflows.md).
 
 ## Workflow Definitions
 

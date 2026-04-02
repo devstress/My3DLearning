@@ -20,22 +20,26 @@
 - `ServiceDefaults` has ZERO project dependencies (cross-cutting defaults)
 - `Activities` depends only on `Contracts`
 - `Workflow.Temporal` depends on `Contracts` and `Activities`
-- `Gateway.Api` depends on `Contracts` and `Ingestion`
 - `Ingestion` depends on `Contracts` (broker abstraction; Kafka, NATS, and Pulsar providers)
+- `Ingestion.Kafka` depends on `Ingestion` and `Contracts`
+- `Ingestion.Nats` depends on `Ingestion` and `Contracts`
+- `Ingestion.Pulsar` depends on `Ingestion` and `Contracts`
 - `Storage.Cassandra` depends on `Contracts`
 - `Processing.*` projects depend on `Contracts`
 - `Connector.*` projects depend on `Contracts`
 - `AI.Ollama` depends on `Contracts`
 - `AI.RagFlow` has ZERO project dependencies (standalone RAG client)
-- `RuleEngine` depends on `Contracts`
+- `Security` depends on `Contracts`
+- `MultiTenancy` depends on `Contracts`
 - `Admin.Api` depends on `Contracts`
+- `Demo.Pipeline` depends on `Contracts` and `Ingestion`
 - `AppHost` references all service projects for orchestration
 - `Observability` depends on `Contracts` and `ServiceDefaults`
 - Test projects may reference any src project
 
 ## Communication Patterns
 
-- **Synchronous**: REST/gRPC via Gateway.Api only for external consumers
+- **Synchronous**: REST via Admin.Api for platform management; connector HTTP delivery for outbound
 - **Asynchronous (streaming)**: Kafka for broadcast event streams, audit logs, fan-out analytics, and decoupled integration
 - **Asynchronous (queuing)**: Configurable queue broker (default: NATS JetStream; Pulsar Key_Shared for large-scale production) for task-oriented delivery — messages keyed by recipientId are distributed across consumers so recipient A never blocks recipient B, even at 1 million recipients
 - **Orchestration**: Temporal for complex workflows and sagas

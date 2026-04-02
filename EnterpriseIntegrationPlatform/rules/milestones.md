@@ -95,7 +95,31 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-All 28 chunks complete. Platform is fully implemented across all four phases.
+**Phase 5 — Production Readiness** begins with Chunk 029 (Kubernetes Deployment).
+
+---
+
+### Phase 5 – Production Readiness
+
+| Chunk | Name | Goal | Status |
+|-------|------|------|--------|
+| 029 | Kubernetes deployment | Helm charts, Kustomize overlays, namespace isolation, resource limits, and liveness/readiness probes for Kubernetes deployment | not-started |
+| 030 | CI/CD pipeline hardening | Multi-environment pipelines (dev/staging/prod), blue-green deployment, canary release strategy, automated rollback triggers | not-started |
+| 031 | API Gateway | Ingress controller configuration, TLS termination, rate limiting at edge, request routing, and API versioning | not-started |
+| 032 | Grafana dashboards | Pre-built Grafana dashboards for platform health, message throughput, connector status, Temporal workflow metrics, and alerting rules | not-started |
+| 033 | Configuration management | Centralized configuration service with environment-specific overrides, feature flags, and dynamic reconfiguration without restart | not-started |
+| 034 | Secrets management | HashiCorp Vault or Azure Key Vault integration for runtime secret injection, automatic rotation, and audit logging | not-started |
+
+### Phase 6 – Advanced Patterns & Scale
+
+| Chunk | Name | Goal | Status |
+|-------|------|------|--------|
+| 035 | Event Sourcing | Event store implementation, event projections, snapshot strategy, and temporal queries for full audit trail reconstruction | not-started |
+| 036 | Scatter-Gather pattern | Broadcast a request to multiple recipients, collect responses within a timeout window, and aggregate results | not-started |
+| 037 | Competing Consumers | Dynamic consumer scaling, partition rebalancing, consumer lag monitoring, and backpressure signaling | not-started |
+| 038 | Tenant onboarding automation | Self-service tenant provisioning, quota management, isolated broker namespaces, and onboarding workflow | not-started |
+| 039 | Disaster recovery automation | Automated failover, cross-region replication, recovery point validation, and DR drill framework | not-started |
+| 040 | Performance profiling | Continuous profiling integration, memory/CPU hotspot detection, GC tuning, and benchmark regression tests | not-started |
 
 ---
 

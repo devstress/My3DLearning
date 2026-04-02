@@ -41,12 +41,12 @@ The Enterprise Integration Platform is a workflow-orchestrated integration syste
 │                        .NET Aspire Host                         │
 │                                                                 │
 │  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  ┌────────┐ │
-│  │ Ingress.API │  │ Admin.API   │  │ Worker.Svc │  │ AI.Svc │ │
+│  │ Ingestion   │  │ Admin.API   │  │ Worker.Svc │  │ AI.Svc │ │
 │  │             │  │             │  │            │  │        │ │
-│  │ • HTTP Recv │  │ • Routes    │  │ • Temporal │  │ • RAG  │ │
-│  │ • SFTP Poll │  │ • Tenants   │  │   Workers  │  │  Retrv │ │
-│  │ • Email Mon │  │ • Config    │  │ • Broker   │  │ • Know │ │
-│  │ • File Watch│  │ • Monitor   │  │   Consumer │  │  ledge │ │
+│  │ • Kafka     │  │ • Routes    │  │ • Temporal │  │ • RAG  │ │
+│  │ • NATS      │  │ • Tenants   │  │   Workers  │  │  Retrv │ │
+│  │ • Pulsar    │  │ • Config    │  │ • Broker   │  │ • Know │ │
+│  │ • File      │  │ • Monitor   │  │   Consumer │  │  ledge │ │
 │  └──────┬──────┘  └──────┬──────┘  └─────┬──────┘  └───┬────┘ │
 │         │                │               │              │      │
 │         ▼                ▼               ▼              ▼      │
@@ -56,6 +56,8 @@ The Enterprise Integration Platform is a workflow-orchestrated integration syste
 │  │  • OpenTelemetry instrumentation                        │   │
 │  │  • Configuration & secret management                    │   │
 │  │  • Health check endpoints                               │   │
+│  │  • Security (input sanitization, payload guards)        │   │
+│  │  • Multi-tenancy (tenant resolution, isolation)         │   │
 │  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
          │              │               │              │

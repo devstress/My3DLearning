@@ -13,7 +13,7 @@ This guide provides a structured approach for migrating integration solutions fr
 | Receive Locations      | Ingress Adapter Configurations| Protocol-specific endpoint configuration                   |
 | Send Ports             | Connectors                    | Outbound delivery with protocol-specific logic             |
 | Send Port Groups       | Recipient Lists (Routes)      | Route to multiple connectors based on subscriptions        |
-| Maps (XSLT/BizTalk Mapper) | Processing.Transform     | Transformation activities with configurable mappings       |
+| Maps (XSLT/BizTalk Mapper) | Processing.Translator    | Transformation activities with configurable mappings       |
 | Pipelines              | Activity Chains               | Ordered sequence of processing activities                  |
 | Pipeline Components    | Individual Activities         | Discrete units: validate, decode, transform, encode        |
 | MessageBox             | Configurable Message Broker    | Kafka for streaming, NATS/Pulsar for task delivery — pub/sub with topic/subject-based routing |

@@ -53,7 +53,7 @@ A modern, AI-driven enterprise integration platform built on .NET 10, replacing 
 | Storage | Apache Cassandra | Latest |
 | Observability | OpenTelemetry + Grafana Loki | 1.14.0 |
 | AI Runtime | Ollama | Latest |
-| Testing | xUnit, FluentAssertions, Testcontainers | Latest |
+| Testing | NUnit 4.4.0, NSubstitute 5.3.0, Testcontainers | Latest |
 
 ## Getting Started
 
@@ -90,7 +90,6 @@ EnterpriseIntegrationPlatform/
 ├── src/
 │   ├── AppHost/                  # .NET Aspire orchestrator
 │   ├── ServiceDefaults/          # Shared OpenTelemetry & health-check config
-│   ├── Gateway.Api/              # HTTP ingress API
 │   ├── Contracts/                # Canonical IntegrationEnvelope & shared interfaces
 │   ├── Ingestion/                # Broker abstraction (IMessageBrokerProducer/Consumer)
 │   ├── Ingestion.Kafka/          # Kafka provider
@@ -98,23 +97,33 @@ EnterpriseIntegrationPlatform/
 │   ├── Ingestion.Pulsar/         # Apache Pulsar Key_Shared provider
 │   ├── Workflow.Temporal/        # Temporal workflow worker
 │   ├── Activities/               # Stateless workflow activities
-│   ├── Processing.Transform/     # Message transformation logic
 │   ├── Processing.Routing/       # Content-based routing
-│   ├── Connectors/               # Outbound delivery plugins (HTTP, SFTP, Email, File)
+│   ├── Processing.Translator/    # Message transformation logic
+│   ├── Processing.Splitter/      # Message splitter
+│   ├── Processing.Aggregator/    # Message aggregator
+│   ├── Processing.DeadLetter/    # Dead letter queue management
+│   ├── Processing.Retry/         # Retry framework
+│   ├── Processing.Replay/        # Replay framework
+│   ├── Connector.Http/           # HTTP connector
+│   ├── Connector.Sftp/           # SFTP connector
+│   ├── Connector.Email/          # Email connector
+│   ├── Connector.File/           # File connector
 │   ├── Storage.Cassandra/        # Cassandra data access layer
-│   ├── RuleEngine/               # Business rules engine
+│   ├── Security/                 # Input sanitization, payload guards, encryption
+│   ├── MultiTenancy/             # Tenant resolution and isolation
 │   ├── AI.Ollama/                # Ollama AI integration
+│   ├── AI.RagFlow/               # RagFlow RAG client
 │   ├── Observability/            # Lifecycle recording, Loki storage, OpenClaw API
 │   ├── OpenClaw.Web/             # "Where is my message?" web UI & RAG knowledge API
 │   ├── Admin.Api/                # Administration REST API
-│   └── Admin.Web/                # Administration web UI
+│   └── Demo.Pipeline/            # End-to-end demo pipeline
 ├── tests/
-│   ├── UnitTests/                # Fast, isolated unit tests
-│   ├── IntegrationTests/         # Testcontainers-based integration tests (Loki)
-│   ├── ContractTests/            # Contract verification tests
-│   ├── WorkflowTests/            # Temporal workflow tests
-│   ├── PlaywrightTests/          # End-to-end browser tests for OpenClaw UI
-│   └── LoadTests/                # Performance and load tests
+│   ├── UnitTests/                # Fast, isolated unit tests (402 tests)
+│   ├── ContractTests/            # Contract verification tests (29 tests)
+│   ├── WorkflowTests/            # Temporal workflow tests (24 tests)
+│   ├── IntegrationTests/         # Testcontainers-based integration tests (17 tests)
+│   ├── PlaywrightTests/          # End-to-end browser tests for OpenClaw UI (13 tests)
+│   └── LoadTests/                # Performance and load tests (5 tests)
 ├── docs/                         # Architecture, ADRs, runbooks, and design docs
 └── rules/                        # Development milestones, coding standards, architecture rules
 ```
@@ -133,12 +142,25 @@ See [`docs/adr/`](docs/adr/) for full Architecture Decision Records.
 ## Documentation
 
 - [Architecture Overview](docs/architecture-overview.md)
+- [Detailed Architecture](docs/architecture.md)
 - [Developer Setup Guide](docs/developer-setup.md)
 - [Domain Model](docs/domain-model.md)
+- [EIP Pattern Mapping](docs/eip-mapping.md)
+- [Connector Architecture](docs/connectors.md)
 - [Observability](docs/observability.md)
 - [Security Architecture](docs/security.md)
+- [Reliability](docs/reliability.md)
+- [Resilience](docs/resilience.md)
 - [Scalability Strategy](docs/scalability.md)
+- [Kafka Topology](docs/kafka-topology.md)
+- [Temporal Workflows](docs/workflows.md)
+- [Temporal Configuration](docs/temporal-workflows.md)
+- [Cassandra Data Model](docs/cassandra-data-model.md)
+- [AI Strategy](docs/ai-strategy.md)
+- [AI Code Generation](docs/ai-code-generation.md)
+- [Operations Runbook](docs/operations-runbook.md)
 - [Migration from BizTalk](docs/migration-from-biztalk.md)
+- [System Context (C4)](docs/system-context.md)
 
 ## Contributing
 
