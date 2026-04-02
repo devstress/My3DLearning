@@ -1,4 +1,5 @@
 using EnterpriseIntegrationPlatform.Connector.Http;
+using Microsoft.Extensions.Time.Testing;
 using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
@@ -32,10 +33,12 @@ public class InMemoryTokenCacheTests
     [Test]
     public void TryGetToken_ExpiredEntry_ReturnsFalse()
     {
-        var cache = new InMemoryTokenCache();
-        // Zero expiry means the token is stored with Expiry == UtcNow,
-        // and the check (Expiry > UtcNow) is immediately false.
-        cache.SetToken("expiring-key", "token", TimeSpan.Zero);
+        var fakeTime = new FakeTimeProvider();
+        var cache = new InMemoryTokenCache(fakeTime);
+        cache.SetToken("expiring-key", "token", TimeSpan.FromMinutes(5));
+
+        // Advance past expiry — no Thread.Sleep needed
+        fakeTime.Advance(TimeSpan.FromMinutes(6));
 
         var result = cache.TryGetToken("expiring-key", out var token);
 

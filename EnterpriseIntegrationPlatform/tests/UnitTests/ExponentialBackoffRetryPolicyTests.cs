@@ -9,7 +9,7 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 public class ExponentialBackoffRetryPolicyTests
 {
     private static readonly Func<int, CancellationToken, Task> FastDelay =
-        (ms, ct) => Task.Delay(Math.Min(ms, 10), ct);
+        (_, _) => Task.CompletedTask;
 
     private ExponentialBackoffRetryPolicy BuildPolicy(RetryOptions? options = null, Func<int, CancellationToken, Task>? delayFunc = null)
     {
