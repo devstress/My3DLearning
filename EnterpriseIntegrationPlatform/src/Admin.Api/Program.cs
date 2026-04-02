@@ -5,6 +5,7 @@ using EnterpriseIntegrationPlatform.Admin.Api.Services;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
 using EnterpriseIntegrationPlatform.Processing.Replay;
+using EnterpriseIntegrationPlatform.Configuration;
 using EnterpriseIntegrationPlatform.Processing.Throttle;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
 using Microsoft.AspNetCore.Authentication;
@@ -73,6 +74,10 @@ builder.Services.AddSingleton<DlqManagementService>();
 // ── Throttle Registry ─────────────────────────────────────────────────────────
 // Partitioned throttles per tenant, queue, and endpoint — controllable at runtime.
 builder.Services.AddMessageThrottle(builder.Configuration);
+
+// ── Configuration Management ──────────────────────────────────────────────────
+// Centralized config store, feature flags, and change notifications.
+builder.Services.AddConfigurationManagement();
 
 var app = builder.Build();
 
@@ -322,6 +327,138 @@ app.MapGet("/api/admin/ratelimit/status", (
 .WithName("AdminGetRateLimitStatus")
 .RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
 
+// ── Configuration Management ──────────────────────────────────────────────────
+// Centralized config store with environment overrides and change notifications.
+
+app.MapGet("/api/admin/config", async (
+    string? environment,
+    IConfigurationStore configStore,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("ListConfiguration", environment, http.User);
+    var entries = await configStore.ListAsync(environment, ct);
+    return Results.Ok(entries);
+})
+.WithName("AdminListConfiguration")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/config/{key}", async (
+    string key,
+    string? environment,
+    IConfigurationStore configStore,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("GetConfiguration", key, http.User);
+    var entry = await configStore.GetAsync(key, environment ?? "default", ct);
+    return entry is null ? Results.NotFound() : Results.Ok(entry);
+})
+.WithName("AdminGetConfiguration")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapPut("/api/admin/config/{key}", async (
+    string key,
+    SetConfigurationRequest request,
+    IConfigurationStore configStore,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("SetConfiguration", key, http.User);
+    var entry = new ConfigurationEntry(
+        Key: key,
+        Value: request.Value,
+        Environment: request.Environment ?? "default",
+        ModifiedBy: http.User.Identity?.Name);
+    var stored = await configStore.SetAsync(entry, ct);
+    return Results.Ok(stored);
+})
+.WithName("AdminSetConfiguration")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapDelete("/api/admin/config/{key}", async (
+    string key,
+    string? environment,
+    IConfigurationStore configStore,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("DeleteConfiguration", key, http.User);
+    var deleted = await configStore.DeleteAsync(key, environment ?? "default", ct);
+    return deleted ? Results.NoContent() : Results.NotFound();
+})
+.WithName("AdminDeleteConfiguration")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+// ── Feature Flags ─────────────────────────────────────────────────────────────
+// Dynamic feature flag management with rollout percentage and tenant targeting.
+
+app.MapGet("/api/admin/features", async (
+    IFeatureFlagService featureService,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("ListFeatureFlags", null, http.User);
+    var flags = await featureService.ListAsync(ct);
+    return Results.Ok(flags);
+})
+.WithName("AdminListFeatureFlags")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/features/{name}", async (
+    string name,
+    IFeatureFlagService featureService,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("GetFeatureFlag", name, http.User);
+    var flag = await featureService.GetAsync(name, ct);
+    return flag is null ? Results.NotFound() : Results.Ok(flag);
+})
+.WithName("AdminGetFeatureFlag")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapPut("/api/admin/features/{name}", async (
+    string name,
+    SetFeatureFlagRequest request,
+    IFeatureFlagService featureService,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("SetFeatureFlag", name, http.User);
+    var flag = new FeatureFlag(
+        Name: name,
+        IsEnabled: request.IsEnabled,
+        Variants: request.Variants,
+        RolloutPercentage: request.RolloutPercentage,
+        TargetTenants: request.TargetTenants);
+    await featureService.SetAsync(flag, ct);
+    return Results.Ok(flag);
+})
+.WithName("AdminSetFeatureFlag")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapDelete("/api/admin/features/{name}", async (
+    string name,
+    IFeatureFlagService featureService,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("DeleteFeatureFlag", name, http.User);
+    var deleted = await featureService.DeleteAsync(name, ct);
+    return deleted ? Results.NoContent() : Results.NotFound();
+})
+.WithName("AdminDeleteFeatureFlag")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
 app.Run();
 
 // ── Request models ────────────────────────────────────────────────────────────
@@ -377,3 +514,25 @@ public sealed record SetThrottlePolicyRequest(
     int MaxWaitTimeSeconds = 30,
     bool RejectOnBackpressure = false,
     bool IsEnabled = true);
+
+/// <summary>
+/// Request body for creating or updating a configuration entry.
+/// </summary>
+/// <param name="Value">The configuration value.</param>
+/// <param name="Environment">Target environment (defaults to "default").</param>
+public sealed record SetConfigurationRequest(
+    string Value,
+    string? Environment);
+
+/// <summary>
+/// Request body for creating or updating a feature flag.
+/// </summary>
+/// <param name="IsEnabled">Whether the feature is enabled.</param>
+/// <param name="Variants">Named variants with their associated values.</param>
+/// <param name="RolloutPercentage">Percentage of traffic (0–100) that should receive this feature.</param>
+/// <param name="TargetTenants">Tenants that always receive this feature.</param>
+public sealed record SetFeatureFlagRequest(
+    bool IsEnabled = false,
+    Dictionary<string, string>? Variants = null,
+    int RolloutPercentage = 100,
+    List<string>? TargetTenants = null);
