@@ -16,7 +16,6 @@ public class BrokerTypeTests
         Assert.That(((int)BrokerType.Pulsar), Is.EqualTo(2));
     }
 
-    [Test]
     [TestCase("NatsJetStream", BrokerType.NatsJetStream)]
     [TestCase("Kafka", BrokerType.Kafka)]
     [TestCase("Pulsar", BrokerType.Pulsar)]

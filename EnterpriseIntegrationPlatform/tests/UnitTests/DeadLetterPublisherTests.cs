@@ -212,7 +212,6 @@ public class DeadLetterPublisherTests
         Assert.ThrowsAsync<InvalidOperationException>(async () => await act());
     }
 
-    [Test]
     [TestCase(DeadLetterReason.MaxRetriesExceeded)]
     [TestCase(DeadLetterReason.PoisonMessage)]
     [TestCase(DeadLetterReason.ProcessingTimeout)]
