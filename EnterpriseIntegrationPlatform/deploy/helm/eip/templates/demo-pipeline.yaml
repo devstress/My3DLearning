@@ -1,0 +1,40 @@
+{{- if .Values.demoPipeline.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eip.fullname" . }}-demo-pipeline
+  namespace: {{ include "eip.namespace" . }}
+  labels:
+    {{- include "eip.componentLabels" (dict "Root" . "Component" "demo-pipeline") | nindent 4 }}
+spec:
+  replicas: {{ .Values.demoPipeline.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "eip.componentSelectorLabels" (dict "Root" . "Component" "demo-pipeline") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "eip.componentLabels" (dict "Root" . "Component" "demo-pipeline") | nindent 8 }}
+    spec:
+      {{- include "eip.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "eip.fullname" . }}-demo-pipeline
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: demo-pipeline
+          image: {{ include "eip.image" .Values.demoPipeline.image }}
+          imagePullPolicy: {{ .Values.demoPipeline.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "eip.fullname" . }}-config
+          resources:
+            {{- toYaml .Values.demoPipeline.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+{{- end }}

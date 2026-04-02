@@ -10,6 +10,16 @@
 > implement it, update the status to `done`, update `Next Chunk`, and log details
 > in `rules/completion-log.md`.
 
+> **ENFORCEMENT RULE — Completed chunks must be removed from this file.**
+>
+> When a chunk is marked `done`:
+> 1. Log full details (date, goal, architecture, files created/modified, test counts) in `rules/completion-log.md`.
+> 2. **Remove the done row from this file.** Milestones.md contains only `not-started` chunks.
+> 3. If an entire phase has no remaining rows, replace the table with: `✅ Phase N complete — see completion-log.md`.
+> 4. Update the `Next Chunk` section to point to the next `not-started` chunk.
+>
+> This rule is mandatory for every AI agent session. Never leave done rows in milestones.md.
+
 ## Vision
 
 Build a modern AI-driven Enterprise Integration Platform to replace Microsoft BizTalk Server.  
@@ -43,59 +53,16 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 - Target .NET 10 (C# 14) with .NET Aspire 13.1.2
 - Non-common Aspire host ports (15xxx range) to avoid conflicts with existing services
 
-## Phases
+## Completed Phases
 
-### Phase 1 – Foundations
-
-| Chunk | Name | Goal | Status |
-|-------|------|------|--------|
-| 001 | Repository scaffold | Create solution structure, projects, directory layout | done |
-| 002 | GitHub Actions CI pipeline | Automated build and test on every push/PR | done |
-| 003 | Aspire AppHost infrastructure | Configure Aspire AppHost with service defaults | done |
-| 004 | Contracts and canonical message envelope | Define shared message contracts | done |
-| 005 | Configurable message broker ingestion | Implement broker abstraction with Kafka, NATS JetStream (default), and Pulsar (Key_Shared) providers for message ingestion | done |
-| 006 | Temporal workflow host | Set up Temporal worker and workflow definitions with validation activities | done |
-| 007 | Cassandra storage module | Implement Cassandra repository and data access | done |
-| 008 | Ollama AI integration | Integrate Ollama for RAG retrieval within RagFlow and trace analysis | done |
-| 009 | OpenTelemetry observability | Configure distributed tracing, metrics (Prometheus), isolated observability storage (Loki), OpenClaw web UI with Playwright tests, RagFlow + Ollama in Aspire, AI.RagFlow client, OpenClaw generation endpoints (POST /api/generate/integration, POST /api/generate/chat), non-common Aspire ports (15xxx range) | done |
-| 010 | Admin API | Build administration API for platform management | done |
-| 011 | End-to-end demo pipeline | Wire all components into a working demo pipeline | done |
-
-### Phase 2 – Integration Patterns
-
-| Chunk | Name | Status |
-|-------|------|--------|
-| 012 | Content-Based Router | done |
-| 013 | Message Translator | done |
-| 014 | Splitter | done |
-| 015 | Aggregator | done |
-| 016 | Dead Letter Queue | done |
-| 017 | Retry framework | done |
-| 018 | Replay framework | done |
-
-### Phase 3 – Connectors
-
-| Chunk | Name | Status |
-|-------|------|--------|
-| 019 | HTTP connector | done |
-| 020 | SFTP connector | done |
-| 021 | Email connector | done |
-| 022 | File connector | done |
-
-### Phase 4 – Hardening
-
-| Chunk | Name | Status |
-|-------|------|--------|
-| 023 | Security | done |
-| 024 | Multi-tenancy | done |
-| 025 | Saga compensation | done |
-| 026 | Load testing | done |
-| 027 | Operational tooling | done |
-| 028 | AI-assisted code generation | done |
+✅ Phase 1 (Foundations, chunks 001-011) complete — see completion-log.md  
+✅ Phase 2 (Integration Patterns, chunks 012-018) complete — see completion-log.md  
+✅ Phase 3 (Connectors, chunks 019-022) complete — see completion-log.md  
+✅ Phase 4 (Hardening, chunks 023-028) complete — see completion-log.md
 
 ## Next Chunk
 
-**Phase 5 — Production Readiness** begins with Chunk 029 (Kubernetes Deployment).
+**Chunk 032** (Grafana Dashboards) is next.
 
 ---
 
@@ -103,9 +70,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Status |
 |-------|------|------|--------|
-| 029 | Kubernetes deployment | Helm charts, Kustomize overlays, namespace isolation, resource limits, and liveness/readiness probes for Kubernetes deployment | not-started |
-| 030 | CI/CD pipeline hardening | Multi-environment pipelines (dev/staging/prod), blue-green deployment, canary release strategy, automated rollback triggers | not-started |
-| 031 | API Gateway | Ingress controller configuration, TLS termination, rate limiting at edge, request routing, and API versioning | not-started |
 | 032 | Grafana dashboards | Pre-built Grafana dashboards for platform health, message throughput, connector status, Temporal workflow metrics, and alerting rules | not-started |
 | 033 | Configuration management | Centralized configuration service with environment-specific overrides, feature flags, and dynamic reconfiguration without restart | not-started |
 | 034 | Secrets management | HashiCorp Vault or Azure Key Vault integration for runtime secret injection, automatic rotation, and audit logging | not-started |
@@ -120,6 +84,24 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 038 | Tenant onboarding automation | Self-service tenant provisioning, quota management, isolated broker namespaces, and onboarding workflow | not-started |
 | 039 | Disaster recovery automation | Automated failover, cross-region replication, recovery point validation, and DR drill framework | not-started |
 | 040 | Performance profiling | Continuous profiling integration, memory/CPU hotspot detection, GC tuning, and benchmark regression tests | not-started |
+
+### Phase 7 – Missing Projects
+
+| Chunk | Name | Goal | Status |
+|-------|------|------|--------|
+| 041 | Processing.Transform | General payload transformation pipeline with pluggable steps (JSON↔XML, regex replace, JSONPath filter), complementing Processing.Translator field mapping | not-started |
+| 042 | RuleEngine | Business rule evaluation engine — conditions (Equals, Contains, Regex, In, GreaterThan) with AND/OR logic, priority-sorted, per-message actions (Route, Transform, Reject, DeadLetter) | not-started |
+| 043 | Connectors abstraction | Unified connector registry and factory (IConnector, IConnectorRegistry, IConnectorFactory) over Connector.Http/Sftp/Email/File with runtime registration | not-started |
+| 044 | Admin.Web (Vue 3) | Vue 3 admin dashboard frontend for Admin.Api — tenant/queue/endpoint throttle control, rate limit status, DLQ management, message inspection, policy CRUD | not-started |
+| 045 | RAG Knowledge Base | XML-based RAG knowledge store under docs/rag/ with platform documentation indexed for RagFlow retrieval. Deployable with Aspire or standalone. Covers all EIP patterns, usage guides, and implementation reference | not-started |
+
+### Phase 8 – Documentation
+
+| Chunk | Name | Goal | Status |
+|-------|------|------|--------|
+| 046 | EIP Pattern Documentation | docs/ folder covering all Enterprise Integration Patterns implemented: Content-Based Router, Message Translator, Splitter, Aggregator, Dead Letter Channel, Retry, Replay, Scatter-Gather, Competing Consumers, Event Sourcing, Saga Compensation — with usage examples from actual implementation | not-started |
+| 047 | Platform Usage Guide | End-to-end usage documentation: getting started, configuration, deployment (K8s/Docker), connector setup, throttle/rate-limit tuning, multi-tenancy, security, observability — focused on EnterpriseIntegrationPlatform features only | not-started |
+| 048 | API Reference | Complete API reference for Admin.Api, Gateway.Api, OpenClaw.Web endpoints with request/response examples, authentication, and rate limit/throttle admin operations | not-started |
 
 ---
 

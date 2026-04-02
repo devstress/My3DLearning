@@ -1,0 +1,77 @@
+{{- if .Values.adminApi.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eip.fullname" . }}-admin-api
+  namespace: {{ include "eip.namespace" . }}
+  labels:
+    {{- include "eip.componentLabels" (dict "Root" . "Component" "admin-api") | nindent 4 }}
+spec:
+  replicas: {{ .Values.adminApi.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "eip.componentSelectorLabels" (dict "Root" . "Component" "admin-api") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "eip.componentLabels" (dict "Root" . "Component" "admin-api") | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      {{- include "eip.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "eip.fullname" . }}-admin-api
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: admin-api
+          image: {{ include "eip.image" .Values.adminApi.image }}
+          imagePullPolicy: {{ .Values.adminApi.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.adminApi.service.targetPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "eip.fullname" . }}-config
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.adminApi.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.adminApi.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.adminApi.probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.adminApi.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.adminApi.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.adminApi.probes.readiness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.adminApi.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "eip.fullname" . }}-admin-api
+  namespace: {{ include "eip.namespace" . }}
+  labels:
+    {{- include "eip.componentLabels" (dict "Root" . "Component" "admin-api") | nindent 4 }}
+spec:
+  type: {{ .Values.adminApi.service.type }}
+  ports:
+    - port: {{ .Values.adminApi.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "eip.componentSelectorLabels" (dict "Root" . "Component" "admin-api") | nindent 4 }}
+{{- end }}

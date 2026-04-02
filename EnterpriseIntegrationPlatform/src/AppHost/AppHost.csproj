@@ -9,5 +9,6 @@
     <ProjectReference Include="..\OpenClaw.Web\OpenClaw.Web.csproj" />
     <ProjectReference Include="..\Admin.Api\Admin.Api.csproj" />
     <ProjectReference Include="..\Demo.Pipeline\Demo.Pipeline.csproj" />
+    <ProjectReference Include="..\Gateway.Api\Gateway.Api.csproj" />
   </ItemGroup>
 </Project>

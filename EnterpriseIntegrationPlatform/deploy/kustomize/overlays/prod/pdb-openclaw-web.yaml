@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: openclaw-web-pdb
+  namespace: eip
+  labels:
+    app.kubernetes.io/name: openclaw-web
+    app.kubernetes.io/instance: eip
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openclaw-web
+      app.kubernetes.io/instance: eip

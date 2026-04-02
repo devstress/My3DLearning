@@ -1,0 +1,40 @@
+{{- if .Values.workflowTemporal.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eip.fullname" . }}-workflow-temporal
+  namespace: {{ include "eip.namespace" . }}
+  labels:
+    {{- include "eip.componentLabels" (dict "Root" . "Component" "workflow-temporal") | nindent 4 }}
+spec:
+  replicas: {{ .Values.workflowTemporal.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "eip.componentSelectorLabels" (dict "Root" . "Component" "workflow-temporal") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "eip.componentLabels" (dict "Root" . "Component" "workflow-temporal") | nindent 8 }}
+    spec:
+      {{- include "eip.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "eip.fullname" . }}-workflow-temporal
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: workflow-temporal
+          image: {{ include "eip.image" .Values.workflowTemporal.image }}
+          imagePullPolicy: {{ .Values.workflowTemporal.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "eip.fullname" . }}-config
+          resources:
+            {{- toYaml .Values.workflowTemporal.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+{{- end }}

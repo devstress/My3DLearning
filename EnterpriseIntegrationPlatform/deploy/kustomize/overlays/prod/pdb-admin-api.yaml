@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: admin-api-pdb
+  namespace: eip
+  labels:
+    app.kubernetes.io/name: admin-api
+    app.kubernetes.io/instance: eip
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: admin-api
+      app.kubernetes.io/instance: eip

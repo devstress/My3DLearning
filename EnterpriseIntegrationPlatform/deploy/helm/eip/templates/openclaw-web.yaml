@@ -1,0 +1,77 @@
+{{- if .Values.openclawWeb.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eip.fullname" . }}-openclaw-web
+  namespace: {{ include "eip.namespace" . }}
+  labels:
+    {{- include "eip.componentLabels" (dict "Root" . "Component" "openclaw-web") | nindent 4 }}
+spec:
+  replicas: {{ .Values.openclawWeb.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "eip.componentSelectorLabels" (dict "Root" . "Component" "openclaw-web") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "eip.componentLabels" (dict "Root" . "Component" "openclaw-web") | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      {{- include "eip.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "eip.fullname" . }}-openclaw-web
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: openclaw-web
+          image: {{ include "eip.image" .Values.openclawWeb.image }}
+          imagePullPolicy: {{ .Values.openclawWeb.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.openclawWeb.service.targetPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "eip.fullname" . }}-config
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.openclawWeb.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.openclawWeb.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.openclawWeb.probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.openclawWeb.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.openclawWeb.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.openclawWeb.probes.readiness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.openclawWeb.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "eip.fullname" . }}-openclaw-web
+  namespace: {{ include "eip.namespace" . }}
+  labels:
+    {{- include "eip.componentLabels" (dict "Root" . "Component" "openclaw-web") | nindent 4 }}
+spec:
+  type: {{ .Values.openclawWeb.service.type }}
+  ports:
+    - port: {{ .Values.openclawWeb.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "eip.componentSelectorLabels" (dict "Root" . "Component" "openclaw-web") | nindent 4 }}
+{{- end }}
