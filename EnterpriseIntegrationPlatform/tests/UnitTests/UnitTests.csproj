@@ -33,5 +33,6 @@
     <ProjectReference Include="..\..\src\Connector.Sftp\Connector.Sftp.csproj" />
     <ProjectReference Include="..\..\src\Connector.Email\Connector.Email.csproj" />
     <ProjectReference Include="..\..\src\Connector.File\Connector.File.csproj" />
+    <ProjectReference Include="..\..\src\Gateway.Api\Gateway.Api.csproj" />
   </ItemGroup>
 </Project>

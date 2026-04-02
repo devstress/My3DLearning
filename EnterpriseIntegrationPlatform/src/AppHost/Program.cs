@@ -108,4 +108,13 @@ builder.AddProject<Projects.Demo_Pipeline>("demo-pipeline")
     .WithEnvironment("Cassandra__ContactPoints__0", "localhost")
     .WithEnvironment("Cassandra__Port", "15042");
 
+// Gateway.Api – API Gateway that acts as the single entry point for all
+// external integration traffic. Provides request routing, rate limiting,
+// JWT authentication passthrough, and health aggregation.
+// Host port 15000 for external access.
+var gateway = builder.AddProject<Projects.Gateway_Api>("gateway-api")
+    .WithExternalHttpEndpoints()
+    .WithEnvironment("Gateway__AdminApiBaseUrl", adminApi.GetEndpoint("http"))
+    .WithEnvironment("Gateway__OpenClawBaseUrl", openClaw.GetEndpoint("http"));
+
 builder.Build().Run();
