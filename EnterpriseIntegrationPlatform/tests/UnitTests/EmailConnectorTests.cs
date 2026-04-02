@@ -11,7 +11,13 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class EmailConnectorTests
 {
-    private readonly ISmtpClientWrapper _smtpClient = Substitute.For<ISmtpClientWrapper>();
+    private ISmtpClientWrapper _smtpClient = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _smtpClient = Substitute.For<ISmtpClientWrapper>();
+    }
 
     private EmailConnector BuildConnector(EmailConnectorOptions? options = null) =>
         new EmailConnector(

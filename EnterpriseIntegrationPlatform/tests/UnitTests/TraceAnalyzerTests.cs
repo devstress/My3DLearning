@@ -10,11 +10,13 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class TraceAnalyzerTests
 {
-    private readonly IOllamaService _ollama = Substitute.For<IOllamaService>();
-    private readonly TraceAnalyzer _analyzer;
+    private IOllamaService _ollama = null!;
+    private TraceAnalyzer _analyzer = null!;
 
-    public TraceAnalyzerTests()
+    [SetUp]
+    public void SetUp()
     {
+        _ollama = Substitute.For<IOllamaService>();
         _analyzer = new TraceAnalyzer(_ollama, NullLogger<TraceAnalyzer>.Instance);
     }
 

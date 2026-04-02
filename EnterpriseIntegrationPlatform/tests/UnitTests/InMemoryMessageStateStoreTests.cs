@@ -7,7 +7,13 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class InMemoryMessageStateStoreTests
 {
-    private readonly InMemoryMessageStateStore _store = new();
+    private InMemoryMessageStateStore _store = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _store = new();
+    }
 
     private static MessageEvent CreateEvent(
         Guid? correlationId = null,

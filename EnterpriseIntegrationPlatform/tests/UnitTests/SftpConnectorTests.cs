@@ -12,7 +12,13 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class SftpConnectorTests
 {
-    private readonly ISftpClient _sftpClient = Substitute.For<ISftpClient>();
+    private ISftpClient _sftpClient = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _sftpClient = Substitute.For<ISftpClient>();
+    }
 
     private SftpConnector BuildConnector(string rootPath = "/uploads") =>
         new SftpConnector(

@@ -10,9 +10,10 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class DeadLetterPublisherTests
 {
-    private readonly IMessageBrokerProducer _producer;
+    private IMessageBrokerProducer _producer = null!;
 
-    public DeadLetterPublisherTests()
+    [SetUp]
+    public void SetUp()
     {
         _producer = Substitute.For<IMessageBrokerProducer>();
     }

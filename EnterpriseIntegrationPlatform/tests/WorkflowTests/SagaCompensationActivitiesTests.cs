@@ -8,11 +8,12 @@ namespace EnterpriseIntegrationPlatform.Tests.Workflow;
 [TestFixture]
 public class SagaCompensationActivitiesTests
 {
-    private readonly ICompensationActivityService _compensationService;
-    private readonly IMessageLoggingService _logging;
-    private readonly SagaCompensationActivities _activities;
+    private ICompensationActivityService _compensationService = null!;
+    private IMessageLoggingService _logging = null!;
+    private SagaCompensationActivities _activities = null!;
 
-    public SagaCompensationActivitiesTests()
+    [SetUp]
+    public void SetUp()
     {
         _compensationService = Substitute.For<ICompensationActivityService>();
         _logging = Substitute.For<IMessageLoggingService>();

@@ -11,13 +11,22 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class CassandraHealthCheckTests
 {
-    private readonly ICassandraSessionFactory _sessionFactory = Substitute.For<ICassandraSessionFactory>();
-    private readonly ILogger<CassandraHealthCheck> _logger = Substitute.For<ILogger<CassandraHealthCheck>>();
-    private readonly CassandraHealthCheck _healthCheck;
+    private ICassandraSessionFactory _sessionFactory = null!;
+    private ILogger<CassandraHealthCheck> _logger = null!;
+    private CassandraHealthCheck _healthCheck = null!;
 
-    public CassandraHealthCheckTests()
+    [SetUp]
+    public void SetUp()
     {
+        _sessionFactory = Substitute.For<ICassandraSessionFactory>();
+        _logger = Substitute.For<ILogger<CassandraHealthCheck>>();
         _healthCheck = new CassandraHealthCheck(_sessionFactory, _logger);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        (_sessionFactory as IDisposable)?.Dispose();
     }
 
     [Test]

@@ -16,32 +16,31 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class PipelineOrchestratorTests
 {
-    private readonly IMessageRepository _repository;
-    private readonly IMessageBrokerProducer _producer;
-    private readonly ITemporalWorkflowDispatcher _dispatcher;
-    private readonly PipelineOptions _options;
-    private readonly PipelineOrchestrator _sut;
+    private IMessageRepository _repository = null!;
+    private IMessageBrokerProducer _producer = null!;
+    private ITemporalWorkflowDispatcher _dispatcher = null!;
+    private PipelineOptions _options = null!;
+    private PipelineOrchestrator _sut = null!;
 
-    public PipelineOrchestratorTests()
+    [SetUp]
+    public void SetUp()
     {
         _repository = Substitute.For<IMessageRepository>();
         _producer = Substitute.For<IMessageBrokerProducer>();
         _dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
         _options = new PipelineOptions();
-
         // Build a minimal MessageLifecycleRecorder with no-op dependencies
         var stateStore = Substitute.For<IMessageStateStore>();
         var eventLog = Substitute.For<IObservabilityEventLog>();
         var lifecycleLogger = NullLogger<MessageLifecycleRecorder>.Instance;
         var lifecycle = new MessageLifecycleRecorder(stateStore, eventLog, lifecycleLogger);
-
         _sut = new PipelineOrchestrator(
-            _repository,
-            lifecycle,
-            _producer,
-            _dispatcher,
-            Options.Create(_options),
-            NullLogger<PipelineOrchestrator>.Instance);
+        _repository,
+        lifecycle,
+        _producer,
+        _dispatcher,
+        Options.Create(_options),
+        NullLogger<PipelineOrchestrator>.Instance);
     }
 
     private static IntegrationEnvelope<JsonElement> BuildEnvelope(

@@ -9,12 +9,15 @@ namespace EnterpriseIntegrationPlatform.Tests.Workflow;
 [TestFixture]
 public class IntegrationActivitiesTests
 {
-    private readonly IMessageValidationService _validation = Substitute.For<IMessageValidationService>();
-    private readonly IMessageLoggingService _logging = Substitute.For<IMessageLoggingService>();
-    private readonly IntegrationActivities _sut;
+    private IMessageValidationService _validation = null!;
+    private IMessageLoggingService _logging = null!;
+    private IntegrationActivities _sut = null!;
 
-    public IntegrationActivitiesTests()
+    [SetUp]
+    public void SetUp()
     {
+        _validation = Substitute.For<IMessageValidationService>();
+        _logging = Substitute.For<IMessageLoggingService>();
         _sut = new IntegrationActivities(_validation, _logging);
     }
 

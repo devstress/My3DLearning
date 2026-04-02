@@ -6,7 +6,13 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class TenantResolverTests
 {
-    private readonly TenantResolver _resolver = new();
+    private TenantResolver _resolver = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _resolver = new();
+    }
 
     [Test]
     public void Resolve_MetadataWithTenantId_ReturnsTenantContext()

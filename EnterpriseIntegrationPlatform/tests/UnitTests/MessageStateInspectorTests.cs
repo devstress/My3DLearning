@@ -10,12 +10,15 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class MessageStateInspectorTests
 {
-    private readonly IObservabilityEventLog _observabilityLog = Substitute.For<IObservabilityEventLog>();
-    private readonly ITraceAnalyzer _analyzer = Substitute.For<ITraceAnalyzer>();
-    private readonly MessageStateInspector _inspector;
+    private IObservabilityEventLog _observabilityLog = null!;
+    private ITraceAnalyzer _analyzer = null!;
+    private MessageStateInspector _inspector = null!;
 
-    public MessageStateInspectorTests()
+    [SetUp]
+    public void SetUp()
     {
+        _observabilityLog = Substitute.For<IObservabilityEventLog>();
+        _analyzer = Substitute.For<ITraceAnalyzer>();
         _inspector = new MessageStateInspector(
             _observabilityLog,
             _analyzer,

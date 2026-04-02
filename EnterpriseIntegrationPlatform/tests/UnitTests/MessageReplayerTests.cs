@@ -11,10 +11,11 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class MessageReplayerTests
 {
-    private readonly IMessageReplayStore _store;
-    private readonly IMessageBrokerProducer _producer;
+    private IMessageReplayStore _store = null!;
+    private IMessageBrokerProducer _producer = null!;
 
-    public MessageReplayerTests()
+    [SetUp]
+    public void SetUp()
     {
         _store = Substitute.For<IMessageReplayStore>();
         _producer = Substitute.For<IMessageBrokerProducer>();

@@ -12,7 +12,13 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class FileConnectorTests
 {
-    private readonly IFileSystem _fileSystem = Substitute.For<IFileSystem>();
+    private IFileSystem _fileSystem = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _fileSystem = Substitute.For<IFileSystem>();
+    }
 
     private FileConnector BuildConnector(FileConnectorOptions? options = null) =>
         new FileConnector(

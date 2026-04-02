@@ -7,7 +7,13 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class TenantIsolationGuardTests
 {
-    private readonly TenantIsolationGuard _guard = new(new TenantResolver());
+    private TenantIsolationGuard _guard = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _guard = new(new TenantResolver());
+    }
 
     private static IntegrationEnvelope<string> BuildEnvelope(string? tenantId = null)
     {

@@ -12,9 +12,10 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class MessageTranslatorTests
 {
-    private readonly IMessageBrokerProducer _producer;
+    private IMessageBrokerProducer _producer = null!;
 
-    public MessageTranslatorTests()
+    [SetUp]
+    public void SetUp()
     {
         _producer = Substitute.For<IMessageBrokerProducer>();
     }

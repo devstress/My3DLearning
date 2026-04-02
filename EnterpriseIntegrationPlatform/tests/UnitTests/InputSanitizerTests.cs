@@ -6,7 +6,13 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class InputSanitizerTests
 {
-    private readonly InputSanitizer _sanitizer = new();
+    private InputSanitizer _sanitizer = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _sanitizer = new();
+    }
 
     [Test]
     public void Sanitize_CleanInput_ReturnsUnchanged()
@@ -26,7 +32,7 @@ public class InputSanitizerTests
     public void Sanitize_NullBytes_RemovesNullBytes()
     {
         var result = _sanitizer.Sanitize("hello\0world");
-        Assert.That(result, Does.Not.Contain("\0"));
+        Assert.That(result.Contains('\0'), Is.False);
     }
 
     [Test]

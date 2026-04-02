@@ -10,10 +10,15 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class PlatformStatusServiceTests
 {
-    private readonly HealthCheckService _healthCheckService =
-        Substitute.For<HealthCheckService>();
-    private readonly ILogger<PlatformStatusService> _logger =
-        Substitute.For<ILogger<PlatformStatusService>>();
+    private HealthCheckService _healthCheckService = null!;
+    private ILogger<PlatformStatusService> _logger = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _healthCheckService = Substitute.For<HealthCheckService>();
+        _logger = Substitute.For<ILogger<PlatformStatusService>>();
+    }
 
     [Test]
     public async Task GetStatusAsync_WhenAllHealthy_ReturnsHealthyOverall()

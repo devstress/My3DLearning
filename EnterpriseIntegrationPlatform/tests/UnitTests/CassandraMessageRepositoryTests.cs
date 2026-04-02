@@ -10,15 +10,26 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class CassandraMessageRepositoryTests
 {
-    private readonly ICassandraSessionFactory _sessionFactory = Substitute.For<ICassandraSessionFactory>();
-    private readonly ISession _session = Substitute.For<ISession>();
-    private readonly ILogger<CassandraMessageRepository> _logger = Substitute.For<ILogger<CassandraMessageRepository>>();
-    private readonly CassandraMessageRepository _repository;
+    private ICassandraSessionFactory _sessionFactory = null!;
+    private ISession _session = null!;
+    private ILogger<CassandraMessageRepository> _logger = null!;
+    private CassandraMessageRepository _repository = null!;
 
-    public CassandraMessageRepositoryTests()
+    [SetUp]
+    public void SetUp()
     {
+        _sessionFactory = Substitute.For<ICassandraSessionFactory>();
+        _session = Substitute.For<ISession>();
+        _logger = Substitute.For<ILogger<CassandraMessageRepository>>();
         _sessionFactory.GetSessionAsync(Arg.Any<CancellationToken>()).Returns(_session);
         _repository = new CassandraMessageRepository(_sessionFactory, _logger);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        (_session as IDisposable)?.Dispose();
+        (_sessionFactory as IDisposable)?.Dispose();
     }
 
     [Test]

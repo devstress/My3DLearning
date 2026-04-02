@@ -11,9 +11,10 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class MessageAggregatorTests
 {
-    private readonly IMessageBrokerProducer _producer;
+    private IMessageBrokerProducer _producer = null!;
 
-    public MessageAggregatorTests()
+    [SetUp]
+    public void SetUp()
     {
         _producer = Substitute.For<IMessageBrokerProducer>();
     }

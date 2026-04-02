@@ -7,7 +7,13 @@ namespace EnterpriseIntegrationPlatform.Tests.Workflow;
 [TestFixture]
 public class DefaultMessageValidationServiceTests
 {
-    private readonly DefaultMessageValidationService _sut = new();
+    private DefaultMessageValidationService _sut = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _sut = new();
+    }
 
     [Test]
     public async Task ValidateAsync_WithValidJsonObject_ReturnsSuccess()

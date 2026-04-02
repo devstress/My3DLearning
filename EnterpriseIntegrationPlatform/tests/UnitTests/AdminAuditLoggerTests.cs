@@ -9,7 +9,13 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class AdminAuditLoggerTests
 {
-    private readonly ILogger<AdminAuditLogger> _logger = Substitute.For<ILogger<AdminAuditLogger>>();
+    private ILogger<AdminAuditLogger> _logger = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _logger = Substitute.For<ILogger<AdminAuditLogger>>();
+    }
 
     [Test]
     public void LogAction_WithValidPrincipal_DoesNotThrow()

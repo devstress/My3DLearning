@@ -9,13 +9,17 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class MessageLifecycleRecorderTests
 {
-    private readonly InMemoryMessageStateStore _productionStore = new();
-    private readonly IObservabilityEventLog _observabilityLog = Substitute.For<IObservabilityEventLog>();
-    private readonly List<MessageEvent> _capturedObsEvents = [];
-    private readonly MessageLifecycleRecorder _recorder;
+    private InMemoryMessageStateStore _productionStore = null!;
+    private IObservabilityEventLog _observabilityLog = null!;
+    private List<MessageEvent> _capturedObsEvents = null!;
+    private MessageLifecycleRecorder _recorder = null!;
 
-    public MessageLifecycleRecorderTests()
+    [SetUp]
+    public void SetUp()
     {
+        _productionStore = new();
+        _observabilityLog = Substitute.For<IObservabilityEventLog>();
+        _capturedObsEvents = [];
         _observabilityLog
             .RecordAsync(Arg.Any<MessageEvent>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask)
