@@ -37,5 +37,6 @@
     <ProjectReference Include="..\..\src\Processing.Throttle\Processing.Throttle.csproj" />
     <ProjectReference Include="..\..\src\Configuration\Configuration.csproj" />
     <ProjectReference Include="..\..\src\Security.Secrets\Security.Secrets.csproj" />
+    <ProjectReference Include="..\..\src\EventSourcing\EventSourcing.csproj" />
   </ItemGroup>
 </Project>
