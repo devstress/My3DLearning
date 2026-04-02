@@ -62,7 +62,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 032** (Grafana Dashboards) is next.
+**Chunk 034** (Secrets Management) is next.
 
 ---
 
@@ -70,8 +70,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Status |
 |-------|------|------|--------|
-| 032 | Grafana dashboards | Pre-built Grafana dashboards for platform health, message throughput, connector status, Temporal workflow metrics, and alerting rules | not-started |
-| 033 | Configuration management | Centralized configuration service with environment-specific overrides, feature flags, and dynamic reconfiguration without restart | not-started |
 | 034 | Secrets management | HashiCorp Vault or Azure Key Vault integration for runtime secret injection, automatic rotation, and audit logging | not-started |
 
 ### Phase 6 – Advanced Patterns & Scale
