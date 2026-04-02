@@ -4,6 +4,109 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 031b – Processing Throttle (Admin-Controlled, Per-Tenant/Queue/Endpoint)
+
+- **Date**: 2026-04-02
+- **Status**: done
+- **Goal**: Implement token-bucket message processing throttle (distinct from HTTP rate limiting) with per-tenant, per-queue, and per-endpoint partitioning — controllable from Admin API at runtime. Like BizTalk host throttling and Apache Camel per-route throttle EIP. Advances Quality Pillar 11 (Performance — throughput control) and Pillar 6 (Resilience — backpressure signaling).
+
+### Architecture
+
+- **Rate Limiting vs Throttling** — Rate limiting (Gateway.Api/Admin.Api) rejects excess HTTP requests with 429 Too Many Requests. Throttling (Processing.Throttle) controls message processing speed by delaying consumers — smoothing throughput and preventing downstream overload. They are independent mechanisms.
+- **TokenBucketThrottle** — SemaphoreSlim-based token bucket with configurable refill rate, burst capacity, max wait, and backpressure rejection mode.
+- **ThrottleRegistry** — ConcurrentDictionary-based registry of partitioned throttles. Resolves in specificity order: exact (tenant+queue+endpoint) → tenant+queue → tenant → queue → global.
+- **ThrottlePolicy** — Admin-configurable settings per partition. CRUD via Admin API endpoints.
+- **Admin Endpoints** — GET/PUT/DELETE `/api/admin/throttle/policies` + GET `/api/admin/ratelimit/status` for visibility into both mechanisms.
+
+### Files created
+
+- `src/Processing.Throttle/Processing.Throttle.csproj`
+- `src/Processing.Throttle/ThrottleOptions.cs`
+- `src/Processing.Throttle/ThrottleResult.cs`
+- `src/Processing.Throttle/ThrottleMetrics.cs`
+- `src/Processing.Throttle/IMessageThrottle.cs`
+- `src/Processing.Throttle/TokenBucketThrottle.cs`
+- `src/Processing.Throttle/ThrottlePartitionKey.cs`
+- `src/Processing.Throttle/ThrottlePolicy.cs`
+- `src/Processing.Throttle/ThrottlePolicyStatus.cs`
+- `src/Processing.Throttle/IThrottleRegistry.cs`
+- `src/Processing.Throttle/ThrottleRegistry.cs`
+- `src/Processing.Throttle/ThrottleServiceExtensions.cs`
+- `tests/UnitTests/Throttle/TokenBucketThrottleTests.cs` — 8 tests
+- `tests/UnitTests/Throttle/ThrottleRegistryTests.cs` — 12 tests
+- `tests/UnitTests/Throttle/ThrottlePartitionKeyTests.cs` — 5 tests
+
+### Files modified
+
+- `src/Admin.Api/Admin.Api.csproj` — added Processing.Throttle reference
+- `src/Admin.Api/Program.cs` — added throttle registry DI, 4 throttle admin endpoints, 1 rate limit status endpoint, SetThrottlePolicyRequest record
+- `tests/UnitTests/UnitTests.csproj` — added Processing.Throttle reference
+- `EnterpriseIntegrationPlatform.sln` — added Processing.Throttle project
+
+### Test count
+
+- UnitTests: 443 (was 418, +25 throttle tests)
+- Total: 531 (was 506)
+
+---
+
+## Chunk 031 – API Gateway (Gateway.Api)
+
+- **Date**: 2026-04-02
+- **Status**: done
+- **Goal**: Create Gateway.Api .NET project — single entry point for external integration traffic with reverse proxy routing, per-client + global rate limiting (429 rejection), JWT passthrough, correlation ID injection, request logging, downstream health aggregation, and API versioning. Advances Quality Pillar 3 (Scalability — single entry point) and Pillar 2 (Security — edge rate limiting).
+
+### Files created
+
+- `src/Gateway.Api/` — full project (Program.cs, GatewayServiceExtensions.cs, Middleware/, Routing/, Health/, Configuration/, Properties/, appsettings)
+- `tests/UnitTests/Gateway/` — 16 tests (CorrelationId, RouteResolver, RequestLogging, DownstreamHealth)
+
+### Files modified
+
+- `EnterpriseIntegrationPlatform.sln` — added Gateway.Api
+- `src/AppHost/AppHost.csproj` — added Gateway.Api reference
+- `src/AppHost/Program.cs` — added gateway service on port 15000
+- `tests/UnitTests/UnitTests.csproj` — added Gateway.Api reference
+
+---
+
+## Chunk 030 – CI/CD Pipeline Hardening
+
+- **Date**: 2026-04-02
+- **Status**: done
+- **Goal**: Multi-environment CI/CD pipelines (dev/staging/prod), blue-green deployment, canary release strategy, automated rollback triggers. Advances Quality Pillar 5 (Availability — zero-downtime deployments) and Pillar 9 (Operational Excellence — automated deployment).
+
+### Files created
+
+- `.github/workflows/deploy.yml` — multi-environment deploy pipeline (7 jobs)
+- `deploy/scripts/blue-green-deploy.sh`
+- `deploy/scripts/canary-deploy.sh`
+- `deploy/scripts/rollback.sh`
+- `deploy/docker/Dockerfile` — multi-stage .NET build
+- `deploy/docker/docker-compose.yml` — local dev compose
+- `deploy/environments/dev.env`
+- `deploy/environments/staging.env`
+- `deploy/environments/prod.env`
+
+---
+
+## Chunk 029 – Kubernetes Deployment
+
+- **Date**: 2026-04-02
+- **Status**: done
+- **Goal**: Helm charts, Kustomize overlays, namespace isolation, resource limits, liveness/readiness probes. Advances Quality Pillar 5 (Availability — K8s self-healing) and Pillar 3 (Scalability — HPA autoscaling).
+
+### Files created
+
+- `deploy/helm/eip/` — Chart.yaml, values.yaml, _helpers.tpl, 10 templates (namespace, services, HPA, NetworkPolicy, ServiceAccount, ConfigMap)
+- `deploy/kustomize/base/` — namespace, OpenClaw.Web/Admin.Api deployments and services
+- `deploy/kustomize/overlays/dev/` — 1 replica, small resources
+- `deploy/kustomize/overlays/staging/` — 2 replicas, medium resources
+- `deploy/kustomize/overlays/prod/` — 3 replicas, PodDisruptionBudgets
+- `deploy/validate.sh` — YAML validation script
+
+---
+
 ## Chunk 028 – AI-Assisted Code Generation
 
 - **Date**: 2026-03-24

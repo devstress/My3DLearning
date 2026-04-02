@@ -95,7 +95,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Phase 5 — Production Readiness** begins with Chunk 029 (Kubernetes Deployment).
+**Chunk 032** (Grafana Dashboards) is next. Complete remaining Phase 5 & 6 chunks, then Phase 7 & 8 for missing projects and documentation.
 
 ---
 
@@ -103,9 +103,10 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Status |
 |-------|------|------|--------|
-| 029 | Kubernetes deployment | Helm charts, Kustomize overlays, namespace isolation, resource limits, and liveness/readiness probes for Kubernetes deployment | not-started |
-| 030 | CI/CD pipeline hardening | Multi-environment pipelines (dev/staging/prod), blue-green deployment, canary release strategy, automated rollback triggers | not-started |
-| 031 | API Gateway | Ingress controller configuration, TLS termination, rate limiting at edge, request routing, and API versioning | not-started |
+| 029 | Kubernetes deployment | Helm charts, Kustomize overlays, namespace isolation, resource limits, and liveness/readiness probes for Kubernetes deployment | done |
+| 030 | CI/CD pipeline hardening | Multi-environment pipelines (dev/staging/prod), blue-green deployment, canary release strategy, automated rollback triggers | done |
+| 031 | API Gateway | Gateway.Api project with reverse proxy routing, TLS termination, per-client + global rate limiting (429 rejection), request routing, API versioning, correlation ID middleware | done |
+| 031b | Processing Throttle | Token-bucket message processing throttle (distinct from rate limiting — delays rather than rejects), per-tenant/queue/endpoint partitioning via ThrottleRegistry, admin-controllable at runtime | done |
 | 032 | Grafana dashboards | Pre-built Grafana dashboards for platform health, message throughput, connector status, Temporal workflow metrics, and alerting rules | not-started |
 | 033 | Configuration management | Centralized configuration service with environment-specific overrides, feature flags, and dynamic reconfiguration without restart | not-started |
 | 034 | Secrets management | HashiCorp Vault or Azure Key Vault integration for runtime secret injection, automatic rotation, and audit logging | not-started |
@@ -120,6 +121,24 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 | 038 | Tenant onboarding automation | Self-service tenant provisioning, quota management, isolated broker namespaces, and onboarding workflow | not-started |
 | 039 | Disaster recovery automation | Automated failover, cross-region replication, recovery point validation, and DR drill framework | not-started |
 | 040 | Performance profiling | Continuous profiling integration, memory/CPU hotspot detection, GC tuning, and benchmark regression tests | not-started |
+
+### Phase 7 – Missing Projects
+
+| Chunk | Name | Goal | Status |
+|-------|------|------|--------|
+| 041 | Processing.Transform | General payload transformation pipeline with pluggable steps (JSON↔XML, regex replace, JSONPath filter), complementing Processing.Translator field mapping | not-started |
+| 042 | RuleEngine | Business rule evaluation engine — conditions (Equals, Contains, Regex, In, GreaterThan) with AND/OR logic, priority-sorted, per-message actions (Route, Transform, Reject, DeadLetter) | not-started |
+| 043 | Connectors abstraction | Unified connector registry and factory (IConnector, IConnectorRegistry, IConnectorFactory) over Connector.Http/Sftp/Email/File with runtime registration | not-started |
+| 044 | Admin.Web (Vue 3) | Vue 3 admin dashboard frontend for Admin.Api — tenant/queue/endpoint throttle control, rate limit status, DLQ management, message inspection, policy CRUD | not-started |
+| 045 | RAG Knowledge Base | XML-based RAG knowledge store under docs/rag/ with platform documentation indexed for RagFlow retrieval. Deployable with Aspire or standalone. Covers all EIP patterns, usage guides, and implementation reference | not-started |
+
+### Phase 8 – Documentation
+
+| Chunk | Name | Goal | Status |
+|-------|------|------|--------|
+| 046 | EIP Pattern Documentation | docs/ folder covering all Enterprise Integration Patterns implemented: Content-Based Router, Message Translator, Splitter, Aggregator, Dead Letter Channel, Retry, Replay, Scatter-Gather, Competing Consumers, Event Sourcing, Saga Compensation — with usage examples from actual implementation | not-started |
+| 047 | Platform Usage Guide | End-to-end usage documentation: getting started, configuration, deployment (K8s/Docker), connector setup, throttle/rate-limit tuning, multi-tenancy, security, observability — focused on EnterpriseIntegrationPlatform features only | not-started |
+| 048 | API Reference | Complete API reference for Admin.Api, Gateway.Api, OpenClaw.Web endpoints with request/response examples, authentication, and rate limit/throttle admin operations | not-started |
 
 ---
 

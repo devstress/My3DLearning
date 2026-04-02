@@ -5,6 +5,7 @@ using EnterpriseIntegrationPlatform.Admin.Api.Services;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
 using EnterpriseIntegrationPlatform.Processing.Replay;
+using EnterpriseIntegrationPlatform.Processing.Throttle;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -68,6 +69,10 @@ builder.Services.AddSingleton<PlatformStatusService>();
 builder.Services.AddSingleton<AdminAuditLogger>();
 builder.Services.AddMessageReplay(builder.Configuration);
 builder.Services.AddSingleton<DlqManagementService>();
+
+// ── Throttle Registry ─────────────────────────────────────────────────────────
+// Partitioned throttles per tenant, queue, and endpoint — controllable at runtime.
+builder.Services.AddMessageThrottle(builder.Configuration);
 
 var app = builder.Build();
 
@@ -219,6 +224,104 @@ app.MapPost("/api/admin/dlq/resubmit", async (
 .WithName("AdminDlqResubmit")
 .RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
 
+// ── Throttle Management ───────────────────────────────────────────────────────
+// Admin-controlled throttle policies per tenant, queue, and endpoint.
+// Like BizTalk host throttling and Camel per-route throttle EIP.
+
+app.MapGet("/api/admin/throttle/policies", (
+    IThrottleRegistry registry,
+    AdminAuditLogger audit,
+    HttpContext http) =>
+{
+    audit.LogAction("GetThrottlePolicies", null, http.User);
+    var policies = registry.GetAllPolicies();
+    return Results.Ok(policies);
+})
+.WithName("AdminGetThrottlePolicies")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/throttle/policies/{policyId}", (
+    string policyId,
+    IThrottleRegistry registry,
+    AdminAuditLogger audit,
+    HttpContext http) =>
+{
+    audit.LogAction("GetThrottlePolicy", policyId, http.User);
+    var policy = registry.GetPolicy(policyId);
+    return policy is null ? Results.NotFound() : Results.Ok(policy);
+})
+.WithName("AdminGetThrottlePolicy")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapPut("/api/admin/throttle/policies", (
+    SetThrottlePolicyRequest request,
+    IThrottleRegistry registry,
+    AdminAuditLogger audit,
+    HttpContext http) =>
+{
+    audit.LogAction("SetThrottlePolicy", request.PolicyId, http.User);
+
+    var policy = new ThrottlePolicy
+    {
+        PolicyId = request.PolicyId,
+        Name = request.Name,
+        Partition = new ThrottlePartitionKey
+        {
+            TenantId = request.TenantId,
+            Queue = request.Queue,
+            Endpoint = request.Endpoint,
+        },
+        MaxMessagesPerSecond = request.MaxMessagesPerSecond,
+        BurstCapacity = request.BurstCapacity,
+        MaxWaitTime = TimeSpan.FromSeconds(request.MaxWaitTimeSeconds),
+        RejectOnBackpressure = request.RejectOnBackpressure,
+        IsEnabled = request.IsEnabled,
+        LastModifiedUtc = DateTimeOffset.UtcNow,
+    };
+
+    registry.SetPolicy(policy);
+    return Results.Ok(policy);
+})
+.WithName("AdminSetThrottlePolicy")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapDelete("/api/admin/throttle/policies/{policyId}", (
+    string policyId,
+    IThrottleRegistry registry,
+    AdminAuditLogger audit,
+    HttpContext http) =>
+{
+    audit.LogAction("DeleteThrottlePolicy", policyId, http.User);
+    var removed = registry.RemovePolicy(policyId);
+    return removed ? Results.NoContent() : Results.NotFound();
+})
+.WithName("AdminDeleteThrottlePolicy")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+// ── Rate Limit Status ─────────────────────────────────────────────────────────
+// Exposes current rate limiter configuration for admin visibility.
+
+app.MapGet("/api/admin/ratelimit/status", (
+    AdminAuditLogger audit,
+    HttpContext http) =>
+{
+    audit.LogAction("GetRateLimitStatus", null, http.User);
+    return Results.Ok(new
+    {
+        AdminApi = new
+        {
+            Type = "FixedWindow",
+            PermitLimit = rateLimitPerMinute,
+            WindowMinutes = 1,
+            PartitionBy = "X-Api-Key header (fallback: client IP)",
+            RejectionStatusCode = 429,
+        },
+        Description = "Rate limiting rejects excess HTTP requests with 429. Throttling (see /api/admin/throttle/policies) controls message processing throughput by delaying — they are independent mechanisms.",
+    });
+})
+.WithName("AdminGetRateLimitStatus")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
 app.Run();
 
 // ── Request models ────────────────────────────────────────────────────────────
@@ -248,3 +351,29 @@ public sealed record DlqResubmitRequest(
     string? MessageType,
     DateTimeOffset? FromTimestamp,
     DateTimeOffset? ToTimestamp);
+
+/// <summary>
+/// Request body for creating or updating a throttle policy.
+/// Throttle policies control message processing throughput per tenant, queue, or endpoint.
+/// </summary>
+/// <param name="PolicyId">Unique policy identifier.</param>
+/// <param name="Name">Human-readable policy name.</param>
+/// <param name="TenantId">Optional tenant/customer to scope the policy to.</param>
+/// <param name="Queue">Optional queue/topic to scope the policy to.</param>
+/// <param name="Endpoint">Optional endpoint/server to scope the policy to.</param>
+/// <param name="MaxMessagesPerSecond">Token-bucket refill rate.</param>
+/// <param name="BurstCapacity">Token-bucket capacity (burst allowance).</param>
+/// <param name="MaxWaitTimeSeconds">Maximum seconds a message waits for a token.</param>
+/// <param name="RejectOnBackpressure">When true, reject immediately instead of waiting.</param>
+/// <param name="IsEnabled">Whether this policy is currently active.</param>
+public sealed record SetThrottlePolicyRequest(
+    string PolicyId,
+    string Name,
+    string? TenantId,
+    string? Queue,
+    string? Endpoint,
+    int MaxMessagesPerSecond = 100,
+    int BurstCapacity = 200,
+    int MaxWaitTimeSeconds = 30,
+    bool RejectOnBackpressure = false,
+    bool IsEnabled = true);

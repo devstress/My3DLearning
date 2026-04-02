@@ -5,5 +5,6 @@
     <ProjectReference Include="..\Storage.Cassandra\Storage.Cassandra.csproj" />
     <ProjectReference Include="..\Processing.DeadLetter\Processing.DeadLetter.csproj" />
     <ProjectReference Include="..\Processing.Replay\Processing.Replay.csproj" />
+    <ProjectReference Include="..\Processing.Throttle\Processing.Throttle.csproj" />
   </ItemGroup>
 </Project>
