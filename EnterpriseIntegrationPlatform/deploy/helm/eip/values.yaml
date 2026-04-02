@@ -1,0 +1,160 @@
+# Default values for Enterprise Integration Platform
+
+global:
+  namespace: eip
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# --- Platform Services ---
+
+openclawWeb:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: eip/openclaw-web
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+  probes:
+    liveness:
+      path: /alive
+      initialDelaySeconds: 15
+      periodSeconds: 10
+    readiness:
+      path: /health
+      initialDelaySeconds: 5
+      periodSeconds: 5
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+adminApi:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: eip/admin-api
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+  probes:
+    liveness:
+      path: /alive
+      initialDelaySeconds: 15
+      periodSeconds: 10
+    readiness:
+      path: /health
+      initialDelaySeconds: 5
+      periodSeconds: 5
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+workflowTemporal:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: eip/workflow-temporal
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+ingestionKafka:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: eip/ingestion-kafka
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+demoPipeline:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: eip/demo-pipeline
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# --- Infrastructure References ---
+
+infrastructure:
+  temporal:
+    host: temporal
+    port: 7233
+  cassandra:
+    host: cassandra
+    port: 9042
+  nats:
+    host: nats
+    port: 4222
+  kafka:
+    bootstrapServers: kafka:9092
+  ollama:
+    host: ollama
+    port: 11434
+  ragflow:
+    host: ragflow
+    apiPort: 9380
+  loki:
+    host: loki
+    port: 3100
+
+# --- Shared Config ---
+
+config:
+  aspnetcoreEnvironment: Production
+  logLevel: Information
+
+# --- Network Policy ---
+
+networkPolicy:
+  enabled: true
+
+# --- Service Accounts ---
+
+serviceAccount:
+  create: true
+  annotations: {}

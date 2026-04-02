@@ -1,0 +1,40 @@
+{{- if .Values.ingestionKafka.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eip.fullname" . }}-ingestion-kafka
+  namespace: {{ include "eip.namespace" . }}
+  labels:
+    {{- include "eip.componentLabels" (dict "Root" . "Component" "ingestion-kafka") | nindent 4 }}
+spec:
+  replicas: {{ .Values.ingestionKafka.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "eip.componentSelectorLabels" (dict "Root" . "Component" "ingestion-kafka") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "eip.componentLabels" (dict "Root" . "Component" "ingestion-kafka") | nindent 8 }}
+    spec:
+      {{- include "eip.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "eip.fullname" . }}-ingestion-kafka
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ingestion-kafka
+          image: {{ include "eip.image" .Values.ingestionKafka.image }}
+          imagePullPolicy: {{ .Values.ingestionKafka.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "eip.fullname" . }}-config
+          resources:
+            {{- toYaml .Values.ingestionKafka.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+{{- end }}

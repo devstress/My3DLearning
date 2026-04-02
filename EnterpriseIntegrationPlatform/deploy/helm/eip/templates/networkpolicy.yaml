@@ -1,0 +1,62 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "eip.fullname" . }}-deny-external
+  namespace: {{ include "eip.namespace" . }}
+  labels:
+    {{- include "eip.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: {{ include "eip.name" . }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from within the eip namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ include "eip.namespace" . }}
+    # Allow traffic from ingress controllers
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow traffic within the eip namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ include "eip.namespace" . }}
+    # Allow traffic to infrastructure services
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.infrastructure.temporal.port }}
+        - protocol: TCP
+          port: {{ .Values.infrastructure.cassandra.port }}
+        - protocol: TCP
+          port: {{ .Values.infrastructure.nats.port }}
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: {{ .Values.infrastructure.ollama.port }}
+        - protocol: TCP
+          port: {{ .Values.infrastructure.ragflow.apiPort }}
+        - protocol: TCP
+          port: {{ .Values.infrastructure.loki.port }}
+{{- end }}
