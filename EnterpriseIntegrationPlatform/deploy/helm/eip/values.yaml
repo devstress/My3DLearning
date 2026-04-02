@@ -141,6 +141,17 @@ infrastructure:
   loki:
     host: loki
     port: 3100
+  prometheus:
+    host: prometheus
+    port: 9090
+
+# --- Grafana ---
+
+grafana:
+  enabled: true
+  datasources:
+    prometheusUrl: http://prometheus:9090
+    lokiUrl: http://loki:3100
 
 # --- Shared Config ---
 

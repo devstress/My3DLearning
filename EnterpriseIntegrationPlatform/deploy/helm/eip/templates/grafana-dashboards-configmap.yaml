@@ -1,0 +1,21 @@
+{{- if .Values.grafana.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "eip.fullname" . }}-grafana-dashboards
+  namespace: {{ include "eip.namespace" . }}
+  labels:
+    {{- include "eip.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  platform-health.json: |-
+    {{- .Files.Get "dashboards/platform-health.json" | nindent 4 }}
+  message-throughput.json: |-
+    {{- .Files.Get "dashboards/message-throughput.json" | nindent 4 }}
+  connector-status.json: |-
+    {{- .Files.Get "dashboards/connector-status.json" | nindent 4 }}
+  temporal-workflows.json: |-
+    {{- .Files.Get "dashboards/temporal-workflows.json" | nindent 4 }}
+  dlq-overview.json: |-
+    {{- .Files.Get "dashboards/dlq-overview.json" | nindent 4 }}
+{{- end }}

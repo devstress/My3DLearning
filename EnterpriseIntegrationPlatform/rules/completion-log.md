@@ -4,6 +4,90 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 033 – Configuration Management
+
+- **Date**: 2026-04-02
+- **Status**: done
+- **Goal**: Centralized configuration service with environment-specific overrides, feature flags, and dynamic reconfiguration without restart.
+
+### Architecture
+
+- **IConfigurationStore** — Interface for config CRUD: GetAsync, SetAsync, DeleteAsync, ListAsync, WatchAsync (change notifications).
+- **IFeatureFlagService** — Interface for feature flags: IsEnabledAsync, GetVariantAsync.
+- **InMemoryConfigurationStore** — Thread-safe ConcurrentDictionary-based implementation with change notifications via Channel<ConfigurationChange>.
+- **InMemoryFeatureFlagService** — Thread-safe in-memory feature flag service with rollout percentage and tenant targeting.
+- **EnvironmentOverrideProvider** — Resolves config values with environment cascade: specific env → default.
+- **ConfigurationChangeNotifier** — Pub/sub for config changes using System.Threading.Channels.
+- **Admin Endpoints** — GET/PUT/DELETE `/api/admin/config/{key}` + GET/PUT/DELETE `/api/admin/features/{name}`.
+
+### Files created
+
+- `src/Configuration/Configuration.csproj`
+- `src/Configuration/IConfigurationStore.cs`
+- `src/Configuration/IFeatureFlagService.cs`
+- `src/Configuration/ConfigurationEntry.cs`
+- `src/Configuration/FeatureFlag.cs`
+- `src/Configuration/ConfigurationChange.cs`
+- `src/Configuration/InMemoryConfigurationStore.cs`
+- `src/Configuration/InMemoryFeatureFlagService.cs`
+- `src/Configuration/EnvironmentOverrideProvider.cs`
+- `src/Configuration/ConfigurationChangeNotifier.cs`
+- `src/Configuration/ConfigurationServiceExtensions.cs`
+
+### Files modified
+
+- `src/Admin.Api/Program.cs` — Added 8 config/feature-flag endpoints
+- `src/Admin.Api/Admin.Api.csproj` — Added Configuration project reference
+- `tests/UnitTests/UnitTests.csproj` — Added Configuration project reference
+- `EnterpriseIntegrationPlatform.sln` — Added Configuration project
+
+### Tests added
+
+- `tests/UnitTests/InMemoryConfigurationStoreTests.cs`
+- `tests/UnitTests/InMemoryFeatureFlagServiceTests.cs`
+- `tests/UnitTests/EnvironmentOverrideProviderTests.cs`
+- `tests/UnitTests/ConfigurationChangeNotifierTests.cs`
+
+---
+
+## Chunk 032 – Grafana Dashboards
+
+- **Date**: 2026-04-02
+- **Status**: done
+- **Goal**: Pre-built Grafana dashboards for platform health, message throughput, connector status, Temporal workflow metrics, and alerting rules.
+
+### Architecture
+
+- **5 Grafana dashboard JSON files** — platform-health, message-throughput, connector-status, temporal-workflows, dlq-overview. Schema version 39+, unique UIDs, real PromQL queries against PlatformMeters.cs metrics.
+- **Provisioning configs** — Prometheus and Loki datasource YAML, dashboard auto-provisioning YAML, alerting rules YAML.
+- **Alerting rules** — High error rate, DLQ depth threshold, service down, high latency, workflow failures.
+- **Helm ConfigMap** — Mounts dashboard JSONs into Grafana pods.
+- **Aspire integration** — Grafana container on port 15300 with provisioning volume mounts.
+
+### Files created
+
+- `deploy/grafana/dashboards/platform-health.json`
+- `deploy/grafana/dashboards/message-throughput.json`
+- `deploy/grafana/dashboards/connector-status.json`
+- `deploy/grafana/dashboards/temporal-workflows.json`
+- `deploy/grafana/dashboards/dlq-overview.json`
+- `deploy/grafana/provisioning/datasources/prometheus.yaml`
+- `deploy/grafana/provisioning/datasources/loki.yaml`
+- `deploy/grafana/provisioning/dashboards/dashboards.yaml`
+- `deploy/grafana/provisioning/alerting/alerts.yaml`
+- `deploy/helm/eip/templates/grafana-dashboards-configmap.yaml`
+
+### Files modified
+
+- `deploy/helm/eip/values.yaml` — Added Grafana settings
+- `src/AppHost/Program.cs` — Added Grafana container on port 15300
+
+### Tests added
+
+- `tests/UnitTests/GrafanaDashboardTests.cs` — 33 tests validating JSON structure, UIDs, datasources, provisioning
+
+---
+
 ## Chunk 031b – Processing Throttle (Admin-Controlled, Per-Tenant/Queue/Endpoint)
 
 - **Date**: 2026-04-02

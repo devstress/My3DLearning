@@ -6,5 +6,6 @@
     <ProjectReference Include="..\Processing.DeadLetter\Processing.DeadLetter.csproj" />
     <ProjectReference Include="..\Processing.Replay\Processing.Replay.csproj" />
     <ProjectReference Include="..\Processing.Throttle\Processing.Throttle.csproj" />
+    <ProjectReference Include="..\Configuration\Configuration.csproj" />
   </ItemGroup>
 </Project>

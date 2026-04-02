@@ -33,6 +33,20 @@ var loki = builder.AddContainer("loki", "grafana/loki", "3.4.2")
     .WithVolume("loki-data", "/loki")
     .WithLifetime(ContainerLifetime.Persistent);
 
+// Grafana provides pre-built dashboards for platform health, message throughput,
+// connector status, Temporal workflow metrics, and DLQ monitoring.
+// Host port 15300 avoids conflict with the default Grafana port 3000.
+var grafana = builder.AddContainer("grafana", "grafana/grafana", "11.6.0")
+    .WithHttpEndpoint(port: 15300, targetPort: 3000, name: "grafana-ui")
+    .WithBindMount("../../deploy/grafana/provisioning", "/etc/grafana/provisioning")
+    .WithBindMount("../../deploy/grafana/dashboards", "/var/lib/grafana/dashboards")
+    .WithEnvironment("GF_AUTH_ANONYMOUS_ENABLED", "true")
+    .WithEnvironment("GF_AUTH_ANONYMOUS_ORG_ROLE", "Viewer")
+    .WithEnvironment("PROMETHEUS_URL", "http://host.docker.internal:9090")
+    .WithEnvironment("LOKI_URL", loki.GetEndpoint("loki-api"))
+    .WithVolume("grafana-data", "/var/lib/grafana")
+    .WithLifetime(ContainerLifetime.Persistent);
+
 // ── Workflow Orchestration ────────────────────────────────────────────────────
 // Temporal provides durable, fault-tolerant workflow orchestration.
 // The auto-setup image creates the default namespace on first start.
