@@ -1,11 +1,11 @@
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Processing.Splitter;
-using FluentAssertions;
 using Microsoft.Extensions.Options;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class JsonArraySplitStrategyTests
 {
     private static JsonArraySplitStrategy BuildStrategy(string? arrayPropertyName = null) =>
@@ -18,7 +18,7 @@ public class JsonArraySplitStrategyTests
     // Top-level array splitting
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public void Split_TopLevelArray_ReturnsIndividualElements()
     {
         var sut = BuildStrategy();
@@ -26,13 +26,13 @@ public class JsonArraySplitStrategyTests
 
         var result = sut.Split(payload);
 
-        result.Should().HaveCount(3);
-        result[0].GetProperty("id").GetInt32().Should().Be(1);
-        result[1].GetProperty("id").GetInt32().Should().Be(2);
-        result[2].GetProperty("id").GetInt32().Should().Be(3);
+        Assert.That(result, Has.Count.EqualTo(3));
+        Assert.That(result[0].GetProperty("id").GetInt32(), Is.EqualTo(1));
+        Assert.That(result[1].GetProperty("id").GetInt32(), Is.EqualTo(2));
+        Assert.That(result[2].GetProperty("id").GetInt32(), Is.EqualTo(3));
     }
 
-    [Fact]
+    [Test]
     public void Split_EmptyTopLevelArray_ReturnsEmptyList()
     {
         var sut = BuildStrategy();
@@ -40,10 +40,10 @@ public class JsonArraySplitStrategyTests
 
         var result = sut.Split(payload);
 
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public void Split_TopLevelArrayOfScalars_ReturnsScalarElements()
     {
         var sut = BuildStrategy();
@@ -51,13 +51,13 @@ public class JsonArraySplitStrategyTests
 
         var result = sut.Split(payload);
 
-        result.Should().HaveCount(3);
-        result[0].GetString().Should().Be("alpha");
-        result[1].GetString().Should().Be("beta");
-        result[2].GetString().Should().Be("gamma");
+        Assert.That(result, Has.Count.EqualTo(3));
+        Assert.That(result[0].GetString(), Is.EqualTo("alpha"));
+        Assert.That(result[1].GetString(), Is.EqualTo("beta"));
+        Assert.That(result[2].GetString(), Is.EqualTo("gamma"));
     }
 
-    [Fact]
+    [Test]
     public void Split_TopLevelNonArray_ThrowsInvalidOperationException()
     {
         var sut = BuildStrategy();
@@ -65,15 +65,15 @@ public class JsonArraySplitStrategyTests
 
         var act = () => sut.Split(payload);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*not a JSON array*");
+        var ex = Assert.Throws<InvalidOperationException>(() => act());
+        Assert.That(ex!.Message, Does.Contain("not a JSON array"));
     }
 
     // ------------------------------------------------------------------ //
     // Named array property splitting
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public void Split_NamedArrayProperty_ReturnsIndividualElements()
     {
         var sut = BuildStrategy(arrayPropertyName: "items");
@@ -81,12 +81,12 @@ public class JsonArraySplitStrategyTests
 
         var result = sut.Split(payload);
 
-        result.Should().HaveCount(2);
-        result[0].GetProperty("id").GetInt32().Should().Be(10);
-        result[1].GetProperty("id").GetInt32().Should().Be(20);
+        Assert.That(result, Has.Count.EqualTo(2));
+        Assert.That(result[0].GetProperty("id").GetInt32(), Is.EqualTo(10));
+        Assert.That(result[1].GetProperty("id").GetInt32(), Is.EqualTo(20));
     }
 
-    [Fact]
+    [Test]
     public void Split_NamedPropertyIsNotArray_ThrowsInvalidOperationException()
     {
         var sut = BuildStrategy(arrayPropertyName: "status");
@@ -94,11 +94,11 @@ public class JsonArraySplitStrategyTests
 
         var act = () => sut.Split(payload);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*'status'*not a JSON array*");
+        var ex = Assert.Throws<InvalidOperationException>(() => act());
+        Assert.That(ex!.Message, Does.Contain("'status'").And.Contain("not a JSON array"));
     }
 
-    [Fact]
+    [Test]
     public void Split_NamedPropertyNotFound_ThrowsInvalidOperationException()
     {
         var sut = BuildStrategy(arrayPropertyName: "missing");
@@ -106,11 +106,11 @@ public class JsonArraySplitStrategyTests
 
         var act = () => sut.Split(payload);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*'missing'*not found*");
+        var ex = Assert.Throws<InvalidOperationException>(() => act());
+        Assert.That(ex!.Message, Does.Contain("'missing'").And.Contain("not found"));
     }
 
-    [Fact]
+    [Test]
     public void Split_NamedPropertyOnNonObject_ThrowsInvalidOperationException()
     {
         var sut = BuildStrategy(arrayPropertyName: "items");
@@ -118,15 +118,15 @@ public class JsonArraySplitStrategyTests
 
         var act = () => sut.Split(payload);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*not a JSON object*");
+        var ex = Assert.Throws<InvalidOperationException>(() => act());
+        Assert.That(ex!.Message, Does.Contain("not a JSON object"));
     }
 
     // ------------------------------------------------------------------ //
     // Element independence (clone verification)
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public void Split_ElementsAreIndependentClones()
     {
         var sut = BuildStrategy();
@@ -139,11 +139,11 @@ public class JsonArraySplitStrategyTests
         var serialized0 = JsonSerializer.Serialize(result[0]);
         var serialized1 = JsonSerializer.Serialize(result[1]);
 
-        serialized0.Should().Contain("\"id\":1");
-        serialized1.Should().Contain("\"id\":2");
+        Assert.That(serialized0, Does.Contain("\"id\":1"));
+        Assert.That(serialized1, Does.Contain("\"id\":2"));
     }
 
-    [Fact]
+    [Test]
     public void Split_EmptyNamedArray_ReturnsEmptyList()
     {
         var sut = BuildStrategy(arrayPropertyName: "orders");
@@ -151,6 +151,6 @@ public class JsonArraySplitStrategyTests
 
         var result = sut.Split(payload);
 
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 }

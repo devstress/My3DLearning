@@ -1,58 +1,58 @@
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class CassandraOptionsTests
 {
-    [Fact]
+    [Test]
     public void DefaultContactPoints_IsLocalhost()
     {
         var options = new CassandraOptions();
 
-        options.ContactPoints.Should().Be("localhost");
+        Assert.That(options.ContactPoints, Is.EqualTo("localhost"));
     }
 
-    [Fact]
+    [Test]
     public void DefaultPort_Is15042()
     {
         var options = new CassandraOptions();
 
-        options.Port.Should().Be(15042);
+        Assert.That(options.Port, Is.EqualTo(15042));
     }
 
-    [Fact]
+    [Test]
     public void DefaultKeyspace_IsEip()
     {
         var options = new CassandraOptions();
 
-        options.Keyspace.Should().Be("eip");
+        Assert.That(options.Keyspace, Is.EqualTo("eip"));
     }
 
-    [Fact]
+    [Test]
     public void DefaultReplicationFactor_Is3()
     {
         var options = new CassandraOptions();
 
-        options.ReplicationFactor.Should().Be(3);
+        Assert.That(options.ReplicationFactor, Is.EqualTo(3));
     }
 
-    [Fact]
+    [Test]
     public void DefaultTtlSeconds_Is30Days()
     {
         var options = new CassandraOptions();
 
-        options.DefaultTtlSeconds.Should().Be(2_592_000);
+        Assert.That(options.DefaultTtlSeconds, Is.EqualTo(2_592_000));
     }
 
-    [Fact]
+    [Test]
     public void SectionName_IsCassandra()
     {
-        CassandraOptions.SectionName.Should().Be("Cassandra");
+        Assert.That(CassandraOptions.SectionName, Is.EqualTo("Cassandra"));
     }
 
-    [Fact]
+    [Test]
     public void ContactPoints_CanBeSetToMultipleHosts()
     {
         var options = new CassandraOptions
@@ -60,10 +60,10 @@ public class CassandraOptionsTests
             ContactPoints = "node1,node2,node3",
         };
 
-        options.ContactPoints.Should().Be("node1,node2,node3");
+        Assert.That(options.ContactPoints, Is.EqualTo("node1,node2,node3"));
     }
 
-    [Fact]
+    [Test]
     public void TtlSeconds_CanBeDisabled()
     {
         var options = new CassandraOptions
@@ -71,6 +71,6 @@ public class CassandraOptionsTests
             DefaultTtlSeconds = 0,
         };
 
-        options.DefaultTtlSeconds.Should().Be(0);
+        Assert.That(options.DefaultTtlSeconds, Is.EqualTo(0));
     }
 }

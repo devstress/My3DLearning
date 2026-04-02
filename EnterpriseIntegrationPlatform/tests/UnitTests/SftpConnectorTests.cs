@@ -1,18 +1,24 @@
 using EnterpriseIntegrationPlatform.Connector.Sftp;
 using EnterpriseIntegrationPlatform.Contracts;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using System.Text;
 using System.Text.Json;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class SftpConnectorTests
 {
-    private readonly ISftpClient _sftpClient = Substitute.For<ISftpClient>();
+    private ISftpClient _sftpClient = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _sftpClient = Substitute.For<ISftpClient>();
+    }
 
     private SftpConnector BuildConnector(string rootPath = "/uploads") =>
         new SftpConnector(
@@ -25,7 +31,7 @@ public class SftpConnectorTests
 
     private static byte[] Utf8Bytes(string s) => Encoding.UTF8.GetBytes(s);
 
-    [Fact]
+    [Test]
     public async Task UploadAsync_ValidEnvelope_UploadsToCorrectRemotePath()
     {
         var connector = BuildConnector("/files");
@@ -37,10 +43,10 @@ public class SftpConnectorTests
 
         await connector.UploadAsync(envelope, "data.json", Utf8Bytes, CancellationToken.None);
 
-        capturedPath.Should().Be("/files/data.json");
+        Assert.That(capturedPath, Is.EqualTo("/files/data.json"));
     }
 
-    [Fact]
+    [Test]
     public async Task UploadAsync_ValidEnvelope_WritesMetadataFile()
     {
         var connector = BuildConnector("/files");
@@ -52,10 +58,10 @@ public class SftpConnectorTests
 
         await connector.UploadAsync(envelope, "data.json", Utf8Bytes, CancellationToken.None);
 
-        uploadedPaths.Should().Contain("/files/data.json.meta");
+        Assert.That(uploadedPaths, Does.Contain("/files/data.json.meta"));
     }
 
-    [Fact]
+    [Test]
     public async Task DownloadAsync_ValidPath_ReturnsFileBytes()
     {
         var connector = BuildConnector();
@@ -65,10 +71,10 @@ public class SftpConnectorTests
 
         var result = await connector.DownloadAsync("/uploads/file.json", CancellationToken.None);
 
-        result.Should().Equal(expected);
+        Assert.That(result, Is.EqualTo(expected));
     }
 
-    [Fact]
+    [Test]
     public async Task ListFilesAsync_ValidPath_ReturnsFiles()
     {
         var connector = BuildConnector();
@@ -76,10 +82,10 @@ public class SftpConnectorTests
 
         var result = await connector.ListFilesAsync("/uploads", CancellationToken.None);
 
-        result.Should().BeEquivalentTo("/uploads/a.json", "/uploads/b.json");
+        Assert.That(result, Is.EquivalentTo(new[] { "/uploads/a.json", "/uploads/b.json" }));
     }
 
-    [Fact]
+    [Test]
     public async Task UploadAsync_NullEnvelope_ThrowsArgumentNullException()
     {
         var connector = BuildConnector();
@@ -87,10 +93,10 @@ public class SftpConnectorTests
         var act = async () =>
             await connector.UploadAsync<string>(null!, "file.json", Utf8Bytes, CancellationToken.None);
 
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        Assert.ThrowsAsync<ArgumentNullException>(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task UploadAsync_CallsConnect_BeforeUpload()
     {
         var connector = BuildConnector();
@@ -102,10 +108,10 @@ public class SftpConnectorTests
 
         await connector.UploadAsync(envelope, "data.json", Utf8Bytes, CancellationToken.None);
 
-        order.IndexOf("Connect").Should().BeLessThan(order.IndexOf("UploadFile"));
+        Assert.That(order.IndexOf("Connect"), Is.LessThan(order.IndexOf("UploadFile")));
     }
 
-    [Fact]
+    [Test]
     public async Task UploadAsync_CallsDisconnect_InFinally()
     {
         var connector = BuildConnector();
@@ -117,11 +123,11 @@ public class SftpConnectorTests
         var act = async () =>
             await connector.UploadAsync(envelope, "data.json", Utf8Bytes, CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await act());
         _sftpClient.Received(1).Disconnect();
     }
 
-    [Fact]
+    [Test]
     public async Task DownloadAsync_CallsConnect_BeforeDownload()
     {
         var connector = BuildConnector();
@@ -132,10 +138,10 @@ public class SftpConnectorTests
 
         await connector.DownloadAsync("/uploads/f.json", CancellationToken.None);
 
-        order.IndexOf("Connect").Should().BeLessThan(order.IndexOf("DownloadFile"));
+        Assert.That(order.IndexOf("Connect"), Is.LessThan(order.IndexOf("DownloadFile")));
     }
 
-    [Fact]
+    [Test]
     public async Task DownloadAsync_CallsDisconnect_AfterDownload()
     {
         var connector = BuildConnector();
@@ -146,7 +152,7 @@ public class SftpConnectorTests
         _sftpClient.Received(1).Disconnect();
     }
 
-    [Fact]
+    [Test]
     public async Task DownloadAsync_ReturnsCorrectBytes()
     {
         var connector = BuildConnector();
@@ -155,6 +161,6 @@ public class SftpConnectorTests
 
         var result = await connector.DownloadAsync("/uploads/binary.bin", CancellationToken.None);
 
-        result.Should().Equal(expected);
+        Assert.That(result, Is.EqualTo(expected));
     }
 }

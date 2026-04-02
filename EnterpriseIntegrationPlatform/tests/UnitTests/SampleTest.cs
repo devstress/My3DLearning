@@ -1,13 +1,13 @@
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class SampleTest
 {
-    [Fact]
+    [Test]
     public void Placeholder_ShouldPass()
     {
-        true.Should().BeTrue();
+        Assert.Pass();
     }
 }

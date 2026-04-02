@@ -1,25 +1,26 @@
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Workflow.Temporal.Activities;
-using FluentAssertions;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Workflow;
 
+[TestFixture]
 public class SagaCompensationActivitiesTests
 {
-    private readonly ICompensationActivityService _compensationService;
-    private readonly IMessageLoggingService _logging;
-    private readonly SagaCompensationActivities _activities;
+    private ICompensationActivityService _compensationService = null!;
+    private IMessageLoggingService _logging = null!;
+    private SagaCompensationActivities _activities = null!;
 
-    public SagaCompensationActivitiesTests()
+    [SetUp]
+    public void SetUp()
     {
         _compensationService = Substitute.For<ICompensationActivityService>();
         _logging = Substitute.For<IMessageLoggingService>();
         _activities = new SagaCompensationActivities(_compensationService, _logging);
     }
 
-    [Fact]
+    [Test]
     public async Task CompensateStepAsync_ServiceReturnsTrue_ReturnsTrue()
     {
         var correlationId = Guid.NewGuid();
@@ -28,10 +29,10 @@ public class SagaCompensationActivitiesTests
 
         var result = await _activities.CompensateStepAsync(correlationId, "StepA");
 
-        result.Should().BeTrue();
+        Assert.That(result, Is.True);
     }
 
-    [Fact]
+    [Test]
     public async Task CompensateStepAsync_ServiceReturnsFalse_ReturnsFalse()
     {
         var correlationId = Guid.NewGuid();
@@ -40,10 +41,10 @@ public class SagaCompensationActivitiesTests
 
         var result = await _activities.CompensateStepAsync(correlationId, "StepB");
 
-        result.Should().BeFalse();
+        Assert.That(result, Is.False);
     }
 
-    [Fact]
+    [Test]
     public async Task CompensateStepAsync_LogsStartAndSuccessStages()
     {
         var correlationId = Guid.NewGuid();
@@ -56,7 +57,7 @@ public class SagaCompensationActivitiesTests
         await _logging.Received(1).LogAsync(correlationId, "StepC", "CompensationSucceeded:StepC");
     }
 
-    [Fact]
+    [Test]
     public async Task CompensateStepAsync_ServiceReturnsFalse_LogsFailureStage()
     {
         var correlationId = Guid.NewGuid();

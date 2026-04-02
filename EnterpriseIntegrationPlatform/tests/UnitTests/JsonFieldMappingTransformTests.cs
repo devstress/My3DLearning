@@ -1,11 +1,11 @@
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Processing.Translator;
-using FluentAssertions;
 using Microsoft.Extensions.Options;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class JsonFieldMappingTransformTests
 {
     private static JsonFieldMappingTransform BuildTransform(params FieldMapping[] mappings)
@@ -21,7 +21,7 @@ public class JsonFieldMappingTransformTests
     // Basic field mapping
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public void Transform_MapsSourceFieldToTargetField()
     {
         var sut = BuildTransform(
@@ -30,10 +30,10 @@ public class JsonFieldMappingTransformTests
 
         var result = sut.Transform(source);
 
-        result.GetProperty("orderId").GetString().Should().Be("abc-123");
+        Assert.That(result.GetProperty("orderId").GetString(), Is.EqualTo("abc-123"));
     }
 
-    [Fact]
+    [Test]
     public void Transform_MapsNestedSourcePathToFlatTarget()
     {
         var sut = BuildTransform(
@@ -42,10 +42,10 @@ public class JsonFieldMappingTransformTests
 
         var result = sut.Transform(source);
 
-        result.GetProperty("orderId").GetString().Should().Be("nested-id");
+        Assert.That(result.GetProperty("orderId").GetString(), Is.EqualTo("nested-id"));
     }
 
-    [Fact]
+    [Test]
     public void Transform_MapsFlatSourceToNestedTargetPath()
     {
         var sut = BuildTransform(
@@ -54,15 +54,14 @@ public class JsonFieldMappingTransformTests
 
         var result = sut.Transform(source);
 
-        result.GetProperty("address").GetProperty("city").GetString()
-            .Should().Be("Amsterdam");
+        Assert.That(result.GetProperty("address").GetProperty("city").GetString(), Is.EqualTo("Amsterdam"));
     }
 
     // ------------------------------------------------------------------ //
     // Static value override
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public void Transform_UsesStaticValue_IgnoresSourceField()
     {
         var sut = BuildTransform(
@@ -76,14 +75,14 @@ public class JsonFieldMappingTransformTests
 
         var result = sut.Transform(source);
 
-        result.GetProperty("schemaVersion").GetString().Should().Be("2.0");
+        Assert.That(result.GetProperty("schemaVersion").GetString(), Is.EqualTo("2.0"));
     }
 
     // ------------------------------------------------------------------ //
     // Missing source path
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public void Transform_MissingSourceField_IsOmittedFromTarget()
     {
         var sut = BuildTransform(
@@ -92,14 +91,14 @@ public class JsonFieldMappingTransformTests
 
         var result = sut.Transform(source);
 
-        result.TryGetProperty("targetField", out _).Should().BeFalse();
+        Assert.That(result.TryGetProperty("targetField", out _), Is.False);
     }
 
     // ------------------------------------------------------------------ //
     // Multiple mappings
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public void Transform_MultipleFieldMappings_AllMappedToTarget()
     {
         var sut = BuildTransform(
@@ -110,16 +109,16 @@ public class JsonFieldMappingTransformTests
 
         var result = sut.Transform(source);
 
-        result.GetProperty("orderId").GetString().Should().Be("O-001");
-        result.GetProperty("customerName").GetString().Should().Be("Alice");
-        result.GetProperty("orderTotal").GetString().Should().Be("99.50");
+        Assert.That(result.GetProperty("orderId").GetString(), Is.EqualTo("O-001"));
+        Assert.That(result.GetProperty("customerName").GetString(), Is.EqualTo("Alice"));
+        Assert.That(result.GetProperty("orderTotal").GetString(), Is.EqualTo("99.50"));
     }
 
     // ------------------------------------------------------------------ //
     // Numeric and boolean values
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public void Transform_NumericSourceValue_MappedAsString()
     {
         var sut = BuildTransform(
@@ -128,10 +127,10 @@ public class JsonFieldMappingTransformTests
 
         var result = sut.Transform(source);
 
-        result.GetProperty("total").GetString().Should().Be("42");
+        Assert.That(result.GetProperty("total").GetString(), Is.EqualTo("42"));
     }
 
-    [Fact]
+    [Test]
     public void Transform_BooleanSourceValue_MappedAsString()
     {
         var sut = BuildTransform(
@@ -140,14 +139,14 @@ public class JsonFieldMappingTransformTests
 
         var result = sut.Transform(source);
 
-        result.GetProperty("isActive").GetString().Should().Be("true");
+        Assert.That(result.GetProperty("isActive").GetString(), Is.EqualTo("true"));
     }
 
     // ------------------------------------------------------------------ //
     // Empty mapping list
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public void Transform_NoMappings_ReturnsEmptyJsonObject()
     {
         var sut = BuildTransform();
@@ -155,7 +154,7 @@ public class JsonFieldMappingTransformTests
 
         var result = sut.Transform(source);
 
-        result.ValueKind.Should().Be(JsonValueKind.Object);
-        result.EnumerateObject().Should().BeEmpty();
+        Assert.That(result.ValueKind, Is.EqualTo(JsonValueKind.Object));
+        Assert.That(result.EnumerateObject(), Is.Empty);
     }
 }

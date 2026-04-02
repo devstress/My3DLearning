@@ -5,12 +5,11 @@ using EnterpriseIntegrationPlatform.Processing.DeadLetter;
 using EnterpriseIntegrationPlatform.Processing.Replay;
 using EnterpriseIntegrationPlatform.Processing.Retry;
 using EnterpriseIntegrationPlatform.Security;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ReceivedExtensions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Load;
 
@@ -23,6 +22,7 @@ namespace EnterpriseIntegrationPlatform.Tests.Load;
 /// to avoid flaky failures in CI — the goal is to catch catastrophic regressions, not to
 /// enforce specific production SLAs.
 /// </summary>
+[TestFixture]
 public class ThroughputLoadTests
 {
     private static IntegrationEnvelope<string> BuildEnvelope(int index) =>
@@ -35,7 +35,7 @@ public class ThroughputLoadTests
     /// Publishes 1,000 messages concurrently to an in-memory DLQ publisher and asserts
     /// that all messages are processed within 5 seconds.
     /// </summary>
-    [Fact]
+    [Test]
     public async Task DeadLetterPublisher_1000ConcurrentPublishes_CompletesWithin5Seconds()
     {
         const int messageCount = 1000;
@@ -57,8 +57,7 @@ public class ThroughputLoadTests
         await Task.WhenAll(tasks);
         sw.Stop();
 
-        sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5),
-            $"expected {messageCount} DLQ publishes to complete within 5 seconds, took {sw.Elapsed.TotalSeconds:F2}s");
+        Assert.That(sw.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)), $"expected {messageCount} DLQ publishes to complete within 5 seconds, took {sw.Elapsed.TotalSeconds:F2}s");
         await producer.ReceivedWithAnyArgs(messageCount).PublishAsync<DeadLetterEnvelope<string>>(default!, default!, default);
     }
 
@@ -66,7 +65,7 @@ public class ThroughputLoadTests
     /// Stores and retrieves 500 messages in the in-memory replay store concurrently
     /// and asserts all operations complete within 5 seconds.
     /// </summary>
-    [Fact]
+    [Test]
     public async Task InMemoryReplayStore_500ConcurrentStores_CompletesWithin5Seconds()
     {
         const int messageCount = 500;
@@ -81,21 +80,20 @@ public class ThroughputLoadTests
         await Task.WhenAll(tasks);
         sw.Stop();
 
-        sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5),
-            $"expected {messageCount} store operations to complete in 5 seconds, took {sw.Elapsed.TotalSeconds:F2}s");
+        Assert.That(sw.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)), $"expected {messageCount} store operations to complete in 5 seconds, took {sw.Elapsed.TotalSeconds:F2}s");
 
         var retrieved = new List<IntegrationEnvelope<object>>();
         await foreach (var env in store.GetMessagesForReplayAsync(topic, new ReplayFilter(), messageCount, CancellationToken.None))
             retrieved.Add(env);
 
-        retrieved.Should().HaveCount(messageCount);
+        Assert.That(retrieved, Has.Count.EqualTo(messageCount));
     }
 
     /// <summary>
     /// Runs 200 retry policy executions concurrently (zero delay configured) and asserts
     /// all complete within 5 seconds.
     /// </summary>
-    [Fact]
+    [Test]
     public async Task ExponentialBackoffRetryPolicy_200ConcurrentSucceedingOperations_CompletesWithin5Seconds()
     {
         const int operationCount = 200;
@@ -111,16 +109,15 @@ public class ThroughputLoadTests
         var results = await Task.WhenAll(tasks);
         sw.Stop();
 
-        sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5),
-            $"expected {operationCount} retry executions to complete in 5 seconds, took {sw.Elapsed.TotalSeconds:F2}s");
-        results.Should().OnlyContain(r => r.IsSucceeded);
+        Assert.That(sw.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)), $"expected {operationCount} retry executions to complete in 5 seconds, took {sw.Elapsed.TotalSeconds:F2}s");
+        Assert.That(results, Has.All.Matches<RetryResult<int>>(r => r.IsSucceeded));
     }
 
     /// <summary>
     /// Validates 10,000 payloads against the PayloadSizeGuard concurrently and asserts
     /// completion within 2 seconds.
     /// </summary>
-    [Fact]
+    [Test]
     public void PayloadSizeGuard_10000ConcurrentValidations_CompletesWithin2Seconds()
     {
         const int validationCount = 10_000;
@@ -134,7 +131,6 @@ public class ThroughputLoadTests
         Parallel.For(0, validationCount, _ => guard.Enforce(payload));
         sw.Stop();
 
-        sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2),
-            $"expected {validationCount} payload validations to complete in 2 seconds, took {sw.Elapsed.TotalSeconds:F2}s");
+        Assert.That(sw.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)), $"expected {validationCount} payload validations to complete in 2 seconds, took {sw.Elapsed.TotalSeconds:F2}s");
     }
 }

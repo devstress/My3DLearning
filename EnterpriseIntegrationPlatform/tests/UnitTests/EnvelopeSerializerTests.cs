@@ -1,13 +1,13 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class EnvelopeSerializerTests
 {
-    [Fact]
+    [Test]
     public void Serialize_RoundTrips_StringPayload()
     {
         // Arrange
@@ -19,15 +19,15 @@ public class EnvelopeSerializerTests
         var result = EnvelopeSerializer.Deserialize<string>(bytes);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.MessageId.Should().Be(envelope.MessageId);
-        result.CorrelationId.Should().Be(envelope.CorrelationId);
-        result.Source.Should().Be("test-source");
-        result.MessageType.Should().Be("test.message");
-        result.Payload.Should().Be("hello");
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.MessageId, Is.EqualTo(envelope.MessageId));
+        Assert.That(result.CorrelationId, Is.EqualTo(envelope.CorrelationId));
+        Assert.That(result.Source, Is.EqualTo("test-source"));
+        Assert.That(result.MessageType, Is.EqualTo("test.message"));
+        Assert.That(result.Payload, Is.EqualTo("hello"));
     }
 
-    [Fact]
+    [Test]
     public void Serialize_RoundTrips_ComplexPayload()
     {
         // Arrange
@@ -40,13 +40,13 @@ public class EnvelopeSerializerTests
         var result = EnvelopeSerializer.Deserialize<OrderPayload>(bytes);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Payload.OrderId.Should().Be("ORD-001");
-        result.Payload.Amount.Should().Be(42.50m);
-        result.Payload.Currency.Should().Be("USD");
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Payload.OrderId, Is.EqualTo("ORD-001"));
+        Assert.That(result.Payload.Amount, Is.EqualTo(42.50m));
+        Assert.That(result.Payload.Currency, Is.EqualTo("USD"));
     }
 
-    [Fact]
+    [Test]
     public void Serialize_PreservesMetadata()
     {
         // Arrange
@@ -60,12 +60,14 @@ public class EnvelopeSerializerTests
         var result = EnvelopeSerializer.Deserialize<string>(bytes);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Metadata.Should().ContainKey("tenant").WhoseValue.Should().Be("acme");
-        result.Metadata.Should().ContainKey("region").WhoseValue.Should().Be("eu-west-1");
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Metadata.ContainsKey("tenant"), Is.True);
+        Assert.That(result.Metadata["tenant"], Is.EqualTo("acme"));
+        Assert.That(result.Metadata.ContainsKey("region"), Is.True);
+        Assert.That(result.Metadata["region"], Is.EqualTo("eu-west-1"));
     }
 
-    [Fact]
+    [Test]
     public void Serialize_PreservesPriority()
     {
         // Arrange
@@ -80,11 +82,11 @@ public class EnvelopeSerializerTests
         var result = EnvelopeSerializer.Deserialize<string>(bytes);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Priority.Should().Be(MessagePriority.Critical);
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Priority, Is.EqualTo(MessagePriority.Critical));
     }
 
-    [Fact]
+    [Test]
     public void Serialize_PreservesCausationId()
     {
         // Arrange
@@ -97,11 +99,11 @@ public class EnvelopeSerializerTests
         var result = EnvelopeSerializer.Deserialize<string>(bytes);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.CausationId.Should().Be(parentId);
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.CausationId, Is.EqualTo(parentId));
     }
 
-    [Fact]
+    [Test]
     public void Deserialize_Throws_ForInvalidData()
     {
         // Arrange
@@ -111,7 +113,7 @@ public class EnvelopeSerializerTests
         var act = () => EnvelopeSerializer.Deserialize<string>(invalidData);
 
         // Assert — invalid JSON throws
-        act.Should().Throw<System.Text.Json.JsonException>();
+        Assert.Throws<System.Text.Json.JsonException>(() => act());
     }
 
     private record OrderPayload(string OrderId, decimal Amount, string Currency);

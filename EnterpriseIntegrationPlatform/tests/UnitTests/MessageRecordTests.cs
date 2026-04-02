@@ -1,13 +1,13 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class MessageRecordTests
 {
-    [Fact]
+    [Test]
     public void DefaultPriority_IsNormal()
     {
         var record = new MessageRecord
@@ -20,10 +20,10 @@ public class MessageRecordTests
             PayloadJson = "{}",
         };
 
-        record.Priority.Should().Be(MessagePriority.Normal);
+        Assert.That(record.Priority, Is.EqualTo(MessagePriority.Normal));
     }
 
-    [Fact]
+    [Test]
     public void DefaultDeliveryStatus_IsPending()
     {
         var record = new MessageRecord
@@ -36,10 +36,10 @@ public class MessageRecordTests
             PayloadJson = "{}",
         };
 
-        record.DeliveryStatus.Should().Be(DeliveryStatus.Pending);
+        Assert.That(record.DeliveryStatus, Is.EqualTo(DeliveryStatus.Pending));
     }
 
-    [Fact]
+    [Test]
     public void DefaultSchemaVersion_IsOnePointZero()
     {
         var record = new MessageRecord
@@ -52,10 +52,10 @@ public class MessageRecordTests
             PayloadJson = "{}",
         };
 
-        record.SchemaVersion.Should().Be("1.0");
+        Assert.That(record.SchemaVersion, Is.EqualTo("1.0"));
     }
 
-    [Fact]
+    [Test]
     public void CausationId_DefaultsToNull()
     {
         var record = new MessageRecord
@@ -68,10 +68,10 @@ public class MessageRecordTests
             PayloadJson = "{}",
         };
 
-        record.CausationId.Should().BeNull();
+        Assert.That(record.CausationId, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void MetadataJson_DefaultsToNull()
     {
         var record = new MessageRecord
@@ -84,10 +84,10 @@ public class MessageRecordTests
             PayloadJson = "{}",
         };
 
-        record.MetadataJson.Should().BeNull();
+        Assert.That(record.MetadataJson, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void AllRequiredProperties_CanBeSet()
     {
         var messageId = Guid.NewGuid();
@@ -110,16 +110,16 @@ public class MessageRecordTests
             DeliveryStatus = DeliveryStatus.Delivered,
         };
 
-        record.MessageId.Should().Be(messageId);
-        record.CorrelationId.Should().Be(correlationId);
-        record.CausationId.Should().Be(causationId);
-        record.RecordedAt.Should().Be(now);
-        record.Source.Should().Be("Connector.Http");
-        record.MessageType.Should().Be("OrderResponse");
-        record.SchemaVersion.Should().Be("2.0");
-        record.Priority.Should().Be(MessagePriority.Critical);
-        record.PayloadJson.Should().Be("""{"orderId":"ABC-123"}""");
-        record.MetadataJson.Should().Be("""{"trace-id":"abc"}""");
-        record.DeliveryStatus.Should().Be(DeliveryStatus.Delivered);
+        Assert.That(record.MessageId, Is.EqualTo(messageId));
+        Assert.That(record.CorrelationId, Is.EqualTo(correlationId));
+        Assert.That(record.CausationId, Is.EqualTo(causationId));
+        Assert.That(record.RecordedAt, Is.EqualTo(now));
+        Assert.That(record.Source, Is.EqualTo("Connector.Http"));
+        Assert.That(record.MessageType, Is.EqualTo("OrderResponse"));
+        Assert.That(record.SchemaVersion, Is.EqualTo("2.0"));
+        Assert.That(record.Priority, Is.EqualTo(MessagePriority.Critical));
+        Assert.That(record.PayloadJson, Is.EqualTo("""{"orderId":"ABC-123"}"""));
+        Assert.That(record.MetadataJson, Is.EqualTo("""{"trace-id":"abc"}"""));
+        Assert.That(record.DeliveryStatus, Is.EqualTo(DeliveryStatus.Delivered));
     }
 }

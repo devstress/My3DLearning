@@ -1,34 +1,34 @@
 using EnterpriseIntegrationPlatform.Processing.Routing;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class RouterOptionsTests
 {
-    [Fact]
+    [Test]
     public void RouterOptions_DefaultRules_IsEmpty()
     {
         var options = new RouterOptions();
 
-        options.Rules.Should().BeEmpty();
+        Assert.That(options.Rules, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public void RouterOptions_DefaultTopic_IsNull()
     {
         var options = new RouterOptions();
 
-        options.DefaultTopic.Should().BeNull();
+        Assert.That(options.DefaultTopic, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void RouterOptions_SectionName_IsExpectedValue()
     {
-        RouterOptions.SectionName.Should().Be("ContentBasedRouter");
+        Assert.That(RouterOptions.SectionName, Is.EqualTo("ContentBasedRouter"));
     }
 
-    [Fact]
+    [Test]
     public void RouterOptions_WithRulesAndDefaultTopic_ReturnsConfiguredValues()
     {
         var rule = new RoutingRule
@@ -46,7 +46,8 @@ public class RouterOptionsTests
             DefaultTopic = "integration.default",
         };
 
-        options.Rules.Should().ContainSingle().Which.Should().Be(rule);
-        options.DefaultTopic.Should().Be("integration.default");
+        Assert.That(options.Rules, Has.Count.EqualTo(1));
+        Assert.That(options.Rules[0], Is.EqualTo(rule));
+        Assert.That(options.DefaultTopic, Is.EqualTo("integration.default"));
     }
 }

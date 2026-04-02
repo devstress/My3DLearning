@@ -1,24 +1,26 @@
 using EnterpriseIntegrationPlatform.AI.Ollama;
 using EnterpriseIntegrationPlatform.Observability;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class TraceAnalyzerTests
 {
-    private readonly IOllamaService _ollama = Substitute.For<IOllamaService>();
-    private readonly TraceAnalyzer _analyzer;
+    private IOllamaService _ollama = null!;
+    private TraceAnalyzer _analyzer = null!;
 
-    public TraceAnalyzerTests()
+    [SetUp]
+    public void SetUp()
     {
+        _ollama = Substitute.For<IOllamaService>();
         _analyzer = new TraceAnalyzer(_ollama, NullLogger<TraceAnalyzer>.Instance);
     }
 
-    [Fact]
+    [Test]
     public async Task AnalyseTraceAsync_ReturnsAiResponse()
     {
         _ollama.AnalyseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -26,10 +28,10 @@ public class TraceAnalyzerTests
 
         var result = await _analyzer.AnalyseTraceAsync("{\"stage\":\"Routing\"}");
 
-        result.Should().Contain("Routing");
+        Assert.That(result, Does.Contain("Routing"));
     }
 
-    [Fact]
+    [Test]
     public async Task AnalyseTraceAsync_ReturnsFallback_WhenOllamaFails()
     {
         _ollama.AnalyseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -37,10 +39,10 @@ public class TraceAnalyzerTests
 
         var result = await _analyzer.AnalyseTraceAsync("{\"stage\":\"Routing\"}");
 
-        result.Should().Contain("unavailable");
+        Assert.That(result, Does.Contain("unavailable"));
     }
 
-    [Fact]
+    [Test]
     public async Task WhereIsMessageAsync_IncludesCorrelationIdInPrompt()
     {
         var correlationId = Guid.NewGuid();
@@ -51,11 +53,11 @@ public class TraceAnalyzerTests
 
         var result = await _analyzer.WhereIsMessageAsync(correlationId, "{\"status\":\"InFlight\"}");
 
-        capturedPrompt.Should().Contain(correlationId.ToString());
-        result.Should().Contain("Delivery");
+        Assert.That(capturedPrompt, Does.Contain(correlationId.ToString()));
+        Assert.That(result, Does.Contain("Delivery"));
     }
 
-    [Fact]
+    [Test]
     public async Task WhereIsMessageAsync_ReturnsFallback_WhenOllamaFails()
     {
         var correlationId = Guid.NewGuid();
@@ -65,7 +67,7 @@ public class TraceAnalyzerTests
 
         var result = await _analyzer.WhereIsMessageAsync(correlationId, "{}");
 
-        result.Should().Contain(correlationId.ToString());
-        result.Should().Contain("unavailable");
+        Assert.That(result, Does.Contain(correlationId.ToString()));
+        Assert.That(result, Does.Contain("unavailable"));
     }
 }

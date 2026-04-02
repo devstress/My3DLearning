@@ -1,0 +1,9 @@
+# Enable GitHub linguist detection for code search indexing
+*.cs linguist-detectable=true
+*.csproj linguist-detectable=true
+*.sln linguist-detectable=true
+*.json linguist-detectable=true
+*.yml linguist-detectable=true
+*.yaml linguist-detectable=true
+*.md linguist-detectable=true
+*.props linguist-detectable=true

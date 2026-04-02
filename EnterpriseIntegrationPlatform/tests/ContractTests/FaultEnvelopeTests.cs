@@ -1,9 +1,9 @@
 using EnterpriseIntegrationPlatform.Contracts;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Contract;
 
+[TestFixture]
 public class FaultEnvelopeTests
 {
     private static IntegrationEnvelope<string> BuildEnvelope() =>
@@ -11,67 +11,67 @@ public class FaultEnvelopeTests
 
     // ── Create factory ────────────────────────────────────────────────────────
 
-    [Fact]
+    [Test]
     public void Create_SetsNewFaultId()
     {
         var original = BuildEnvelope();
 
         var fault = FaultEnvelope.Create(original, "processor", "Unhandled error", retryCount: 3);
 
-        fault.FaultId.Should().NotBe(Guid.Empty);
+        Assert.That(fault.FaultId, Is.Not.EqualTo(Guid.Empty));
     }
 
-    [Fact]
+    [Test]
     public void Create_CopiesOriginalMessageId()
     {
         var original = BuildEnvelope();
 
         var fault = FaultEnvelope.Create(original, "processor", "Unhandled error", retryCount: 0);
 
-        fault.OriginalMessageId.Should().Be(original.MessageId);
+        Assert.That(fault.OriginalMessageId, Is.EqualTo(original.MessageId));
     }
 
-    [Fact]
+    [Test]
     public void Create_CopiesCorrelationId()
     {
         var original = BuildEnvelope();
 
         var fault = FaultEnvelope.Create(original, "processor", "Unhandled error", retryCount: 0);
 
-        fault.CorrelationId.Should().Be(original.CorrelationId);
+        Assert.That(fault.CorrelationId, Is.EqualTo(original.CorrelationId));
     }
 
-    [Fact]
+    [Test]
     public void Create_CopiesMessageType()
     {
         var original = BuildEnvelope();
 
         var fault = FaultEnvelope.Create(original, "processor", "Bad format", retryCount: 1);
 
-        fault.OriginalMessageType.Should().Be(original.MessageType);
+        Assert.That(fault.OriginalMessageType, Is.EqualTo(original.MessageType));
     }
 
-    [Fact]
+    [Test]
     public void Create_SetsRetryCount()
     {
         var original = BuildEnvelope();
 
         var fault = FaultEnvelope.Create(original, "processor", "reason", retryCount: 5);
 
-        fault.RetryCount.Should().Be(5);
+        Assert.That(fault.RetryCount, Is.EqualTo(5));
     }
 
-    [Fact]
+    [Test]
     public void Create_SetsNullErrorDetails_WhenNoException()
     {
         var original = BuildEnvelope();
 
         var fault = FaultEnvelope.Create(original, "processor", "reason", retryCount: 0);
 
-        fault.ErrorDetails.Should().BeNull();
+        Assert.That(fault.ErrorDetails, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void Create_SetsErrorDetails_WhenExceptionProvided()
     {
         var original = BuildEnvelope();
@@ -79,11 +79,11 @@ public class FaultEnvelopeTests
 
         var fault = FaultEnvelope.Create(original, "processor", "reason", retryCount: 2, exception);
 
-        fault.ErrorDetails.Should().Contain("InvalidOperationException");
-        fault.ErrorDetails.Should().Contain("Something went wrong");
+        Assert.That(fault.ErrorDetails, Does.Contain("InvalidOperationException"));
+        Assert.That(fault.ErrorDetails, Does.Contain("Something went wrong"));
     }
 
-    [Fact]
+    [Test]
     public void Create_SetsFaultedAtToUtcNow()
     {
         var before = DateTimeOffset.UtcNow;
@@ -91,16 +91,16 @@ public class FaultEnvelopeTests
         var fault = FaultEnvelope.Create(original, "processor", "reason", retryCount: 0);
         var after = DateTimeOffset.UtcNow;
 
-        fault.FaultedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+        Assert.That(fault.FaultedAt, Is.GreaterThanOrEqualTo(before).And.LessThanOrEqualTo(after));
     }
 
-    [Fact]
+    [Test]
     public void Create_SetsFaultedBy()
     {
         var original = BuildEnvelope();
 
         var fault = FaultEnvelope.Create(original, "ingestion-kafka", "reason", retryCount: 0);
 
-        fault.FaultedBy.Should().Be("ingestion-kafka");
+        Assert.That(fault.FaultedBy, Is.EqualTo("ingestion-kafka"));
     }
 }

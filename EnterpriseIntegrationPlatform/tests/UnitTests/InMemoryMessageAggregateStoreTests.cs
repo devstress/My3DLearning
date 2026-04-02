@@ -1,10 +1,10 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Aggregator;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class InMemoryMessageAggregateStoreTests
 {
     private static IntegrationEnvelope<string> BuildEnvelope(
@@ -22,7 +22,7 @@ public class InMemoryMessageAggregateStoreTests
     // AddAsync
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AddAsync_SingleEnvelope_ReturnsGroupWithOneItem()
     {
         var store = new InMemoryMessageAggregateStore<string>();
@@ -30,11 +30,11 @@ public class InMemoryMessageAggregateStoreTests
 
         var group = await store.AddAsync(envelope);
 
-        group.Should().HaveCount(1);
-        group[0].MessageId.Should().Be(envelope.MessageId);
+        Assert.That(group, Has.Count.EqualTo(1));
+        Assert.That(group[0].MessageId, Is.EqualTo(envelope.MessageId));
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_MultipleEnvelopes_SameCorrelation_ReturnsGrownGroup()
     {
         var store = new InMemoryMessageAggregateStore<string>();
@@ -47,10 +47,10 @@ public class InMemoryMessageAggregateStoreTests
         await store.AddAsync(env2);
         var group = await store.AddAsync(env3);
 
-        group.Should().HaveCount(3);
+        Assert.That(group, Has.Count.EqualTo(3));
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_DifferentCorrelationIds_AreSeparateGroups()
     {
         var store = new InMemoryMessageAggregateStore<string>();
@@ -60,27 +60,27 @@ public class InMemoryMessageAggregateStoreTests
         var group1 = await store.AddAsync(BuildEnvelope(corr1, "x"));
         var group2 = await store.AddAsync(BuildEnvelope(corr2, "y"));
 
-        group1.Should().HaveCount(1);
-        group2.Should().HaveCount(1);
-        group1[0].Payload.Should().Be("x");
-        group2[0].Payload.Should().Be("y");
+        Assert.That(group1, Has.Count.EqualTo(1));
+        Assert.That(group2, Has.Count.EqualTo(1));
+        Assert.That(group1[0].Payload, Is.EqualTo("x"));
+        Assert.That(group2[0].Payload, Is.EqualTo("y"));
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_NullEnvelope_ThrowsArgumentNullException()
     {
         var store = new InMemoryMessageAggregateStore<string>();
 
         var act = () => store.AddAsync(null!);
 
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        Assert.ThrowsAsync<ArgumentNullException>(async () => await act());
     }
 
     // ------------------------------------------------------------------ //
     // RemoveGroupAsync
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task RemoveGroupAsync_ClearsGroup_SubsequentAddStartsFresh()
     {
         var store = new InMemoryMessageAggregateStore<string>();
@@ -92,20 +92,20 @@ public class InMemoryMessageAggregateStoreTests
 
         // Adding again after removal should start a new group of size 1
         var group = await store.AddAsync(BuildEnvelope(correlationId, "c"));
-        group.Should().HaveCount(1);
+        Assert.That(group, Has.Count.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task RemoveGroupAsync_NonexistentCorrelationId_DoesNotThrow()
     {
         var store = new InMemoryMessageAggregateStore<string>();
 
         var act = () => store.RemoveGroupAsync(Guid.NewGuid());
 
-        await act.Should().NotThrowAsync();
+        Assert.DoesNotThrowAsync(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task RemoveGroupAsync_OnlyRemovesTargetGroup_LeavesOthersIntact()
     {
         var store = new InMemoryMessageAggregateStore<string>();
@@ -118,14 +118,14 @@ public class InMemoryMessageAggregateStoreTests
 
         // corr2 group should still exist and grow normally
         var group2 = await store.AddAsync(BuildEnvelope(corr2, "c"));
-        group2.Should().HaveCount(2);
+        Assert.That(group2, Has.Count.EqualTo(2));
     }
 
     // ------------------------------------------------------------------ //
     // Thread safety
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task AddAsync_ConcurrentAdds_SameCorrelationId_AllEnvelopesAreRecorded()
     {
         var store = new InMemoryMessageAggregateStore<string>();
@@ -140,6 +140,6 @@ public class InMemoryMessageAggregateStoreTests
 
         // One final add to read the group state
         var group = await store.AddAsync(BuildEnvelope(correlationId, "last"));
-        group.Should().HaveCount(count + 1);
+        Assert.That(group, Has.Count.EqualTo(count + 1));
     }
 }

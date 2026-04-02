@@ -1,21 +1,26 @@
 using EnterpriseIntegrationPlatform.Admin.Api.Services;
-using FluentAssertions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class PlatformStatusServiceTests
 {
-    private readonly HealthCheckService _healthCheckService =
-        Substitute.For<HealthCheckService>();
-    private readonly ILogger<PlatformStatusService> _logger =
-        Substitute.For<ILogger<PlatformStatusService>>();
+    private HealthCheckService _healthCheckService = null!;
+    private ILogger<PlatformStatusService> _logger = null!;
 
-    [Fact]
+    [SetUp]
+    public void SetUp()
+    {
+        _healthCheckService = Substitute.For<HealthCheckService>();
+        _logger = Substitute.For<ILogger<PlatformStatusService>>();
+    }
+
+    [Test]
     public async Task GetStatusAsync_WhenAllHealthy_ReturnsHealthyOverall()
     {
         var entries = new Dictionary<string, HealthReportEntry>
@@ -30,13 +35,13 @@ public class PlatformStatusServiceTests
 
         var result = await service.GetStatusAsync();
 
-        result.Overall.Should().Be("Healthy");
-        result.Components.Should().HaveCount(1);
-        result.Components[0].Name.Should().Be("self");
-        result.Components[0].Status.Should().Be("Healthy");
+        Assert.That(result.Overall, Is.EqualTo("Healthy"));
+        Assert.That(result.Components, Has.Count.EqualTo(1));
+        Assert.That(result.Components[0].Name, Is.EqualTo("self"));
+        Assert.That(result.Components[0].Status, Is.EqualTo("Healthy"));
     }
 
-    [Fact]
+    [Test]
     public async Task GetStatusAsync_WhenComponentUnhealthy_ReturnsUnhealthyOverall()
     {
         var entries = new Dictionary<string, HealthReportEntry>
@@ -51,11 +56,11 @@ public class PlatformStatusServiceTests
 
         var result = await service.GetStatusAsync();
 
-        result.Overall.Should().Be("Unhealthy");
-        result.Components[0].Description.Should().Be("Connection refused");
+        Assert.That(result.Overall, Is.EqualTo("Unhealthy"));
+        Assert.That(result.Components[0].Description, Is.EqualTo("Connection refused"));
     }
 
-    [Fact]
+    [Test]
     public async Task GetStatusAsync_WhenHealthCheckThrows_ReturnsUnhealthyGracefully()
     {
         _healthCheckService
@@ -65,11 +70,11 @@ public class PlatformStatusServiceTests
 
         var result = await service.GetStatusAsync();
 
-        result.Overall.Should().Be("Unhealthy");
-        result.Components.Should().BeEmpty();
+        Assert.That(result.Overall, Is.EqualTo("Unhealthy"));
+        Assert.That(result.Components, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task GetStatusAsync_AlwaysPopulatesCheckedAt()
     {
         var entries = new Dictionary<string, HealthReportEntry>();
@@ -83,10 +88,10 @@ public class PlatformStatusServiceTests
         var result = await service.GetStatusAsync();
         var after = DateTimeOffset.UtcNow;
 
-        result.CheckedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+        Assert.That(result.CheckedAt, Is.GreaterThanOrEqualTo(before).And.LessThanOrEqualTo(after));
     }
 
-    [Fact]
+    [Test]
     public async Task GetStatusAsync_PopulatesComponentDuration()
     {
         var duration = TimeSpan.FromMilliseconds(42);
@@ -102,6 +107,6 @@ public class PlatformStatusServiceTests
 
         var result = await service.GetStatusAsync();
 
-        result.Components[0].Duration.Should().Be(duration);
+        Assert.That(result.Components[0].Duration, Is.EqualTo(duration));
     }
 }

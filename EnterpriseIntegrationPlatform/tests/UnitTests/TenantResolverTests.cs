@@ -1,64 +1,70 @@
 using EnterpriseIntegrationPlatform.MultiTenancy;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class TenantResolverTests
 {
-    private readonly TenantResolver _resolver = new();
+    private TenantResolver _resolver = null!;
 
-    [Fact]
+    [SetUp]
+    public void SetUp()
+    {
+        _resolver = new();
+    }
+
+    [Test]
     public void Resolve_MetadataWithTenantId_ReturnsTenantContext()
     {
         var meta = new Dictionary<string, string> { [TenantResolver.TenantMetadataKey] = "tenant-abc" };
         var ctx = _resolver.Resolve(meta);
-        ctx.TenantId.Should().Be("tenant-abc");
-        ctx.IsResolved.Should().BeTrue();
+        Assert.That(ctx.TenantId, Is.EqualTo("tenant-abc"));
+        Assert.That(ctx.IsResolved, Is.True);
     }
 
-    [Fact]
+    [Test]
     public void Resolve_MetadataWithoutTenantId_ReturnsAnonymous()
     {
         var meta = new Dictionary<string, string> { ["other"] = "value" };
         var ctx = _resolver.Resolve(meta);
-        ctx.IsResolved.Should().BeFalse();
-        ctx.TenantId.Should().Be("anonymous");
+        Assert.That(ctx.IsResolved, Is.False);
+        Assert.That(ctx.TenantId, Is.EqualTo("anonymous"));
     }
 
-    [Fact]
+    [Test]
     public void Resolve_EmptyMetadata_ReturnsAnonymous()
     {
         var ctx = _resolver.Resolve(new Dictionary<string, string>());
-        ctx.IsResolved.Should().BeFalse();
+        Assert.That(ctx.IsResolved, Is.False);
     }
 
-    [Fact]
+    [Test]
     public void Resolve_NullMetadata_ThrowsArgumentNullException()
     {
         var act = () => _resolver.Resolve((IReadOnlyDictionary<string, string>)null!);
-        act.Should().Throw<ArgumentNullException>();
+        Assert.Throws<ArgumentNullException>(() => act());
     }
 
-    [Fact]
+    [Test]
     public void Resolve_String_WithTenantId_ReturnsTenantContext()
     {
         var ctx = _resolver.Resolve("tenant-xyz");
-        ctx.TenantId.Should().Be("tenant-xyz");
-        ctx.IsResolved.Should().BeTrue();
+        Assert.That(ctx.TenantId, Is.EqualTo("tenant-xyz"));
+        Assert.That(ctx.IsResolved, Is.True);
     }
 
-    [Fact]
+    [Test]
     public void Resolve_NullString_ReturnsAnonymous()
     {
         var ctx = _resolver.Resolve((string?)null);
-        ctx.IsResolved.Should().BeFalse();
+        Assert.That(ctx.IsResolved, Is.False);
     }
 
-    [Fact]
+    [Test]
     public void Resolve_WhitespaceString_ReturnsAnonymous()
     {
         var ctx = _resolver.Resolve("   ");
-        ctx.IsResolved.Should().BeFalse();
+        Assert.That(ctx.IsResolved, Is.False);
     }
 }

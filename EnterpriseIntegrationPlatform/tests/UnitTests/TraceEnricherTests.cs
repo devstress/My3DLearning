@@ -1,14 +1,14 @@
 using System.Diagnostics;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class TraceEnricherTests
 {
-    [Fact]
+    [Test]
     public void Enrich_SetsAllStandardTags()
     {
         using var listener = new ActivityListener
@@ -26,14 +26,14 @@ public class TraceEnricherTests
 
         TraceEnricher.Enrich(activity, envelope);
 
-        activity.GetTagItem(PlatformActivitySource.TagMessageId).Should().Be(envelope.MessageId.ToString());
-        activity.GetTagItem(PlatformActivitySource.TagCorrelationId).Should().Be(envelope.CorrelationId.ToString());
-        activity.GetTagItem(PlatformActivitySource.TagMessageType).Should().Be("TestMessage");
-        activity.GetTagItem(PlatformActivitySource.TagSource).Should().Be("TestService");
-        activity.GetTagItem(PlatformActivitySource.TagPriority).Should().Be("Normal");
+        Assert.That(activity.GetTagItem(PlatformActivitySource.TagMessageId), Is.EqualTo(envelope.MessageId.ToString()));
+        Assert.That(activity.GetTagItem(PlatformActivitySource.TagCorrelationId), Is.EqualTo(envelope.CorrelationId.ToString()));
+        Assert.That(activity.GetTagItem(PlatformActivitySource.TagMessageType), Is.EqualTo("TestMessage"));
+        Assert.That(activity.GetTagItem(PlatformActivitySource.TagSource), Is.EqualTo("TestService"));
+        Assert.That(activity.GetTagItem(PlatformActivitySource.TagPriority), Is.EqualTo("Normal"));
     }
 
-    [Fact]
+    [Test]
     public void SetDeliveryStatus_SetsTag()
     {
         using var listener = new ActivityListener
@@ -47,10 +47,10 @@ public class TraceEnricherTests
 
         TraceEnricher.SetDeliveryStatus(activity, DeliveryStatus.Delivered);
 
-        activity.GetTagItem(PlatformActivitySource.TagDeliveryStatus).Should().Be("Delivered");
+        Assert.That(activity.GetTagItem(PlatformActivitySource.TagDeliveryStatus), Is.EqualTo("Delivered"));
     }
 
-    [Fact]
+    [Test]
     public void RecordException_SetsErrorStatusAndAddsEvent()
     {
         using var listener = new ActivityListener
@@ -65,8 +65,8 @@ public class TraceEnricherTests
 
         TraceEnricher.RecordException(activity, ex);
 
-        activity.Status.Should().Be(ActivityStatusCode.Error);
-        activity.StatusDescription.Should().Be("something broke");
-        activity.Events.Should().ContainSingle(e => e.Name == "exception");
+        Assert.That(activity.Status, Is.EqualTo(ActivityStatusCode.Error));
+        Assert.That(activity.StatusDescription, Is.EqualTo("something broke"));
+        Assert.That(activity.Events.Count(e => e.Name == "exception"), Is.EqualTo(1));
     }
 }

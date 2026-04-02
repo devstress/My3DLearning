@@ -1,31 +1,30 @@
 using EnterpriseIntegrationPlatform.Ingestion;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class BrokerTypeTests
 {
-    [Fact]
+    [Test]
     public void BrokerType_HasExpectedValues()
     {
         // Assert
-        Enum.GetValues<BrokerType>().Should().HaveCount(3);
-        ((int)BrokerType.NatsJetStream).Should().Be(0);
-        ((int)BrokerType.Kafka).Should().Be(1);
-        ((int)BrokerType.Pulsar).Should().Be(2);
+        Assert.That(Enum.GetValues<BrokerType>().Length, Is.EqualTo(3));
+        Assert.That(((int)BrokerType.NatsJetStream), Is.EqualTo(0));
+        Assert.That(((int)BrokerType.Kafka), Is.EqualTo(1));
+        Assert.That(((int)BrokerType.Pulsar), Is.EqualTo(2));
     }
 
-    [Theory]
-    [InlineData("NatsJetStream", BrokerType.NatsJetStream)]
-    [InlineData("Kafka", BrokerType.Kafka)]
-    [InlineData("Pulsar", BrokerType.Pulsar)]
+    [TestCase("NatsJetStream", BrokerType.NatsJetStream)]
+    [TestCase("Kafka", BrokerType.Kafka)]
+    [TestCase("Pulsar", BrokerType.Pulsar)]
     public void BrokerType_ParsesFromString(string input, BrokerType expected)
     {
         // Act
         var parsed = Enum.Parse<BrokerType>(input);
 
         // Assert
-        parsed.Should().Be(expected);
+        Assert.That(parsed, Is.EqualTo(expected));
     }
 }

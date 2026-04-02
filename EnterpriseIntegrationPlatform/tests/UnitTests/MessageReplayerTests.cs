@@ -1,20 +1,21 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Replay;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class MessageReplayerTests
 {
-    private readonly IMessageReplayStore _store;
-    private readonly IMessageBrokerProducer _producer;
+    private IMessageReplayStore _store = null!;
+    private IMessageBrokerProducer _producer = null!;
 
-    public MessageReplayerTests()
+    [SetUp]
+    public void SetUp()
     {
         _store = Substitute.For<IMessageReplayStore>();
         _producer = Substitute.For<IMessageBrokerProducer>();
@@ -53,7 +54,7 @@ public class MessageReplayerTests
         }
     }
 
-    [Fact]
+    [Test]
     public async Task ReplayAsync_ValidMessages_RepublishesToTargetTopic()
     {
         var replayer = BuildReplayer();
@@ -65,10 +66,10 @@ public class MessageReplayerTests
 
         await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        capturedTopic.Should().Be("target.topic");
+        Assert.That(capturedTopic, Is.EqualTo("target.topic"));
     }
 
-    [Fact]
+    [Test]
     public async Task ReplayAsync_ReplayedEnvelope_GetsNewMessageId()
     {
         var replayer = BuildReplayer();
@@ -80,11 +81,11 @@ public class MessageReplayerTests
 
         await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        captured!.MessageId.Should().NotBe(envelope.MessageId);
-        captured!.MessageId.Should().NotBe(Guid.Empty);
+        Assert.That(captured!.MessageId, Is.Not.EqualTo(envelope.MessageId));
+        Assert.That(captured!.MessageId, Is.Not.EqualTo(Guid.Empty));
     }
 
-    [Fact]
+    [Test]
     public async Task ReplayAsync_ReplayedEnvelope_SetsCausationIdToOriginalMessageId()
     {
         var replayer = BuildReplayer();
@@ -96,10 +97,10 @@ public class MessageReplayerTests
 
         await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        captured!.CausationId.Should().Be(envelope.MessageId);
+        Assert.That(captured!.CausationId, Is.EqualTo(envelope.MessageId));
     }
 
-    [Fact]
+    [Test]
     public async Task ReplayAsync_ThreeMessages_ReturnsCorrectCount()
     {
         var replayer = BuildReplayer();
@@ -109,10 +110,10 @@ public class MessageReplayerTests
 
         var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        result.ReplayedCount.Should().Be(3);
+        Assert.That(result.ReplayedCount, Is.EqualTo(3));
     }
 
-    [Fact]
+    [Test]
     public async Task ReplayAsync_EmptyFilter_ReplaysAllMessages()
     {
         var replayer = BuildReplayer();
@@ -122,10 +123,10 @@ public class MessageReplayerTests
 
         var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        result.ReplayedCount.Should().Be(5);
+        Assert.That(result.ReplayedCount, Is.EqualTo(5));
     }
 
-    [Fact]
+    [Test]
     public async Task ReplayAsync_CorrelationIdFilter_PassesFilterToStore()
     {
         var replayer = BuildReplayer();
@@ -141,10 +142,10 @@ public class MessageReplayerTests
 
         await replayer.ReplayAsync(filter, CancellationToken.None);
 
-        capturedFilter!.CorrelationId.Should().Be(correlationId);
+        Assert.That(capturedFilter!.CorrelationId, Is.EqualTo(correlationId));
     }
 
-    [Fact]
+    [Test]
     public async Task ReplayAsync_NoMessagesMatchFilter_ReturnsZeroCount()
     {
         var replayer = BuildReplayer();
@@ -153,30 +154,30 @@ public class MessageReplayerTests
 
         var result = await replayer.ReplayAsync(new ReplayFilter { CorrelationId = Guid.NewGuid() }, CancellationToken.None);
 
-        result.ReplayedCount.Should().Be(0);
+        Assert.That(result.ReplayedCount, Is.EqualTo(0));
     }
 
-    [Fact]
+    [Test]
     public async Task ReplayAsync_EmptySourceTopic_ThrowsInvalidOperationException()
     {
         var replayer = BuildReplayer(new ReplayOptions { SourceTopic = "", TargetTopic = "target" });
 
         var act = async () => await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task ReplayAsync_EmptyTargetTopic_ThrowsInvalidOperationException()
     {
         var replayer = BuildReplayer(new ReplayOptions { SourceTopic = "source", TargetTopic = "" });
 
         var act = async () => await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task ReplayAsync_PublishesEnvelope_EnvelopeIsPublished()
     {
         var replayer = BuildReplayer();

@@ -1,17 +1,23 @@
 using EnterpriseIntegrationPlatform.Connector.Email;
 using EnterpriseIntegrationPlatform.Contracts;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using MimeKit;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class EmailConnectorTests
 {
-    private readonly ISmtpClientWrapper _smtpClient = Substitute.For<ISmtpClientWrapper>();
+    private ISmtpClientWrapper _smtpClient = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _smtpClient = Substitute.For<ISmtpClientWrapper>();
+    }
 
     private EmailConnector BuildConnector(EmailConnectorOptions? options = null) =>
         new EmailConnector(
@@ -31,7 +37,7 @@ public class EmailConnectorTests
     private static IntegrationEnvelope<string> BuildEnvelope(string payload = "test") =>
         IntegrationEnvelope<string>.Create(payload, "TestService", "OrderPlaced");
 
-    [Fact]
+    [Test]
     public async Task SendAsync_ValidEnvelope_SendsToCorrectToAddress()
     {
         var connector = BuildConnector();
@@ -40,10 +46,10 @@ public class EmailConnectorTests
 
         await connector.SendAsync(BuildEnvelope(), "recipient@example.com", null, p => p, CancellationToken.None);
 
-        captured!.To.Mailboxes.Should().ContainSingle(m => m.Address == "recipient@example.com");
+        Assert.That(captured!.To.Mailboxes.Count(m => m.Address == "recipient@example.com"), Is.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task SendAsync_ValidEnvelope_SendsFromDefaultFrom()
     {
         var connector = BuildConnector();
@@ -52,10 +58,10 @@ public class EmailConnectorTests
 
         await connector.SendAsync(BuildEnvelope(), "recipient@example.com", null, p => p, CancellationToken.None);
 
-        captured!.From.Mailboxes.Should().ContainSingle(m => m.Address == "sender@example.com");
+        Assert.That(captured!.From.Mailboxes.Count(m => m.Address == "sender@example.com"), Is.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task SendAsync_NoSubject_UsesDefaultSubjectTemplate()
     {
         var connector = BuildConnector();
@@ -64,10 +70,10 @@ public class EmailConnectorTests
 
         await connector.SendAsync(BuildEnvelope(), "recipient@example.com", null, p => p, CancellationToken.None);
 
-        captured!.Subject.Should().Be("OrderPlaced notification");
+        Assert.That(captured!.Subject, Is.EqualTo("OrderPlaced notification"));
     }
 
-    [Fact]
+    [Test]
     public async Task SendAsync_CustomSubject_UsesCustomSubject()
     {
         var connector = BuildConnector();
@@ -76,10 +82,10 @@ public class EmailConnectorTests
 
         await connector.SendAsync(BuildEnvelope(), "recipient@example.com", "My Custom Subject", p => p, CancellationToken.None);
 
-        captured!.Subject.Should().Be("My Custom Subject");
+        Assert.That(captured!.Subject, Is.EqualTo("My Custom Subject"));
     }
 
-    [Fact]
+    [Test]
     public async Task SendAsync_ValidEnvelope_BodyBuiltFromPayload()
     {
         var connector = BuildConnector();
@@ -89,10 +95,10 @@ public class EmailConnectorTests
         await connector.SendAsync(BuildEnvelope("payload-value"), "r@example.com", null,
             p => $"Body: {p}", CancellationToken.None);
 
-        captured!.TextBody.Should().Be("Body: payload-value");
+        Assert.That(captured!.TextBody, Is.EqualTo("Body: payload-value"));
     }
 
-    [Fact]
+    [Test]
     public async Task SendAsync_ValidEnvelope_IncludesCorrelationHeader()
     {
         var connector = BuildConnector();
@@ -102,10 +108,10 @@ public class EmailConnectorTests
 
         await connector.SendAsync(envelope, "r@example.com", null, p => p, CancellationToken.None);
 
-        captured!.Headers["X-Correlation-Id"].Should().Be(envelope.CorrelationId.ToString());
+        Assert.That(captured!.Headers["X-Correlation-Id"], Is.EqualTo(envelope.CorrelationId.ToString()));
     }
 
-    [Fact]
+    [Test]
     public async Task SendAsync_ValidEnvelope_ConnectsBeforeSend()
     {
         var connector = BuildConnector();
@@ -117,10 +123,10 @@ public class EmailConnectorTests
 
         await connector.SendAsync(BuildEnvelope(), "r@example.com", null, p => p, CancellationToken.None);
 
-        order.IndexOf("Connect").Should().BeLessThan(order.IndexOf("Send"));
+        Assert.That(order.IndexOf("Connect"), Is.LessThan(order.IndexOf("Send")));
     }
 
-    [Fact]
+    [Test]
     public async Task SendAsync_ValidEnvelope_DisconnectsAfterSend()
     {
         var connector = BuildConnector();
@@ -130,11 +136,11 @@ public class EmailConnectorTests
         var act = async () =>
             await connector.SendAsync(BuildEnvelope(), "r@example.com", null, p => p, CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await act());
         await _smtpClient.Received(1).DisconnectAsync(true, Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task SendAsync_NullEnvelope_ThrowsArgumentNullException()
     {
         var connector = BuildConnector();
@@ -142,10 +148,10 @@ public class EmailConnectorTests
         var act = async () =>
             await connector.SendAsync<string>(null!, "r@example.com", null, p => p, CancellationToken.None);
 
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        Assert.ThrowsAsync<ArgumentNullException>(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task SendAsync_EmptyToAddresses_ThrowsArgumentException()
     {
         var connector = BuildConnector();
@@ -153,6 +159,6 @@ public class EmailConnectorTests
         var act = async () =>
             await connector.SendAsync(BuildEnvelope(), Array.Empty<string>(), null, p => p, CancellationToken.None);
 
-        await act.Should().ThrowAsync<ArgumentException>();
+        Assert.ThrowsAsync<ArgumentException>(async () => await act());
     }
 }

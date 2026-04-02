@@ -1,40 +1,40 @@
 using EnterpriseIntegrationPlatform.Processing.DeadLetter;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class DeadLetterOptionsTests
 {
-    [Fact]
+    [Test]
     public void MaxRetryAttempts_Default_IsThree()
     {
         var options = new DeadLetterOptions();
-        options.MaxRetryAttempts.Should().Be(3);
+        Assert.That(options.MaxRetryAttempts, Is.EqualTo(3));
     }
 
-    [Fact]
+    [Test]
     public void MessageType_Default_IsDeadLetter()
     {
         var options = new DeadLetterOptions();
-        options.MessageType.Should().Be("DeadLetter");
+        Assert.That(options.MessageType, Is.EqualTo("DeadLetter"));
     }
 
-    [Fact]
+    [Test]
     public void DeadLetterTopic_Default_IsEmptyString()
     {
         var options = new DeadLetterOptions();
-        options.DeadLetterTopic.Should().BeEmpty();
+        Assert.That(options.DeadLetterTopic, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public void Source_Default_IsNull()
     {
         var options = new DeadLetterOptions();
-        options.Source.Should().BeNull();
+        Assert.That(options.Source, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void Properties_SetValues_ReturnCorrectValues()
     {
         var options = new DeadLetterOptions
@@ -45,9 +45,9 @@ public class DeadLetterOptionsTests
             MessageType = "CustomDeadLetter"
         };
 
-        options.DeadLetterTopic.Should().Be("dlq.orders");
-        options.MaxRetryAttempts.Should().Be(5);
-        options.Source.Should().Be("OrderService");
-        options.MessageType.Should().Be("CustomDeadLetter");
+        Assert.That(options.DeadLetterTopic, Is.EqualTo("dlq.orders"));
+        Assert.That(options.MaxRetryAttempts, Is.EqualTo(5));
+        Assert.That(options.Source, Is.EqualTo("OrderService"));
+        Assert.That(options.MessageType, Is.EqualTo("CustomDeadLetter"));
     }
 }

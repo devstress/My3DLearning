@@ -1,10 +1,10 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Replay;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class InMemoryMessageReplayStoreTests
 {
     private static IntegrationEnvelope<string> BuildEnvelope(
@@ -19,7 +19,7 @@ public class InMemoryMessageReplayStoreTests
         return env;
     }
 
-    [Fact]
+    [Test]
     public async Task StoreForReplayAsync_StoreAndRetrieve_ReturnsStoredEnvelope()
     {
         var store = new InMemoryMessageReplayStore();
@@ -30,11 +30,11 @@ public class InMemoryMessageReplayStoreTests
         await foreach (var e in store.GetMessagesForReplayAsync("topic1", new ReplayFilter(), 100, CancellationToken.None))
             results.Add(e);
 
-        results.Should().HaveCount(1);
-        results[0].MessageId.Should().Be(envelope.MessageId);
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].MessageId, Is.EqualTo(envelope.MessageId));
     }
 
-    [Fact]
+    [Test]
     public async Task GetMessagesForReplayAsync_FilterByCorrelationId_ReturnsMatchingOnly()
     {
         var store = new InMemoryMessageReplayStore();
@@ -48,11 +48,11 @@ public class InMemoryMessageReplayStoreTests
         await foreach (var e in store.GetMessagesForReplayAsync("topic", new ReplayFilter { CorrelationId = correlationId }, 100, CancellationToken.None))
             results.Add(e);
 
-        results.Should().HaveCount(1);
-        results[0].CorrelationId.Should().Be(correlationId);
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].CorrelationId, Is.EqualTo(correlationId));
     }
 
-    [Fact]
+    [Test]
     public async Task GetMessagesForReplayAsync_FilterByMessageType_ReturnsMatchingOnly()
     {
         var store = new InMemoryMessageReplayStore();
@@ -65,11 +65,11 @@ public class InMemoryMessageReplayStoreTests
         await foreach (var e in store.GetMessagesForReplayAsync("topic", new ReplayFilter { MessageType = "TypeA" }, 100, CancellationToken.None))
             results.Add(e);
 
-        results.Should().HaveCount(1);
-        results[0].MessageType.Should().Be("TypeA");
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].MessageType, Is.EqualTo("TypeA"));
     }
 
-    [Fact]
+    [Test]
     public async Task GetMessagesForReplayAsync_FilterByTimestampRange_ReturnsMatchingOnly()
     {
         var store = new InMemoryMessageReplayStore();
@@ -85,10 +85,10 @@ public class InMemoryMessageReplayStoreTests
         await foreach (var e in store.GetMessagesForReplayAsync("topic", filter, 100, CancellationToken.None))
             results.Add(e);
 
-        results.Should().HaveCount(1);
+        Assert.That(results, Has.Count.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task GetMessagesForReplayAsync_MaxMessagesRespected_ReturnsOnlyMaxCount()
     {
         var store = new InMemoryMessageReplayStore();
@@ -99,10 +99,10 @@ public class InMemoryMessageReplayStoreTests
         await foreach (var e in store.GetMessagesForReplayAsync("topic", new ReplayFilter(), 3, CancellationToken.None))
             results.Add(e);
 
-        results.Should().HaveCount(3);
+        Assert.That(results, Has.Count.EqualTo(3));
     }
 
-    [Fact]
+    [Test]
     public async Task GetMessagesForReplayAsync_EmptyStore_ReturnsNothing()
     {
         var store = new InMemoryMessageReplayStore();
@@ -110,10 +110,10 @@ public class InMemoryMessageReplayStoreTests
         await foreach (var e in store.GetMessagesForReplayAsync("nonexistent", new ReplayFilter(), 100, CancellationToken.None))
             results.Add(e);
 
-        results.Should().BeEmpty();
+        Assert.That(results, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task GetMessagesForReplayAsync_MultipleTopics_TopicsAreIsolated()
     {
         var store = new InMemoryMessageReplayStore();
@@ -124,15 +124,15 @@ public class InMemoryMessageReplayStoreTests
         await foreach (var e in store.GetMessagesForReplayAsync("topicA", new ReplayFilter(), 100, CancellationToken.None))
             resultsA.Add(e);
 
-        resultsA.Should().HaveCount(1);
+        Assert.That(resultsA, Has.Count.EqualTo(1));
         var resultsB = new List<IntegrationEnvelope<object>>();
         await foreach (var e in store.GetMessagesForReplayAsync("topicB", new ReplayFilter(), 100, CancellationToken.None))
             resultsB.Add(e);
 
-        resultsB.Should().HaveCount(1);
+        Assert.That(resultsB, Has.Count.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task StoreForReplayAsync_ThreadSafety_Stores100ItemsConcurrently()
     {
         var store = new InMemoryMessageReplayStore();
@@ -145,6 +145,6 @@ public class InMemoryMessageReplayStoreTests
         await foreach (var e in store.GetMessagesForReplayAsync("topic", new ReplayFilter(), 200, CancellationToken.None))
             results.Add(e);
 
-        results.Should().HaveCount(100);
+        Assert.That(results, Has.Count.EqualTo(100));
     }
 }

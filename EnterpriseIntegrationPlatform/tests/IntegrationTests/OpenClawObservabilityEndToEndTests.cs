@@ -1,14 +1,11 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Integration;
 
@@ -24,13 +21,11 @@ namespace EnterpriseIntegrationPlatform.Tests.Integration;
 /// Tests are skipped when Docker is not available.
 /// </para>
 /// </summary>
-public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
+[TestFixture]
+public class OpenClawObservabilityEndToEndTests
 {
-    private IContainer? _lokiContainer;
     private WebApplicationFactory<Program>? _factory;
     private HttpClient? _client;
-    private bool _dockerAvailable;
-    private string _lokiBaseUrl = "";
     private readonly ITraceAnalyzer _traceAnalyzer = Substitute.For<ITraceAnalyzer>();
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -38,61 +33,49 @@ public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
         PropertyNameCaseInsensitive = true,
     };
 
-    public async Task InitializeAsync()
+    [OneTimeSetUp]
+    public void OneTimeSetUp()
     {
-        try
-        {
-            _lokiContainer = new ContainerBuilder()
-                .WithImage("grafana/loki:3.4.2")
-                .WithPortBinding(3100, true)
-                .WithWaitStrategy(Wait.ForUnixContainer()
-                    .UntilHttpRequestIsSucceeded(r => r.ForPort(3100).ForPath("/ready")))
-                .Build();
+        if (!SharedLokiFixture.DockerAvailable) return;
 
-            await _lokiContainer.StartAsync();
-            _dockerAvailable = true;
+        _factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("Loki:BaseAddress", SharedLokiFixture.LokiBaseUrl);
 
-            var host = _lokiContainer.Hostname;
-            var port = _lokiContainer.GetMappedPublicPort(3100);
-            _lokiBaseUrl = $"http://{host}:{port}";
-
-            _factory = new WebApplicationFactory<Program>()
-                .WithWebHostBuilder(builder =>
+                builder.ConfigureServices(services =>
                 {
-                    builder.UseSetting("Loki:BaseAddress", _lokiBaseUrl);
-
-                    builder.ConfigureServices(services =>
-                    {
-                        // Replace ITraceAnalyzer with a mock to simulate AI responses
-                        var existing = services.FirstOrDefault(
-                            d => d.ServiceType == typeof(ITraceAnalyzer));
-                        if (existing is not null) services.Remove(existing);
-                        services.AddSingleton(_traceAnalyzer);
-                    });
+                    // Replace ITraceAnalyzer with a mock to simulate AI responses
+                    var existing = services.FirstOrDefault(
+                        d => d.ServiceType == typeof(ITraceAnalyzer));
+                    if (existing is not null) services.Remove(existing);
+                    services.AddSingleton(_traceAnalyzer);
                 });
+            });
 
-            _client = _factory.CreateClient();
-        }
-        catch (Exception)
-        {
-            _dockerAvailable = false;
-        }
+        _client = _factory.CreateClient();
     }
 
-    public async Task DisposeAsync()
+    [OneTimeTearDown]
+    public void OneTimeTearDown()
     {
         _client?.Dispose();
         _factory?.Dispose();
-        if (_lokiContainer is not null)
-        {
-            await _lokiContainer.DisposeAsync();
-        }
     }
 
-    private bool SkipIfNoDocker() => !_dockerAvailable;
+    private bool SkipIfNoDocker() => !SharedLokiFixture.DockerAvailable;
 
-    /// <summary>Wait for Loki's eventual-consistency write path.</summary>
-    private static async Task WaitForLokiIndex() => await Task.Delay(2000);
+    private LokiObservabilityEventLog CreateDirectLokiLog()
+    {
+        var httpClient = new HttpClient
+        {
+            BaseAddress = new Uri(SharedLokiFixture.LokiBaseUrl + "/"),
+            Timeout = TimeSpan.FromSeconds(30),
+        };
+        return new LokiObservabilityEventLog(
+            httpClient,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<LokiObservabilityEventLog>.Instance);
+    }
 
     private static IntegrationEnvelope<string> CreateEnvelope(string messageType = "OrderShipment")
     {
@@ -102,7 +85,7 @@ public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
             messageType: messageType);
     }
 
-    [Fact]
+    [Test]
     public async Task OpenClaw_InspectBusinessKey_AI_FindsDeliveredMessage()
     {
         if (SkipIfNoDocker()) return;
@@ -120,7 +103,10 @@ public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
         await recorder.RecordProcessingAsync(envelope, MessageTracer.StageTransformation, businessKey);
         await recorder.RecordDeliveredAsync(envelope, activity: null, durationMs: 123.4, businessKey);
 
-        await WaitForLokiIndex();
+        // Poll via the app's own Loki log to confirm indexing
+        var directLog = CreateDirectLokiLog();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await directLog.GetByCorrelationIdAsync(correlationId)).Count, 4);
 
         // ── Arrange: configure AI mock ───────────────────────────────────────
         _traceAnalyzer
@@ -136,26 +122,26 @@ public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
         var response = await _client!.GetAsync($"/api/inspect/business/{businessKey}");
 
         // ── Assert: HTTP response is successful ──────────────────────────────
-        response.IsSuccessStatusCode.Should().BeTrue(
+        Assert.That(response.IsSuccessStatusCode, Is.True,
             $"OpenClaw API should return success for business key '{businessKey}'");
 
         var json = await response.Content.ReadAsStringAsync();
         var result = JsonSerializer.Deserialize<InspectionResultDto>(json, JsonOptions);
 
-        result.Should().NotBeNull();
-        result!.Found.Should().BeTrue("the message lifecycle was recorded in Loki");
-        result.LatestStatus.Should().Be(DeliveryStatus.Delivered);
-        result.LatestStage.Should().Be(MessageTracer.StageDelivery);
-        result.Events.Should().HaveCount(4);
-        result.OllamaAvailable.Should().BeTrue();
-        result.Summary.Should().Contain("delivered");
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Found, Is.True, "the message lifecycle was recorded in Loki");
+        Assert.That(result.LatestStatus, Is.EqualTo(DeliveryStatus.Delivered));
+        Assert.That(result.LatestStage, Is.EqualTo(MessageTracer.StageDelivery));
+        Assert.That(result.Events, Has.Count.EqualTo(4));
+        Assert.That(result.OllamaAvailable, Is.True);
+        Assert.That(result.Summary, Does.Contain("delivered"));
 
         // Verify AI was called with the correct correlation ID
         await _traceAnalyzer.Received(1)
             .WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [Test]
     public async Task OpenClaw_InspectCorrelationId_AI_FindsDeliveredMessage()
     {
         if (SkipIfNoDocker()) return;
@@ -172,7 +158,10 @@ public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
         await recorder.RecordProcessingAsync(envelope, MessageTracer.StageRouting, businessKey);
         await recorder.RecordDeliveredAsync(envelope, activity: null, durationMs: 75.0, businessKey);
 
-        await WaitForLokiIndex();
+        // Poll via direct Loki log to confirm indexing
+        var directLog = CreateDirectLokiLog();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await directLog.GetByCorrelationIdAsync(correlationId)).Count, 3);
 
         // ── Arrange: configure AI mock ───────────────────────────────────────
         _traceAnalyzer
@@ -183,17 +172,17 @@ public class OpenClawObservabilityEndToEndTests : IAsyncLifetime
         var response = await _client!.GetAsync($"/api/inspect/correlation/{correlationId}");
 
         // ── Assert ───────────────────────────────────────────────────────────
-        response.IsSuccessStatusCode.Should().BeTrue();
+        Assert.That(response.IsSuccessStatusCode, Is.True);
 
         var json = await response.Content.ReadAsStringAsync();
         var result = JsonSerializer.Deserialize<InspectionResultDto>(json, JsonOptions);
 
-        result.Should().NotBeNull();
-        result!.Found.Should().BeTrue();
-        result.LatestStatus.Should().Be(DeliveryStatus.Delivered);
-        result.LatestStage.Should().Be(MessageTracer.StageDelivery);
-        result.Events.Should().HaveCount(3);
-        result.Summary.Should().Contain("delivered");
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Found, Is.True);
+        Assert.That(result.LatestStatus, Is.EqualTo(DeliveryStatus.Delivered));
+        Assert.That(result.LatestStage, Is.EqualTo(MessageTracer.StageDelivery));
+        Assert.That(result.Events, Has.Count.EqualTo(3));
+        Assert.That(result.Summary, Does.Contain("delivered"));
     }
 
     /// <summary>

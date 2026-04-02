@@ -1,122 +1,122 @@
 using EnterpriseIntegrationPlatform.Contracts;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Contract;
 
+[TestFixture]
 public class IntegrationEnvelopeTests
 {
     // ── Create factory ────────────────────────────────────────────────────────
 
-    [Fact]
+    [Test]
     public void Create_SetsNewMessageId()
     {
         var envelope = IntegrationEnvelope<string>.Create("payload", "svc", "TestEvent");
 
-        envelope.MessageId.Should().NotBe(Guid.Empty);
+        Assert.That(envelope.MessageId, Is.Not.EqualTo(Guid.Empty));
     }
 
-    [Fact]
+    [Test]
     public void Create_GeneratesNewCorrelationIdWhenNotSupplied()
     {
         var envelope = IntegrationEnvelope<string>.Create("payload", "svc", "TestEvent");
 
-        envelope.CorrelationId.Should().NotBe(Guid.Empty);
+        Assert.That(envelope.CorrelationId, Is.Not.EqualTo(Guid.Empty));
     }
 
-    [Fact]
+    [Test]
     public void Create_UsesProvidedCorrelationId()
     {
         var correlationId = Guid.NewGuid();
 
         var envelope = IntegrationEnvelope<string>.Create("payload", "svc", "TestEvent", correlationId: correlationId);
 
-        envelope.CorrelationId.Should().Be(correlationId);
+        Assert.That(envelope.CorrelationId, Is.EqualTo(correlationId));
     }
 
-    [Fact]
+    [Test]
     public void Create_SetsCausationId_WhenProvided()
     {
         var causationId = Guid.NewGuid();
 
         var envelope = IntegrationEnvelope<string>.Create("payload", "svc", "TestEvent", causationId: causationId);
 
-        envelope.CausationId.Should().Be(causationId);
+        Assert.That(envelope.CausationId, Is.EqualTo(causationId));
     }
 
-    [Fact]
+    [Test]
     public void Create_LeavesNullCausationId_WhenNotProvided()
     {
         var envelope = IntegrationEnvelope<string>.Create("payload", "svc", "TestEvent");
 
-        envelope.CausationId.Should().BeNull();
+        Assert.That(envelope.CausationId, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void Create_SetsTimestampToUtcNow()
     {
         var before = DateTimeOffset.UtcNow;
         var envelope = IntegrationEnvelope<string>.Create("payload", "svc", "TestEvent");
         var after = DateTimeOffset.UtcNow;
 
-        envelope.Timestamp.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+        Assert.That(envelope.Timestamp, Is.GreaterThanOrEqualTo(before).And.LessThanOrEqualTo(after));
     }
 
-    [Fact]
+    [Test]
     public void Create_SetsSourceAndMessageType()
     {
         var envelope = IntegrationEnvelope<string>.Create("payload", "gateway-api", "OrderCreated");
 
-        envelope.Source.Should().Be("gateway-api");
-        envelope.MessageType.Should().Be("OrderCreated");
+        Assert.That(envelope.Source, Is.EqualTo("gateway-api"));
+        Assert.That(envelope.MessageType, Is.EqualTo("OrderCreated"));
     }
 
-    [Fact]
+    [Test]
     public void Create_DefaultsSchemaVersionToOnePointZero()
     {
         var envelope = IntegrationEnvelope<string>.Create("payload", "svc", "TestEvent");
 
-        envelope.SchemaVersion.Should().Be("1.0");
+        Assert.That(envelope.SchemaVersion, Is.EqualTo("1.0"));
     }
 
-    [Fact]
+    [Test]
     public void Create_DefaultsPriorityToNormal()
     {
         var envelope = IntegrationEnvelope<string>.Create("payload", "svc", "TestEvent");
 
-        envelope.Priority.Should().Be(MessagePriority.Normal);
+        Assert.That(envelope.Priority, Is.EqualTo(MessagePriority.Normal));
     }
 
-    [Fact]
+    [Test]
     public void Create_SetsPayload()
     {
         var envelope = IntegrationEnvelope<int>.Create(42, "svc", "TestEvent");
 
-        envelope.Payload.Should().Be(42);
+        Assert.That(envelope.Payload, Is.EqualTo(42));
     }
 
-    [Fact]
+    [Test]
     public void Create_InitialisesEmptyMetadata()
     {
         var envelope = IntegrationEnvelope<string>.Create("payload", "svc", "TestEvent");
 
-        envelope.Metadata.Should().BeEmpty();
+        Assert.That(envelope.Metadata, Is.Empty);
     }
 
     // ── Two calls produce different MessageIds ────────────────────────────────
 
-    [Fact]
+    [Test]
     public void Create_TwoCallsProduce_DifferentMessageIds()
     {
         var first = IntegrationEnvelope<string>.Create("x", "svc", "Ev");
         var second = IntegrationEnvelope<string>.Create("x", "svc", "Ev");
 
-        first.MessageId.Should().NotBe(second.MessageId);
+        Assert.That(first.MessageId, Is.Not.EqualTo(second.MessageId));
     }
 
     // ── Record equality ───────────────────────────────────────────────────────
 
-    [Fact]
+    [Test]
     public void Envelope_WithSameValues_AreEqual()
     {
         var id = Guid.NewGuid();
@@ -135,6 +135,6 @@ public class IntegrationEnvelopeTests
 
         var b = a with { };
 
-        a.Should().Be(b);
+        Assert.That(a, Is.EqualTo(b));
     }
 }

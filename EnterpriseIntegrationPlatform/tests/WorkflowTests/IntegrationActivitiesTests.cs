@@ -1,24 +1,27 @@
-using FluentAssertions;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Workflow.Temporal.Activities;
 
 namespace EnterpriseIntegrationPlatform.Tests.Workflow;
 
+[TestFixture]
 public class IntegrationActivitiesTests
 {
-    private readonly IMessageValidationService _validation = Substitute.For<IMessageValidationService>();
-    private readonly IMessageLoggingService _logging = Substitute.For<IMessageLoggingService>();
-    private readonly IntegrationActivities _sut;
+    private IMessageValidationService _validation = null!;
+    private IMessageLoggingService _logging = null!;
+    private IntegrationActivities _sut = null!;
 
-    public IntegrationActivitiesTests()
+    [SetUp]
+    public void SetUp()
     {
+        _validation = Substitute.For<IMessageValidationService>();
+        _logging = Substitute.For<IMessageLoggingService>();
         _sut = new IntegrationActivities(_validation, _logging);
     }
 
-    [Fact]
+    [Test]
     public async Task ValidateMessageAsync_DelegatesToValidationService()
     {
         _validation.ValidateAsync("OrderCreated", """{"id":1}""")
@@ -26,11 +29,11 @@ public class IntegrationActivitiesTests
 
         var result = await _sut.ValidateMessageAsync("OrderCreated", """{"id":1}""");
 
-        result.IsValid.Should().BeTrue();
+        Assert.That(result.IsValid, Is.True);
         await _validation.Received(1).ValidateAsync("OrderCreated", """{"id":1}""");
     }
 
-    [Fact]
+    [Test]
     public async Task ValidateMessageAsync_WhenServiceReturnsFailure_PropagatesResult()
     {
         _validation.ValidateAsync("Bad", "x")
@@ -38,11 +41,11 @@ public class IntegrationActivitiesTests
 
         var result = await _sut.ValidateMessageAsync("Bad", "x");
 
-        result.IsValid.Should().BeFalse();
-        result.Reason.Should().Be("invalid");
+        Assert.That(result.IsValid, Is.False);
+        Assert.That(result.Reason, Is.EqualTo("invalid"));
     }
 
-    [Fact]
+    [Test]
     public async Task LogProcessingStageAsync_DelegatesToLoggingService()
     {
         var id = Guid.NewGuid();

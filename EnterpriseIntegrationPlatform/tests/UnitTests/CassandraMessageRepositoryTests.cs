@@ -1,27 +1,38 @@
 using Cassandra;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class CassandraMessageRepositoryTests
 {
-    private readonly ICassandraSessionFactory _sessionFactory = Substitute.For<ICassandraSessionFactory>();
-    private readonly ISession _session = Substitute.For<ISession>();
-    private readonly ILogger<CassandraMessageRepository> _logger = Substitute.For<ILogger<CassandraMessageRepository>>();
-    private readonly CassandraMessageRepository _repository;
+    private ICassandraSessionFactory _sessionFactory = null!;
+    private ISession _session = null!;
+    private ILogger<CassandraMessageRepository> _logger = null!;
+    private CassandraMessageRepository _repository = null!;
 
-    public CassandraMessageRepositoryTests()
+    [SetUp]
+    public void SetUp()
     {
+        _sessionFactory = Substitute.For<ICassandraSessionFactory>();
+        _session = Substitute.For<ISession>();
+        _logger = Substitute.For<ILogger<CassandraMessageRepository>>();
         _sessionFactory.GetSessionAsync(Arg.Any<CancellationToken>()).Returns(_session);
         _repository = new CassandraMessageRepository(_sessionFactory, _logger);
     }
 
-    [Fact]
+    [TearDown]
+    public void TearDown()
+    {
+        (_session as IDisposable)?.Dispose();
+        (_sessionFactory as IDisposable)?.Dispose();
+    }
+
+    [Test]
     public async Task SaveMessageAsync_ExecutesBatch()
     {
         // Arrange
@@ -36,7 +47,7 @@ public class CassandraMessageRepositoryTests
         await _session.Received(1).ExecuteAsync(Arg.Any<BatchStatement>());
     }
 
-    [Fact]
+    [Test]
     public async Task SaveFaultAsync_ExecutesStatement()
     {
         // Arrange
@@ -51,7 +62,7 @@ public class CassandraMessageRepositoryTests
         await _session.Received(1).ExecuteAsync(Arg.Any<SimpleStatement>());
     }
 
-    [Fact]
+    [Test]
     public async Task GetByCorrelationIdAsync_ReturnsEmptyList_WhenNoResults()
     {
         // Arrange
@@ -63,10 +74,10 @@ public class CassandraMessageRepositoryTests
         var result = await _repository.GetByCorrelationIdAsync(Guid.NewGuid());
 
         // Assert
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task GetByMessageIdAsync_ReturnsNull_WhenNotFound()
     {
         // Arrange
@@ -78,10 +89,10 @@ public class CassandraMessageRepositoryTests
         var result = await _repository.GetByMessageIdAsync(Guid.NewGuid());
 
         // Assert
-        result.Should().BeNull();
+        Assert.That(result, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task GetFaultsByCorrelationIdAsync_ReturnsEmptyList_WhenNoResults()
     {
         // Arrange
@@ -93,10 +104,10 @@ public class CassandraMessageRepositoryTests
         var result = await _repository.GetFaultsByCorrelationIdAsync(Guid.NewGuid());
 
         // Assert
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateDeliveryStatusAsync_ExecutesBatch()
     {
         // Arrange
@@ -111,7 +122,7 @@ public class CassandraMessageRepositoryTests
         await _session.Received(1).ExecuteAsync(Arg.Any<BatchStatement>());
     }
 
-    [Fact]
+    [Test]
     public async Task SaveMessageAsync_ObtainsSessionFromFactory()
     {
         // Arrange

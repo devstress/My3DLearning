@@ -1,26 +1,35 @@
 using Cassandra;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
-using FluentAssertions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class CassandraHealthCheckTests
 {
-    private readonly ICassandraSessionFactory _sessionFactory = Substitute.For<ICassandraSessionFactory>();
-    private readonly ILogger<CassandraHealthCheck> _logger = Substitute.For<ILogger<CassandraHealthCheck>>();
-    private readonly CassandraHealthCheck _healthCheck;
+    private ICassandraSessionFactory _sessionFactory = null!;
+    private ILogger<CassandraHealthCheck> _logger = null!;
+    private CassandraHealthCheck _healthCheck = null!;
 
-    public CassandraHealthCheckTests()
+    [SetUp]
+    public void SetUp()
     {
+        _sessionFactory = Substitute.For<ICassandraSessionFactory>();
+        _logger = Substitute.For<ILogger<CassandraHealthCheck>>();
         _healthCheck = new CassandraHealthCheck(_sessionFactory, _logger);
     }
 
-    [Fact]
+    [TearDown]
+    public void TearDown()
+    {
+        (_sessionFactory as IDisposable)?.Dispose();
+    }
+
+    [Test]
     public async Task CheckHealthAsync_ReturnsHealthy_WhenCassandraIsReachable()
     {
         // Arrange
@@ -38,11 +47,11 @@ public class CassandraHealthCheckTests
         var result = await _healthCheck.CheckHealthAsync(new HealthCheckContext());
 
         // Assert
-        result.Status.Should().Be(HealthStatus.Healthy);
-        result.Description.Should().Contain("5.0");
+        Assert.That(result.Status, Is.EqualTo(HealthStatus.Healthy));
+        Assert.That(result.Description, Does.Contain("5.0"));
     }
 
-    [Fact]
+    [Test]
     public async Task CheckHealthAsync_ReturnsUnhealthy_WhenCassandraIsNotReachable()
     {
         // Arrange
@@ -53,11 +62,11 @@ public class CassandraHealthCheckTests
         var result = await _healthCheck.CheckHealthAsync(new HealthCheckContext());
 
         // Assert
-        result.Status.Should().Be(HealthStatus.Unhealthy);
-        result.Description.Should().Contain("not reachable");
+        Assert.That(result.Status, Is.EqualTo(HealthStatus.Unhealthy));
+        Assert.That(result.Description, Does.Contain("not reachable"));
     }
 
-    [Fact]
+    [Test]
     public async Task CheckHealthAsync_ReturnsUnhealthy_WhenSessionThrows()
     {
         // Arrange
@@ -68,7 +77,7 @@ public class CassandraHealthCheckTests
         var result = await _healthCheck.CheckHealthAsync(new HealthCheckContext());
 
         // Assert
-        result.Status.Should().Be(HealthStatus.Unhealthy);
-        result.Exception.Should().BeOfType<InvalidOperationException>();
+        Assert.That(result.Status, Is.EqualTo(HealthStatus.Unhealthy));
+        Assert.That(result.Exception, Is.InstanceOf<InvalidOperationException>());
     }
 }

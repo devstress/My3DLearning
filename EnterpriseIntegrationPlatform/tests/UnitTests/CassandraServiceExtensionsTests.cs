@@ -1,15 +1,15 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
-using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class CassandraServiceExtensionsTests
 {
-    [Fact]
+    [Test]
     public void AddCassandraStorage_RegistersSessionFactory()
     {
         // Arrange
@@ -30,11 +30,11 @@ public class CassandraServiceExtensionsTests
 
         // Assert
         var descriptors = services.Where(d => d.ServiceType == typeof(ICassandraSessionFactory)).ToList();
-        descriptors.Should().ContainSingle();
-        descriptors[0].Lifetime.Should().Be(ServiceLifetime.Singleton);
+        Assert.That(descriptors, Has.Count.EqualTo(1));
+        Assert.That(descriptors[0].Lifetime, Is.EqualTo(ServiceLifetime.Singleton));
     }
 
-    [Fact]
+    [Test]
     public void AddCassandraStorage_RegistersMessageRepository()
     {
         // Arrange
@@ -47,11 +47,11 @@ public class CassandraServiceExtensionsTests
 
         // Assert
         var descriptors = services.Where(d => d.ServiceType == typeof(IMessageRepository)).ToList();
-        descriptors.Should().ContainSingle();
-        descriptors[0].Lifetime.Should().Be(ServiceLifetime.Singleton);
+        Assert.That(descriptors, Has.Count.EqualTo(1));
+        Assert.That(descriptors[0].Lifetime, Is.EqualTo(ServiceLifetime.Singleton));
     }
 
-    [Fact]
+    [Test]
     public void AddCassandraStorage_BindsOptionsFromConfiguration()
     {
         // Arrange
@@ -74,14 +74,14 @@ public class CassandraServiceExtensionsTests
         var options = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<CassandraOptions>>();
 
         // Assert
-        options.Value.ContactPoints.Should().Be("db1.example.com,db2.example.com");
-        options.Value.Port.Should().Be(19042);
-        options.Value.Keyspace.Should().Be("production_eip");
-        options.Value.ReplicationFactor.Should().Be(5);
-        options.Value.DefaultTtlSeconds.Should().Be(86400);
+        Assert.That(options.Value.ContactPoints, Is.EqualTo("db1.example.com,db2.example.com"));
+        Assert.That(options.Value.Port, Is.EqualTo(19042));
+        Assert.That(options.Value.Keyspace, Is.EqualTo("production_eip"));
+        Assert.That(options.Value.ReplicationFactor, Is.EqualTo(5));
+        Assert.That(options.Value.DefaultTtlSeconds, Is.EqualTo(86400));
     }
 
-    [Fact]
+    [Test]
     public void AddCassandraStorage_RegistersHealthCheck()
     {
         // Arrange
@@ -105,7 +105,6 @@ public class CassandraServiceExtensionsTests
         var healthCheckOptions = provider
             .GetRequiredService<Microsoft.Extensions.Options.IOptions<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckServiceOptions>>();
 
-        healthCheckOptions.Value.Registrations
-            .Should().Contain(r => r.Name == "cassandra");
+        Assert.That(healthCheckOptions.Value.Registrations.Any(r => r.Name == "cassandra"), Is.True);
     }
 }

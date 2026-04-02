@@ -1,13 +1,19 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class InMemoryMessageStateStoreTests
 {
-    private readonly InMemoryMessageStateStore _store = new();
+    private InMemoryMessageStateStore _store = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _store = new();
+    }
 
     private static MessageEvent CreateEvent(
         Guid? correlationId = null,
@@ -28,7 +34,7 @@ public class InMemoryMessageStateStoreTests
         };
     }
 
-    [Fact]
+    [Test]
     public async Task RecordAsync_StoresEvent_GetByCorrelationIdReturnsIt()
     {
         var correlationId = Guid.NewGuid();
@@ -37,11 +43,11 @@ public class InMemoryMessageStateStoreTests
         await _store.RecordAsync(evt);
 
         var result = await _store.GetByCorrelationIdAsync(correlationId);
-        result.Should().ContainSingle()
-              .Which.Should().BeEquivalentTo(evt);
+        Assert.That(result, Has.Count.EqualTo(1));
+        Assert.That(result[0].CorrelationId, Is.EqualTo(evt.CorrelationId));
     }
 
-    [Fact]
+    [Test]
     public async Task GetByBusinessKeyAsync_ReturnsEventsForKey()
     {
         var correlationId = Guid.NewGuid();
@@ -50,12 +56,12 @@ public class InMemoryMessageStateStoreTests
 
         var result = await _store.GetByBusinessKeyAsync("order-02");
 
-        result.Should().HaveCount(2);
-        result[0].Stage.Should().Be("Ingestion");
-        result[1].Stage.Should().Be("Routing");
+        Assert.That(result, Has.Count.EqualTo(2));
+        Assert.That(result[0].Stage, Is.EqualTo("Ingestion"));
+        Assert.That(result[1].Stage, Is.EqualTo("Routing"));
     }
 
-    [Fact]
+    [Test]
     public async Task GetByBusinessKeyAsync_IsCaseInsensitive()
     {
         var correlationId = Guid.NewGuid();
@@ -63,18 +69,18 @@ public class InMemoryMessageStateStoreTests
 
         var result = await _store.GetByBusinessKeyAsync("ORDER-02");
 
-        result.Should().ContainSingle();
+        Assert.That(result, Has.Count.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task GetByBusinessKeyAsync_ReturnsEmpty_WhenNotFound()
     {
         var result = await _store.GetByBusinessKeyAsync("nonexistent-key");
 
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task GetLatestByCorrelationIdAsync_ReturnsLatestEvent()
     {
         var correlationId = Guid.NewGuid();
@@ -84,20 +90,20 @@ public class InMemoryMessageStateStoreTests
 
         var latest = await _store.GetLatestByCorrelationIdAsync(correlationId);
 
-        latest.Should().NotBeNull();
-        latest!.Stage.Should().Be("Delivery");
-        latest.Status.Should().Be(DeliveryStatus.Delivered);
+        Assert.That(latest, Is.Not.Null);
+        Assert.That(latest!.Stage, Is.EqualTo("Delivery"));
+        Assert.That(latest.Status, Is.EqualTo(DeliveryStatus.Delivered));
     }
 
-    [Fact]
+    [Test]
     public async Task GetLatestByCorrelationIdAsync_ReturnsNull_WhenNotFound()
     {
         var result = await _store.GetLatestByCorrelationIdAsync(Guid.NewGuid());
 
-        result.Should().BeNull();
+        Assert.That(result, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task GetByMessageIdAsync_ReturnsEventsForMessage()
     {
         var messageId = Guid.NewGuid();
@@ -115,11 +121,11 @@ public class InMemoryMessageStateStoreTests
 
         var result = await _store.GetByMessageIdAsync(messageId);
 
-        result.Should().ContainSingle()
-              .Which.MessageId.Should().Be(messageId);
+        Assert.That(result, Has.Count.EqualTo(1));
+        Assert.That(result[0].MessageId, Is.EqualTo(messageId));
     }
 
-    [Fact]
+    [Test]
     public async Task MultipleCorrelationIds_WithSameBusinessKey_ReturnsAllEvents()
     {
         var corr1 = Guid.NewGuid();
@@ -129,6 +135,6 @@ public class InMemoryMessageStateStoreTests
 
         var result = await _store.GetByBusinessKeyAsync("order-02");
 
-        result.Should().HaveCount(2);
+        Assert.That(result, Has.Count.EqualTo(2));
     }
 }

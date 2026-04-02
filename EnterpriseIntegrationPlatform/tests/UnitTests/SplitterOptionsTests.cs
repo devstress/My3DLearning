@@ -1,72 +1,72 @@
 using EnterpriseIntegrationPlatform.Processing.Splitter;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class SplitterOptionsTests
 {
-    [Fact]
+    [Test]
     public void TargetTopic_Defaults_ToEmptyString()
     {
         var options = new SplitterOptions();
 
-        options.TargetTopic.Should().BeEmpty();
+        Assert.That(options.TargetTopic, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public void TargetTopic_CanBeSet()
     {
         var options = new SplitterOptions { TargetTopic = "items.split" };
 
-        options.TargetTopic.Should().Be("items.split");
+        Assert.That(options.TargetTopic, Is.EqualTo("items.split"));
     }
 
-    [Fact]
+    [Test]
     public void TargetMessageType_Defaults_ToNull()
     {
         var options = new SplitterOptions();
 
-        options.TargetMessageType.Should().BeNull();
+        Assert.That(options.TargetMessageType, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void TargetMessageType_CanBeSet()
     {
         var options = new SplitterOptions { TargetMessageType = "ItemSplit" };
 
-        options.TargetMessageType.Should().Be("ItemSplit");
+        Assert.That(options.TargetMessageType, Is.EqualTo("ItemSplit"));
     }
 
-    [Fact]
+    [Test]
     public void TargetSource_Defaults_ToNull()
     {
         var options = new SplitterOptions();
 
-        options.TargetSource.Should().BeNull();
+        Assert.That(options.TargetSource, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void TargetSource_CanBeSet()
     {
         var options = new SplitterOptions { TargetSource = "Splitter" };
 
-        options.TargetSource.Should().Be("Splitter");
+        Assert.That(options.TargetSource, Is.EqualTo("Splitter"));
     }
 
-    [Fact]
+    [Test]
     public void ArrayPropertyName_Defaults_ToNull()
     {
         var options = new SplitterOptions();
 
-        options.ArrayPropertyName.Should().BeNull();
+        Assert.That(options.ArrayPropertyName, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public void ArrayPropertyName_CanBeSet()
     {
         var options = new SplitterOptions { ArrayPropertyName = "items" };
 
-        options.ArrayPropertyName.Should().Be("items");
+        Assert.That(options.ArrayPropertyName, Is.EqualTo("items"));
     }
 }

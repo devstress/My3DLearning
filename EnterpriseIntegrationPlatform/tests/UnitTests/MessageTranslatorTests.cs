@@ -2,19 +2,20 @@ using System.Text.Json;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Translator;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class MessageTranslatorTests
 {
-    private readonly IMessageBrokerProducer _producer;
+    private IMessageBrokerProducer _producer = null!;
 
-    public MessageTranslatorTests()
+    [SetUp]
+    public void SetUp()
     {
         _producer = Substitute.For<IMessageBrokerProducer>();
     }
@@ -54,7 +55,7 @@ public class MessageTranslatorTests
     // Payload transformation
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_WithFuncTransform_TranslatesPayload()
     {
         var options = new TranslatorOptions { TargetTopic = "orders.translated" };
@@ -63,14 +64,14 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.TranslatedEnvelope.Payload.Should().Be("HELLO");
+        Assert.That(result.TranslatedEnvelope.Payload, Is.EqualTo("HELLO"));
     }
 
     // ------------------------------------------------------------------ //
     // Envelope header propagation
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_PreservesCorrelationId_FromSource()
     {
         var correlationId = Guid.NewGuid();
@@ -80,10 +81,10 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.TranslatedEnvelope.CorrelationId.Should().Be(correlationId);
+        Assert.That(result.TranslatedEnvelope.CorrelationId, Is.EqualTo(correlationId));
     }
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_SetsCausationId_ToSourceMessageId()
     {
         var options = new TranslatorOptions { TargetTopic = "orders.translated" };
@@ -92,10 +93,10 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.TranslatedEnvelope.CausationId.Should().Be(envelope.MessageId);
+        Assert.That(result.TranslatedEnvelope.CausationId, Is.EqualTo(envelope.MessageId));
     }
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_AssignsNewMessageId_ToTranslatedEnvelope()
     {
         var options = new TranslatorOptions { TargetTopic = "orders.translated" };
@@ -104,10 +105,10 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.TranslatedEnvelope.MessageId.Should().NotBe(envelope.MessageId);
+        Assert.That(result.TranslatedEnvelope.MessageId, Is.Not.EqualTo(envelope.MessageId));
     }
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_PreservesMetadata_FromSource()
     {
         var metadata = new Dictionary<string, string> { ["region"] = "eu-west" };
@@ -117,11 +118,11 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.TranslatedEnvelope.Metadata.Should().ContainKey("region")
-            .WhoseValue.Should().Be("eu-west");
+        Assert.That(result.TranslatedEnvelope.Metadata.ContainsKey("region"), Is.True);
+        Assert.That(result.TranslatedEnvelope.Metadata["region"], Is.EqualTo("eu-west"));
     }
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_PreservesPriority_FromSource()
     {
         var options = new TranslatorOptions { TargetTopic = "orders.translated" };
@@ -130,14 +131,14 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.TranslatedEnvelope.Priority.Should().Be(MessagePriority.High);
+        Assert.That(result.TranslatedEnvelope.Priority, Is.EqualTo(MessagePriority.High));
     }
 
     // ------------------------------------------------------------------ //
     // MessageType overriding
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_OverridesMessageType_WhenTargetMessageTypeConfigured()
     {
         var options = new TranslatorOptions
@@ -150,10 +151,10 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.TranslatedEnvelope.MessageType.Should().Be("OrderV2");
+        Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("OrderV2"));
     }
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_PreservesMessageType_WhenTargetMessageTypeNotConfigured()
     {
         var options = new TranslatorOptions { TargetTopic = "orders.translated" };
@@ -162,14 +163,14 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.TranslatedEnvelope.MessageType.Should().Be("OrderCreated");
+        Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("OrderCreated"));
     }
 
     // ------------------------------------------------------------------ //
     // Source overriding
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_OverridesSource_WhenTargetSourceConfigured()
     {
         var options = new TranslatorOptions
@@ -182,10 +183,10 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.TranslatedEnvelope.Source.Should().Be("Translator");
+        Assert.That(result.TranslatedEnvelope.Source, Is.EqualTo("Translator"));
     }
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_PreservesSource_WhenTargetSourceNotConfigured()
     {
         var options = new TranslatorOptions { TargetTopic = "orders.translated" };
@@ -194,14 +195,14 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.TranslatedEnvelope.Source.Should().Be("OrderService");
+        Assert.That(result.TranslatedEnvelope.Source, Is.EqualTo("OrderService"));
     }
 
     // ------------------------------------------------------------------ //
     // Broker publish
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_PublishesToTargetTopic()
     {
         var options = new TranslatorOptions { TargetTopic = "orders.translated" };
@@ -220,7 +221,7 @@ public class MessageTranslatorTests
     // Result record
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_ReturnsResult_WithSourceMessageId()
     {
         var options = new TranslatorOptions { TargetTopic = "orders.translated" };
@@ -229,10 +230,10 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.SourceMessageId.Should().Be(envelope.MessageId);
+        Assert.That(result.SourceMessageId, Is.EqualTo(envelope.MessageId));
     }
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_ReturnsResult_WithTargetTopic()
     {
         var options = new TranslatorOptions { TargetTopic = "orders.translated" };
@@ -241,14 +242,14 @@ public class MessageTranslatorTests
 
         var result = await sut.TranslateAsync(envelope);
 
-        result.TargetTopic.Should().Be("orders.translated");
+        Assert.That(result.TargetTopic, Is.EqualTo("orders.translated"));
     }
 
     // ------------------------------------------------------------------ //
     // Guard clauses
     // ------------------------------------------------------------------ //
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_NullEnvelope_ThrowsArgumentNullException()
     {
         var options = new TranslatorOptions { TargetTopic = "orders.translated" };
@@ -256,10 +257,10 @@ public class MessageTranslatorTests
 
         var act = () => sut.TranslateAsync(null!);
 
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        Assert.ThrowsAsync<ArgumentNullException>(async () => await act());
     }
 
-    [Fact]
+    [Test]
     public async Task TranslateAsync_EmptyTargetTopic_ThrowsInvalidOperationException()
     {
         var options = new TranslatorOptions { TargetTopic = string.Empty };
@@ -268,6 +269,6 @@ public class MessageTranslatorTests
 
         var act = () => sut.TranslateAsync(envelope);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await act());
     }
 }

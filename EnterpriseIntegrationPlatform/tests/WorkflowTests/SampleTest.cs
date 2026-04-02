@@ -1,29 +1,29 @@
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 using EnterpriseIntegrationPlatform.Workflow.Temporal;
 
 namespace EnterpriseIntegrationPlatform.Tests.Workflow;
 
+[TestFixture]
 public class TemporalOptionsTests
 {
-    [Fact]
+    [Test]
     public void Defaults_ShouldHaveExpectedValues()
     {
         var options = new TemporalOptions();
 
-        options.ServerAddress.Should().Be("localhost:15233");
-        options.Namespace.Should().Be("default");
-        options.TaskQueue.Should().Be("integration-workflows");
+        Assert.That(options.ServerAddress, Is.EqualTo("localhost:15233"));
+        Assert.That(options.Namespace, Is.EqualTo("default"));
+        Assert.That(options.TaskQueue, Is.EqualTo("integration-workflows"));
     }
 
-    [Fact]
+    [Test]
     public void SectionName_ShouldBeTemporal()
     {
-        TemporalOptions.SectionName.Should().Be("Temporal");
+        Assert.That(TemporalOptions.SectionName, Is.EqualTo("Temporal"));
     }
 
-    [Fact]
+    [Test]
     public void Properties_ShouldBeSettable()
     {
         var options = new TemporalOptions
@@ -33,8 +33,8 @@ public class TemporalOptionsTests
             TaskQueue = "custom-queue",
         };
 
-        options.ServerAddress.Should().Be("temporal.prod:7233");
-        options.Namespace.Should().Be("production");
-        options.TaskQueue.Should().Be("custom-queue");
+        Assert.That(options.ServerAddress, Is.EqualTo("temporal.prod:7233"));
+        Assert.That(options.Namespace, Is.EqualTo("production"));
+        Assert.That(options.TaskQueue, Is.EqualTo("custom-queue"));
     }
 }

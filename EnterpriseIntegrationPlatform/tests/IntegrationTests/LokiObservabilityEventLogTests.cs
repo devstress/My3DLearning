@@ -1,10 +1,7 @@
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Integration;
 
@@ -20,61 +17,34 @@ namespace EnterpriseIntegrationPlatform.Tests.Integration;
 /// Tests are skipped when Docker is not available.
 /// </para>
 /// </summary>
-public class LokiObservabilityEventLogTests : IAsyncLifetime
+[TestFixture]
+public class LokiObservabilityEventLogTests
 {
-    private IContainer? _lokiContainer;
     private LokiObservabilityEventLog? _log;
     private HttpClient? _httpClient;
-    private bool _dockerAvailable;
 
-    public async Task InitializeAsync()
+    [OneTimeSetUp]
+    public void OneTimeSetUp()
     {
-        try
+        if (!SharedLokiFixture.DockerAvailable) return;
+
+        _httpClient = new HttpClient
         {
-            _lokiContainer = new ContainerBuilder()
-                .WithImage("grafana/loki:3.4.2")
-                .WithPortBinding(3100, true)
-                .WithWaitStrategy(Wait.ForUnixContainer()
-                    .UntilHttpRequestIsSucceeded(r => r.ForPort(3100).ForPath("/ready")))
-                .Build();
-
-            await _lokiContainer.StartAsync();
-            _dockerAvailable = true;
-
-            var host = _lokiContainer.Hostname;
-            var port = _lokiContainer.GetMappedPublicPort(3100);
-            var baseUrl = $"http://{host}:{port}/";
-
-            _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(30) };
-            _log = new LokiObservabilityEventLog(
-                _httpClient,
-                NullLogger<LokiObservabilityEventLog>.Instance);
-        }
-        catch (Exception)
-        {
-            _dockerAvailable = false;
-        }
+            BaseAddress = new Uri(SharedLokiFixture.LokiBaseUrl + "/"),
+            Timeout = TimeSpan.FromSeconds(30),
+        };
+        _log = new LokiObservabilityEventLog(
+            _httpClient,
+            NullLogger<LokiObservabilityEventLog>.Instance);
     }
 
-    public async Task DisposeAsync()
+    [OneTimeTearDown]
+    public void OneTimeTearDown()
     {
         _httpClient?.Dispose();
-        if (_lokiContainer is not null)
-        {
-            await _lokiContainer.DisposeAsync();
-        }
     }
 
-    private bool SkipIfNoDocker()
-    {
-        return !_dockerAvailable;
-    }
-
-    /// <summary>
-    /// Retries a query until it returns the expected count, to account for
-    /// Loki's eventual-consistency write path.
-    /// </summary>
-    private static async Task WaitForLokiIndex() => await Task.Delay(2000);
+    private bool SkipIfNoDocker() => !SharedLokiFixture.DockerAvailable;
 
     private static MessageEvent CreateEvent(
         Guid? correlationId = null,
@@ -97,7 +67,7 @@ public class LokiObservabilityEventLogTests : IAsyncLifetime
         };
     }
 
-    [Fact]
+    [Test]
     public async Task RecordAsync_StoresEvent_GetByCorrelationIdReturnsIt()
     {
         if (SkipIfNoDocker()) return;
@@ -106,16 +76,17 @@ public class LokiObservabilityEventLogTests : IAsyncLifetime
         var evt = CreateEvent(correlationId);
 
         await _log!.RecordAsync(evt);
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByCorrelationIdAsync(correlationId)).Count, 1);
 
         var result = await _log.GetByCorrelationIdAsync(correlationId);
-        result.Should().ContainSingle();
-        result[0].CorrelationId.Should().Be(correlationId);
-        result[0].MessageType.Should().Be("OrderShipment");
-        result[0].Stage.Should().Be("Ingestion");
+        Assert.That(result, Has.Count.EqualTo(1));
+        Assert.That(result[0].CorrelationId, Is.EqualTo(correlationId));
+        Assert.That(result[0].MessageType, Is.EqualTo("OrderShipment"));
+        Assert.That(result[0].Stage, Is.EqualTo("Ingestion"));
     }
 
-    [Fact]
+    [Test]
     public async Task GetByBusinessKeyAsync_ReturnsEventsForKey()
     {
         if (SkipIfNoDocker()) return;
@@ -128,16 +99,17 @@ public class LokiObservabilityEventLogTests : IAsyncLifetime
             DateTimeOffset.UtcNow.AddSeconds(-2)));
         await _log.RecordAsync(CreateEvent(correlationId, businessKey, "Routing", DeliveryStatus.InFlight,
             DateTimeOffset.UtcNow));
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByBusinessKeyAsync(businessKey)).Count, 2);
 
         var result = await _log.GetByBusinessKeyAsync(businessKey);
 
-        result.Should().HaveCount(2);
-        result[0].Stage.Should().Be("Ingestion");
-        result[1].Stage.Should().Be("Routing");
+        Assert.That(result, Has.Count.EqualTo(2));
+        Assert.That(result[0].Stage, Is.EqualTo("Ingestion"));
+        Assert.That(result[1].Stage, Is.EqualTo("Routing"));
     }
 
-    [Fact]
+    [Test]
     public async Task GetByBusinessKeyAsync_IsCaseInsensitive()
     {
         if (SkipIfNoDocker()) return;
@@ -146,35 +118,36 @@ public class LokiObservabilityEventLogTests : IAsyncLifetime
         var businessKey = $"Order-CI-{Guid.NewGuid():N}";
 
         await _log!.RecordAsync(CreateEvent(correlationId, businessKey));
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByBusinessKeyAsync(businessKey.ToUpperInvariant())).Count, 1);
 
         // Query with different case
         var result = await _log.GetByBusinessKeyAsync(businessKey.ToUpperInvariant());
 
-        result.Should().ContainSingle();
+        Assert.That(result, Has.Count.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task GetByBusinessKeyAsync_ReturnsEmpty_WhenNotFound()
     {
         if (SkipIfNoDocker()) return;
 
         var result = await _log!.GetByBusinessKeyAsync("nonexistent-key-" + Guid.NewGuid());
 
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task GetByCorrelationIdAsync_ReturnsEmpty_WhenNotFound()
     {
         if (SkipIfNoDocker()) return;
 
         var result = await _log!.GetByCorrelationIdAsync(Guid.NewGuid());
 
-        result.Should().BeEmpty();
+        Assert.That(result, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task MultipleCorrelationIds_WithSameBusinessKey_ReturnsAllEvents()
     {
         if (SkipIfNoDocker()) return;
@@ -185,14 +158,15 @@ public class LokiObservabilityEventLogTests : IAsyncLifetime
 
         await _log!.RecordAsync(CreateEvent(corr1, businessKey, "Ingestion"));
         await _log.RecordAsync(CreateEvent(corr2, businessKey, "Ingestion"));
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByBusinessKeyAsync(businessKey)).Count, 2);
 
         var result = await _log.GetByBusinessKeyAsync(businessKey);
 
-        result.Should().HaveCount(2);
+        Assert.That(result, Has.Count.EqualTo(2));
     }
 
-    [Fact]
+    [Test]
     public async Task RecordAsync_WithoutBusinessKey_StillRetrievableByCorrelationId()
     {
         if (SkipIfNoDocker()) return;
@@ -210,13 +184,14 @@ public class LokiObservabilityEventLogTests : IAsyncLifetime
         };
 
         await _log!.RecordAsync(evt);
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByCorrelationIdAsync(correlationId)).Count, 1);
 
         var result = await _log.GetByCorrelationIdAsync(correlationId);
-        result.Should().ContainSingle();
+        Assert.That(result, Has.Count.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task EventsAreOrderedByTimestamp()
     {
         if (SkipIfNoDocker()) return;
@@ -231,11 +206,12 @@ public class LokiObservabilityEventLogTests : IAsyncLifetime
         // Insert in reverse order
         await _log!.RecordAsync(newer);
         await _log.RecordAsync(older);
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByCorrelationIdAsync(correlationId)).Count, 2);
 
         var result = await _log.GetByCorrelationIdAsync(correlationId);
-        result.Should().HaveCount(2);
-        result[0].Stage.Should().Be("Ingestion");
-        result[1].Stage.Should().Be("Routing");
+        Assert.That(result, Has.Count.EqualTo(2));
+        Assert.That(result[0].Stage, Is.EqualTo("Ingestion"));
+        Assert.That(result[1].Stage, Is.EqualTo("Routing"));
     }
 }

@@ -1,15 +1,15 @@
 using EnterpriseIntegrationPlatform.Ingestion;
-using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class IngestionServiceExtensionsTests
 {
-    [Fact]
+    [Test]
     public void AddBrokerOptions_BindsFromConfiguration()
     {
         // Arrange
@@ -29,11 +29,11 @@ public class IngestionServiceExtensionsTests
         var options = provider.GetRequiredService<IOptions<BrokerOptions>>().Value;
 
         // Assert
-        options.BrokerType.Should().Be(BrokerType.Kafka);
-        options.ConnectionString.Should().Be("localhost:9092");
+        Assert.That(options.BrokerType, Is.EqualTo(BrokerType.Kafka));
+        Assert.That(options.ConnectionString, Is.EqualTo("localhost:9092"));
     }
 
-    [Fact]
+    [Test]
     public void AddBrokerOptions_DefaultsToNatsJetStream_WhenNotConfigured()
     {
         // Arrange
@@ -49,10 +49,10 @@ public class IngestionServiceExtensionsTests
         var options = provider.GetRequiredService<IOptions<BrokerOptions>>().Value;
 
         // Assert
-        options.BrokerType.Should().Be(BrokerType.NatsJetStream);
+        Assert.That(options.BrokerType, Is.EqualTo(BrokerType.NatsJetStream));
     }
 
-    [Fact]
+    [Test]
     public void AddBrokerOptions_BindsPulsarType()
     {
         // Arrange
@@ -72,7 +72,7 @@ public class IngestionServiceExtensionsTests
         var options = provider.GetRequiredService<IOptions<BrokerOptions>>().Value;
 
         // Assert
-        options.BrokerType.Should().Be(BrokerType.Pulsar);
-        options.ConnectionString.Should().Be("pulsar://localhost:6650");
+        Assert.That(options.BrokerType, Is.EqualTo(BrokerType.Pulsar));
+        Assert.That(options.ConnectionString, Is.EqualTo("pulsar://localhost:6650"));
     }
 }

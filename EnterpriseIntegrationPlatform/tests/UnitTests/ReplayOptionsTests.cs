@@ -1,40 +1,40 @@
 using EnterpriseIntegrationPlatform.Processing.Replay;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class ReplayOptionsTests
 {
-    [Fact]
+    [Test]
     public void MaxMessages_Default_Is1000()
     {
         var options = new ReplayOptions();
-        options.MaxMessages.Should().Be(1000);
+        Assert.That(options.MaxMessages, Is.EqualTo(1000));
     }
 
-    [Fact]
+    [Test]
     public void BatchSize_Default_Is100()
     {
         var options = new ReplayOptions();
-        options.BatchSize.Should().Be(100);
+        Assert.That(options.BatchSize, Is.EqualTo(100));
     }
 
-    [Fact]
+    [Test]
     public void SourceTopic_Default_IsEmptyString()
     {
         var options = new ReplayOptions();
-        options.SourceTopic.Should().BeEmpty();
+        Assert.That(options.SourceTopic, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public void TargetTopic_Default_IsEmptyString()
     {
         var options = new ReplayOptions();
-        options.TargetTopic.Should().BeEmpty();
+        Assert.That(options.TargetTopic, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public void Properties_SetValues_ReturnCorrectValues()
     {
         var options = new ReplayOptions
@@ -45,9 +45,9 @@ public class ReplayOptionsTests
             BatchSize = 50
         };
 
-        options.SourceTopic.Should().Be("events.source");
-        options.TargetTopic.Should().Be("events.target");
-        options.MaxMessages.Should().Be(500);
-        options.BatchSize.Should().Be(50);
+        Assert.That(options.SourceTopic, Is.EqualTo("events.source"));
+        Assert.That(options.TargetTopic, Is.EqualTo("events.target"));
+        Assert.That(options.MaxMessages, Is.EqualTo(500));
+        Assert.That(options.BatchSize, Is.EqualTo(50));
     }
 }

@@ -1,44 +1,44 @@
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
-using FluentAssertions;
-using Xunit;
+using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
 
+[TestFixture]
 public class CassandraDiagnosticsTests
 {
-    [Fact]
+    [Test]
     public void SourceName_IsCorrect()
     {
-        CassandraDiagnostics.SourceName.Should().Be("EnterpriseIntegrationPlatform.Storage.Cassandra");
+        Assert.That(CassandraDiagnostics.SourceName, Is.EqualTo("EnterpriseIntegrationPlatform.Storage.Cassandra"));
     }
 
-    [Fact]
+    [Test]
     public void SourceVersion_IsOnePointZero()
     {
-        CassandraDiagnostics.SourceVersion.Should().Be("1.0.0");
+        Assert.That(CassandraDiagnostics.SourceVersion, Is.EqualTo("1.0.0"));
     }
 
-    [Fact]
+    [Test]
     public void ActivitySource_HasCorrectName()
     {
-        CassandraDiagnostics.ActivitySource.Name.Should().Be(CassandraDiagnostics.SourceName);
+        Assert.That(CassandraDiagnostics.ActivitySource.Name, Is.EqualTo(CassandraDiagnostics.SourceName));
     }
 
-    [Fact]
+    [Test]
     public void ActivitySource_HasCorrectVersion()
     {
-        CassandraDiagnostics.ActivitySource.Version.Should().Be(CassandraDiagnostics.SourceVersion);
+        Assert.That(CassandraDiagnostics.ActivitySource.Version, Is.EqualTo(CassandraDiagnostics.SourceVersion));
     }
 
-    [Fact]
+    [Test]
     public void Meter_HasCorrectName()
     {
-        CassandraDiagnostics.Meter.Name.Should().Be(CassandraDiagnostics.SourceName);
+        Assert.That(CassandraDiagnostics.Meter.Name, Is.EqualTo(CassandraDiagnostics.SourceName));
     }
 
-    [Fact]
+    [Test]
     public void Meter_HasCorrectVersion()
     {
-        CassandraDiagnostics.Meter.Version.Should().Be(CassandraDiagnostics.SourceVersion);
+        Assert.That(CassandraDiagnostics.Meter.Version, Is.EqualTo(CassandraDiagnostics.SourceVersion));
     }
 }
