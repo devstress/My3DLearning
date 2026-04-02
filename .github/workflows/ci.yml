@@ -29,30 +29,5 @@ jobs:
       - name: Build solution
         run: dotnet build --no-restore --configuration Release
 
-      - name: Run tests in parallel
-        run: |
-          pids=()
-          exit_code=0
-
-          for project in tests/UnitTests tests/ContractTests tests/WorkflowTests tests/IntegrationTests tests/PlaywrightTests tests/LoadTests; do
-            name=$(basename "$project")
-            dotnet test "$project" --no-build --configuration Release --verbosity normal \
-              --logger "trx;LogFileName=${name}.trx" \
-              > "/tmp/${name}.log" 2>&1 &
-            pids+=($!)
-          done
-
-          for i in "${!pids[@]}"; do
-            if ! wait "${pids[$i]}"; then
-              exit_code=1
-            fi
-          done
-
-          for project in tests/UnitTests tests/ContractTests tests/WorkflowTests tests/IntegrationTests tests/PlaywrightTests tests/LoadTests; do
-            name=$(basename "$project")
-            echo "::group::${name}"
-            cat "/tmp/${name}.log"
-            echo "::endgroup::"
-          done
-
-          exit $exit_code
+      - name: Run tests
+        run: dotnet test --no-build --configuration Release --verbosity normal

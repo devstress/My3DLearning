@@ -33,9 +33,9 @@ public class InMemoryTokenCacheTests
     public void TryGetToken_ExpiredEntry_ReturnsFalse()
     {
         var cache = new InMemoryTokenCache();
-        cache.SetToken("expiring-key", "token", TimeSpan.FromMilliseconds(1));
-
-        Thread.Sleep(20);
+        // Zero expiry means the token is stored with Expiry == UtcNow,
+        // and the check (Expiry > UtcNow) is immediately false.
+        cache.SetToken("expiring-key", "token", TimeSpan.Zero);
 
         var result = cache.TryGetToken("expiring-key", out var token);
 
