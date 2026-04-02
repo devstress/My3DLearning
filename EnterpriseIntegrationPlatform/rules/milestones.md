@@ -58,27 +58,19 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 ✅ Phase 1 (Foundations, chunks 001-011) complete — see completion-log.md  
 ✅ Phase 2 (Integration Patterns, chunks 012-018) complete — see completion-log.md  
 ✅ Phase 3 (Connectors, chunks 019-022) complete — see completion-log.md  
-✅ Phase 4 (Hardening, chunks 023-028) complete — see completion-log.md
+✅ Phase 4 (Hardening, chunks 023-028) complete — see completion-log.md  
+✅ Phase 5 (Production Readiness, chunks 029-034) complete — see completion-log.md
 
 ## Next Chunk
 
-**Chunk 034** (Secrets Management) is next.
+**Chunk 038** (Tenant onboarding automation) is next.
 
 ---
-
-### Phase 5 – Production Readiness
-
-| Chunk | Name | Goal | Status |
-|-------|------|------|--------|
-| 034 | Secrets management | HashiCorp Vault or Azure Key Vault integration for runtime secret injection, automatic rotation, and audit logging | not-started |
 
 ### Phase 6 – Advanced Patterns & Scale
 
 | Chunk | Name | Goal | Status |
 |-------|------|------|--------|
-| 035 | Event Sourcing | Event store implementation, event projections, snapshot strategy, and temporal queries for full audit trail reconstruction | not-started |
-| 036 | Scatter-Gather pattern | Broadcast a request to multiple recipients, collect responses within a timeout window, and aggregate results | not-started |
-| 037 | Competing Consumers | Dynamic consumer scaling, partition rebalancing, consumer lag monitoring, and backpressure signaling | not-started |
 | 038 | Tenant onboarding automation | Self-service tenant provisioning, quota management, isolated broker namespaces, and onboarding workflow | not-started |
 | 039 | Disaster recovery automation | Automated failover, cross-region replication, recovery point validation, and DR drill framework | not-started |
 | 040 | Performance profiling | Continuous profiling integration, memory/CPU hotspot detection, GC tuning, and benchmark regression tests | not-started |

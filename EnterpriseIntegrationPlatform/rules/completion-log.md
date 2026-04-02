@@ -4,6 +4,173 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 037 – Competing Consumers
+
+- **Date**: 2026-04-02
+- **Status**: done
+- **Goal**: Dynamic consumer scaling, partition rebalancing, consumer lag monitoring, and backpressure signaling.
+
+### Architecture
+
+- **IConsumerScaler** — Interface for dynamic consumer instance management (ScaleUpAsync, ScaleDownAsync, GetActiveCountAsync).
+- **IConsumerLagMonitor** — Interface for consumer lag tracking per consumer group/partition.
+- **IBackpressureSignal** — Interface for signaling backpressure state (IsActive, Activate, Deactivate).
+- **InMemoryConsumerScaler** — Thread-safe consumer scaling with configurable min/max instance bounds.
+- **InMemoryConsumerLagMonitor** — In-memory lag tracking using ConcurrentDictionary with lag history.
+- **BackpressureSignal** — Thread-safe backpressure signal with activation threshold and cooldown.
+- **CompetingConsumerOrchestrator** — Coordinates scaling decisions based on lag metrics and backpressure signals.
+- **CompetingConsumerOptions** — Configuration for min/max consumers, lag threshold, scale interval, and cooldown.
+
+### Files created
+
+- `src/Processing.CompetingConsumers/Processing.CompetingConsumers.csproj`
+- `src/Processing.CompetingConsumers/IConsumerScaler.cs`
+- `src/Processing.CompetingConsumers/IConsumerLagMonitor.cs`
+- `src/Processing.CompetingConsumers/IBackpressureSignal.cs`
+- `src/Processing.CompetingConsumers/InMemoryConsumerScaler.cs`
+- `src/Processing.CompetingConsumers/InMemoryConsumerLagMonitor.cs`
+- `src/Processing.CompetingConsumers/BackpressureSignal.cs`
+- `src/Processing.CompetingConsumers/CompetingConsumerOrchestrator.cs`
+- `src/Processing.CompetingConsumers/CompetingConsumerOptions.cs`
+- `src/Processing.CompetingConsumers/ConsumerLagInfo.cs`
+- `src/Processing.CompetingConsumers/CompetingConsumerServiceExtensions.cs`
+- `tests/UnitTests/CompetingConsumersTests/BackpressureSignalTests.cs` (7 tests)
+- `tests/UnitTests/CompetingConsumersTests/CompetingConsumerOrchestratorTests.cs` (11 tests)
+- `tests/UnitTests/CompetingConsumersTests/InMemoryConsumerLagMonitorTests.cs` (10 tests)
+- `tests/UnitTests/CompetingConsumersTests/InMemoryConsumerScalerTests.cs` (11 tests)
+
+### Test count
+
+- 39 new unit tests (total: 666 across UnitTests)
+
+---
+
+## Chunk 036 – Scatter-Gather Pattern
+
+- **Date**: 2026-04-02
+- **Status**: done
+- **Goal**: Broadcast a request to multiple recipients, collect responses within a timeout window, and aggregate results.
+
+### Architecture
+
+- **IScatterGatherer<TRequest, TResponse>** — Generic interface for scatter-gather operations.
+- **ScatterGatherer<TRequest, TResponse>** — Full implementation with Channel-based response collection, timeout handling, and concurrent operation tracking.
+- **ScatterRequest<TRequest>** — Request record with correlation ID, payload, recipient list, and optional timeout.
+- **GatherResponse<TResponse>** — Response record with recipient identifier, payload, success/error status.
+- **ScatterGatherResult<TResponse>** — Aggregated result with all responses, timeout indicator, and duration.
+- **ScatterGatherOptions** — Configuration for default timeout, max recipients, max concurrent operations.
+
+### Files created
+
+- `src/Processing.ScatterGather/Processing.ScatterGather.csproj`
+- `src/Processing.ScatterGather/IScatterGatherer.cs`
+- `src/Processing.ScatterGather/ScatterGatherer.cs`
+- `src/Processing.ScatterGather/ScatterRequest.cs`
+- `src/Processing.ScatterGather/GatherResponse.cs`
+- `src/Processing.ScatterGather/ScatterGatherResult.cs`
+- `src/Processing.ScatterGather/ScatterGatherOptions.cs`
+- `src/Processing.ScatterGather/ScatterGatherServiceExtensions.cs`
+- `tests/UnitTests/ScatterGatherTests/ScatterGathererTests.cs` (21 tests)
+
+### Test count
+
+- 21 new unit tests
+
+---
+
+## Chunk 035 – Event Sourcing
+
+- **Date**: 2026-04-02
+- **Status**: done
+- **Goal**: Event store implementation, event projections, snapshot strategy, and temporal queries for full audit trail reconstruction.
+
+### Architecture
+
+- **IEventStore** — Interface for event persistence: AppendAsync, GetEventsAsync, GetEventsAfterAsync.
+- **ISnapshotStore** — Interface for snapshot persistence: SaveAsync, GetLatestAsync.
+- **IEventProjection** — Interface for event projections with type filtering and Apply method.
+- **InMemoryEventStore** — Thread-safe event store with optimistic concurrency via expected version checks.
+- **InMemorySnapshotStore** — Thread-safe snapshot store using ConcurrentDictionary.
+- **EventProjectionEngine** — Processes events through registered projections with checkpoint tracking.
+- **EventEnvelope** — Immutable record wrapping domain events with metadata (stream, version, timestamp, correlation).
+- **TemporalQuery** — Query model for time-range event retrieval.
+- **OptimisticConcurrencyException** — Thrown when event stream version conflicts are detected.
+- **EventSourcingOptions** — Configuration for snapshot interval, max events per query, projection batch size.
+
+### Files created
+
+- `src/EventSourcing/EventSourcing.csproj`
+- `src/EventSourcing/IEventStore.cs`
+- `src/EventSourcing/ISnapshotStore.cs`
+- `src/EventSourcing/IEventProjection.cs`
+- `src/EventSourcing/InMemoryEventStore.cs`
+- `src/EventSourcing/InMemorySnapshotStore.cs`
+- `src/EventSourcing/EventProjectionEngine.cs`
+- `src/EventSourcing/EventEnvelope.cs`
+- `src/EventSourcing/TemporalQuery.cs`
+- `src/EventSourcing/OptimisticConcurrencyException.cs`
+- `src/EventSourcing/EventSourcingOptions.cs`
+- `src/EventSourcing/EventSourcingServiceExtensions.cs`
+- `tests/UnitTests/EventSourcingTests/InMemoryEventStoreTests.cs` (16 tests)
+- `tests/UnitTests/EventSourcingTests/InMemorySnapshotStoreTests.cs` (7 tests)
+- `tests/UnitTests/EventSourcingTests/EventProjectionEngineTests.cs` (11 tests)
+
+### Test count
+
+- 34 new unit tests
+
+---
+
+## Chunk 034 – Secrets Management
+
+- **Date**: 2026-04-02
+- **Status**: done
+- **Goal**: HashiCorp Vault and Azure Key Vault integration for runtime secret injection, automatic rotation, and audit logging.
+
+### Architecture
+
+- **ISecretProvider** — Interface for secret CRUD: GetSecretAsync, SetSecretAsync, DeleteSecretAsync, ListSecretsAsync.
+- **ISecretRotationService** — Interface for automatic secret rotation with policy-based scheduling.
+- **InMemorySecretProvider** — Thread-safe in-memory secret store for development and testing.
+- **VaultSecretProvider** — HashiCorp Vault integration via HTTP API with token-based auth.
+- **AzureKeyVaultSecretProvider** — Azure Key Vault integration via Azure.Security.KeyVault.Secrets SDK.
+- **CachedSecretProvider** — Decorator that caches secrets with configurable TTL to reduce provider calls.
+- **SecretRotationService** — Background service that monitors rotation policies and triggers rotation when due.
+- **SecretAuditLogger** — Structured audit logging for all secret access, modification, and rotation events.
+- **SecretEntry** — Record for secret data with version, expiry, and metadata.
+- **SecretRotationPolicy** — Configuration record for rotation interval, notification window, and target secret.
+- **SecretAuditEvent** — Audit event record with action, principal, timestamp, and outcome.
+- **SecretAccessAction** — Enum of auditable actions (Get, Set, Delete, Rotate, List).
+- **SecretsOptions** — Configuration for provider type, cache TTL, rotation check interval.
+
+### Files created
+
+- `src/Security.Secrets/Security.Secrets.csproj`
+- `src/Security.Secrets/ISecretProvider.cs`
+- `src/Security.Secrets/ISecretRotationService.cs`
+- `src/Security.Secrets/InMemorySecretProvider.cs`
+- `src/Security.Secrets/VaultSecretProvider.cs`
+- `src/Security.Secrets/AzureKeyVaultSecretProvider.cs`
+- `src/Security.Secrets/CachedSecretProvider.cs`
+- `src/Security.Secrets/SecretRotationService.cs`
+- `src/Security.Secrets/SecretAuditLogger.cs`
+- `src/Security.Secrets/SecretEntry.cs`
+- `src/Security.Secrets/SecretRotationPolicy.cs`
+- `src/Security.Secrets/SecretAuditEvent.cs`
+- `src/Security.Secrets/SecretAccessAction.cs`
+- `src/Security.Secrets/SecretsOptions.cs`
+- `src/Security.Secrets/SecretsServiceExtensions.cs`
+- `tests/UnitTests/SecretsTests/CachedSecretProviderTests.cs` (11 tests)
+- `tests/UnitTests/SecretsTests/InMemorySecretProviderTests.cs` (15 tests)
+- `tests/UnitTests/SecretsTests/SecretAuditLoggerTests.cs` (11 tests)
+- `tests/UnitTests/SecretsTests/SecretRotationServiceTests.cs` (9 tests)
+
+### Test count
+
+- 46 new unit tests
+
+---
+
 ## Chunk 033 – Configuration Management
 
 - **Date**: 2026-04-02
