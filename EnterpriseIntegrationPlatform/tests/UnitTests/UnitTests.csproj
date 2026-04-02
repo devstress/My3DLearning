@@ -36,5 +36,6 @@
     <ProjectReference Include="..\..\src\Gateway.Api\Gateway.Api.csproj" />
     <ProjectReference Include="..\..\src\Processing.Throttle\Processing.Throttle.csproj" />
     <ProjectReference Include="..\..\src\Configuration\Configuration.csproj" />
+    <ProjectReference Include="..\..\src\Security.Secrets\Security.Secrets.csproj" />
   </ItemGroup>
 </Project>
