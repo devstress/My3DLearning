@@ -61,11 +61,12 @@ All code must satisfy the 11 Quality Pillars defined in `rules/quality-pillars.m
 
 ## Testing
 
-- xUnit for unit tests
+- NUnit for unit tests
 - Arrange-Act-Assert pattern
 - One assertion per test (logical)
-- Use `FluentAssertions` for readable assertions
+- Use `Assert.That` with NUnit constraint model for readable assertions
 - Use `NSubstitute` for mocking
+- Use `[SetUp]` for per-test mock initialization
 - Test naming: `MethodName_Scenario_ExpectedResult`
 
 ## Documentation

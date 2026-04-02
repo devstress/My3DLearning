@@ -4,6 +4,8 @@
 
 This document describes the Temporal.io configuration for the Enterprise Integration Platform, including namespace setup, task queue design, worker configuration, timeout policies, retry strategies, and search attributes.
 
+For workflow definitions, patterns, and code examples, see [Workflow Definitions and Patterns](workflows.md).
+
 ## Namespace Setup
 
 ### Production Namespace

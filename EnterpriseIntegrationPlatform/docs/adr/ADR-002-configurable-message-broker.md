@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — March 2026
+**Accepted** — March 2026 (architecture decision made during Phase 1 implementation)
 
 ## Context
 

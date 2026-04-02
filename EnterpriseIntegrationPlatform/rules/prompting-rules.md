@@ -23,11 +23,13 @@ continue next chunk
 The agent must:
 
 1. Read `rules/milestones.md`
-2. Identify the next chunk with status `not-started`
+2. Identify the next chunk with status `not-started` (Phase 5 begins with Chunk 029)
 3. Implement ONLY that chunk
 4. Update chunk status in `milestones.md`
 5. Log completion details in `rules/completion-log.md`
 6. Ensure the repository remains resumable
+
+> **Note:** Phases 1–4 (Chunks 001–028) are complete. New chunks begin at Phase 5.
 
 ## Chunk Implementation Rules
 

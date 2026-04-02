@@ -2,7 +2,7 @@
 
 ## Overview
 
-Connectors are the outbound delivery components of the Enterprise Integration Platform. Each connector encapsulates the protocol-specific logic required to communicate with an external system, including authentication, serialization, error handling, and delivery confirmation.
+Connectors are the outbound delivery components of the Enterprise Integration Platform. Each connector is implemented as a separate project (`Connector.Http`, `Connector.Sftp`, `Connector.Email`, `Connector.File`) encapsulating the protocol-specific logic required to communicate with an external system, including authentication, serialization, error handling, and delivery confirmation.
 
 ## Connector Interface
 
