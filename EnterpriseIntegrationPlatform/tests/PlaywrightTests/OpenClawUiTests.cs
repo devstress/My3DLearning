@@ -119,9 +119,9 @@ public class OpenClawUiTests
 
         var ollamaStatus = page.Locator("#ollamaStatus");
         await Expect(ollamaStatus).ToBeVisibleAsync();
-        // In test environment Ollama is not running, so it should show unavailable
-        // after the health check completes
-        await page.WaitForTimeoutAsync(2000);
+        // Wait for the health check to complete — the element transitions from
+        // "ollama-checking" to either "ollama-up" or "ollama-down".
+        await Expect(ollamaStatus).Not.ToHaveClassAsync(new Regex("ollama-checking"));
         var text = await ollamaStatus.TextContentAsync();
         Assert.That(text, Does.Contain("Ollama"));
     }
@@ -246,13 +246,20 @@ public class OpenClawUiTests
     {
         if (SkipIfNoBrowsers()) return;
 
-        // Wait for demo seeder to run
-        await Task.Delay(500);
-
-        var response = await _httpClient!.GetAsync("/api/inspect/business/order-02");
+        // Poll until the demo seeder has completed rather than using a fixed delay.
+        HttpResponseMessage response;
+        string content;
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        do
+        {
+            response = await _httpClient!.GetAsync("/api/inspect/business/order-02");
+            content = await response.Content.ReadAsStringAsync();
+            if (content.Contains("\"found\":true"))
+                break;
+            await Task.Delay(50);
+        } while (DateTime.UtcNow < deadline);
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
 
-        var content = await response.Content.ReadAsStringAsync();
         Assert.That(content, Does.Contain("\"found\":true"));
         Assert.That(content, Does.Contain("\"ollamaAvailable\""));
     }
