@@ -1,5 +1,3 @@
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -20,63 +18,33 @@ namespace EnterpriseIntegrationPlatform.Tests.Integration;
 /// </para>
 /// </summary>
 [TestFixture]
-public class LokiObservabilityEventLogTests 
+public class LokiObservabilityEventLogTests
 {
-    private IContainer? _lokiContainer;
     private LokiObservabilityEventLog? _log;
     private HttpClient? _httpClient;
-    private bool _dockerAvailable;
 
-    [SetUp]
-    public async Task SetUp()
+    [OneTimeSetUp]
+    public void OneTimeSetUp()
     {
-        try
+        if (!SharedLokiFixture.DockerAvailable) return;
+
+        _httpClient = new HttpClient
         {
-            _lokiContainer = new ContainerBuilder()
-                .WithImage("grafana/loki:3.4.2")
-                .WithPortBinding(3100, true)
-                .WithWaitStrategy(Wait.ForUnixContainer()
-                    .UntilHttpRequestIsSucceeded(r => r.ForPort(3100).ForPath("/ready")))
-                .Build();
-
-            await _lokiContainer.StartAsync();
-            _dockerAvailable = true;
-
-            var host = _lokiContainer.Hostname;
-            var port = _lokiContainer.GetMappedPublicPort(3100);
-            var baseUrl = $"http://{host}:{port}/";
-
-            _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(30) };
-            _log = new LokiObservabilityEventLog(
-                _httpClient,
-                NullLogger<LokiObservabilityEventLog>.Instance);
-        }
-        catch (Exception)
-        {
-            _dockerAvailable = false;
-        }
+            BaseAddress = new Uri(SharedLokiFixture.LokiBaseUrl + "/"),
+            Timeout = TimeSpan.FromSeconds(30),
+        };
+        _log = new LokiObservabilityEventLog(
+            _httpClient,
+            NullLogger<LokiObservabilityEventLog>.Instance);
     }
 
-    [TearDown]
-    public async Task TearDown()
+    [OneTimeTearDown]
+    public void OneTimeTearDown()
     {
         _httpClient?.Dispose();
-        if (_lokiContainer is not null)
-        {
-            await _lokiContainer.DisposeAsync();
-        }
     }
 
-    private bool SkipIfNoDocker()
-    {
-        return !_dockerAvailable;
-    }
-
-    /// <summary>
-    /// Retries a query until it returns the expected count, to account for
-    /// Loki's eventual-consistency write path.
-    /// </summary>
-    private static async Task WaitForLokiIndex() => await Task.Delay(2000);
+    private bool SkipIfNoDocker() => !SharedLokiFixture.DockerAvailable;
 
     private static MessageEvent CreateEvent(
         Guid? correlationId = null,
@@ -108,7 +76,8 @@ public class LokiObservabilityEventLogTests
         var evt = CreateEvent(correlationId);
 
         await _log!.RecordAsync(evt);
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByCorrelationIdAsync(correlationId)).Count, 1);
 
         var result = await _log.GetByCorrelationIdAsync(correlationId);
         Assert.That(result, Has.Count.EqualTo(1));
@@ -130,7 +99,8 @@ public class LokiObservabilityEventLogTests
             DateTimeOffset.UtcNow.AddSeconds(-2)));
         await _log.RecordAsync(CreateEvent(correlationId, businessKey, "Routing", DeliveryStatus.InFlight,
             DateTimeOffset.UtcNow));
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByBusinessKeyAsync(businessKey)).Count, 2);
 
         var result = await _log.GetByBusinessKeyAsync(businessKey);
 
@@ -148,7 +118,8 @@ public class LokiObservabilityEventLogTests
         var businessKey = $"Order-CI-{Guid.NewGuid():N}";
 
         await _log!.RecordAsync(CreateEvent(correlationId, businessKey));
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByBusinessKeyAsync(businessKey.ToUpperInvariant())).Count, 1);
 
         // Query with different case
         var result = await _log.GetByBusinessKeyAsync(businessKey.ToUpperInvariant());
@@ -187,7 +158,8 @@ public class LokiObservabilityEventLogTests
 
         await _log!.RecordAsync(CreateEvent(corr1, businessKey, "Ingestion"));
         await _log.RecordAsync(CreateEvent(corr2, businessKey, "Ingestion"));
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByBusinessKeyAsync(businessKey)).Count, 2);
 
         var result = await _log.GetByBusinessKeyAsync(businessKey);
 
@@ -212,7 +184,8 @@ public class LokiObservabilityEventLogTests
         };
 
         await _log!.RecordAsync(evt);
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByCorrelationIdAsync(correlationId)).Count, 1);
 
         var result = await _log.GetByCorrelationIdAsync(correlationId);
         Assert.That(result, Has.Count.EqualTo(1));
@@ -233,7 +206,8 @@ public class LokiObservabilityEventLogTests
         // Insert in reverse order
         await _log!.RecordAsync(newer);
         await _log.RecordAsync(older);
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _log.GetByCorrelationIdAsync(correlationId)).Count, 2);
 
         var result = await _log.GetByCorrelationIdAsync(correlationId);
         Assert.That(result, Has.Count.EqualTo(2));

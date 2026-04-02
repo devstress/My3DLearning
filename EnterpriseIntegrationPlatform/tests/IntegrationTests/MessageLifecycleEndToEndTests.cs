@@ -1,5 +1,3 @@
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,57 +19,33 @@ namespace EnterpriseIntegrationPlatform.Tests.Integration;
 /// </para>
 /// </summary>
 [TestFixture]
-public class MessageLifecycleEndToEndTests 
+public class MessageLifecycleEndToEndTests
 {
-    private IContainer? _lokiContainer;
     private LokiObservabilityEventLog? _lokiLog;
     private HttpClient? _httpClient;
-    private bool _dockerAvailable;
 
-    [SetUp]
-    public async Task SetUp()
+    [OneTimeSetUp]
+    public void OneTimeSetUp()
     {
-        try
+        if (!SharedLokiFixture.DockerAvailable) return;
+
+        _httpClient = new HttpClient
         {
-            _lokiContainer = new ContainerBuilder()
-                .WithImage("grafana/loki:3.4.2")
-                .WithPortBinding(3100, true)
-                .WithWaitStrategy(Wait.ForUnixContainer()
-                    .UntilHttpRequestIsSucceeded(r => r.ForPort(3100).ForPath("/ready")))
-                .Build();
-
-            await _lokiContainer.StartAsync();
-            _dockerAvailable = true;
-
-            var host = _lokiContainer.Hostname;
-            var port = _lokiContainer.GetMappedPublicPort(3100);
-            var baseUrl = $"http://{host}:{port}/";
-
-            _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(30) };
-            _lokiLog = new LokiObservabilityEventLog(
-                _httpClient,
-                NullLogger<LokiObservabilityEventLog>.Instance);
-        }
-        catch (Exception)
-        {
-            _dockerAvailable = false;
-        }
+            BaseAddress = new Uri(SharedLokiFixture.LokiBaseUrl + "/"),
+            Timeout = TimeSpan.FromSeconds(30),
+        };
+        _lokiLog = new LokiObservabilityEventLog(
+            _httpClient,
+            NullLogger<LokiObservabilityEventLog>.Instance);
     }
 
-    [TearDown]
-    public async Task TearDown()
+    [OneTimeTearDown]
+    public void OneTimeTearDown()
     {
         _httpClient?.Dispose();
-        if (_lokiContainer is not null)
-        {
-            await _lokiContainer.DisposeAsync();
-        }
     }
 
-    private bool SkipIfNoDocker() => !_dockerAvailable;
-
-    /// <summary>Wait for Loki's eventual-consistency write path.</summary>
-    private static async Task WaitForLokiIndex() => await Task.Delay(2000);
+    private bool SkipIfNoDocker() => !SharedLokiFixture.DockerAvailable;
 
     private static IntegrationEnvelope<string> CreateEnvelope(string messageType = "OrderShipment")
     {
@@ -102,7 +76,8 @@ public class MessageLifecycleEndToEndTests
         await recorder.RecordProcessingAsync(envelope, MessageTracer.StageTransformation, businessKey);
         await recorder.RecordDeliveredAsync(envelope, activity: null, durationMs: 123.4, businessKey);
 
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _lokiLog!.GetByCorrelationIdAsync(correlationId)).Count, 4);
 
         // ── Query by correlation ID ──────────────────────────────────────────
         var byCorrelation = await _lokiLog!.GetByCorrelationIdAsync(correlationId);
@@ -151,7 +126,8 @@ public class MessageLifecycleEndToEndTests
         await recorder.RecordRetryAsync(envelope, retryCount: 1, MessageTracer.StageDelivery, businessKey);
         await recorder.RecordDeliveredAsync(envelope, activity: null, durationMs: 200.0, businessKey);
 
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _lokiLog!.GetByCorrelationIdAsync(correlationId)).Count, 5);
 
         // ── Verify all 5 events in Loki ──────────────────────────────────────
         var events = await _lokiLog!.GetByCorrelationIdAsync(correlationId);
@@ -191,7 +167,8 @@ public class MessageLifecycleEndToEndTests
         await recorder.RecordRetryAsync(envelope, retryCount: 2, MessageTracer.StageDelivery, businessKey);
         await recorder.RecordDeadLetteredAsync(envelope, "Max retries exceeded", businessKey);
 
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _lokiLog!.GetByCorrelationIdAsync(correlationId)).Count, 5);
 
         // ── Verify all events including dead-letter ──────────────────────────
         var events = await _lokiLog!.GetByCorrelationIdAsync(correlationId);
@@ -223,7 +200,8 @@ public class MessageLifecycleEndToEndTests
         await recorder.RecordReceivedAsync(envelope, businessKey);
         await recorder.RecordDeliveredAsync(envelope, activity: null, durationMs: 50.0, businessKey);
 
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _lokiLog!.GetByCorrelationIdAsync(correlationId)).Count, 2);
 
         // Query multiple times — Loki storage is durable, not ephemeral
         var first = await _lokiLog!.GetByCorrelationIdAsync(correlationId);
@@ -259,7 +237,8 @@ public class MessageLifecycleEndToEndTests
         await recorder.RecordProcessingAsync(envelope, MessageTracer.StageTransformation, businessKey);
         await recorder.RecordDeliveredAsync(envelope, activity: null, durationMs: 99.9, businessKey);
 
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _lokiLog!.GetByCorrelationIdAsync(correlationId)).Count, 4);
 
         // ── Arrange: wire up MessageStateInspector with real Loki + AI ───────
         var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
@@ -314,7 +293,8 @@ public class MessageLifecycleEndToEndTests
         await recorder.RecordProcessingAsync(envelope, MessageTracer.StageRouting, businessKey);
         await recorder.RecordDeliveredAsync(envelope, activity: null, durationMs: 75.0, businessKey);
 
-        await WaitForLokiIndex();
+        await SharedLokiFixture.WaitForLokiIndexAsync(
+            async () => (await _lokiLog!.GetByCorrelationIdAsync(correlationId)).Count, 3);
 
         // ── Arrange: wire up inspector with AI ───────────────────────────────
         var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
