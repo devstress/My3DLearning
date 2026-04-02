@@ -87,6 +87,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Security.Secrets", "src\Sec
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventSourcing", "src\EventSourcing\EventSourcing.csproj", "{1482FC34-B343-4316-BDAD-4E3A5EA86512}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Processing.ScatterGather", "src\Processing.ScatterGather\Processing.ScatterGather.csproj", "{8683E107-CA14-4741-AAB2-8B77DEC20D14}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -541,6 +543,18 @@ Global
 		{1482FC34-B343-4316-BDAD-4E3A5EA86512}.Release|x64.Build.0 = Release|Any CPU
 		{1482FC34-B343-4316-BDAD-4E3A5EA86512}.Release|x86.ActiveCfg = Release|Any CPU
 		{1482FC34-B343-4316-BDAD-4E3A5EA86512}.Release|x86.Build.0 = Release|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Debug|x64.Build.0 = Debug|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Debug|x86.Build.0 = Debug|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Release|x64.ActiveCfg = Release|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Release|x64.Build.0 = Release|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Release|x86.ActiveCfg = Release|Any CPU
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -586,5 +600,6 @@ Global
 		{DF06E360-2D1A-4067-8619-D821F3C32BCD} = {A1B2C3D4-0001-0001-0001-000000000001}
 		{DBD1201C-74B3-4C60-B2C3-B19CC9A8CB59} = {A1B2C3D4-0001-0001-0001-000000000001}
 		{1482FC34-B343-4316-BDAD-4E3A5EA86512} = {A1B2C3D4-0001-0001-0001-000000000001}
+		{8683E107-CA14-4741-AAB2-8B77DEC20D14} = {A1B2C3D4-0001-0001-0001-000000000001}
 	EndGlobalSection
 EndGlobal

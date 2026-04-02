@@ -38,5 +38,6 @@
     <ProjectReference Include="..\..\src\Configuration\Configuration.csproj" />
     <ProjectReference Include="..\..\src\Security.Secrets\Security.Secrets.csproj" />
     <ProjectReference Include="..\..\src\EventSourcing\EventSourcing.csproj" />
+    <ProjectReference Include="..\..\src\Processing.ScatterGather\Processing.ScatterGather.csproj" />
   </ItemGroup>
 </Project>
