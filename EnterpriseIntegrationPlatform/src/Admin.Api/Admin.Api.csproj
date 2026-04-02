@@ -7,5 +7,6 @@
     <ProjectReference Include="..\Processing.Replay\Processing.Replay.csproj" />
     <ProjectReference Include="..\Processing.Throttle\Processing.Throttle.csproj" />
     <ProjectReference Include="..\Configuration\Configuration.csproj" />
+    <ProjectReference Include="..\MultiTenancy.Onboarding\MultiTenancy.Onboarding.csproj" />
   </ItemGroup>
 </Project>

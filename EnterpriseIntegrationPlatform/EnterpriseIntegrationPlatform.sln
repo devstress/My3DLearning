@@ -91,6 +91,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Processing.ScatterGather", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Processing.CompetingConsumers", "src\Processing.CompetingConsumers\Processing.CompetingConsumers.csproj", "{D69931DA-DF4B-4538-B326-AA0D0326BC8A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiTenancy.Onboarding", "src\MultiTenancy.Onboarding\MultiTenancy.Onboarding.csproj", "{B178653A-1FE4-4216-8A91-0F87C42E4A88}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -569,6 +571,18 @@ Global
 		{D69931DA-DF4B-4538-B326-AA0D0326BC8A}.Release|x64.Build.0 = Release|Any CPU
 		{D69931DA-DF4B-4538-B326-AA0D0326BC8A}.Release|x86.ActiveCfg = Release|Any CPU
 		{D69931DA-DF4B-4538-B326-AA0D0326BC8A}.Release|x86.Build.0 = Release|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Debug|x64.Build.0 = Debug|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Debug|x86.Build.0 = Debug|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Release|x64.ActiveCfg = Release|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Release|x64.Build.0 = Release|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Release|x86.ActiveCfg = Release|Any CPU
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -616,5 +630,6 @@ Global
 		{1482FC34-B343-4316-BDAD-4E3A5EA86512} = {A1B2C3D4-0001-0001-0001-000000000001}
 		{8683E107-CA14-4741-AAB2-8B77DEC20D14} = {A1B2C3D4-0001-0001-0001-000000000001}
 		{D69931DA-DF4B-4538-B326-AA0D0326BC8A} = {A1B2C3D4-0001-0001-0001-000000000001}
+		{B178653A-1FE4-4216-8A91-0F87C42E4A88} = {A1B2C3D4-0001-0001-0001-000000000001}
 	EndGlobalSection
 EndGlobal

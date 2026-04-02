@@ -8,6 +8,7 @@ using EnterpriseIntegrationPlatform.Processing.Replay;
 using EnterpriseIntegrationPlatform.Configuration;
 using EnterpriseIntegrationPlatform.Processing.Throttle;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
+using EnterpriseIntegrationPlatform.MultiTenancy.Onboarding;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 
@@ -78,6 +79,10 @@ builder.Services.AddMessageThrottle(builder.Configuration);
 // ── Configuration Management ──────────────────────────────────────────────────
 // Centralized config store, feature flags, and change notifications.
 builder.Services.AddConfigurationManagement();
+
+// ── Tenant Onboarding ─────────────────────────────────────────────────────────
+// Self-service tenant provisioning, quota management, and broker namespaces.
+builder.Services.AddTenantOnboarding(builder.Configuration);
 
 var app = builder.Build();
 
@@ -457,6 +462,79 @@ app.MapDelete("/api/admin/features/{name}", async (
     return deleted ? Results.NoContent() : Results.NotFound();
 })
 .WithName("AdminDeleteFeatureFlag")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+// ── Tenant Onboarding ─────────────────────────────────────────────────────────
+
+app.MapPost("/api/admin/tenants/onboard", async (
+    TenantOnboardingRequest request,
+    ITenantOnboardingService onboardingService,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("OnboardTenant", request.TenantId, http.User);
+    var result = await onboardingService.ProvisionAsync(request, ct);
+    return Results.Ok(result);
+})
+.WithName("AdminOnboardTenant")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapDelete("/api/admin/tenants/{tenantId}", async (
+    string tenantId,
+    ITenantOnboardingService onboardingService,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("DeprovisionTenant", tenantId, http.User);
+    var result = await onboardingService.DeprovisionAsync(tenantId, ct);
+    return Results.Ok(result);
+})
+.WithName("AdminDeprovisionTenant")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/tenants/{tenantId}/status", async (
+    string tenantId,
+    ITenantOnboardingService onboardingService,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("GetTenantStatus", tenantId, http.User);
+    var result = await onboardingService.GetStatusAsync(tenantId, ct);
+    return result is not null ? Results.Ok(result) : Results.NotFound();
+})
+.WithName("AdminGetTenantStatus")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/tenants/{tenantId}/quota", async (
+    string tenantId,
+    ITenantQuotaManager quotaManager,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("GetTenantQuota", tenantId, http.User);
+    var quota = await quotaManager.GetQuotaAsync(tenantId, ct);
+    return quota is not null ? Results.Ok(quota) : Results.NotFound();
+})
+.WithName("AdminGetTenantQuota")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapPut("/api/admin/tenants/{tenantId}/quota", async (
+    string tenantId,
+    TenantQuota quota,
+    ITenantQuotaManager quotaManager,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("SetTenantQuota", tenantId, http.User);
+    await quotaManager.SetQuotaAsync(tenantId, quota, ct);
+    return Results.Ok(quota);
+})
+.WithName("AdminSetTenantQuota")
 .RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
 
 app.Run();
