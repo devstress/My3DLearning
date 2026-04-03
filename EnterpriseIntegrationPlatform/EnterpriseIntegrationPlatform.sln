@@ -93,6 +93,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Processing.CompetingConsume
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiTenancy.Onboarding", "src\MultiTenancy.Onboarding\MultiTenancy.Onboarding.csproj", "{B178653A-1FE4-4216-8A91-0F87C42E4A88}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DisasterRecovery", "src\DisasterRecovery\DisasterRecovery.csproj", "{F963885A-2090-4FEC-B207-7ACB95E7AAD0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -583,6 +585,18 @@ Global
 		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Release|x64.Build.0 = Release|Any CPU
 		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Release|x86.ActiveCfg = Release|Any CPU
 		{B178653A-1FE4-4216-8A91-0F87C42E4A88}.Release|x86.Build.0 = Release|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Debug|x64.Build.0 = Debug|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Debug|x86.Build.0 = Debug|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Release|x64.ActiveCfg = Release|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Release|x64.Build.0 = Release|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Release|x86.ActiveCfg = Release|Any CPU
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -631,5 +645,6 @@ Global
 		{8683E107-CA14-4741-AAB2-8B77DEC20D14} = {A1B2C3D4-0001-0001-0001-000000000001}
 		{D69931DA-DF4B-4538-B326-AA0D0326BC8A} = {A1B2C3D4-0001-0001-0001-000000000001}
 		{B178653A-1FE4-4216-8A91-0F87C42E4A88} = {A1B2C3D4-0001-0001-0001-000000000001}
+		{F963885A-2090-4FEC-B207-7ACB95E7AAD0} = {A1B2C3D4-0001-0001-0001-000000000001}
 	EndGlobalSection
 EndGlobal

@@ -9,6 +9,7 @@ using EnterpriseIntegrationPlatform.Configuration;
 using EnterpriseIntegrationPlatform.Processing.Throttle;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
 using EnterpriseIntegrationPlatform.MultiTenancy.Onboarding;
+using EnterpriseIntegrationPlatform.DisasterRecovery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 
@@ -83,6 +84,10 @@ builder.Services.AddConfigurationManagement();
 // ── Tenant Onboarding ─────────────────────────────────────────────────────────
 // Self-service tenant provisioning, quota management, and broker namespaces.
 builder.Services.AddTenantOnboarding(builder.Configuration);
+
+// ── Disaster Recovery ─────────────────────────────────────────────────────────
+// Automated failover, cross-region replication, recovery point validation, and DR drills.
+builder.Services.AddDisasterRecovery(builder.Configuration);
 
 var app = builder.Build();
 
@@ -535,6 +540,130 @@ app.MapPut("/api/admin/tenants/{tenantId}/quota", async (
     return Results.Ok(quota);
 })
 .WithName("AdminSetTenantQuota")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+// ── Disaster Recovery ─────────────────────────────────────────────────────────
+
+app.MapGet("/api/admin/dr/regions", async (
+    IFailoverManager failoverManager,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("GetDrRegions", null, http.User);
+    var regions = await failoverManager.GetAllRegionsAsync(ct);
+    return Results.Ok(regions);
+})
+.WithName("AdminGetDrRegions")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapPost("/api/admin/dr/regions", async (
+    RegionInfo region,
+    IFailoverManager failoverManager,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("RegisterDrRegion", region.RegionId, http.User);
+    await failoverManager.RegisterRegionAsync(region, ct);
+    return Results.Ok(region);
+})
+.WithName("AdminRegisterDrRegion")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapPost("/api/admin/dr/failover/{targetRegionId}", async (
+    string targetRegionId,
+    IFailoverManager failoverManager,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("DrFailover", targetRegionId, http.User);
+    var result = await failoverManager.FailoverAsync(targetRegionId, ct);
+    return result.Success ? Results.Ok(result) : Results.UnprocessableEntity(result);
+})
+.WithName("AdminDrFailover")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapPost("/api/admin/dr/failback/{regionId}", async (
+    string regionId,
+    IFailoverManager failoverManager,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("DrFailback", regionId, http.User);
+    var result = await failoverManager.FailbackAsync(regionId, ct);
+    return result.Success ? Results.Ok(result) : Results.UnprocessableEntity(result);
+})
+.WithName("AdminDrFailback")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/dr/replication", async (
+    IReplicationManager replicationManager,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("GetDrReplication", null, http.User);
+    var statuses = await replicationManager.GetAllStatusesAsync(ct);
+    return Results.Ok(statuses);
+})
+.WithName("AdminGetDrReplication")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/dr/objectives", async (
+    IRecoveryPointValidator validator,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("GetDrObjectives", null, http.User);
+    var objectives = await validator.GetObjectivesAsync(ct);
+    return Results.Ok(objectives);
+})
+.WithName("AdminGetDrObjectives")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapPost("/api/admin/dr/objectives", async (
+    RecoveryObjective objective,
+    IRecoveryPointValidator validator,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("RegisterDrObjective", objective.ObjectiveId, http.User);
+    await validator.RegisterObjectiveAsync(objective, ct);
+    return Results.Ok(objective);
+})
+.WithName("AdminRegisterDrObjective")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapPost("/api/admin/dr/drills", async (
+    DrDrillScenario scenario,
+    IDrDrillRunner drillRunner,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("RunDrDrill", scenario.ScenarioId, http.User);
+    var result = await drillRunner.RunDrillAsync(scenario, ct);
+    return Results.Ok(result);
+})
+.WithName("AdminRunDrDrill")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/dr/drills/history", async (
+    IDrDrillRunner drillRunner,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("GetDrDrillHistory", null, http.User);
+    var history = await drillRunner.GetDrillHistoryAsync(cancellationToken: ct);
+    return Results.Ok(history);
+})
+.WithName("AdminGetDrDrillHistory")
 .RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
 
 app.Run();
