@@ -63,7 +63,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 038** (Tenant onboarding automation) is next.
+**Chunk 040** (Performance profiling) is next.
 
 ---
 
@@ -71,8 +71,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Status |
 |-------|------|------|--------|
-| 038 | Tenant onboarding automation | Self-service tenant provisioning, quota management, isolated broker namespaces, and onboarding workflow | not-started |
-| 039 | Disaster recovery automation | Automated failover, cross-region replication, recovery point validation, and DR drill framework | not-started |
 | 040 | Performance profiling | Continuous profiling integration, memory/CPU hotspot detection, GC tuning, and benchmark regression tests | not-started |
 
 ### Phase 7 – Missing Projects
