@@ -4,6 +4,62 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 042 – RuleEngine
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: Business rule evaluation engine — conditions (Equals, Contains, Regex, In, GreaterThan) with AND/OR logic, priority-sorted, per-message actions (Route, Transform, Reject, DeadLetter).
+
+### Architecture
+
+- **RuleConditionOperator** — Enum: Equals, Contains, Regex, In, GreaterThan.
+- **RuleCondition** — Record: FieldName + Operator + Value. Supports MessageType, Source, Priority, Metadata.{key}, Payload.{path} fields.
+- **RuleLogicOperator** — Enum: And (all conditions must match), Or (any condition must match).
+- **RuleActionType** — Enum: Route, Transform, Reject, DeadLetter.
+- **RuleAction** — Record: ActionType + TargetTopic + TransformName + Reason.
+- **BusinessRule** — Record: Name + Priority + LogicOperator + Conditions + Action + StopOnMatch + Enabled.
+- **RuleEvaluationResult** — Record: MatchedRules + Actions + HasMatch + RulesEvaluated.
+- **IRuleEngine** — Interface for evaluating rules against IntegrationEnvelope<T>.
+- **BusinessRuleEngine** — Production implementation. Priority-sorted evaluation. AND/OR logic. Disabled rule skip. MaxRulesPerEvaluation guard. Regex timeout protection against catastrophic backtracking. Structured logging.
+- **RuleEngineOptions** — Configuration (Enabled, MaxRulesPerEvaluation, Rules seed list, RegexTimeout). Bind from RuleEngine section.
+- **IRuleStore** — Interface for CRUD on business rules. GetAll (sorted), GetByName, AddOrUpdate, Remove, Count.
+- **InMemoryRuleStore** — Thread-safe ConcurrentDictionary implementation. Case-insensitive name lookup.
+- **RuleEngineServiceExtensions** — DI registration: AddRuleEngine (store + engine + config seed), AddRuleStore<T> (custom store replacement).
+
+### Files created
+
+- `src/RuleEngine/RuleEngine.csproj`
+- `src/RuleEngine/RuleConditionOperator.cs`
+- `src/RuleEngine/RuleCondition.cs`
+- `src/RuleEngine/RuleLogicOperator.cs`
+- `src/RuleEngine/RuleActionType.cs`
+- `src/RuleEngine/RuleAction.cs`
+- `src/RuleEngine/BusinessRule.cs`
+- `src/RuleEngine/RuleEvaluationResult.cs`
+- `src/RuleEngine/IRuleEngine.cs`
+- `src/RuleEngine/IRuleStore.cs`
+- `src/RuleEngine/InMemoryRuleStore.cs`
+- `src/RuleEngine/BusinessRuleEngine.cs`
+- `src/RuleEngine/RuleEngineOptions.cs`
+- `src/RuleEngine/RuleEngineServiceExtensions.cs`
+- `tests/UnitTests/BusinessRuleEngineTests.cs`
+- `tests/UnitTests/InMemoryRuleStoreTests.cs`
+- `tests/UnitTests/RuleEngineOptionsTests.cs`
+
+### Test counts after chunk
+
+| Suite | Count |
+|-------|-------|
+| UnitTests | 944 |
+| ContractTests | 29 |
+| WorkflowTests | 24 |
+| IntegrationTests | 17 |
+| PlaywrightTests | 13 |
+| LoadTests | 10 |
+| **Total** | **1037** |
+
+---
+
 ## Chunk 041 – Processing.Transform
 
 - **Date**: 2026-04-03
