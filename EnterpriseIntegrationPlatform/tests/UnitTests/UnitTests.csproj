@@ -44,5 +44,6 @@
     <ProjectReference Include="..\..\src\DisasterRecovery\DisasterRecovery.csproj" />
     <ProjectReference Include="..\..\src\Performance.Profiling\Performance.Profiling.csproj" />
     <ProjectReference Include="..\..\src\Processing.Transform\Processing.Transform.csproj" />
+    <ProjectReference Include="..\..\src\RuleEngine\RuleEngine.csproj" />
   </ItemGroup>
 </Project>
