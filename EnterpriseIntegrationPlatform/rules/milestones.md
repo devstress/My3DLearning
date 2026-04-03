@@ -64,7 +64,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 044** (Missing EIP — Messaging Channels) is next.
+**Chunk 045** (Message Construction — Return Address, Message Expiration, Format Indicator, Message Sequence, Command/Document/Event Messages) is next.
 
 ---
 
@@ -80,7 +80,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Tests Required |
 |-------|------|------|----------------|
-| 044 | Messaging Channels — Point-to-Point, Pub-Sub, Datatype Channel, Invalid Message Channel, Messaging Bridge, Message Bus | (a) Add `PointToPointChannel` and `PublishSubscribeChannel` abstractions in Ingestion/ wrapping broker-specific queue-group vs fan-out semantics. (b) Add `DatatypeChannel` helper that auto-resolves topic/subject from `IntegrationEnvelope.MessageType`. (c) Add `InvalidMessageChannel` that routes unparseable/invalid-schema messages to a dedicated invalid-message topic (distinct from DLQ — DLQ is for processing failures, Invalid is for malformed input). (d) Add `MessagingBridge` component in Ingestion/ that forwards messages between two different broker instances (e.g., Kafka→NATS, NATS→Pulsar) with envelope preservation and dedup. (e) Document `Message Bus` as the architectural pattern the platform itself implements. | UnitTests: ≥20 (channel abstractions, datatype routing, invalid-message routing, bridge forwarding with dedup) |
 | 045 | Message Construction — Return Address, Message Expiration, Format Indicator, Message Sequence, Command/Document/Event Messages | (a) Add `ReplyTo` field to `IntegrationEnvelope<T>` for Return Address pattern. (b) Add `ExpiresAt` (DateTimeOffset?) field to envelope for Message Expiration — processing steps must check expiry and route expired messages to DLQ with reason "expired". (c) Add `FormatIndicator` as `ContentType` metadata header constant (already partially exists via `MessageHeaders.ContentType` — formalize and validate). (d) Add `SequenceNumber` and `TotalCount` fields to envelope for Message Sequence (used by Splitter output — currently only in metadata; promote to first-class fields). (e) Add `MessageIntent` enum (Command, Document, Event) to envelope to distinguish Command Message / Document Message / Event Message patterns. Update ContractTests for all new fields. | ContractTests: ≥15 new (envelope field serialization, expiry, sequence). UnitTests: ≥10 (expiry check in pipeline, intent-based routing) |
 | 046 | Message Construction — Request-Reply | (a) Add `RequestReplyCorrelator` in Processing/ that publishes a request envelope with `ReplyTo` set, subscribes to the reply topic, and correlates the response by `CorrelationId` with configurable timeout. (b) Integrate with `IMessageBrokerProducer`/`IMessageBrokerConsumer`. (c) This is the async messaging equivalent of HTTP request-response — critical for BizTalk solicit-response port replacement. | UnitTests: ≥12 (send-request, receive-reply, timeout, correlation mismatch) |
 
@@ -150,15 +149,15 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 - 🔲 Message Endpoint (chunk 056 — formalize consumer patterns)
 
 **Messaging Channels:**
-- 🔲 Point-to-Point Channel (chunk 044)
-- 🔲 Publish-Subscribe Channel (chunk 044)
-- 🔲 Datatype Channel (chunk 044)
-- 🔲 Invalid Message Channel (chunk 044)
+- ✅ Point-to-Point Channel (Ingestion.Channels.PointToPointChannel)
+- ✅ Publish-Subscribe Channel (Ingestion.Channels.PublishSubscribeChannel)
+- ✅ Datatype Channel (Ingestion.Channels.DatatypeChannel)
+- ✅ Invalid Message Channel (Ingestion.Channels.InvalidMessageChannel)
 - ✅ Dead Letter Channel (Processing.DeadLetter)
 - ✅ Guaranteed Delivery (Kafka + Temporal)
 - ✅ Channel Adapter (Connector.Http/Sftp/Email/File)
-- 🔲 Messaging Bridge (chunk 044)
-- 🔲 Message Bus (chunk 044 — document)
+- ✅ Messaging Bridge (Ingestion.Channels.MessagingBridge)
+- ✅ Message Bus (the platform IS the message bus — documented)
 
 **Message Construction:**
 - 🔲 Command Message (chunk 045 — MessageIntent enum)

@@ -4,6 +4,68 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 044 – Messaging Channels (Point-to-Point, Pub-Sub, Datatype, Invalid Message, Bridge, Message Bus)
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: Add EIP Messaging Channel patterns — PointToPointChannel (queue-group semantics), PublishSubscribeChannel (fan-out), DatatypeChannel (auto-resolve topic from MessageType), InvalidMessageChannel (malformed input routing distinct from DLQ), MessagingBridge (cross-broker forwarding with dedup), Message Bus (documented as platform architecture).
+
+### Architecture
+
+- **IPointToPointChannel / PointToPointChannel** — Wraps IMessageBrokerProducer/Consumer to enforce queue-group semantics: each message delivered to exactly one consumer in the group.
+- **IPublishSubscribeChannel / PublishSubscribeChannel** — Wraps broker with fan-out delivery: each subscriber gets a unique consumer group so every subscriber receives every message.
+- **IDatatypeChannel / DatatypeChannel** — Auto-resolves topic from IntegrationEnvelope.MessageType using configurable prefix and separator. Each message type flows on its own dedicated channel.
+- **DatatypeChannelOptions** — TopicPrefix and Separator configuration.
+- **IInvalidMessageChannel / InvalidMessageChannel** — Routes unparseable/invalid-schema messages to a dedicated invalid-message topic. Distinct from DLQ (processing failures). Supports both envelope-based and raw-data routing.
+- **InvalidMessageEnvelope** — Record carrying OriginalMessageId, RawData, SourceTopic, Reason, RejectedAt.
+- **InvalidMessageChannelOptions** — InvalidMessageTopic and Source configuration.
+- **IMessagingBridge / MessagingBridge** — Forwards messages between two broker instances with envelope preservation and sliding-window deduplication by MessageId. Thread-safe via ConcurrentDictionary + ConcurrentQueue.
+- **MessagingBridgeOptions** — ConsumerGroup and DeduplicationWindowSize configuration.
+- **ChannelServiceExtensions** — DI registration for all channel services.
+- **Message Bus** — Documented as the architectural pattern the platform itself implements (the entire EIP platform IS the message bus).
+
+### Files created
+
+- `src/Ingestion/Channels/IPointToPointChannel.cs`
+- `src/Ingestion/Channels/PointToPointChannel.cs`
+- `src/Ingestion/Channels/IPublishSubscribeChannel.cs`
+- `src/Ingestion/Channels/PublishSubscribeChannel.cs`
+- `src/Ingestion/Channels/IDatatypeChannel.cs`
+- `src/Ingestion/Channels/DatatypeChannel.cs`
+- `src/Ingestion/Channels/DatatypeChannelOptions.cs`
+- `src/Ingestion/Channels/IInvalidMessageChannel.cs`
+- `src/Ingestion/Channels/InvalidMessageChannel.cs`
+- `src/Ingestion/Channels/InvalidMessageEnvelope.cs`
+- `src/Ingestion/Channels/InvalidMessageChannelOptions.cs`
+- `src/Ingestion/Channels/IMessagingBridge.cs`
+- `src/Ingestion/Channels/MessagingBridge.cs`
+- `src/Ingestion/Channels/MessagingBridgeOptions.cs`
+- `src/Ingestion/Channels/ChannelServiceExtensions.cs`
+- `tests/UnitTests/PointToPointChannelTests.cs`
+- `tests/UnitTests/PublishSubscribeChannelTests.cs`
+- `tests/UnitTests/DatatypeChannelTests.cs`
+- `tests/UnitTests/InvalidMessageChannelTests.cs`
+- `tests/UnitTests/MessagingBridgeTests.cs`
+
+### Files modified
+
+- `rules/milestones.md` — Removed chunk 044 row, updated Next Chunk to 045, updated EIP checklist
+- `rules/completion-log.md` — Added chunk 044 entry
+
+### Test counts after chunk
+
+| Suite | Count |
+|-------|-------|
+| UnitTests | 1018 |
+| ContractTests | 29 |
+| WorkflowTests | 24 |
+| IntegrationTests | 17 |
+| PlaywrightTests | 13 |
+| LoadTests | 10 |
+| **Total** | **1111** |
+
+---
+
 ## Chunk 043 – Stateful Pipeline Workflow (Temporal All-or-Nothing)
 
 - **Date**: 2026-04-03
