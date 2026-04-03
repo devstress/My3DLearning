@@ -30,4 +30,19 @@ public static class MessageHeaders
 
     /// <summary>Zero-based number of times this message has been retried.</summary>
     public const string RetryCount = "retry-count";
+
+    /// <summary>Return address — the topic or subject the sender expects replies on.</summary>
+    public const string ReplyTo = "reply-to";
+
+    /// <summary>ISO-8601 UTC timestamp after which the message is considered expired.</summary>
+    public const string ExpiresAt = "expires-at";
+
+    /// <summary>Zero-based sequence number of this message within a split sequence.</summary>
+    public const string SequenceNumber = "sequence-number";
+
+    /// <summary>Total number of messages in the split sequence.</summary>
+    public const string TotalCount = "total-count";
+
+    /// <summary>Message intent — Command, Document, or Event.</summary>
+    public const string Intent = "intent";
 }
