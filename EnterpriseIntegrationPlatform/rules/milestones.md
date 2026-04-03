@@ -64,7 +64,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 043** (Stateful Pipeline Workflow) is next.
+**Chunk 044** (Connectors abstraction) is next.
 
 ---
 
@@ -76,7 +76,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Status |
 |-------|------|------|--------|
-| 043 | Stateful Pipeline Workflow (Temporal All-or-Nothing) | Move ALL pipeline orchestration logic inside Temporal workflows for true BizTalk-replacement atomicity. Currently PipelineOrchestrator does persist/validate/ack/nack OUTSIDE Temporal — not atomic, not recoverable. Fix: new IntegrationPipelineWorkflow with Temporal activities for every side-effect (persist to Cassandra, update status, save fault, publish ack/nack). Demo.Pipeline becomes a thin NATS→Temporal dispatcher. Workflow.Temporal worker gets infrastructure deps (Storage.Cassandra, Ingestion, Observability). All-or-nothing: if any step fails, Temporal retries or compensates — no partial state. | not-started |
 | 044 | Connectors abstraction | Unified connector registry and factory (IConnector, IConnectorRegistry, IConnectorFactory) over Connector.Http/Sftp/Email/File with runtime registration | not-started |
 | 045 | Admin.Web (Vue 3) | Vue 3 admin dashboard frontend for Admin.Api — tenant/queue/endpoint throttle control, rate limit status, DLQ management, message inspection, policy CRUD | not-started |
 | 046 | RAG Knowledge Base | XML-based RAG knowledge store under docs/rag/ with platform documentation indexed for RagFlow retrieval. Deployable with Aspire or standalone. Covers all EIP patterns, usage guides, and implementation reference | not-started |

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 
+using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
 
@@ -7,10 +8,10 @@ namespace EnterpriseIntegrationPlatform.Workflow.Temporal.Services;
 
 /// <summary>
 /// Persistence activity service backed by Cassandra.
-/// Used by <see cref="Activities.PipelineActivities"/> to execute durable
+/// Used by <see cref="Temporal.Activities.PipelineActivities"/> to execute durable
 /// persistence operations as Temporal activities.
 /// </summary>
-public sealed class CassandraPersistenceActivityService : Activities.IPersistenceActivityService
+public sealed class CassandraPersistenceActivityService : IPersistenceActivityService
 {
     private readonly IMessageRepository _repository;
     private readonly ILogger<CassandraPersistenceActivityService> _logger;
@@ -25,7 +26,7 @@ public sealed class CassandraPersistenceActivityService : Activities.IPersistenc
 
     /// <inheritdoc />
     public async Task SaveMessageAsync(
-        Activities.IntegrationPipelineInput input,
+        IntegrationPipelineInput input,
         CancellationToken cancellationToken = default)
     {
         var record = new MessageRecord

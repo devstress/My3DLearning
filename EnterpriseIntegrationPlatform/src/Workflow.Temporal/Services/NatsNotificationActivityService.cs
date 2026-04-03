@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 
+using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
 
@@ -7,10 +8,10 @@ namespace EnterpriseIntegrationPlatform.Workflow.Temporal.Services;
 
 /// <summary>
 /// Notification activity service backed by the configured message broker (NATS JetStream).
-/// Used by <see cref="Activities.PipelineActivities"/> to publish Ack/Nack messages
+/// Used by <see cref="Temporal.Activities.PipelineActivities"/> to publish Ack/Nack messages
 /// as Temporal activities, ensuring notification delivery is durable and retried.
 /// </summary>
-public sealed class NatsNotificationActivityService : Activities.INotificationActivityService
+public sealed class NatsNotificationActivityService : INotificationActivityService
 {
     private const string ServiceName = "Workflow.Temporal";
 

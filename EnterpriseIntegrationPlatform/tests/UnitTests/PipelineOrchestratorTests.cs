@@ -2,9 +2,6 @@ using System.Text.Json;
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Demo.Pipeline;
-using EnterpriseIntegrationPlatform.Ingestion;
-using EnterpriseIntegrationPlatform.Observability;
-using EnterpriseIntegrationPlatform.Storage.Cassandra;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -16,8 +13,6 @@ namespace EnterpriseIntegrationPlatform.Tests.Unit;
 [TestFixture]
 public class PipelineOrchestratorTests
 {
-    private IMessageRepository _repository = null!;
-    private IMessageBrokerProducer _producer = null!;
     private ITemporalWorkflowDispatcher _dispatcher = null!;
     private PipelineOptions _options = null!;
     private PipelineOrchestrator _sut = null!;
@@ -25,22 +20,12 @@ public class PipelineOrchestratorTests
     [SetUp]
     public void SetUp()
     {
-        _repository = Substitute.For<IMessageRepository>();
-        _producer = Substitute.For<IMessageBrokerProducer>();
         _dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
         _options = new PipelineOptions();
-        // Build a minimal MessageLifecycleRecorder with no-op dependencies
-        var stateStore = Substitute.For<IMessageStateStore>();
-        var eventLog = Substitute.For<IObservabilityEventLog>();
-        var lifecycleLogger = NullLogger<MessageLifecycleRecorder>.Instance;
-        var lifecycle = new MessageLifecycleRecorder(stateStore, eventLog, lifecycleLogger);
         _sut = new PipelineOrchestrator(
-        _repository,
-        lifecycle,
-        _producer,
-        _dispatcher,
-        Options.Create(_options),
-        NullLogger<PipelineOrchestrator>.Instance);
+            _dispatcher,
+            Options.Create(_options),
+            NullLogger<PipelineOrchestrator>.Instance);
     }
 
     private static IntegrationEnvelope<JsonElement> BuildEnvelope(
@@ -54,152 +39,156 @@ public class PipelineOrchestratorTests
     }
 
     [Test]
-    public async Task ProcessAsync_ValidMessage_SavesMessageToCassandra()
+    public async Task ProcessAsync_ValidMessage_DispatchesToTemporal()
     {
         var envelope = BuildEnvelope();
-        _dispatcher.DispatchAsync(Arg.Any<ProcessIntegrationMessageInput>(), Arg.Any<string>())
-            .Returns(new ProcessIntegrationMessageResult(envelope.MessageId, true));
+        _dispatcher.DispatchAsync(Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>())
+            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
 
         await _sut.ProcessAsync(envelope);
 
-        await _repository.Received(1).SaveMessageAsync(
-            Arg.Is<MessageRecord>(r => r.MessageId == envelope.MessageId),
+        await _dispatcher.Received(1).DispatchAsync(
+            Arg.Is<IntegrationPipelineInput>(i => i.MessageId == envelope.MessageId),
+            Arg.Any<string>(),
             Arg.Any<CancellationToken>());
     }
 
     [Test]
-    public async Task ProcessAsync_ValidMessage_UpdatesStatusToDelivered()
+    public async Task ProcessAsync_ValidMessage_SetsCorrectWorkflowId()
     {
         var envelope = BuildEnvelope();
-        _dispatcher.DispatchAsync(Arg.Any<ProcessIntegrationMessageInput>(), Arg.Any<string>())
-            .Returns(new ProcessIntegrationMessageResult(envelope.MessageId, true));
-
-        await _sut.ProcessAsync(envelope);
-
-        await _repository.Received(1).UpdateDeliveryStatusAsync(
-            envelope.MessageId,
-            envelope.CorrelationId,
-            Arg.Any<DateTimeOffset>(),
-            DeliveryStatus.Delivered,
-            Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task ProcessAsync_ValidMessage_PublishesAckToCorrectSubject()
-    {
-        var envelope = BuildEnvelope();
-        _dispatcher.DispatchAsync(Arg.Any<ProcessIntegrationMessageInput>(), Arg.Any<string>())
-            .Returns(new ProcessIntegrationMessageResult(envelope.MessageId, true));
-
-        await _sut.ProcessAsync(envelope);
-
-        await _producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<AckPayload>>(),
-            _options.AckSubject,
-            Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task ProcessAsync_InvalidMessage_UpdatesStatusToFailed()
-    {
-        var envelope = BuildEnvelope();
-        _dispatcher.DispatchAsync(Arg.Any<ProcessIntegrationMessageInput>(), Arg.Any<string>())
-            .Returns(new ProcessIntegrationMessageResult(envelope.MessageId, false, "Bad payload"));
-
-        await _sut.ProcessAsync(envelope);
-
-        await _repository.Received(1).UpdateDeliveryStatusAsync(
-            envelope.MessageId,
-            envelope.CorrelationId,
-            Arg.Any<DateTimeOffset>(),
-            DeliveryStatus.Failed,
-            Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task ProcessAsync_InvalidMessage_SavesFaultEnvelope()
-    {
-        var envelope = BuildEnvelope();
-        _dispatcher.DispatchAsync(Arg.Any<ProcessIntegrationMessageInput>(), Arg.Any<string>())
-            .Returns(new ProcessIntegrationMessageResult(envelope.MessageId, false, "Bad payload"));
-
-        await _sut.ProcessAsync(envelope);
-
-        await _repository.Received(1).SaveFaultAsync(
-            Arg.Is<FaultEnvelope>(f =>
-                f.OriginalMessageId == envelope.MessageId &&
-                f.FaultReason == "Bad payload"),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task ProcessAsync_InvalidMessage_PublishesNackToCorrectSubject()
-    {
-        var envelope = BuildEnvelope();
-        _dispatcher.DispatchAsync(Arg.Any<ProcessIntegrationMessageInput>(), Arg.Any<string>())
-            .Returns(new ProcessIntegrationMessageResult(envelope.MessageId, false, "Bad payload"));
-
-        await _sut.ProcessAsync(envelope);
-
-        await _producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<NackPayload>>(),
-            _options.NackSubject,
-            Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task ProcessAsync_DispatcherThrows_SavesFaultEnvelope()
-    {
-        var envelope = BuildEnvelope();
-        _dispatcher.DispatchAsync(Arg.Any<ProcessIntegrationMessageInput>(), Arg.Any<string>())
-            .ThrowsAsync(new InvalidOperationException("Temporal unavailable"));
-
-        await _sut.ProcessAsync(envelope);
-
-        await _repository.Received(1).SaveFaultAsync(
-            Arg.Is<FaultEnvelope>(f => f.OriginalMessageId == envelope.MessageId),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task ProcessAsync_DispatcherThrows_PublishesNack()
-    {
-        var envelope = BuildEnvelope();
-        _dispatcher.DispatchAsync(Arg.Any<ProcessIntegrationMessageInput>(), Arg.Any<string>())
-            .ThrowsAsync(new InvalidOperationException("Temporal unavailable"));
-
-        await _sut.ProcessAsync(envelope);
-
-        await _producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<NackPayload>>(),
-            _options.NackSubject,
-            Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task ProcessAsync_ValidMessage_DispatchesCorrectWorkflowInput()
-    {
-        var envelope = BuildEnvelope("""{"orderId":42}""");
-        ProcessIntegrationMessageInput? capturedInput = null;
+        string? capturedWorkflowId = null;
 
         _dispatcher.DispatchAsync(
-                Arg.Do<ProcessIntegrationMessageInput>(i => capturedInput = i),
-                Arg.Any<string>())
-            .Returns(new ProcessIntegrationMessageResult(envelope.MessageId, true));
+                Arg.Any<IntegrationPipelineInput>(),
+                Arg.Do<string>(id => capturedWorkflowId = id),
+                Arg.Any<CancellationToken>())
+            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
+
+        await _sut.ProcessAsync(envelope);
+
+        Assert.That(capturedWorkflowId, Is.EqualTo($"integration-{envelope.MessageId}"));
+    }
+
+    [Test]
+    public async Task ProcessAsync_ValidMessage_PassesCorrectInput()
+    {
+        var envelope = BuildEnvelope("""{"orderId":42}""");
+        IntegrationPipelineInput? capturedInput = null;
+
+        _dispatcher.DispatchAsync(
+                Arg.Do<IntegrationPipelineInput>(i => capturedInput = i),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
 
         await _sut.ProcessAsync(envelope);
 
         Assert.That(capturedInput, Is.Not.Null);
         Assert.That(capturedInput!.MessageId, Is.EqualTo(envelope.MessageId));
+        Assert.That(capturedInput.CorrelationId, Is.EqualTo(envelope.CorrelationId));
+        Assert.That(capturedInput.Source, Is.EqualTo(envelope.Source));
         Assert.That(capturedInput.MessageType, Is.EqualTo(envelope.MessageType));
         Assert.That(capturedInput.PayloadJson, Does.Contain("42"));
+        Assert.That(capturedInput.AckSubject, Is.EqualTo(_options.AckSubject));
+        Assert.That(capturedInput.NackSubject, Is.EqualTo(_options.NackSubject));
+    }
+
+    [Test]
+    public async Task ProcessAsync_ValidMessage_PassesPriorityAsInt()
+    {
+        var envelope = BuildEnvelope();
+        IntegrationPipelineInput? capturedInput = null;
+
+        _dispatcher.DispatchAsync(
+                Arg.Do<IntegrationPipelineInput>(i => capturedInput = i),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
+
+        await _sut.ProcessAsync(envelope);
+
+        Assert.That(capturedInput!.Priority, Is.EqualTo((int)envelope.Priority));
+    }
+
+    [Test]
+    public async Task ProcessAsync_ValidMessage_PassesSchemaVersion()
+    {
+        var envelope = BuildEnvelope();
+        IntegrationPipelineInput? capturedInput = null;
+
+        _dispatcher.DispatchAsync(
+                Arg.Do<IntegrationPipelineInput>(i => capturedInput = i),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
+
+        await _sut.ProcessAsync(envelope);
+
+        Assert.That(capturedInput!.SchemaVersion, Is.EqualTo(envelope.SchemaVersion));
+    }
+
+    [Test]
+    public async Task ProcessAsync_FailedMessage_DoesNotThrow()
+    {
+        var envelope = BuildEnvelope();
+        _dispatcher.DispatchAsync(Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>())
+            .Returns(new IntegrationPipelineResult(envelope.MessageId, false, "Bad payload"));
+
+        // Thin dispatcher does not throw on failure — it logs the result
+        Assert.DoesNotThrowAsync(() => _sut.ProcessAsync(envelope));
+    }
+
+    [Test]
+    public async Task ProcessAsync_DispatcherThrows_PropagatesException()
+    {
+        var envelope = BuildEnvelope();
+        _dispatcher.DispatchAsync(Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>())
+            .ThrowsAsync(new InvalidOperationException("Temporal unavailable"));
+
+        Assert.ThrowsAsync<InvalidOperationException>(() => _sut.ProcessAsync(envelope));
     }
 
     [Test]
     public async Task ProcessAsync_NullEnvelope_ThrowsArgumentNullException()
     {
-        var act = () => _sut.ProcessAsync(null!);
+        Assert.ThrowsAsync<ArgumentNullException>(() => _sut.ProcessAsync(null!));
+    }
 
-        Assert.ThrowsAsync<ArgumentNullException>(async () => await act());
+    [Test]
+    public async Task ProcessAsync_EmptyMetadata_SetsMetadataJsonNull()
+    {
+        var envelope = BuildEnvelope();
+        IntegrationPipelineInput? capturedInput = null;
+
+        _dispatcher.DispatchAsync(
+                Arg.Do<IntegrationPipelineInput>(i => capturedInput = i),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
+
+        await _sut.ProcessAsync(envelope);
+
+        Assert.That(capturedInput!.MetadataJson, Is.Null);
+    }
+
+    [Test]
+    public async Task ProcessAsync_PassesCancellationToken()
+    {
+        var envelope = BuildEnvelope();
+        using var cts = new CancellationTokenSource();
+
+        _dispatcher.DispatchAsync(
+                Arg.Any<IntegrationPipelineInput>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
+
+        await _sut.ProcessAsync(envelope, cts.Token);
+
+        await _dispatcher.Received(1).DispatchAsync(
+            Arg.Any<IntegrationPipelineInput>(),
+            Arg.Any<string>(),
+            cts.Token);
     }
 }

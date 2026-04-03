@@ -19,7 +19,7 @@
 - `Contracts` has ZERO project dependencies (pure DTOs and interfaces)
 - `ServiceDefaults` has ZERO project dependencies (cross-cutting defaults)
 - `Activities` depends only on `Contracts`
-- `Workflow.Temporal` depends on `Contracts` and `Activities`
+- `Workflow.Temporal` depends on `Contracts`, `Activities`, `Storage.Cassandra`, `Ingestion`, `Ingestion.Nats`, and `Observability`
 - `Ingestion` depends on `Contracts` (broker abstraction; Kafka, NATS, and Pulsar providers)
 - `Ingestion.Kafka` depends on `Ingestion` and `Contracts`
 - `Ingestion.Nats` depends on `Ingestion` and `Contracts`
