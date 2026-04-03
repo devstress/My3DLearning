@@ -169,8 +169,6 @@ public sealed class DrDrillRunner : IDrDrillRunner
     public Task<DrDrillResult?> GetLastDrillResultAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _history.TryPeek(out var last);
-        // ConcurrentQueue is FIFO, but we want the last element
         var result = _history.LastOrDefault();
         return Task.FromResult(result);
     }

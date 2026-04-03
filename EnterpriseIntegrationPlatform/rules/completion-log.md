@@ -4,6 +4,128 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 039 – Disaster Recovery Automation
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: Automated failover, cross-region replication, recovery point validation, and DR drill framework.
+
+### Architecture
+
+- **IFailoverManager** — Interface for managing automated failover between primary and standby regions (register, failover, failback, health check).
+- **InMemoryFailoverManager** — Thread-safe in-memory implementation with full state tracking, lock-based failover serialization.
+- **IReplicationManager** — Interface for cross-region data replication monitoring (report progress, get lag/status).
+- **InMemoryReplicationManager** — In-memory replication tracking with lag calculation based on pending items and configurable per-item replication time.
+- **IRecoveryPointValidator** — Interface for validating RPO/RTO targets against current system state.
+- **RecoveryPointValidator** — Validates registered recovery objectives against current replication lag and failover duration.
+- **IDrDrillRunner** — Interface for running DR drill scenarios and tracking drill history.
+- **DrDrillRunner** — Full drill orchestrator: detection → replication check → failover → objective validation → failback, with history retention.
+- **DisasterRecoveryOptions** — Configuration (MaxReplicationLag, HealthCheckInterval, MaxDrillHistorySize, OfflineThreshold, PerItemReplicationTime).
+
+### Files created
+
+- `src/DisasterRecovery/DisasterRecovery.csproj`
+- `src/DisasterRecovery/FailoverState.cs`
+- `src/DisasterRecovery/RegionInfo.cs`
+- `src/DisasterRecovery/FailoverResult.cs`
+- `src/DisasterRecovery/ReplicationStatus.cs`
+- `src/DisasterRecovery/RecoveryObjective.cs`
+- `src/DisasterRecovery/RecoveryPointValidationResult.cs`
+- `src/DisasterRecovery/DrDrillScenario.cs`
+- `src/DisasterRecovery/DrDrillType.cs`
+- `src/DisasterRecovery/DrDrillResult.cs`
+- `src/DisasterRecovery/IFailoverManager.cs`
+- `src/DisasterRecovery/IReplicationManager.cs`
+- `src/DisasterRecovery/IRecoveryPointValidator.cs`
+- `src/DisasterRecovery/IDrDrillRunner.cs`
+- `src/DisasterRecovery/DisasterRecoveryOptions.cs`
+- `src/DisasterRecovery/InMemoryFailoverManager.cs`
+- `src/DisasterRecovery/InMemoryReplicationManager.cs`
+- `src/DisasterRecovery/RecoveryPointValidator.cs`
+- `src/DisasterRecovery/DrDrillRunner.cs`
+- `src/DisasterRecovery/DisasterRecoveryServiceExtensions.cs`
+- `tests/UnitTests/DisasterRecoveryTests/InMemoryFailoverManagerTests.cs` (14 tests)
+- `tests/UnitTests/DisasterRecoveryTests/InMemoryReplicationManagerTests.cs` (13 tests)
+- `tests/UnitTests/DisasterRecoveryTests/RecoveryPointValidatorTests.cs` (12 tests)
+- `tests/UnitTests/DisasterRecoveryTests/DrDrillRunnerTests.cs` (13 tests)
+
+### Files modified
+
+- `src/Admin.Api/Admin.Api.csproj` — added ProjectReference to DisasterRecovery
+- `src/Admin.Api/Program.cs` — added DisasterRecovery DI registration and 9 DR admin endpoints
+- `tests/UnitTests/UnitTests.csproj` — added ProjectReference to DisasterRecovery
+- `EnterpriseIntegrationPlatform.sln` — added DisasterRecovery project
+- `rules/milestones.md` — removed chunks 038/039, updated Next Chunk to 040
+- `rules/completion-log.md` — this entry
+
+### Admin API endpoints added
+
+- `GET /api/admin/dr/regions` — list all registered regions
+- `POST /api/admin/dr/regions` — register a DR region
+- `POST /api/admin/dr/failover/{targetRegionId}` — trigger failover
+- `POST /api/admin/dr/failback/{regionId}` — trigger failback
+- `GET /api/admin/dr/replication` — get all replication statuses
+- `GET /api/admin/dr/objectives` — list recovery objectives
+- `POST /api/admin/dr/objectives` — register a recovery objective
+- `POST /api/admin/dr/drills` — run a DR drill
+- `GET /api/admin/dr/drills/history` — get drill history
+
+### Test count
+
+- 52 new unit tests (total: 745 across UnitTests, 833 across all test projects)
+
+---
+
+## Chunk 038 – Tenant Onboarding Automation
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: Self-service tenant provisioning, quota management, isolated broker namespaces, and onboarding workflow.
+
+### Architecture
+
+- **ITenantOnboardingService** — Interface for tenant provisioning and deprovisioning.
+- **InMemoryTenantOnboardingService** — Thread-safe in-memory implementation with status tracking.
+- **ITenantQuotaManager** — Interface for per-tenant quota management.
+- **InMemoryTenantQuotaManager** — In-memory quota tracking.
+- **IBrokerNamespaceProvisioner** — Interface for isolated broker namespace creation.
+- **InMemoryBrokerNamespaceProvisioner** — In-memory broker namespace tracking.
+- **TenantOnboardingServiceExtensions** — DI extension method `AddTenantOnboarding()`.
+
+### Files created
+
+- `src/MultiTenancy.Onboarding/MultiTenancy.Onboarding.csproj`
+- `src/MultiTenancy.Onboarding/ITenantOnboardingService.cs`
+- `src/MultiTenancy.Onboarding/InMemoryTenantOnboardingService.cs`
+- `src/MultiTenancy.Onboarding/ITenantQuotaManager.cs`
+- `src/MultiTenancy.Onboarding/InMemoryTenantQuotaManager.cs`
+- `src/MultiTenancy.Onboarding/IBrokerNamespaceProvisioner.cs`
+- `src/MultiTenancy.Onboarding/InMemoryBrokerNamespaceProvisioner.cs`
+- `src/MultiTenancy.Onboarding/TenantOnboardingServiceExtensions.cs`
+- `src/MultiTenancy.Onboarding/TenantOnboardingRequest.cs`
+- `src/MultiTenancy.Onboarding/TenantOnboardingResult.cs`
+- `src/MultiTenancy.Onboarding/OnboardingStatus.cs`
+- `src/MultiTenancy.Onboarding/IsolationLevel.cs`
+- `src/MultiTenancy.Onboarding/TenantPlan.cs`
+- `src/MultiTenancy.Onboarding/TenantQuota.cs`
+- `src/MultiTenancy.Onboarding/BrokerNamespaceConfig.cs`
+- `tests/UnitTests/TenantOnboardingTests/InMemoryTenantOnboardingServiceTests.cs`
+- `tests/UnitTests/TenantOnboardingTests/InMemoryTenantQuotaManagerTests.cs`
+- `tests/UnitTests/TenantOnboardingTests/InMemoryBrokerNamespaceProvisionerTests.cs`
+
+### Files modified
+
+- `src/Admin.Api/Admin.Api.csproj` — added ProjectReference to MultiTenancy.Onboarding
+- `src/Admin.Api/Program.cs` — added tenant onboarding DI registration and 5 admin endpoints
+- `tests/UnitTests/UnitTests.csproj` — added ProjectReference to MultiTenancy.Onboarding
+- `EnterpriseIntegrationPlatform.sln` — added MultiTenancy.Onboarding project
+
+### Test count
+
+- 27 new unit tests (total: 693 across UnitTests)
+
+---
+
 ## Chunk 037 – Competing Consumers
 
 - **Date**: 2026-04-02
