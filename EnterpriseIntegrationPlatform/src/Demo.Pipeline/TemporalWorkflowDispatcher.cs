@@ -7,9 +7,10 @@ using EnterpriseIntegrationPlatform.Activities;
 namespace EnterpriseIntegrationPlatform.Demo.Pipeline;
 
 /// <summary>
-/// Connects to Temporal and starts the <c>ProcessIntegrationMessageWorkflow</c>
-/// using the Temporal .NET client. The connection is established lazily on the
-/// first dispatch call and reused for the service lifetime.
+/// Connects to Temporal and starts the <c>IntegrationPipelineWorkflow</c>
+/// using the Temporal .NET client. The entire pipeline (persist → validate →
+/// ack/nack) runs atomically inside Temporal — this dispatcher is a thin
+/// pass-through that starts the workflow and awaits its result.
 /// </summary>
 public sealed class TemporalWorkflowDispatcher : ITemporalWorkflowDispatcher, IAsyncDisposable
 {
@@ -28,8 +29,8 @@ public sealed class TemporalWorkflowDispatcher : ITemporalWorkflowDispatcher, IA
     }
 
     /// <inheritdoc />
-    public async Task<ProcessIntegrationMessageResult> DispatchAsync(
-        ProcessIntegrationMessageInput input,
+    public async Task<IntegrationPipelineResult> DispatchAsync(
+        IntegrationPipelineInput input,
         string workflowId,
         CancellationToken cancellationToken = default)
     {
@@ -39,25 +40,25 @@ public sealed class TemporalWorkflowDispatcher : ITemporalWorkflowDispatcher, IA
         var client = await EnsureClientAsync(cancellationToken);
 
         _logger.LogDebug(
-            "Starting workflow {WorkflowId} for message {MessageId}",
+            "Starting IntegrationPipelineWorkflow {WorkflowId} for message {MessageId}",
             workflowId, input.MessageId);
 
-        // Use the string-based API so this project does not need a project reference
+        // Use string-based API so this project does not need a project reference
         // to Workflow.Temporal. The workflow type name matches the [Workflow] class name.
         var handle = await client.StartWorkflowAsync(
-            "ProcessIntegrationMessageWorkflow",
+            "IntegrationPipelineWorkflow",
             (IReadOnlyCollection<object>)[input],
             new WorkflowOptions(id: workflowId, taskQueue: _options.TemporalTaskQueue)
             {
                 ExecutionTimeout = _options.WorkflowTimeout,
             });
 
-        var result = await handle.GetResultAsync<ProcessIntegrationMessageResult>(
+        var result = await handle.GetResultAsync<IntegrationPipelineResult>(
             rpcOptions: new RpcOptions { CancellationToken = cancellationToken });
 
         _logger.LogDebug(
-            "Workflow {WorkflowId} completed: IsValid={IsValid}",
-            workflowId, result.IsValid);
+            "Workflow {WorkflowId} completed: IsSuccess={IsSuccess}",
+            workflowId, result.IsSuccess);
 
         return result;
     }

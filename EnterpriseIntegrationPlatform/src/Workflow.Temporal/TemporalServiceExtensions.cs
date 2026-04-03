@@ -5,6 +5,7 @@ using Temporalio.Extensions.Hosting;
 
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Workflow.Temporal.Activities;
+using EnterpriseIntegrationPlatform.Workflow.Temporal.Services;
 using EnterpriseIntegrationPlatform.Workflow.Temporal.Workflows;
 
 namespace EnterpriseIntegrationPlatform.Workflow.Temporal;
@@ -31,6 +32,10 @@ public static class TemporalServiceExtensions
         services.AddSingleton<IMessageLoggingService, DefaultMessageLoggingService>();
         services.AddSingleton<ICompensationActivityService, DefaultCompensationActivityService>();
 
+        // Register pipeline activity services (persistence + notification)
+        services.AddSingleton<IPersistenceActivityService, CassandraPersistenceActivityService>();
+        services.AddSingleton<INotificationActivityService, NatsNotificationActivityService>();
+
         // Register Temporal hosted worker with workflows and scoped activities
         services
             .AddHostedTemporalWorker(options.TaskQueue)
@@ -44,8 +49,10 @@ public static class TemporalServiceExtensions
             })
             .AddWorkflow<ProcessIntegrationMessageWorkflow>()
             .AddWorkflow<SagaCompensationWorkflow>()
+            .AddWorkflow<IntegrationPipelineWorkflow>()
             .AddScopedActivities<IntegrationActivities>()
-            .AddScopedActivities<SagaCompensationActivities>();
+            .AddScopedActivities<SagaCompensationActivities>()
+            .AddScopedActivities<PipelineActivities>();
 
         return services;
     }

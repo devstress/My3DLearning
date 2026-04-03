@@ -64,7 +64,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 043** (Connectors abstraction) is next.
+**Chunk 043** (Stateful Pipeline Workflow) is next.
 
 ---
 
@@ -72,21 +72,22 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ✅ Phase 6 complete — see completion-log.md
 
-### Phase 7 – Missing Projects
+### Phase 7 – Stateful Architecture Correction & Missing Projects
 
 | Chunk | Name | Goal | Status |
 |-------|------|------|--------|
-| 043 | Connectors abstraction | Unified connector registry and factory (IConnector, IConnectorRegistry, IConnectorFactory) over Connector.Http/Sftp/Email/File with runtime registration | not-started |
-| 044 | Admin.Web (Vue 3) | Vue 3 admin dashboard frontend for Admin.Api — tenant/queue/endpoint throttle control, rate limit status, DLQ management, message inspection, policy CRUD | not-started |
-| 045 | RAG Knowledge Base | XML-based RAG knowledge store under docs/rag/ with platform documentation indexed for RagFlow retrieval. Deployable with Aspire or standalone. Covers all EIP patterns, usage guides, and implementation reference | not-started |
+| 043 | Stateful Pipeline Workflow (Temporal All-or-Nothing) | Move ALL pipeline orchestration logic inside Temporal workflows for true BizTalk-replacement atomicity. Currently PipelineOrchestrator does persist/validate/ack/nack OUTSIDE Temporal — not atomic, not recoverable. Fix: new IntegrationPipelineWorkflow with Temporal activities for every side-effect (persist to Cassandra, update status, save fault, publish ack/nack). Demo.Pipeline becomes a thin NATS→Temporal dispatcher. Workflow.Temporal worker gets infrastructure deps (Storage.Cassandra, Ingestion, Observability). All-or-nothing: if any step fails, Temporal retries or compensates — no partial state. | not-started |
+| 044 | Connectors abstraction | Unified connector registry and factory (IConnector, IConnectorRegistry, IConnectorFactory) over Connector.Http/Sftp/Email/File with runtime registration | not-started |
+| 045 | Admin.Web (Vue 3) | Vue 3 admin dashboard frontend for Admin.Api — tenant/queue/endpoint throttle control, rate limit status, DLQ management, message inspection, policy CRUD | not-started |
+| 046 | RAG Knowledge Base | XML-based RAG knowledge store under docs/rag/ with platform documentation indexed for RagFlow retrieval. Deployable with Aspire or standalone. Covers all EIP patterns, usage guides, and implementation reference | not-started |
 
 ### Phase 8 – Documentation
 
 | Chunk | Name | Goal | Status |
 |-------|------|------|--------|
-| 046 | EIP Pattern Documentation | docs/ folder covering all Enterprise Integration Patterns implemented: Content-Based Router, Message Translator, Splitter, Aggregator, Dead Letter Channel, Retry, Replay, Scatter-Gather, Competing Consumers, Event Sourcing, Saga Compensation — with usage examples from actual implementation | not-started |
-| 047 | Platform Usage Guide | End-to-end usage documentation: getting started, configuration, deployment (K8s/Docker), connector setup, throttle/rate-limit tuning, multi-tenancy, security, observability — focused on EnterpriseIntegrationPlatform features only | not-started |
-| 048 | API Reference | Complete API reference for Admin.Api, Gateway.Api, OpenClaw.Web endpoints with request/response examples, authentication, and rate limit/throttle admin operations | not-started |
+| 047 | EIP Pattern Documentation | docs/ folder covering all Enterprise Integration Patterns implemented: Content-Based Router, Message Translator, Splitter, Aggregator, Dead Letter Channel, Retry, Replay, Scatter-Gather, Competing Consumers, Event Sourcing, Saga Compensation — with usage examples from actual implementation | not-started |
+| 048 | Platform Usage Guide | End-to-end usage documentation: getting started, configuration, deployment (K8s/Docker), connector setup, throttle/rate-limit tuning, multi-tenancy, security, observability — focused on EnterpriseIntegrationPlatform features only | not-started |
+| 049 | API Reference | Complete API reference for Admin.Api, Gateway.Api, OpenClaw.Web endpoints with request/response examples, authentication, and rate limit/throttle admin operations | not-started |
 
 ---
 
