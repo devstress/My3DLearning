@@ -4,6 +4,84 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 040 – Performance Profiling
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: Continuous profiling integration, memory/CPU hotspot detection, GC tuning, and benchmark regression tests.
+
+### Architecture
+
+- **IContinuousProfiler** — Interface for capturing periodic CPU, memory, and GC snapshots. Computes delta metrics (CPU%, allocation rate) from previous snapshot.
+- **ContinuousProfiler** — Production implementation using System.Diagnostics.Process, GC.GetGCMemoryInfo(), and GC.GetTotalAllocatedBytes(). Thread-safe with bounded snapshot retention and lock-based capture serialization.
+- **IHotspotDetector** — Interface for registering operation metrics and detecting CPU/memory hotspots against configurable thresholds.
+- **AllocationHotspotDetector** — Lock-free concurrent implementation using ConcurrentDictionary with Interlocked-based OperationAccumulator. Supports configurable max tracked operations, minimum invocation thresholds, and warning/critical severity levels.
+- **IGcMonitor** — Interface for monitoring GC behavior and providing tuning recommendations.
+- **GcMonitor** — Captures GC generation sizes, collection counts, fragmentation ratio, pause time, and LOH metrics. Generates tuning recommendations for ServerGC, fragmentation, Gen2 pressure, pause time, and LOH size.
+- **IBenchmarkRegistry** — Interface for storing benchmark baselines and detecting regressions.
+- **InMemoryBenchmarkRegistry** — Thread-safe ConcurrentDictionary-based registry with case-insensitive lookup. Compares duration and allocation metrics against configurable regression thresholds.
+- **ProfilingOptions** — Configuration (SnapshotInterval, MaxRetainedSnapshots, MaxTrackedOperations, Enabled, HotspotThresholds).
+
+### Files created
+
+- `src/Performance.Profiling/Performance.Profiling.csproj`
+- `src/Performance.Profiling/CpuSnapshot.cs`
+- `src/Performance.Profiling/MemorySnapshot.cs`
+- `src/Performance.Profiling/GcSnapshot.cs`
+- `src/Performance.Profiling/ProfileSnapshot.cs`
+- `src/Performance.Profiling/HotspotSeverity.cs`
+- `src/Performance.Profiling/HotspotInfo.cs`
+- `src/Performance.Profiling/HotspotThresholds.cs`
+- `src/Performance.Profiling/OperationStats.cs`
+- `src/Performance.Profiling/BenchmarkBaseline.cs`
+- `src/Performance.Profiling/BenchmarkResult.cs`
+- `src/Performance.Profiling/BenchmarkRegression.cs`
+- `src/Performance.Profiling/GcTuningRecommendation.cs`
+- `src/Performance.Profiling/ProfilingOptions.cs`
+- `src/Performance.Profiling/IContinuousProfiler.cs`
+- `src/Performance.Profiling/IHotspotDetector.cs`
+- `src/Performance.Profiling/IGcMonitor.cs`
+- `src/Performance.Profiling/IBenchmarkRegistry.cs`
+- `src/Performance.Profiling/ContinuousProfiler.cs`
+- `src/Performance.Profiling/AllocationHotspotDetector.cs`
+- `src/Performance.Profiling/GcMonitor.cs`
+- `src/Performance.Profiling/InMemoryBenchmarkRegistry.cs`
+- `src/Performance.Profiling/ProfilingServiceExtensions.cs`
+- `tests/UnitTests/ProfilingTests/ContinuousProfilerTests.cs` (20 tests)
+- `tests/UnitTests/ProfilingTests/AllocationHotspotDetectorTests.cs` (24 tests)
+- `tests/UnitTests/ProfilingTests/GcMonitorTests.cs` (15 tests)
+- `tests/UnitTests/ProfilingTests/InMemoryBenchmarkRegistryTests.cs` (22 tests)
+- `tests/LoadTests/ProfilingLoadTests.cs` (5 load tests)
+
+### Files modified
+
+- `src/Admin.Api/Admin.Api.csproj` — added ProjectReference to Performance.Profiling
+- `src/Admin.Api/Program.cs` — added Performance.Profiling DI registration and 8 profiling admin endpoints
+- `tests/UnitTests/UnitTests.csproj` — added ProjectReference to Performance.Profiling
+- `tests/LoadTests/LoadTests.csproj` — added ProjectReference to Performance.Profiling
+- `EnterpriseIntegrationPlatform.sln` — added Performance.Profiling project
+- `rules/milestones.md` — removed chunk 040, updated Next Chunk to 041, completed Phase 6
+- `rules/completion-log.md` — this entry
+
+### Admin API endpoints added
+
+- `POST /api/admin/profiling/snapshot` — capture a new profile snapshot (optional ?label=)
+- `GET /api/admin/profiling/snapshot/latest` — get the most recent snapshot
+- `GET /api/admin/profiling/snapshots` — get snapshots in time range (?from=&to=)
+- `GET /api/admin/profiling/hotspots` — detect hotspots with optional thresholds
+- `GET /api/admin/profiling/operations` — get all tracked operation stats
+- `GET /api/admin/profiling/gc` — capture and return GC snapshot
+- `GET /api/admin/profiling/gc/recommendations` — get GC tuning recommendations
+- `GET /api/admin/profiling/benchmarks` — list all benchmark baselines
+
+### Test counts
+
+- UnitTests: 826 (745 + 81 new)
+- LoadTests: 10 (5 + 5 new)
+- Total across all projects: 919 (UnitTests 826, ContractTests 29, WorkflowTests 24, IntegrationTests 17, PlaywrightTests 13, LoadTests 10)
+
+---
+
 ## Chunk 039 – Disaster Recovery Automation
 
 - **Date**: 2026-04-03

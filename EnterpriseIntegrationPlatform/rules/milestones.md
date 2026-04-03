@@ -59,19 +59,18 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 ✅ Phase 2 (Integration Patterns, chunks 012-018) complete — see completion-log.md  
 ✅ Phase 3 (Connectors, chunks 019-022) complete — see completion-log.md  
 ✅ Phase 4 (Hardening, chunks 023-028) complete — see completion-log.md  
-✅ Phase 5 (Production Readiness, chunks 029-034) complete — see completion-log.md
+✅ Phase 5 (Production Readiness, chunks 029-034) complete — see completion-log.md  
+✅ Phase 6 (Advanced Patterns & Scale, chunks 035-040) complete — see completion-log.md
 
 ## Next Chunk
 
-**Chunk 040** (Performance profiling) is next.
+**Chunk 041** (Processing.Transform) is next.
 
 ---
 
 ### Phase 6 – Advanced Patterns & Scale
 
-| Chunk | Name | Goal | Status |
-|-------|------|------|--------|
-| 040 | Performance profiling | Continuous profiling integration, memory/CPU hotspot detection, GC tuning, and benchmark regression tests | not-started |
+✅ Phase 6 complete — see completion-log.md
 
 ### Phase 7 – Missing Projects
 

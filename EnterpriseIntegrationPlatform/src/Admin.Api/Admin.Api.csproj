@@ -9,5 +9,6 @@
     <ProjectReference Include="..\Configuration\Configuration.csproj" />
     <ProjectReference Include="..\MultiTenancy.Onboarding\MultiTenancy.Onboarding.csproj" />
     <ProjectReference Include="..\DisasterRecovery\DisasterRecovery.csproj" />
+    <ProjectReference Include="..\Performance.Profiling\Performance.Profiling.csproj" />
   </ItemGroup>
 </Project>

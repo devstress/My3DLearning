@@ -18,5 +18,6 @@
     <ProjectReference Include="..\..\src\Ingestion\Ingestion.csproj" />
     <ProjectReference Include="..\..\src\Security\Security.csproj" />
     <ProjectReference Include="..\..\src\MultiTenancy\MultiTenancy.csproj" />
+    <ProjectReference Include="..\..\src\Performance.Profiling\Performance.Profiling.csproj" />
   </ItemGroup>
 </Project>
