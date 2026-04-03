@@ -64,7 +64,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 045** (Message Construction — Return Address, Message Expiration, Format Indicator, Message Sequence, Command/Document/Event Messages) is next.
+**Chunk 047** (Dynamic Router) is next.
 
 ---
 
@@ -74,14 +74,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ### Phase 7 – Missing EIP Patterns (Messaging Channels & Construction)
 
-> These chunks fill gaps identified by comparing the full EIP book TOC
-> (https://www.enterpriseintegrationpatterns.com/patterns/messaging/toc.html)
-> against the current implementation. Every chunk includes mandatory tests.
-
-| Chunk | Name | Goal | Tests Required |
-|-------|------|------|----------------|
-| 045 | Message Construction — Return Address, Message Expiration, Format Indicator, Message Sequence, Command/Document/Event Messages | (a) Add `ReplyTo` field to `IntegrationEnvelope<T>` for Return Address pattern. (b) Add `ExpiresAt` (DateTimeOffset?) field to envelope for Message Expiration — processing steps must check expiry and route expired messages to DLQ with reason "expired". (c) Add `FormatIndicator` as `ContentType` metadata header constant (already partially exists via `MessageHeaders.ContentType` — formalize and validate). (d) Add `SequenceNumber` and `TotalCount` fields to envelope for Message Sequence (used by Splitter output — currently only in metadata; promote to first-class fields). (e) Add `MessageIntent` enum (Command, Document, Event) to envelope to distinguish Command Message / Document Message / Event Message patterns. Update ContractTests for all new fields. | ContractTests: ≥15 new (envelope field serialization, expiry, sequence). UnitTests: ≥10 (expiry check in pipeline, intent-based routing) |
-| 046 | Message Construction — Request-Reply | (a) Add `RequestReplyCorrelator` in Processing/ that publishes a request envelope with `ReplyTo` set, subscribes to the reply topic, and correlates the response by `CorrelationId` with configurable timeout. (b) Integrate with `IMessageBrokerProducer`/`IMessageBrokerConsumer`. (c) This is the async messaging equivalent of HTTP request-response — critical for BizTalk solicit-response port replacement. | UnitTests: ≥12 (send-request, receive-reply, timeout, correlation mismatch) |
+✅ Phase 7 complete — see completion-log.md
 
 ### Phase 8 – Missing EIP Patterns (Routing & Transformation)
 
@@ -160,15 +153,15 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 - ✅ Message Bus (the platform IS the message bus — documented)
 
 **Message Construction:**
-- 🔲 Command Message (chunk 045 — MessageIntent enum)
-- 🔲 Document Message (chunk 045 — MessageIntent enum)
-- 🔲 Event Message (chunk 045 — MessageIntent enum)
-- 🔲 Request-Reply (chunk 046)
-- 🔲 Return Address (chunk 045 — ReplyTo field)
+- ✅ Command Message (IntegrationEnvelope.Intent = Command)
+- ✅ Document Message (IntegrationEnvelope.Intent = Document)
+- ✅ Event Message (IntegrationEnvelope.Intent = Event)
+- ✅ Request-Reply (Processing.RequestReply.RequestReplyCorrelator)
+- ✅ Return Address (IntegrationEnvelope.ReplyTo)
 - ✅ Correlation Identifier (IntegrationEnvelope.CorrelationId)
-- 🔲 Message Sequence (chunk 045 — SequenceNumber/TotalCount fields)
-- 🔲 Message Expiration (chunk 045 — ExpiresAt field)
-- 🔲 Format Indicator (chunk 045 — formalize ContentType)
+- ✅ Message Sequence (IntegrationEnvelope.SequenceNumber/TotalCount)
+- ✅ Message Expiration (IntegrationEnvelope.ExpiresAt + MessageExpirationChecker)
+- ✅ Format Indicator (MessageHeaders.ContentType — formalized)
 
 **Message Routing:**
 - ✅ Content-Based Router (Processing.Routing)

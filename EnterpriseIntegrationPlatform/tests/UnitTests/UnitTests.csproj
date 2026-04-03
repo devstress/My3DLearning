@@ -39,6 +39,7 @@
     <ProjectReference Include="..\..\src\Security.Secrets\Security.Secrets.csproj" />
     <ProjectReference Include="..\..\src\EventSourcing\EventSourcing.csproj" />
     <ProjectReference Include="..\..\src\Processing.ScatterGather\Processing.ScatterGather.csproj" />
+    <ProjectReference Include="..\..\src\Processing.RequestReply\Processing.RequestReply.csproj" />
     <ProjectReference Include="..\..\src\Processing.CompetingConsumers\Processing.CompetingConsumers.csproj" />
     <ProjectReference Include="..\..\src\MultiTenancy.Onboarding\MultiTenancy.Onboarding.csproj" />
     <ProjectReference Include="..\..\src\DisasterRecovery\DisasterRecovery.csproj" />
