@@ -64,7 +64,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 041** (Processing.Transform) is next.
+**Chunk 042** (RuleEngine) is next.
 
 ---
 
@@ -76,7 +76,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Status |
 |-------|------|------|--------|
-| 041 | Processing.Transform | General payload transformation pipeline with pluggable steps (JSON↔XML, regex replace, JSONPath filter), complementing Processing.Translator field mapping | not-started |
 | 042 | RuleEngine | Business rule evaluation engine — conditions (Equals, Contains, Regex, In, GreaterThan) with AND/OR logic, priority-sorted, per-message actions (Route, Transform, Reject, DeadLetter) | not-started |
 | 043 | Connectors abstraction | Unified connector registry and factory (IConnector, IConnectorRegistry, IConnectorFactory) over Connector.Http/Sftp/Email/File with runtime registration | not-started |
 | 044 | Admin.Web (Vue 3) | Vue 3 admin dashboard frontend for Admin.Api — tenant/queue/endpoint throttle control, rate limit status, DLQ management, message inspection, policy CRUD | not-started |
