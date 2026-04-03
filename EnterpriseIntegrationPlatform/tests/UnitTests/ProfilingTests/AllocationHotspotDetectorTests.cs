@@ -71,7 +71,7 @@ public class AllocationHotspotDetectorTests
         var detector = BuildDetector();
 
         Assert.That(() => detector.RegisterOperation(null!, TimeSpan.FromSeconds(1), 0),
-            Throws.TypeOf<ArgumentException>());
+            Throws.ArgumentNullException);
     }
 
     [Test]
@@ -267,7 +267,7 @@ public class AllocationHotspotDetectorTests
     {
         var detector = BuildDetector();
 
-        Assert.That(() => detector.GetOperationStats(null!), Throws.TypeOf<ArgumentException>());
+        Assert.That(() => detector.GetOperationStats(null!), Throws.ArgumentNullException);
     }
 
     [Test]

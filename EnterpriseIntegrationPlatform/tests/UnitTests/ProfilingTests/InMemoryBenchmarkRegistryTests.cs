@@ -101,7 +101,7 @@ public class InMemoryBenchmarkRegistryTests
     {
         var registry = BuildRegistry();
 
-        Assert.That(() => registry.GetBaseline(null!), Throws.TypeOf<ArgumentException>());
+        Assert.That(() => registry.GetBaseline(null!), Throws.ArgumentNullException);
     }
 
     [Test]
@@ -261,7 +261,7 @@ public class InMemoryBenchmarkRegistryTests
     {
         var registry = BuildRegistry();
 
-        Assert.That(() => registry.RemoveBaseline(null!), Throws.TypeOf<ArgumentException>());
+        Assert.That(() => registry.RemoveBaseline(null!), Throws.ArgumentNullException);
     }
 
     [Test]

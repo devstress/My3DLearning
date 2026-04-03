@@ -10,6 +10,7 @@ using EnterpriseIntegrationPlatform.Processing.Throttle;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
 using EnterpriseIntegrationPlatform.MultiTenancy.Onboarding;
 using EnterpriseIntegrationPlatform.DisasterRecovery;
+using Performance.Profiling;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 
@@ -88,6 +89,10 @@ builder.Services.AddTenantOnboarding(builder.Configuration);
 // ── Disaster Recovery ─────────────────────────────────────────────────────────
 // Automated failover, cross-region replication, recovery point validation, and DR drills.
 builder.Services.AddDisasterRecovery(builder.Configuration);
+
+// ── Performance Profiling ─────────────────────────────────────────────────────
+// Continuous profiling, hotspot detection, GC monitoring, and benchmark regression tracking.
+builder.Services.AddPerformanceProfiling(builder.Configuration);
 
 var app = builder.Build();
 
@@ -664,6 +669,95 @@ app.MapGet("/api/admin/dr/drills/history", async (
     return Results.Ok(history);
 })
 .WithName("AdminGetDrDrillHistory")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+// ── Performance Profiling Endpoints ───────────────────────────────────────────
+
+app.MapPost("/api/admin/profiling/snapshot", async (
+    IContinuousProfiler profiler,
+    HttpContext ctx) =>
+{
+    var label = ctx.Request.Query["label"].FirstOrDefault();
+    var snapshot = profiler.CaptureSnapshot(label);
+    return Results.Ok(snapshot);
+})
+.WithName("AdminCaptureProfileSnapshot")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/profiling/snapshot/latest", async (
+    IContinuousProfiler profiler) =>
+{
+    var snapshot = profiler.GetLatestSnapshot();
+    return snapshot is not null ? Results.Ok(snapshot) : Results.NotFound();
+})
+.WithName("AdminGetLatestProfileSnapshot")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/profiling/snapshots", async (
+    IContinuousProfiler profiler,
+    HttpContext ctx) =>
+{
+    var from = ctx.Request.Query.TryGetValue("from", out var fromStr) && DateTimeOffset.TryParse(fromStr, out var fromDate)
+        ? fromDate
+        : DateTimeOffset.UtcNow.AddHours(-1);
+    var to = ctx.Request.Query.TryGetValue("to", out var toStr) && DateTimeOffset.TryParse(toStr, out var toDate)
+        ? toDate
+        : DateTimeOffset.UtcNow;
+    var snapshots = profiler.GetSnapshots(from, to);
+    return Results.Ok(snapshots);
+})
+.WithName("AdminGetProfileSnapshots")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/profiling/hotspots", async (
+    IHotspotDetector detector,
+    HttpContext ctx) =>
+{
+    var thresholds = new HotspotThresholds();
+    if (ctx.Request.Query.TryGetValue("durationWarningMs", out var dw) && double.TryParse(dw, out var dwVal))
+        thresholds.DurationWarningMs = dwVal;
+    if (ctx.Request.Query.TryGetValue("durationCriticalMs", out var dc) && double.TryParse(dc, out var dcVal))
+        thresholds.DurationCriticalMs = dcVal;
+    var hotspots = detector.DetectHotspots(thresholds);
+    return Results.Ok(hotspots);
+})
+.WithName("AdminGetHotspots")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/profiling/operations", async (
+    IHotspotDetector detector) =>
+{
+    var stats = detector.GetAllOperationStats();
+    return Results.Ok(stats);
+})
+.WithName("AdminGetOperationStats")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/profiling/gc", async (
+    IGcMonitor monitor) =>
+{
+    var snapshot = monitor.CaptureSnapshot();
+    return Results.Ok(snapshot);
+})
+.WithName("AdminGetGcSnapshot")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/profiling/gc/recommendations", async (
+    IGcMonitor monitor) =>
+{
+    var recommendations = monitor.GetRecommendations();
+    return Results.Ok(recommendations);
+})
+.WithName("AdminGetGcRecommendations")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/profiling/benchmarks", async (
+    IBenchmarkRegistry registry) =>
+{
+    var baselines = registry.GetAllBaselines();
+    return Results.Ok(baselines);
+})
+.WithName("AdminGetBenchmarkBaselines")
 .RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
 
 app.Run();

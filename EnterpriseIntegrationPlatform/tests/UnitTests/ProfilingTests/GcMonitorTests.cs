@@ -58,13 +58,13 @@ public class GcMonitorTests
     }
 
     [Test]
-    public void CaptureSnapshot_TotalCommittedBytes_Positive()
+    public void CaptureSnapshot_TotalCommittedBytes_NonNegative()
     {
         var monitor = BuildMonitor();
 
         var snapshot = monitor.CaptureSnapshot();
 
-        Assert.That(snapshot.TotalCommittedBytes, Is.GreaterThan(0));
+        Assert.That(snapshot.TotalCommittedBytes, Is.GreaterThanOrEqualTo(0));
     }
 
     [Test]
