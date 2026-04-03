@@ -17,4 +17,17 @@ public static class DeadLetterServiceExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Registers the <see cref="IMessageExpirationChecker{T}"/> that checks
+    /// <see cref="Contracts.IntegrationEnvelope{T}.ExpiresAt"/> and routes expired
+    /// messages to the Dead Letter Queue.
+    /// </summary>
+    public static IServiceCollection AddMessageExpirationChecker<T>(
+        this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddScoped<IMessageExpirationChecker<T>, MessageExpirationChecker<T>>();
+        return services;
+    }
 }

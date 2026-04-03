@@ -4,6 +4,104 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 046 – Message Construction — Request-Reply
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: Add RequestReplyCorrelator in Processing.RequestReply/ that publishes a request envelope with ReplyTo set, subscribes to the reply topic, and correlates the response by CorrelationId with configurable timeout. Async messaging equivalent of HTTP request-response — replaces BizTalk solicit-response port.
+
+### Architecture
+
+- **IRequestReplyCorrelator<TRequest, TResponse>** — Interface for sending a request and awaiting a correlated reply.
+- **RequestReplyCorrelator<TRequest, TResponse>** — Production implementation using ConcurrentDictionary for pending requests, TaskCompletionSource for async correlation, and linked CancellationTokenSource for timeout.
+- **RequestReplyMessage<TRequest>** — Record describing the request (Payload, RequestTopic, ReplyTopic, Source, MessageType, CorrelationId?).
+- **RequestReplyResult<TResponse>** — Record with CorrelationId, Reply envelope (null on timeout), TimedOut flag, Duration.
+- **RequestReplyOptions** — TimeoutMs (default 30s) and ConsumerGroup configuration.
+- **RequestReplyServiceExtensions** — DI registration.
+
+### Files created
+
+- `src/Processing.RequestReply/Processing.RequestReply.csproj`
+- `src/Processing.RequestReply/IRequestReplyCorrelator.cs`
+- `src/Processing.RequestReply/RequestReplyCorrelator.cs`
+- `src/Processing.RequestReply/RequestReplyMessage.cs`
+- `src/Processing.RequestReply/RequestReplyResult.cs`
+- `src/Processing.RequestReply/RequestReplyOptions.cs`
+- `src/Processing.RequestReply/RequestReplyServiceExtensions.cs`
+- `tests/UnitTests/RequestReplyCorrelatorTests.cs`
+
+### Files modified
+
+- `tests/UnitTests/UnitTests.csproj` — Added Processing.RequestReply project reference
+- `rules/milestones.md` — Removed chunk 046 row, updated Next Chunk to 047, marked Phase 7 complete, updated EIP checklist
+- `rules/completion-log.md` — Added chunk 046 entry
+
+### Test counts after chunk
+
+| Suite | Count |
+|-------|-------|
+| UnitTests | 1047 |
+| ContractTests | 58 |
+| WorkflowTests | 24 |
+| IntegrationTests | 17 |
+| PlaywrightTests | 13 |
+| LoadTests | 10 |
+| **Total** | **1169** |
+
+---
+
+## Chunk 045 – Message Construction (Return Address, Message Expiration, Format Indicator, Message Sequence, Command/Document/Event Messages)
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: Add EIP Message Construction patterns — Return Address (ReplyTo field), Message Expiration (ExpiresAt field + MessageExpirationChecker routing to DLQ), Format Indicator (formalized ContentType header), Message Sequence (SequenceNumber/TotalCount first-class fields on envelope + Splitter integration), Command/Document/Event Messages (MessageIntent enum).
+
+### Architecture
+
+- **MessageIntent enum** — Three values: Command (0), Document (1), Event (2). Distinguishes the three fundamental EIP message types.
+- **IntegrationEnvelope<T> new fields** — `ReplyTo` (string?), `ExpiresAt` (DateTimeOffset?), `SequenceNumber` (int?), `TotalCount` (int?), `Intent` (MessageIntent?). All nullable with defaults of null so existing code is unaffected. Added `IsExpired` computed property.
+- **MessageHeaders new constants** — `ReplyTo` ("reply-to"), `ExpiresAt` ("expires-at"), `SequenceNumber` ("sequence-number"), `TotalCount` ("total-count"), `Intent` ("intent").
+- **DeadLetterReason.MessageExpired** — New enum value for expired message routing.
+- **IMessageExpirationChecker<T> / MessageExpirationChecker<T>** — Checks ExpiresAt against TimeProvider, routes expired messages to DLQ via IDeadLetterPublisher with reason MessageExpired. Uses TimeProvider for testability.
+- **DeadLetterServiceExtensions.AddMessageExpirationChecker<T>()** — DI registration for the expiration checker.
+- **MessageSplitter<T>** — Updated to set SequenceNumber (0-based index) and TotalCount on each split envelope. Also preserves ReplyTo, ExpiresAt, and Intent from source envelope.
+
+### Files created
+
+- `src/Contracts/MessageIntent.cs`
+- `src/Processing.DeadLetter/IMessageExpirationChecker.cs`
+- `src/Processing.DeadLetter/MessageExpirationChecker.cs`
+- `tests/ContractTests/IntegrationEnvelopeMessageConstructionTests.cs`
+- `tests/ContractTests/MessageHeadersNewFieldsTests.cs`
+- `tests/ContractTests/MessageIntentTests.cs`
+- `tests/UnitTests/MessageExpirationCheckerTests.cs`
+- `tests/UnitTests/MessageSplitterSequenceTests.cs`
+
+### Files modified
+
+- `src/Contracts/IntegrationEnvelope.cs` — Added ReplyTo, ExpiresAt, SequenceNumber, TotalCount, Intent fields + IsExpired property
+- `src/Contracts/MessageHeaders.cs` — Added ReplyTo, ExpiresAt, SequenceNumber, TotalCount, Intent constants
+- `src/Processing.DeadLetter/DeadLetterReason.cs` — Added MessageExpired value
+- `src/Processing.DeadLetter/DeadLetterServiceExtensions.cs` — Added AddMessageExpirationChecker<T>()
+- `src/Processing.Splitter/MessageSplitter.cs` — Set SequenceNumber, TotalCount, ReplyTo, ExpiresAt, Intent on split envelopes
+- `tests/ContractTests/MessageHeadersTests.cs` — Updated AllConstantsAreNonEmpty to include new constants
+- `rules/milestones.md` — Removed chunk 045 row, updated Next Chunk to 046, updated EIP checklist
+- `rules/completion-log.md` — Added chunk 045 entry
+
+### Test counts after chunk
+
+| Suite | Count |
+|-------|-------|
+| UnitTests | 1035 |
+| ContractTests | 58 |
+| WorkflowTests | 24 |
+| IntegrationTests | 17 |
+| PlaywrightTests | 13 |
+| LoadTests | 10 |
+| **Total** | **1157** |
+
+---
+
 ## Chunk 044 – Messaging Channels (Point-to-Point, Pub-Sub, Datatype, Invalid Message, Bridge, Message Bus)
 
 - **Date**: 2026-04-03

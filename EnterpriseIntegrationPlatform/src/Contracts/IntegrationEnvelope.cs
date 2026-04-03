@@ -41,6 +41,37 @@ public record IntegrationEnvelope<T>
     public Dictionary<string, string> Metadata { get; init; } = new();
 
     /// <summary>
+    /// Return Address — the topic or subject that the sender expects replies to be published to.
+    /// Null when no reply is expected. Used by the Request-Reply pattern.
+    /// </summary>
+    public string? ReplyTo { get; init; }
+
+    /// <summary>
+    /// Message Expiration — the point in time after which this message should be considered stale.
+    /// Processing steps must check this value and route expired messages to the Dead Letter Queue
+    /// with reason "expired". Null means the message never expires.
+    /// </summary>
+    public DateTimeOffset? ExpiresAt { get; init; }
+
+    /// <summary>
+    /// Message Sequence — zero-based position of this message within a sequence (e.g. produced by a Splitter).
+    /// Null for standalone (non-sequenced) messages.
+    /// </summary>
+    public int? SequenceNumber { get; init; }
+
+    /// <summary>
+    /// Total number of messages in the sequence this message belongs to.
+    /// Null for standalone (non-sequenced) messages.
+    /// </summary>
+    public int? TotalCount { get; init; }
+
+    /// <summary>
+    /// Message Intent — distinguishes between Command, Document, and Event messages
+    /// as defined by the Enterprise Integration Patterns. Null when intent is not specified.
+    /// </summary>
+    public MessageIntent? Intent { get; init; }
+
+    /// <summary>
     /// Creates a new <see cref="IntegrationEnvelope{T}"/> with a generated <see cref="MessageId"/>
     /// and the current UTC timestamp.
     /// </summary>
@@ -70,4 +101,10 @@ public record IntegrationEnvelope<T>
             MessageType = messageType,
             Payload = payload,
         };
+
+    /// <summary>
+    /// Returns <c>true</c> when <see cref="ExpiresAt"/> is set and the current UTC time
+    /// is past the expiration timestamp.
+    /// </summary>
+    public bool IsExpired => ExpiresAt.HasValue && DateTimeOffset.UtcNow > ExpiresAt.Value;
 }

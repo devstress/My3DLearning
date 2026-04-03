@@ -71,7 +71,7 @@ public sealed class MessageSplitter<T> : IMessageSplitter<T>
 
         var splitEnvelopes = new List<IntegrationEnvelope<T>>(items.Count);
 
-        foreach (var item in items)
+        for (var i = 0; i < items.Count; i++)
         {
             var envelope = new IntegrationEnvelope<T>
             {
@@ -87,8 +87,13 @@ public sealed class MessageSplitter<T> : IMessageSplitter<T>
                     : _options.TargetMessageType,
                 SchemaVersion = source.SchemaVersion,
                 Priority = source.Priority,
-                Payload = item,
+                Payload = items[i],
                 Metadata = new Dictionary<string, string>(source.Metadata),
+                ReplyTo = source.ReplyTo,
+                ExpiresAt = source.ExpiresAt,
+                SequenceNumber = i,
+                TotalCount = items.Count,
+                Intent = source.Intent,
             };
 
             await _producer.PublishAsync(envelope, _options.TargetTopic, cancellationToken);

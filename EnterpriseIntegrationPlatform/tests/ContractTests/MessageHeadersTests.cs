@@ -39,6 +39,11 @@ public class MessageHeadersTests
             MessageHeaders.ConsumerGroup,
             MessageHeaders.LastAttemptAt,
             MessageHeaders.RetryCount,
+            MessageHeaders.ReplyTo,
+            MessageHeaders.ExpiresAt,
+            MessageHeaders.SequenceNumber,
+            MessageHeaders.TotalCount,
+            MessageHeaders.Intent,
         };
 
         Assert.That(constants, Has.All.Not.Null.And.All.Not.Empty);

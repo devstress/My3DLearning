@@ -6,5 +6,6 @@ public enum DeadLetterReason
     PoisonMessage,
     ProcessingTimeout,
     ValidationFailed,
-    UnroutableMessage
+    UnroutableMessage,
+    MessageExpired
 }
