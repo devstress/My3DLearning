@@ -4,6 +4,70 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 043 – Stateful Pipeline Workflow (Temporal All-or-Nothing)
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: Move ALL pipeline orchestration logic inside Temporal workflows for true BizTalk-replacement atomicity. Previously PipelineOrchestrator did persist/validate/ack/nack OUTSIDE Temporal — not atomic, not recoverable. Fix: new IntegrationPipelineWorkflow with Temporal activities for every side-effect. Demo.Pipeline becomes a thin NATS→Temporal dispatcher. All-or-nothing: if any step fails, Temporal retries or compensates — no partial state.
+
+### Architecture
+
+- **IntegrationPipelineInput** — Record carrying full message data (MessageId, CorrelationId, CausationId, Timestamp, Source, MessageType, SchemaVersion, Priority, PayloadJson, MetadataJson, AckSubject, NackSubject) so that every step executes as a Temporal activity.
+- **IntegrationPipelineResult** — Record (MessageId, IsSuccess, FailureReason?) returned by the workflow.
+- **IPersistenceActivityService** — Interface for persist message, update delivery status, save fault envelope.
+- **INotificationActivityService** — Interface for publish Ack/Nack to message broker.
+- **CassandraPersistenceActivityService** — Implementation backed by IMessageRepository (Cassandra). Maps IntegrationPipelineInput to MessageRecord, creates FaultEnvelope, parses DeliveryStatus enum.
+- **NatsNotificationActivityService** — Implementation backed by IMessageBrokerProducer (NATS JetStream). Creates IntegrationEnvelope<AckPayload/NackPayload> with correct correlation/causation IDs.
+- **PipelineActivities** — Temporal activity class wrapping IPersistenceActivityService + INotificationActivityService + IMessageLoggingService. Activities: PersistMessageAsync, UpdateDeliveryStatusAsync, SaveFaultAsync, PublishAckAsync, PublishNackAsync, LogStageAsync.
+- **IntegrationPipelineWorkflow** — Temporal workflow orchestrating the full pipeline atomically: (1) Persist as Pending → (2) Log Received → (3) Validate → (4a) Success: Log Validated → Update Delivered → Publish Ack → (4b) Failure: Log ValidationFailed → Save Fault → Update Failed → Publish Nack. Retry policies: 5 attempts with exponential backoff for infrastructure activities, 3 attempts for validation.
+- **PipelineOrchestrator** — Simplified to thin dispatcher: converts IntegrationEnvelope<JsonElement> → IntegrationPipelineInput → dispatches to Temporal. No side-effects outside Temporal.
+- **TemporalWorkflowDispatcher** — Updated to dispatch IntegrationPipelineWorkflow instead of ProcessIntegrationMessageWorkflow.
+- **TemporalServiceExtensions** — Registers IntegrationPipelineWorkflow, PipelineActivities, CassandraPersistenceActivityService, NatsNotificationActivityService.
+- **Workflow.Temporal/Program.cs** — Registers Cassandra storage, NATS JetStream broker, platform observability.
+
+### Files created
+
+- `src/Activities/IntegrationPipelineInput.cs`
+- `src/Activities/IntegrationPipelineResult.cs`
+- `src/Activities/IPersistenceActivityService.cs`
+- `src/Activities/INotificationActivityService.cs`
+- `src/Workflow.Temporal/Activities/PipelineActivities.cs`
+- `src/Workflow.Temporal/Services/CassandraPersistenceActivityService.cs`
+- `src/Workflow.Temporal/Services/NatsNotificationActivityService.cs`
+- `src/Workflow.Temporal/Workflows/IntegrationPipelineWorkflow.cs`
+- `tests/UnitTests/PipelineActivitiesTests.cs`
+- `tests/UnitTests/CassandraPersistenceActivityServiceTests.cs`
+- `tests/UnitTests/NatsNotificationActivityServiceTests.cs`
+- `tests/UnitTests/IntegrationPipelineInputResultTests.cs`
+
+### Files modified
+
+- `src/Workflow.Temporal/Workflow.Temporal.csproj` — Added Storage.Cassandra, Ingestion, Ingestion.Nats, Observability refs
+- `src/Workflow.Temporal/TemporalServiceExtensions.cs` — Registered new workflow, activities, services
+- `src/Workflow.Temporal/Program.cs` — Added infrastructure registrations
+- `src/Demo.Pipeline/PipelineOrchestrator.cs` — Simplified to thin Temporal dispatcher
+- `src/Demo.Pipeline/ITemporalWorkflowDispatcher.cs` — Changed to use IntegrationPipelineInput/Result
+- `src/Demo.Pipeline/TemporalWorkflowDispatcher.cs` — Dispatches IntegrationPipelineWorkflow
+- `src/Demo.Pipeline/PipelineServiceExtensions.cs` — Removed Cassandra/Observability registrations
+- `tests/UnitTests/PipelineOrchestratorTests.cs` — Rewritten for new thin constructor
+- `tests/UnitTests/UnitTests.csproj` — Added Activities and Workflow.Temporal refs
+- `rules/architecture-rules.md` — Updated Workflow.Temporal dependency rules
+- `rules/milestones.md` — Chunk 043 redefined, downstream chunks renumbered
+
+### Test counts after chunk
+
+| Suite | Count |
+|-------|-------|
+| UnitTests | 969 |
+| ContractTests | 29 |
+| WorkflowTests | 24 |
+| IntegrationTests | 17 |
+| PlaywrightTests | 13 |
+| LoadTests | 10 |
+| **Total** | **1062** |
+
+---
+
 ## Chunk 042 – RuleEngine
 
 - **Date**: 2026-04-03

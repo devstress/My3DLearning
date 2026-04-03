@@ -11,7 +11,10 @@ namespace EnterpriseIntegrationPlatform.Demo.Pipeline;
 public interface ITemporalWorkflowDispatcher
 {
     /// <summary>
-    /// Starts the <c>ProcessIntegrationMessageWorkflow</c> and awaits its completion.
+    /// Starts the <c>IntegrationPipelineWorkflow</c> and awaits its completion.
+    /// The workflow handles the entire pipeline atomically inside Temporal:
+    /// persist → validate → (ack/nack) — all-or-nothing with Temporal's
+    /// durability guarantees.
     /// </summary>
     /// <param name="input">Workflow input produced from the inbound message envelope.</param>
     /// <param name="workflowId">
@@ -20,8 +23,8 @@ public interface ITemporalWorkflowDispatcher
     /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The workflow result.</returns>
-    Task<ProcessIntegrationMessageResult> DispatchAsync(
-        ProcessIntegrationMessageInput input,
+    Task<IntegrationPipelineResult> DispatchAsync(
+        IntegrationPipelineInput input,
         string workflowId,
         CancellationToken cancellationToken = default);
 }

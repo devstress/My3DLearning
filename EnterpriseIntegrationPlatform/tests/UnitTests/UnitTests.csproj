@@ -45,5 +45,7 @@
     <ProjectReference Include="..\..\src\Performance.Profiling\Performance.Profiling.csproj" />
     <ProjectReference Include="..\..\src\Processing.Transform\Processing.Transform.csproj" />
     <ProjectReference Include="..\..\src\RuleEngine\RuleEngine.csproj" />
+    <ProjectReference Include="..\..\src\Activities\Activities.csproj" />
+    <ProjectReference Include="..\..\src\Workflow.Temporal\Workflow.Temporal.csproj" />
   </ItemGroup>
 </Project>

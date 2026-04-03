@@ -3,8 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 using EnterpriseIntegrationPlatform.Ingestion.Nats;
-using EnterpriseIntegrationPlatform.Storage.Cassandra;
-using EnterpriseIntegrationPlatform.Observability;
 
 namespace EnterpriseIntegrationPlatform.Demo.Pipeline;
 
@@ -16,9 +14,9 @@ public static class PipelineServiceExtensions
 {
     /// <summary>
     /// Registers all services required by the end-to-end demo integration pipeline:
-    /// NATS broker, Cassandra storage, observability, Temporal dispatcher, orchestrator,
-    /// and the background worker. Configuration is read from <c>Pipeline</c> and
-    /// <c>Cassandra</c> sections.
+    /// NATS broker (for inbound subscription), Temporal dispatcher, orchestrator,
+    /// and the background worker. All orchestration logic now runs atomically
+    /// inside the Temporal <c>IntegrationPipelineWorkflow</c>.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">Application configuration.</param>
@@ -34,20 +32,13 @@ public static class PipelineServiceExtensions
         var pipelineOpts = new PipelineOptions();
         configuration.GetSection(PipelineOptions.SectionName).Bind(pipelineOpts);
 
-        // ── Message broker (NATS JetStream) ───────────────────────────────────
+        // ── Message broker (NATS JetStream) for inbound subscription ──────────
         services.AddNatsJetStreamBroker(pipelineOpts.NatsUrl);
-
-        // ── Cassandra storage ─────────────────────────────────────────────────
-        services.AddCassandraStorage(configuration);
-
-        // ── Observability (Loki-backed event log + lifecycle recorder) ─────────
-        var lokiBaseUrl = configuration["Loki:BaseAddress"] ?? "http://localhost:15100";
-        services.AddPlatformObservability(lokiBaseUrl);
 
         // ── Temporal workflow dispatcher ───────────────────────────────────────
         services.AddSingleton<ITemporalWorkflowDispatcher, TemporalWorkflowDispatcher>();
 
-        // ── Pipeline orchestrator ──────────────────────────────────────────────
+        // ── Pipeline orchestrator (thin Temporal dispatcher) ───────────────────
         services.AddSingleton<IPipelineOrchestrator, PipelineOrchestrator>();
 
         // ── Background worker ──────────────────────────────────────────────────
