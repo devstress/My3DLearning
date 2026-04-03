@@ -2,5 +2,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Contracts\Contracts.csproj" />
     <ProjectReference Include="..\Ingestion\Ingestion.csproj" />
+    <ProjectReference Include="..\RuleEngine\RuleEngine.csproj" />
   </ItemGroup>
 </Project>

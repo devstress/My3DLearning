@@ -86,4 +86,27 @@ public static class RoutingServiceExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Registers the <see cref="IMessageFilter"/> implementation, binding
+    /// <see cref="MessageFilterOptions"/> from the <c>MessageFilter</c> configuration section.
+    /// </summary>
+    /// <remarks>
+    /// An <see cref="Ingestion.IMessageBrokerProducer"/> must be registered separately
+    /// (e.g. via <c>AddNatsJetStreamBroker</c>) before calling this method.
+    /// </remarks>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">Application configuration.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddMessageFilter(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<MessageFilterOptions>(
+            configuration.GetSection(MessageFilterOptions.SectionName));
+
+        services.AddSingleton<IMessageFilter, MessageFilter>();
+
+        return services;
+    }
 }
