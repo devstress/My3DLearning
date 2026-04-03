@@ -4,6 +4,61 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 041 – Processing.Transform
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: General payload transformation pipeline with pluggable steps (JSON↔XML, regex replace, JSONPath filter), complementing Processing.Translator field mapping.
+
+### Architecture
+
+- **ITransformStep** — Interface for a single pipeline step. Each step has a Name and ExecuteAsync method that transforms a TransformContext.
+- **TransformContext** — Carries payload string + content type + mutable metadata through the pipeline. Immutable payload/contentType with WithPayload factory methods.
+- **TransformResult** — Record containing transformed payload, content type, steps applied count, and accumulated metadata.
+- **ITransformPipeline** — Interface for executing ordered transform steps against a payload.
+- **TransformPipeline** — Production implementation. Executes steps in registration order. Supports Enabled toggle, MaxPayloadSizeBytes guard, StopOnStepFailure (halt vs skip), cancellation propagation, and structured logging.
+- **TransformOptions** — Configuration (Enabled, MaxPayloadSizeBytes, StopOnStepFailure). Bind from TransformPipeline section.
+- **JsonToXmlStep** — Converts JSON to XML with configurable root element name. Handles objects, arrays, nested structures, booleans, nulls. Sanitizes invalid XML element names.
+- **XmlToJsonStep** — Converts XML to JSON. Repeated sibling elements become arrays. Attributes use @prefix. Mixed content uses #text.
+- **RegexReplaceStep** — Applies compiled regex replacement with configurable options and timeout (default 5s) to protect against catastrophic backtracking.
+- **JsonPathFilterStep** — Extracts subset of JSON using dot-notation paths. Creates intermediate objects. Missing paths silently skipped. Preserves value types (arrays, numbers, strings).
+- **TransformServiceExtensions** — DI registration: AddTransformPipeline, AddJsonToXmlStep, AddXmlToJsonStep, AddRegexReplaceStep, AddJsonPathFilterStep.
+
+### Files created
+
+- `src/Processing.Transform/Processing.Transform.csproj`
+- `src/Processing.Transform/ITransformStep.cs`
+- `src/Processing.Transform/ITransformPipeline.cs`
+- `src/Processing.Transform/TransformContext.cs`
+- `src/Processing.Transform/TransformResult.cs`
+- `src/Processing.Transform/TransformOptions.cs`
+- `src/Processing.Transform/TransformPipeline.cs`
+- `src/Processing.Transform/JsonToXmlStep.cs`
+- `src/Processing.Transform/XmlToJsonStep.cs`
+- `src/Processing.Transform/RegexReplaceStep.cs`
+- `src/Processing.Transform/JsonPathFilterStep.cs`
+- `src/Processing.Transform/TransformServiceExtensions.cs`
+- `tests/UnitTests/TransformPipelineTests.cs`
+- `tests/UnitTests/JsonToXmlStepTests.cs`
+- `tests/UnitTests/XmlToJsonStepTests.cs`
+- `tests/UnitTests/RegexReplaceStepTests.cs`
+- `tests/UnitTests/JsonPathFilterStepTests.cs`
+- `tests/UnitTests/TransformOptionsTests.cs`
+- `tests/UnitTests/TransformContextTests.cs`
+
+### Files modified
+
+- `EnterpriseIntegrationPlatform.sln` — added Processing.Transform project
+- `tests/UnitTests/UnitTests.csproj` — added Processing.Transform reference
+- `rules/milestones.md` — removed chunk 041 row, updated Next Chunk to 042
+- `rules/completion-log.md` — added chunk 041 entry
+
+### Test counts
+
+- **New tests**: 64 (TransformPipeline 18, JsonToXmlStep 9, XmlToJsonStep 8, RegexReplaceStep 10, JsonPathFilterStep 11, TransformOptions 6, TransformContext 6)
+- **Total UnitTests**: 890 (826 + 64)
+- **All test projects**: UnitTests 890, ContractTests 29, WorkflowTests 24, IntegrationTests 17, PlaywrightTests 13, LoadTests 10 = **983 total**
+
 ## Chunk 040 – Performance Profiling
 
 - **Date**: 2026-04-03

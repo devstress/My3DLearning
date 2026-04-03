@@ -43,5 +43,6 @@
     <ProjectReference Include="..\..\src\MultiTenancy.Onboarding\MultiTenancy.Onboarding.csproj" />
     <ProjectReference Include="..\..\src\DisasterRecovery\DisasterRecovery.csproj" />
     <ProjectReference Include="..\..\src\Performance.Profiling\Performance.Profiling.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Transform\Processing.Transform.csproj" />
   </ItemGroup>
 </Project>
