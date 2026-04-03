@@ -4,6 +4,49 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 048 – Recipient List
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: Add `IRecipientList` and `RecipientListRouter` in Processing.Routing/ that resolves a list of target destinations for each message based on configurable rules or message metadata. Publishes the message to ALL resolved recipients (fan-out).
+
+### Architecture
+
+- **IRecipientList** — Interface for fan-out routing to multiple destinations.
+- **RecipientListRouter** — Production implementation that evaluates all matching rules and aggregates destinations. Supports rule-based and metadata-based resolution. Deduplicates destinations (case-insensitive). Publishes concurrently to all resolved destinations.
+- **RecipientListRule** — Record defining a rule that contributes destinations (FieldName, Operator, Value, Destinations list).
+- **RecipientListOptions** — Configuration: Rules list, optional MetadataRecipientsKey for dynamic metadata-based resolution.
+- **RecipientListResult** — Record with Destinations list, ResolvedCount, DuplicatesRemoved.
+
+### Files created
+
+- `src/Processing.Routing/IRecipientList.cs`
+- `src/Processing.Routing/RecipientListRouter.cs`
+- `src/Processing.Routing/RecipientListRule.cs`
+- `src/Processing.Routing/RecipientListOptions.cs`
+- `src/Processing.Routing/RecipientListResult.cs`
+- `tests/UnitTests/RecipientListRouterTests.cs`
+
+### Files modified
+
+- `src/Processing.Routing/RoutingServiceExtensions.cs` — Added `AddRecipientList` extension method
+- `rules/milestones.md` — Removed chunk 048 row, updated Next Chunk to 049, updated EIP checklist
+- `rules/completion-log.md` — Added chunk 048 entry
+
+### Test counts after chunk
+
+| Suite | Count |
+|-------|-------|
+| UnitTests | 1078 |
+| ContractTests | 58 |
+| WorkflowTests | 24 |
+| IntegrationTests | 17 |
+| PlaywrightTests | 13 |
+| LoadTests | 10 |
+| **Total** | **1200** |
+
+---
+
 ## Chunk 047 – Dynamic Router
 
 - **Date**: 2026-04-03

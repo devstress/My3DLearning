@@ -64,7 +64,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 048** (Recipient List) is next.
+**Chunk 049** (Message Filter) is next.
 
 ---
 
@@ -80,7 +80,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Tests Required |
 |-------|------|------|----------------|
-| 048 | Recipient List | Add `IRecipientList` and `RecipientListRouter` in Processing.Routing/ that resolves a list of target destinations (connectors/topics) for each message based on configurable rules or message metadata. Publishes the message to ALL resolved recipients (fan-out). Distinct from Content-Based Router (single route) and Scatter-Gather (expects replies). | UnitTests: ≥10 (resolve multiple recipients, empty list handling, dedup, metadata-based resolution) |
 | 049 | Message Filter | Add `IMessageFilter` and `MessageFilter` in Processing.Routing/ that evaluates a predicate against an envelope and either passes it through or discards it (with optional DLQ routing for discarded messages). Reuse `RuleCondition` from RuleEngine for predicate definition. | UnitTests: ≥8 (pass-through, discard, discard-to-DLQ, multiple predicates AND/OR) |
 | 050 | Routing Slip | Add `RoutingSlip` record to Contracts/ containing an ordered list of processing step descriptors. Add `IRoutingSlipRouter` in Processing.Routing/ that reads the slip from the envelope metadata, executes the current step, and forwards to the next step. Each step consumes its entry from the slip. Enables dynamic, per-message processing pipelines — replaces BizTalk dynamic send ports. | UnitTests: ≥12 (execute step, advance slip, empty slip completion, step failure handling) |
 | 051 | Resequencer | Add `IResequencer` and `MessageResequencer` in Processing/ that buffers out-of-order messages by `CorrelationId` + `SequenceNumber`, and releases them in order once the sequence is complete or a configurable timeout expires. Uses `SequenceNumber` and `TotalCount` from envelope (added in chunk 045). | UnitTests: ≥12 (in-order passthrough, out-of-order buffering, timeout release, duplicate sequence detection) |
@@ -166,7 +165,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 - ✅ Content-Based Router (Processing.Routing)
 - 🔲 Message Filter (chunk 049)
 - ✅ Dynamic Router (Processing.Routing.DynamicRouter)
-- 🔲 Recipient List (chunk 048)
+- ✅ Recipient List (Processing.Routing.RecipientListRouter)
 - ✅ Splitter (Processing.Splitter)
 - ✅ Aggregator (Processing.Aggregator)
 - 🔲 Resequencer (chunk 051)
