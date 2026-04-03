@@ -42,5 +42,6 @@
     <ProjectReference Include="..\..\src\Processing.CompetingConsumers\Processing.CompetingConsumers.csproj" />
     <ProjectReference Include="..\..\src\MultiTenancy.Onboarding\MultiTenancy.Onboarding.csproj" />
     <ProjectReference Include="..\..\src\DisasterRecovery\DisasterRecovery.csproj" />
+    <ProjectReference Include="..\..\src\Performance.Profiling\Performance.Profiling.csproj" />
   </ItemGroup>
 </Project>

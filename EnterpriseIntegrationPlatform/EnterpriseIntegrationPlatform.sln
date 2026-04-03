@@ -95,6 +95,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiTenancy.Onboarding", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DisasterRecovery", "src\DisasterRecovery\DisasterRecovery.csproj", "{F963885A-2090-4FEC-B207-7ACB95E7AAD0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Performance.Profiling", "src\Performance.Profiling\Performance.Profiling.csproj", "{2CA37607-8841-4928-BAC0-1DB2B27B667E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -597,6 +599,18 @@ Global
 		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Release|x64.Build.0 = Release|Any CPU
 		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Release|x86.ActiveCfg = Release|Any CPU
 		{F963885A-2090-4FEC-B207-7ACB95E7AAD0}.Release|x86.Build.0 = Release|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Debug|x64.Build.0 = Debug|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Debug|x86.Build.0 = Debug|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Release|x64.ActiveCfg = Release|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Release|x64.Build.0 = Release|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Release|x86.ActiveCfg = Release|Any CPU
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -646,5 +660,6 @@ Global
 		{D69931DA-DF4B-4538-B326-AA0D0326BC8A} = {A1B2C3D4-0001-0001-0001-000000000001}
 		{B178653A-1FE4-4216-8A91-0F87C42E4A88} = {A1B2C3D4-0001-0001-0001-000000000001}
 		{F963885A-2090-4FEC-B207-7ACB95E7AAD0} = {A1B2C3D4-0001-0001-0001-000000000001}
+		{2CA37607-8841-4928-BAC0-1DB2B27B667E} = {A1B2C3D4-0001-0001-0001-000000000001}
 	EndGlobalSection
 EndGlobal
