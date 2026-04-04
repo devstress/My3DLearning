@@ -141,8 +141,9 @@ public sealed class MessageStateInspector
             var correlationId = events[0].CorrelationId;
             // Use a short timeout for trace analysis so the inspector doesn't hang
             // when Ollama is unavailable (e.g. in CI or before Ollama starts).
+            // 30 seconds allows CPU-only inference of small models in CI.
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            cts.CancelAfter(TimeSpan.FromSeconds(30));
             aiSummary = await _traceAnalyzer.WhereIsMessageAsync(correlationId, json, cts.Token);
         }
         catch (Exception ex)

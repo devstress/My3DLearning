@@ -11,7 +11,8 @@ builder.AddServiceDefaults();
 // variable (Ollama__BaseAddress) or config, with localhost fallback for local dev
 var ollamaBaseAddress = builder.Configuration["Ollama:BaseAddress"]
                         ?? OllamaServiceExtensions.DefaultBaseAddress;
-builder.Services.AddOllamaService(ollamaBaseAddress);
+var ollamaModel = builder.Configuration["Ollama:Model"] ?? "llama3.2";
+builder.Services.AddOllamaService(ollamaBaseAddress, ollamaModel);
 
 // Register platform observability — Loki URL is injected by Aspire (Loki__BaseAddress)
 var lokiBaseAddress = builder.Configuration["Loki:BaseAddress"]
