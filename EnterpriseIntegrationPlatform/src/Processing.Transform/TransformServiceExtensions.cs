@@ -92,4 +92,56 @@ public static class TransformServiceExtensions
         services.AddSingleton<ITransformStep>(new JsonPathFilterStep(paths));
         return services;
     }
+
+    /// <summary>
+    /// Registers a <see cref="ContentEnricher"/> and binds <see cref="ContentEnricherOptions"/>
+    /// from the <c>ContentEnricher</c> configuration section. Also registers the named
+    /// <see cref="HttpClient"/> used by the enricher.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">Application configuration.</param>
+    /// <returns>The updated <paramref name="services"/> for chaining.</returns>
+    public static IServiceCollection AddContentEnricher(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services.Configure<ContentEnricherOptions>(configuration.GetSection("ContentEnricher"));
+        services.AddHttpClient("ContentEnricher");
+        services.AddSingleton<IContentEnricher, ContentEnricher>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers a <see cref="ContentFilter"/> as a singleton <see cref="IContentFilter"/>.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The updated <paramref name="services"/> for chaining.</returns>
+    public static IServiceCollection AddContentFilter(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddSingleton<IContentFilter, ContentFilter>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers a <see cref="MessageNormalizer"/> as a singleton <see cref="INormalizer"/>
+    /// and binds <see cref="NormalizerOptions"/> from the <c>Normalizer</c> configuration section.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">Application configuration.</param>
+    /// <returns>The updated <paramref name="services"/> for chaining.</returns>
+    public static IServiceCollection AddNormalizer(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services.Configure<NormalizerOptions>(configuration.GetSection("Normalizer"));
+        services.AddSingleton<INormalizer, MessageNormalizer>();
+        return services;
+    }
 }
