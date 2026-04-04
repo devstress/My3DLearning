@@ -160,7 +160,6 @@ public class AdminDashboardTests
     // ── Throttle CRUD Page Tests ──────────────────────────────────────────────
 
     [Test]
-    [Ignore("Excluded — fix in chunk 063-fix: #throttle-table element not found after navigation in CI")]
     public async Task ThrottlePage_Navigates_AndShowsPolicyTable()
     {
         if (SkipIfNoBrowsers()) return;
@@ -175,9 +174,11 @@ public class AdminDashboardTests
         var throttlePage = page.Locator("#page-throttle");
         await Expect(throttlePage).ToBeVisibleAsync();
 
-        // Verify policy table exists
+        // Wait for the loading state to resolve (API call may fail fast
+        // since Admin.Api is not running — the proxy now returns an empty
+        // array on connection failure rather than a 500 error).
         var table = page.Locator("#throttle-table");
-        await Expect(table).ToBeVisibleAsync();
+        await Expect(table).ToBeVisibleAsync(new() { Timeout = 10_000 });
 
         // Verify Add Policy button exists
         var addBtn = page.Locator("#btn-add-throttle");

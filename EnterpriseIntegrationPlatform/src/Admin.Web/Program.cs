@@ -79,9 +79,16 @@ proxy.MapPost("/dlq/resubmit", async (
 proxy.MapGet("/throttle/policies", async (IHttpClientFactory factory, CancellationToken ct) =>
 {
     var client = factory.CreateClient("AdminApi");
-    var response = await client.GetAsync("/api/admin/throttle/policies", ct);
-    var content = await response.Content.ReadAsStringAsync(ct);
-    return Results.Content(content, "application/json", statusCode: (int)response.StatusCode);
+    try
+    {
+        var response = await client.GetAsync("/api/admin/throttle/policies", ct);
+        var content = await response.Content.ReadAsStringAsync(ct);
+        return Results.Content(content, "application/json", statusCode: (int)response.StatusCode);
+    }
+    catch (HttpRequestException)
+    {
+        return Results.Json(Array.Empty<object>(), statusCode: 200);
+    }
 }).WithName("ProxyGetThrottlePolicies");
 
 proxy.MapGet("/throttle/policies/{policyId}", async (

@@ -81,6 +81,16 @@ app.MapGet("/api/health/ragflow", async (IRagFlowService ragFlow, CancellationTo
 })
 .WithName("RagFlowHealth");
 
+// ── Seeder readiness endpoint ─────────────────────────────────────────────────
+// Allows E2E tests to poll until demo data seeding has completed before
+// querying for seeded business keys like "order-02" or "shipment-123".
+
+app.MapGet("/api/health/seeder", () =>
+{
+    return Results.Ok(new { seeded = DemoDataSeeder.IsSeeded });
+})
+.WithName("SeederHealth");
+
 // ── RAG context retrieval endpoints ───────────────────────────────────────────
 // Developers use their own preferred AI provider (Copilot, Codex, Claude Code)
 // to generate code. These endpoints provide RAG context from the platform's
@@ -372,7 +382,7 @@ internal static class OpenClawHtml
             async function checkOllamaHealth() {
                 const el = document.getElementById('ollamaStatus');
                 try {
-                    const res = await fetch('/api/health/ollama');
+                    const res = await fetch('/api/health/ollama', { signal: AbortSignal.timeout(5000) });
                     const data = await res.json();
                     if (data.available) {
                         el.textContent = 'Ollama: connected';

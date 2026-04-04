@@ -4,6 +4,41 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 063-fix – Playwright E2E Test Fixes
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Debug and fix 8 failing Playwright E2E tests (7 OpenClaw + 1 Admin). Root-cause each failure, add proper wait/retry logic and environment-aware timeouts.
+- **Architecture**:
+  - **Root Cause 1 — Ollama timeout**: Ollama HttpClient had 120-second timeout. When Ollama is unavailable in CI, `IsHealthyAsync()` and `WhereIsMessageAsync()` hung for up to 120 seconds, causing Playwright assertions to timeout while waiting for `#result` div or `#ollamaStatus` class change.
+  - **Root Cause 2 — DemoDataSeeder async**: `BackgroundService.ExecuteAsync()` runs asynchronously after startup. Tests queried seeded data before seeding completed.
+  - **Root Cause 3 — Admin.Api unavailable**: Admin.Web proxy to Admin.Api threw unhandled `HttpRequestException` when Admin.Api wasn't running, returning a 500 error page. ThrottlePage's `throttleLoading` stayed true during the long timeout.
+  - **Fix 1**: Added 3-second `CancellationTokenSource` to `OllamaService.IsHealthyAsync()` so health checks fail fast.
+  - **Fix 2**: Added 5-second `CancellationTokenSource` to `MessageStateInspector.BuildResultAsync()` for Ollama trace analysis so search results return quickly with graceful fallback.
+  - **Fix 3**: Added `DemoDataSeeder.IsSeeded` static property and `/api/health/seeder` endpoint for test readiness polling.
+  - **Fix 4**: Added `AbortSignal.timeout(5000)` to the JS `checkOllamaHealth()` fetch call in OpenClaw HTML.
+  - **Fix 5**: Added try-catch to Admin.Web throttle policies proxy endpoint, returning empty array on `HttpRequestException`.
+  - **Fix 6**: Removed all 8 `[Ignore]` attributes. Added `WaitForSeederAsync()` helper for seeded-data tests. Increased Playwright assertion timeouts to 10–15 seconds for server-side operations.
+- **Files modified**:
+  - `src/AI.Ollama/OllamaService.cs` — Added 3-second CTS to `IsHealthyAsync`
+  - `src/Observability/MessageStateInspector.cs` — Added 5-second CTS to trace analysis call
+  - `src/OpenClaw.Web/DemoDataSeeder.cs` — Added `IsSeeded` static property
+  - `src/OpenClaw.Web/Program.cs` — Added `/api/health/seeder` endpoint, JS fetch timeout
+  - `src/Admin.Web/Program.cs` — Added try-catch on throttle proxy endpoint
+  - `tests/PlaywrightTests/OpenClawUiTests.cs` — Removed 7 `[Ignore]`, added `WaitForSeederAsync`, increased timeouts
+  - `tests/PlaywrightTests/AdminDashboardTests.cs` — Removed 1 `[Ignore]`, increased timeout
+  - `rules/milestones.md` — Removed chunk 063-fix row, updated Next Chunk to 063
+  - `rules/completion-log.md` — Added chunk 063-fix entry
+- **Test counts**:
+  - UnitTests: 1,400 (unchanged)
+  - PlaywrightTests: 24 (all 24 now active — 0 [Ignore]d)
+  - Total tests: 1,537 across 6 test projects (UnitTests 1400, ContractTests 58, WorkflowTests 29, IntegrationTests 17, PlaywrightTests 24, LoadTests 10; note: 1 Vitest test count unchanged at 19)
+- **Notes**:
+  - 48 src projects (unchanged)
+  - All 8 previously-ignored Playwright tests are now enabled
+  - Server-side Ollama timeouts reduced from 120s to 3s (health) / 5s (trace analysis)
+  - Tests poll `/api/health/seeder` before querying seeded data for reliability
+
 ## Chunk 062 – RAG Knowledge Base
 
 - **Date**: 2026-04-04

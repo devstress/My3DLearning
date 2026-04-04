@@ -71,7 +71,11 @@ public sealed class OllamaService : IOllamaService
     {
         try
         {
-            var response = await _httpClient.GetAsync(string.Empty, cancellationToken);
+            // Use a short timeout for health checks so the UI doesn't hang
+            // when Ollama is unavailable (e.g. in CI or before Ollama starts).
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
+            var response = await _httpClient.GetAsync(string.Empty, cts.Token);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)

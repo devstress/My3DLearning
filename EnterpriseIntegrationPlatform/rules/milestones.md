@@ -68,7 +68,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 063-fix** (Playwright E2E Test Fixes) is next.
+**Chunk 063** (EIP Pattern Documentation) is next.
 
 ---
 
@@ -78,9 +78,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ### Phase 11 – Admin Dashboard & RAG
 
-| Chunk | Name | Goal | Tests Required |
-|-------|------|------|----------------|
-| 063-fix | Playwright E2E Test Fixes | Debug and fix 8 failing Playwright E2E tests: 7 OpenClaw (search/seeded-data/Ollama-status assertions fail because DemoDataSeeder runs async and Ollama is unavailable in test env) + 1 Admin ThrottlePage (policy table visibility). Root-cause each failure, add proper wait/retry logic or environment-aware assertions. | All 24 Playwright tests must pass |
+✅ Phase 11 complete — see completion-log.md
 
 ### Phase 12 – Documentation
 

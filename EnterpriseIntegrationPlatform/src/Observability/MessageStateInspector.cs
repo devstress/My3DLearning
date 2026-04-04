@@ -139,7 +139,11 @@ public sealed class MessageStateInspector
         try
         {
             var correlationId = events[0].CorrelationId;
-            aiSummary = await _traceAnalyzer.WhereIsMessageAsync(correlationId, json, cancellationToken);
+            // Use a short timeout for trace analysis so the inspector doesn't hang
+            // when Ollama is unavailable (e.g. in CI or before Ollama starts).
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            aiSummary = await _traceAnalyzer.WhereIsMessageAsync(correlationId, json, cts.Token);
         }
         catch (Exception ex)
         {

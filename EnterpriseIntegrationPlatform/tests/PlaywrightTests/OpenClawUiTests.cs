@@ -109,7 +109,6 @@ public class OpenClawUiTests
     }
 
     [Test]
-    [Ignore("Excluded — fix in chunk 063-fix: Ollama status indicator depends on health-check JS that times out in CI")]
     public async Task HomePage_ShowsOllamaStatusIndicator()
     {
         if (SkipIfNoBrowsers()) return;
@@ -121,7 +120,10 @@ public class OpenClawUiTests
         await Expect(ollamaStatus).ToBeVisibleAsync();
         // Wait for the health check to complete — the element transitions from
         // "ollama-checking" to either "ollama-up" or "ollama-down".
-        await Expect(ollamaStatus).Not.ToHaveClassAsync(new Regex("ollama-checking"));
+        // Use a generous timeout because the server-side health check has a 3-second CTS.
+        await Expect(ollamaStatus).Not.ToHaveClassAsync(
+            new Regex("ollama-checking"),
+            new() { Timeout = 10_000 });
         var text = await ollamaStatus.TextContentAsync();
         Assert.That(text, Does.Contain("Ollama"));
     }
@@ -129,7 +131,6 @@ public class OpenClawUiTests
     // ── Search and query tests ────────────────────────────────────────────────
 
     [Test]
-    [Ignore("Excluded — fix in chunk 063-fix: #result div stays hidden after search click in CI")]
     public async Task SearchForUnknownKey_ShowsNotFound()
     {
         if (SkipIfNoBrowsers()) return;
@@ -140,9 +141,9 @@ public class OpenClawUiTests
         await page.FillAsync("#query", "nonexistent-order-xyz");
         await page.ClickAsync("#askBtn");
 
-        // Wait for result to appear
+        // Wait for result to appear — the server-side Ollama timeout is now 5s
         var resultDiv = page.Locator("#result");
-        await Expect(resultDiv).ToBeVisibleAsync();
+        await Expect(resultDiv).ToBeVisibleAsync(new() { Timeout = 15_000 });
 
         var notFound = page.Locator(".not-found");
         await Expect(notFound).ToBeVisibleAsync();
@@ -151,10 +152,12 @@ public class OpenClawUiTests
     }
 
     [Test]
-    [Ignore("Excluded — fix in chunk 063-fix: #result div stays hidden after search click in CI")]
     public async Task SearchForSeededKey_ShowsResults()
     {
         if (SkipIfNoBrowsers()) return;
+
+        // Wait for demo seeder to complete before searching seeded data
+        await WaitForSeederAsync();
 
         var page = await _browser!.NewPageAsync();
         await page.GotoAsync(_baseUrl!);
@@ -164,7 +167,7 @@ public class OpenClawUiTests
         await page.ClickAsync("#askBtn");
 
         var resultDiv = page.Locator("#result");
-        await Expect(resultDiv).ToBeVisibleAsync();
+        await Expect(resultDiv).ToBeVisibleAsync(new() { Timeout = 15_000 });
 
         // Should show lifecycle timeline with events (seeded data)
         var timeline = page.Locator(".timeline");
@@ -172,10 +175,12 @@ public class OpenClawUiTests
     }
 
     [Test]
-    [Ignore("Excluded — fix in chunk 063-fix: #result div stays hidden after search click in CI")]
     public async Task SearchForSeededShipment_ShowsInFlightStatus()
     {
         if (SkipIfNoBrowsers()) return;
+
+        // Wait for demo seeder to complete before searching seeded data
+        await WaitForSeederAsync();
 
         var page = await _browser!.NewPageAsync();
         await page.GotoAsync(_baseUrl!);
@@ -185,7 +190,7 @@ public class OpenClawUiTests
         await page.ClickAsync("#askBtn");
 
         var resultDiv = page.Locator("#result");
-        await Expect(resultDiv).ToBeVisibleAsync();
+        await Expect(resultDiv).ToBeVisibleAsync(new() { Timeout = 15_000 });
 
         // Should have the status card visible
         var cards = page.Locator(".card");
@@ -194,7 +199,6 @@ public class OpenClawUiTests
     }
 
     [Test]
-    [Ignore("Excluded — fix in chunk 063-fix: #result div stays hidden after search click in CI")]
     public async Task SearchBox_SupportsEnterKey()
     {
         if (SkipIfNoBrowsers()) return;
@@ -206,14 +210,16 @@ public class OpenClawUiTests
         await page.PressAsync("#query", "Enter");
 
         var resultDiv = page.Locator("#result");
-        await Expect(resultDiv).ToBeVisibleAsync();
+        await Expect(resultDiv).ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     [Test]
-    [Ignore("Excluded — fix in chunk 063-fix: #result div stays hidden after search click in CI")]
     public async Task OllamaUnavailable_ShowsWarningCard_WhenSearchingSeededData()
     {
         if (SkipIfNoBrowsers()) return;
+
+        // Wait for demo seeder to complete before searching seeded data
+        await WaitForSeederAsync();
 
         var page = await _browser!.NewPageAsync();
         await page.GotoAsync(_baseUrl!);
@@ -223,7 +229,7 @@ public class OpenClawUiTests
         await page.ClickAsync("#askBtn");
 
         var resultDiv = page.Locator("#result");
-        await Expect(resultDiv).ToBeVisibleAsync();
+        await Expect(resultDiv).ToBeVisibleAsync(new() { Timeout = 15_000 });
 
         // Since Ollama is unavailable, the response should have ollamaAvailable=false
         // and the UI should show the ⚠️ Ollama Unavailable card
@@ -247,15 +253,26 @@ public class OpenClawUiTests
     }
 
     [Test]
-    [Ignore("Excluded — fix in chunk 063-fix: DemoDataSeeder runs async; seeded data not ready within polling deadline in CI")]
     public async Task ApiEndpoint_SeededData_ReturnsFound()
     {
         if (SkipIfNoBrowsers()) return;
 
         // Poll until the demo seeder has completed rather than using a fixed delay.
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        HttpResponseMessage seederResponse;
+        string seederContent;
+        do
+        {
+            seederResponse = await _httpClient!.GetAsync("/api/health/seeder");
+            seederContent = await seederResponse.Content.ReadAsStringAsync();
+            if (seederContent.Contains("\"seeded\":true", StringComparison.OrdinalIgnoreCase))
+                break;
+            await Task.Delay(100);
+        } while (DateTime.UtcNow < deadline);
+
         HttpResponseMessage response;
         string content;
-        var deadline = DateTime.UtcNow.AddSeconds(10);
+        deadline = DateTime.UtcNow.AddSeconds(10);
         do
         {
             response = await _httpClient!.GetAsync("/api/inspect/business/order-02");
@@ -297,4 +314,28 @@ public class OpenClawUiTests
 
     private static ILocatorAssertions Expect(ILocator locator) =>
         Assertions.Expect(locator);
+
+    /// <summary>
+    /// Polls the <c>/api/health/seeder</c> endpoint until the demo data has
+    /// been fully seeded, or until a 30-second deadline is exceeded.
+    /// </summary>
+    private async Task WaitForSeederAsync()
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var response = await _httpClient!.GetAsync("/api/health/seeder");
+                var content = await response.Content.ReadAsStringAsync();
+                if (content.Contains("\"seeded\":true", StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+            catch
+            {
+                // Server may not be ready yet
+            }
+            await Task.Delay(100);
+        }
+    }
 }
