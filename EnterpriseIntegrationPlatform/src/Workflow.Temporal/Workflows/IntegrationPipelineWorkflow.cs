@@ -109,11 +109,17 @@ public class IntegrationPipelineWorkflow
                     input.Timestamp, "Delivered"),
             PipelineActivityOptions);
 
-        // ── Step 4c: Publish Ack ───────────────────────────────────────────
-        await Temporalio.Workflows.Workflow.ExecuteActivityAsync(
-            (PipelineActivities act) =>
-                act.PublishAckAsync(input.MessageId, input.CorrelationId, input.AckSubject),
-            PipelineActivityOptions);
+        // ── Step 4c: Publish Ack (only if notifications are enabled) ──────
+        // Use Case 1: NotificationsEnabled=false → skip (backward compatible)
+        // Use Case 2: NotificationsEnabled=true  → publish Ack via Channel Adapter
+        // Use Case 4: Feature flag off → service silently skips even if enabled
+        if (input.NotificationsEnabled)
+        {
+            await Temporalio.Workflows.Workflow.ExecuteActivityAsync(
+                (PipelineActivities act) =>
+                    act.PublishAckAsync(input.MessageId, input.CorrelationId, input.AckSubject),
+                PipelineActivityOptions);
+        }
 
         return new IntegrationPipelineResult(input.MessageId, true);
     }
@@ -144,13 +150,19 @@ public class IntegrationPipelineWorkflow
                     input.Timestamp, "Failed"),
             PipelineActivityOptions);
 
-        // ── Step 5d: Publish Nack ──────────────────────────────────────────
-        await Temporalio.Workflows.Workflow.ExecuteActivityAsync(
-            (PipelineActivities act) =>
-                act.PublishNackAsync(
-                    input.MessageId, input.CorrelationId,
-                    reason, input.NackSubject),
-            PipelineActivityOptions);
+        // ── Step 5d: Publish Nack (only if notifications are enabled) ──────
+        // Use Case 1: NotificationsEnabled=false → skip (backward compatible)
+        // Use Case 3: NotificationsEnabled=true  → publish Nack via Channel Adapter
+        // Use Case 5: Feature flag off → service silently skips even if enabled
+        if (input.NotificationsEnabled)
+        {
+            await Temporalio.Workflows.Workflow.ExecuteActivityAsync(
+                (PipelineActivities act) =>
+                    act.PublishNackAsync(
+                        input.MessageId, input.CorrelationId,
+                        reason, input.NackSubject),
+                PipelineActivityOptions);
+        }
 
         return new IntegrationPipelineResult(input.MessageId, false, reason);
     }

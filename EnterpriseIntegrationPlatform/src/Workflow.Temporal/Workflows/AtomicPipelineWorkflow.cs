@@ -122,11 +122,17 @@ public class AtomicPipelineWorkflow
             PipelineActivityOptions);
         completedSteps.Add("UpdateStatusDelivered");
 
-        // ── Step 5: Publish Ack ─────────────────────────────────────────────
-        await Temporalio.Workflows.Workflow.ExecuteActivityAsync(
-            (PipelineActivities act) =>
-                act.PublishAckAsync(input.MessageId, input.CorrelationId, input.AckSubject),
-            PipelineActivityOptions);
+        // ── Step 5: Publish Ack (only if notifications are enabled) ──────────
+        // Use Case 1: NotificationsEnabled=false → skip (backward compatible)
+        // Use Case 2: NotificationsEnabled=true  → Channel Adapter delivered, publish Ack
+        // Use Case 4: Feature flag off → service silently skips even if enabled
+        if (input.NotificationsEnabled)
+        {
+            await Temporalio.Workflows.Workflow.ExecuteActivityAsync(
+                (PipelineActivities act) =>
+                    act.PublishAckAsync(input.MessageId, input.CorrelationId, input.AckSubject),
+                PipelineActivityOptions);
+        }
 
         return new AtomicPipelineResult(input.MessageId, true);
     }
@@ -178,13 +184,19 @@ public class AtomicPipelineWorkflow
                     input.Timestamp, "Failed"),
             PipelineActivityOptions);
 
-        // ── Publish Nack ────────────────────────────────────────────────────
-        await Temporalio.Workflows.Workflow.ExecuteActivityAsync(
-            (PipelineActivities act) =>
-                act.PublishNackAsync(
-                    input.MessageId, input.CorrelationId,
-                    failureReason, input.NackSubject),
-            PipelineActivityOptions);
+        // ── Publish Nack (only if notifications are enabled) ─────────────────
+        // Use Case 1: NotificationsEnabled=false → skip (backward compatible)
+        // Use Case 3: NotificationsEnabled=true  → Channel Adapter failed, publish Nack
+        // Use Case 5: Feature flag off → service silently skips even if enabled
+        if (input.NotificationsEnabled)
+        {
+            await Temporalio.Workflows.Workflow.ExecuteActivityAsync(
+                (PipelineActivities act) =>
+                    act.PublishNackAsync(
+                        input.MessageId, input.CorrelationId,
+                        failureReason, input.NackSubject),
+                PipelineActivityOptions);
+        }
 
         return new AtomicPipelineResult(
             input.MessageId,

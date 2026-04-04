@@ -62,7 +62,8 @@ public class AtomicPipelineWorkflowTests
             PayloadJson: payloadJson,
             MetadataJson: null,
             AckSubject: "integration.ack",
-            NackSubject: "integration.nack");
+            NackSubject: "integration.nack",
+            NotificationsEnabled: true);
 
     // ─────────────────────────────────────────────────────────────────────────
     // SUCCESS PATH — Full pipeline → Ack
