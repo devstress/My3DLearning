@@ -10,5 +10,6 @@
     <ProjectReference Include="..\Ingestion\Ingestion.csproj" />
     <ProjectReference Include="..\Ingestion.Nats\Ingestion.Nats.csproj" />
     <ProjectReference Include="..\Observability\Observability.csproj" />
+    <ProjectReference Include="..\Configuration\Configuration.csproj" />
   </ItemGroup>
 </Project>
