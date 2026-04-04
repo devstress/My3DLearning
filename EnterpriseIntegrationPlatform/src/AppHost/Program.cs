@@ -111,6 +111,14 @@ var adminApi = builder.AddProject<Projects.Admin_Api>("admin-api")
     .WithEnvironment("Cassandra__ContactPoints__0", "localhost")
     .WithEnvironment("Cassandra__Port", "15042");
 
+// Admin.Web – Vue 3 admin dashboard for platform management.
+// Proxies authenticated requests to Admin.Api for throttle control, DLQ management,
+// DR drill execution, message inspection, and performance profiling.
+var adminWeb = builder.AddProject<Projects.Admin_Web>("admin-web")
+    .WithExternalHttpEndpoints()
+    .WithEnvironment("AdminApi__BaseAddress", adminApi.GetEndpoint("http"))
+    .WithEnvironment("AdminApi__ApiKey", "dev-admin-key-001");
+
 // Demo.Pipeline – end-to-end integration pipeline that wires all platform
 // components together: NATS JetStream inbound consumer → Temporal workflow
 // (validate + log) → Cassandra persistence → NATS Ack/Nack notification.
