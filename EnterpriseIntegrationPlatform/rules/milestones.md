@@ -174,4 +174,307 @@ All phases complete. See `rules/completion-log.md` for full history.
 
 ---
 
+## Tutorial Audit (2026-04-04)
+
+> Full audit of all 50 tutorials against the actual codebase.  
+> Build succeeds. All 1,538 .NET tests pass (1,400 Unit + 58 Contract + 29 Workflow + 24 Playwright + 17 Integration + 10 Load).  
+> Tutorials 49/50 claim "1,181+ unit tests" — actual count is **1,400**.
+
+### README Discrepancy
+
+| Issue | Severity |
+|-------|----------|
+| **tutorials/README.md** lists Tutorial 48 as "[Migrating from BizTalk](48-migrating-from-biztalk.md)" but the actual file is `48-notification-use-cases.md` (about notification use cases). `48-migrating-from-biztalk.md` does not exist. | 🔴 ERROR |
+
+### Tutorial 03 — Your First Message
+
+| Issue | Severity |
+|-------|----------|
+| `PublishAsync` parameter order shown as `(topic, envelope)` but actual signature is `(envelope, topic)` in `IMessageBrokerProducer`. Code will not compile. | 🔴 ERROR |
+
+### Tutorial 04 — The Integration Envelope
+
+| Issue | Severity |
+|-------|----------|
+| `SchemaVersion` field exists in `IntegrationEnvelope` but is not documented in the tutorial. | 🟡 WARNING |
+| `Intent` property shown as non-nullable but is actually `MessageIntent?` (nullable). | 🟡 WARNING |
+
+### Tutorial 06 — Messaging Channels
+
+| Issue | Severity |
+|-------|----------|
+| `IPointToPointChannel.ReceiveAsync` missing required `channel` and `consumerGroup` parameters. Code will not compile. | 🔴 ERROR |
+| `IDatatypeChannel` methods differ: tutorial shows `RouteAsync()`/`RegisterHandlerAsync()`, actual has `PublishAsync<T>()`/`ResolveChannel()`. | 🟡 WARNING |
+| `IMessagingBridge.StartAsync` missing `sourceChannel` and `targetChannel` parameters. | 🟡 WARNING |
+
+### Tutorial 08 — Activities and the Pipeline
+
+| Issue | Severity |
+|-------|----------|
+| `IPersistenceActivityService.SaveMessageAsync` — completely wrong signature. Actual takes `IntegrationPipelineInput`, not `IntegrationEnvelope<T>` + `DeliveryStatus`. | 🔴 ERROR |
+| `IMessageValidationService.ValidateAsync` — completely wrong. Returns `MessageValidationResult` (not `ValidationResult`), takes `(string messageType, string payloadJson)` not `IntegrationEnvelope<T>`. | 🔴 ERROR |
+| `INotificationActivityService.PublishAckAsync` — takes `(Guid messageId, Guid correlationId, string topic)`, not `IntegrationEnvelope<T>`. | 🔴 ERROR |
+| `INotificationActivityService.PublishNackAsync` — takes `(Guid messageId, Guid correlationId, string reason, string topic)`, not `(IntegrationEnvelope<T>, IReadOnlyList<string>)`. | 🔴 ERROR |
+| `ICompensationActivityService` — method is `CompensateAsync(Guid, string)` returning `Task<bool>`, not `ExecuteCompensationAsync(string, IntegrationPipelineInput)`. | 🔴 ERROR |
+
+### Tutorial 10 — Message Filter
+
+| Issue | Severity |
+|-------|----------|
+| `RuleCondition` referenced at `src/Processing.Routing/RuleCondition.cs` but actually located at `src/RuleEngine/RuleCondition.cs`. | 🟡 WARNING |
+
+### Tutorial 13 — Routing Slip
+
+| Issue | Severity |
+|-------|----------|
+| `RoutingSlip.Advance()` shown as one-liner lambda but actual code includes `InvalidOperationException` guard for completed slips. | 🟡 WARNING |
+
+### Tutorial 14 — Process Manager
+
+| Issue | Severity |
+|-------|----------|
+| `SagaCompensationActivities` code snippet omits post-compensation success/failure logging that exists in actual code. | 🟡 WARNING |
+
+### Tutorial 26 — Message Replay
+
+| Issue | Severity |
+|-------|----------|
+| `ReplayFilter` uses `From`/`To` properties but actual has `FromTimestamp`/`ToTimestamp`. | 🔴 ERROR |
+| `ReplayFilter.CorrelationId` shown as `string?` but actual is `Guid?`. | 🔴 ERROR |
+| `IMessageReplayStore.QueryAsync` does not exist. Actual method is `GetMessagesForReplayAsync(topic, filter, maxMessages, ct)` returning `IAsyncEnumerable`. | 🔴 ERROR |
+| `IMessageReplayStore.StoreAsync` signature wrong. Actual is `StoreForReplayAsync<T>(envelope, topic, ct)`. | 🔴 ERROR |
+| `ReplayResult` missing `SkippedCount` and `FailedCount` properties. | 🟡 WARNING |
+| `InMemoryMessageReplayStore` class mentioned but does not exist in codebase. | 🟡 WARNING |
+
+### Tutorial 27 — Resequencer
+
+| Issue | Severity |
+|-------|----------|
+| `IResequencer.SubmitAsync` does not exist. Actual method is `Accept<T>(envelope)` — synchronous, not async. | 🔴 ERROR |
+| `GapPolicy` enum (`WaitForTimeout`, `ReleasePartial`, `DeadLetter`) does not exist. | 🔴 ERROR |
+| `ResequencerOptions` properties wrong: `MaxBufferSize`→`MaxConcurrentSequences`, `SequenceTimeout`→`ReleaseTimeout`, no `GapPolicy`. | 🔴 ERROR |
+| Default timeout shown as 5 minutes but actual is 30 seconds. Default buffer shown as 1,000 but actual is 10,000. | 🔴 ERROR |
+
+### Tutorial 28 — Competing Consumers
+
+| Issue | Severity |
+|-------|----------|
+| `IConsumerLagMonitor.GetCurrentLagAsync` — actual is `GetLagAsync(topic, consumerGroup, ct)` returning `ConsumerLagInfo`. | 🔴 ERROR |
+| `IConsumerLagMonitor.GetLagByPartitionAsync` does not exist. | 🔴 ERROR |
+| `IConsumerScaler` shows `ScaleUpAsync`/`ScaleDownAsync` but actual has single `ScaleAsync(desiredCount, ct)`. | 🔴 ERROR |
+| `IBackpressureSignal.IsActive` → actual is `IsBackpressured`. `Activate`/`Deactivate` → actual is `Signal`/`Release`. | 🔴 ERROR |
+| `CompetingConsumerOptions.EvaluationInterval` does not exist. `CooldownPeriod` is actually `CooldownMs` (int milliseconds, default 30s not 2min). | 🔴 ERROR |
+
+### Tutorial 29 — Throttle & Rate Limiting
+
+| Issue | Severity |
+|-------|----------|
+| `IMessageThrottle.AcquireAsync` takes `IntegrationEnvelope<T>` not `string partitionKey`. Returns `ThrottleResult` not `ThrottleDecision`. | 🔴 ERROR |
+| `ThrottleDecision` class does not exist — actual is `ThrottleResult`. | 🔴 ERROR |
+| `IMessageThrottle.GetMetrics` takes no parameters, not `string partitionKey`. | 🔴 ERROR |
+| `ThrottlePartitionStrategy` enum does not exist. Partitioning uses `ThrottlePartitionKey` record with `TenantId`, `Queue`, `Endpoint`. | 🔴 ERROR |
+| `IThrottleRegistry` methods differ significantly from tutorial. | 🔴 ERROR |
+| `ThrottleMetrics` properties differ: no `PartitionKey`, `TotalThrottled`, `AverageWaitTime`; actual has `TotalAcquired`, `TotalRejected`, `BurstCapacity`, `RefillRate`, `TotalWaitTime`. | 🔴 ERROR |
+
+### Tutorial 30 — Rule Engine
+
+| Issue | Severity |
+|-------|----------|
+| `ConditionGroup` class does not exist. `BusinessRule` directly has `LogicOperator` and `Conditions`. | 🔴 ERROR |
+| Enum is `RuleLogicOperator`, not `LogicalOperator`. | 🔴 ERROR |
+| `BusinessRule` properties wrong: no `Id`, uses `Enabled` not `IsEnabled`, has `StopOnMatch`, uses `LogicOperator` not separate `ConditionGroup`. | 🔴 ERROR |
+| `RuleCondition` uses `FieldName` not `Field`. | 🟡 WARNING |
+| `RuleConditionOperator` enum missing values: no `NotEquals`, `StartsWith`, `EndsWith`, `LessThan`, `Exists`. Has `In` instead. | 🔴 ERROR |
+| `RuleAction` uses named properties (`ActionType`, `TargetTopic`, `TransformName`, `Reason`), not generic `Parameters` dict. | 🔴 ERROR |
+| `RuleActionType` enum: missing `Enrich`, `Notify`, `Store`; has `DeadLetter` instead. | 🔴 ERROR |
+| `IRuleStore` methods differ: no `GetActiveRulesAsync`, has `GetAllAsync`, `GetByNameAsync`, `AddOrUpdateAsync`, `CountAsync`. | 🔴 ERROR |
+| `RuleEvaluationResult` returns collections (`MatchedRules`, `Actions`) not singles (`MatchedRule`, `SelectedAction`). | 🔴 ERROR |
+
+### Tutorial 31 — Event Sourcing
+
+| Issue | Severity |
+|-------|----------|
+| `IEventStore.AppendAsync` returns `Task<long>`, not `Task`. | 🔴 ERROR |
+| `IEventStore.ReadStreamAsync` missing `count` parameter. | 🔴 ERROR |
+| `IEventStore.QueryAsync(TemporalQuery)` does not exist. `TemporalQuery` is a static helper class, not a query object. | 🔴 ERROR |
+| `EventEnvelope` property is `Data`, not `Payload`. | 🔴 ERROR |
+| `ISnapshotStore` is generic `ISnapshotStore<TState>`, saves typed state not string. | 🔴 ERROR |
+| `IEventProjection` is generic `IEventProjection<TState>`, takes and returns state. No `ProjectionName` property. | 🔴 ERROR |
+| `TemporalQuery` is a static class with helper methods, not a record. | 🔴 ERROR |
+
+### Tutorial 32 — Multi-Tenancy
+
+| Issue | Severity |
+|-------|----------|
+| `ITenantResolver` methods are synchronous `Resolve()`, not async. Takes `IReadOnlyDictionary<string, string>` or `string?`, not `IntegrationEnvelope`. | 🔴 ERROR |
+| `TenantContext.TenantName` is nullable, not required. Property is `IsResolved` not `IsAnonymous`. | 🔴 ERROR |
+| `ITenantIsolationGuard` has single `Enforce<T>(envelope, expectedTenantId)`, not `Validate`/`ValidateEnvelope`. | 🔴 ERROR |
+| `TenantIsolationException` properties are `MessageId`, `ActualTenantId`, `ExpectedTenantId` — not `SourceTenantId`, `TargetTenantId`, `Operation`. | 🔴 ERROR |
+
+### Tutorial 33 — Security
+
+| Issue | Severity |
+|-------|----------|
+| `IInputSanitizer` methods are synchronous `Sanitize(string)`/`IsClean(string)`, not async `SanitizeAsync` returning `SanitizationResult`. | 🔴 ERROR |
+| `IPayloadSizeGuard` method is `Enforce(string)`/`Enforce(byte[])`, not `Validate(IntegrationEnvelope)`. | 🔴 ERROR |
+| `JwtOptions` uses `set` accessors with empty string defaults, not `init`/`required`. Has `ClockSkew` instead of `TokenLifetime`. | 🔴 ERROR |
+| `ISecretProvider` returns `SecretEntry?` objects with version/metadata support, not raw strings. Additional `DeleteSecretAsync`/`ListSecretKeysAsync` methods. | 🔴 ERROR |
+| `HashiCorpVaultSecretProvider` is actually named `VaultSecretProvider`. | 🟡 WARNING |
+
+### Tutorial 34 — HTTP Connector
+
+| Issue | Severity |
+|-------|----------|
+| `IHttpConnector` methods are generic `SendAsync<TPayload, TResponse>` with URL/method params, not `SendAsync(envelope, options)`. | 🔴 ERROR |
+| `HttpConnectorOptions` completely different: uses `BaseUrl` (string), `TimeoutSeconds` (int), retry/cache settings. No `AuthenticationMode` enum. | 🔴 ERROR |
+| `ConnectorResult` has no `HttpStatusCode` or `Duration`. Has `ConnectorName`, `StatusMessage`, `CompletedAt` instead. | 🔴 ERROR |
+
+### Tutorial 35 — SFTP Connector
+
+| Issue | Severity |
+|-------|----------|
+| `ISftpConnector` methods completely different: `UploadAsync` returns path string, `DownloadAsync` returns bytes, `ListFilesAsync` returns strings. | 🔴 ERROR |
+| `RemoteFileInfo` record does not exist in codebase. | 🔴 ERROR |
+| `SftpConnectorOptions` much simpler: no SSH key auth, no atomic rename option, no sidecar metadata, no file template. Uses `RootPath` not `RemoteDirectory`. | 🔴 ERROR |
+
+### Tutorial 36 — Email Connector
+
+| Issue | Severity |
+|-------|----------|
+| `IEmailConnector.SendAsync` is generic, returns `Task` (not `ConnectorResult`), takes individual params not options object. | 🔴 ERROR |
+| `EmailConnectorOptions` only has basic SMTP config. No To/Cc/Bcc, no body template, no HTML flag, no attachments. | 🔴 ERROR |
+| `EmailAttachment` record does not exist. | 🔴 ERROR |
+| Liquid template rendering described but not implemented — uses `Func<T, string>` body builders instead. | 🔴 ERROR |
+
+### Tutorial 37 — File Connector
+
+| Issue | Severity |
+|-------|----------|
+| `IFileConnector` methods differ: `WriteAsync` returns path, `ReadAsync` returns bytes, `ListFilesAsync` returns strings. | 🔴 ERROR |
+| `LocalFileInfo` record does not exist. | 🔴 ERROR |
+| `FileConnectorOptions` uses string encoding, no atomic write flag, no sidecar metadata. Namespace is `Connector.FileSystem`, not `Connector.File`. | 🔴 ERROR |
+
+### Tutorial 38 — OpenTelemetry
+
+| Issue | Severity |
+|-------|----------|
+| `PlatformActivitySource` doesn't directly expose `ActivitySource`. It's in `DiagnosticsConfig`. Has generic overload for envelopes. | 🔴 ERROR |
+| `PlatformMeters` missing `MessagesDeadLettered`, `MessagesRetried`, `MessagesInFlight` counters. Has `MessagesProcessed` not `MessagesDelivered`. | 🔴 ERROR |
+| `CorrelationPropagator` methods differ: `InjectTraceContext<T>` returns envelope, `ExtractAndStart<T>` returns Activity. | 🔴 ERROR |
+
+### Tutorial 39 — Message Lifecycle
+
+| Issue | Severity |
+|-------|----------|
+| `MessageEvent` IDs are `Guid` not `string`. Uses `Stage`/`Status`/`Source` not `State`/`Component`. Has additional `EventId`, `TraceId`, `SpanId`. | 🔴 ERROR |
+| `DeliveryStatus` enum values are `Pending, InFlight, Delivered, Failed, Retrying, DeadLettered` — not `Received, Routed, Transformed, Acked, Nacked`. | 🔴 ERROR |
+| `IMessageStateStore` methods take `Guid` not `string` for message/correlation IDs. Has additional `GetLatestByCorrelationIdAsync`. | 🔴 ERROR |
+| `ITraceAnalyzer` methods differ: returns AI-generated strings, not structured `TraceAnalysis` record. | 🔴 ERROR |
+| `IObservabilityEventLog` method is `RecordAsync` not `WriteAsync`. No generic `QueryAsync` with date range. | 🔴 ERROR |
+
+### Tutorial 40 — RAG with Ollama
+
+| Issue | Severity |
+|-------|----------|
+| `IOllamaEmbeddingProvider` does not exist. Actual is `IOllamaService` with `GenerateAsync`/`AnalyseAsync`/`IsHealthyAsync`. | 🔴 ERROR |
+| `OllamaOptions` → actual class is `OllamaSettings` with only a `Model` property. | 🔴 ERROR |
+| `IRagPipeline` does not exist. Actual is `IRagFlowService` with `RetrieveAsync`/`ChatAsync`/`ListDatasetsAsync`/`IsHealthyAsync`. | 🔴 ERROR |
+| `RagResponse` → actual is `RagFlowChatResponse(Answer, ConversationId, References)`. No `Confidence` field. | 🔴 ERROR |
+| `RagOptions` → actual is `RagFlowOptions` for connection config (BaseAddress, ApiKey, AssistantId), not query options. | 🔴 ERROR |
+| `IGenerationProvider` interface does not exist in codebase. | 🔴 ERROR |
+
+### Tutorial 41 — OpenClaw Web UI
+
+| Issue | Severity |
+|-------|----------|
+| `IMessageSearchService`, `IMessageInspector`, `IRagChatService` do not exist. OpenClaw.Web only has `DemoDataSeeder.cs` and `Program.cs`. | 🔴 ERROR |
+
+### Tutorial 42 — Configuration
+
+| Issue | Severity |
+|-------|----------|
+| `IConfigurationStore` methods differ: `GetAsync` requires `environment`, `SetAsync` takes `ConfigurationEntry` not key+value, no `GetAllAsync`/`GetHistoryAsync`. Has `DeleteAsync`/`WatchAsync`. | 🔴 ERROR |
+| `IFeatureFlagService` methods differ: param names, `GetAllFlagsAsync` → `ListAsync`, missing `GetAsync`/`SetAsync`/`DeleteAsync`. | 🔴 ERROR |
+| `ConfigurationChangeNotifier` uses `IObservable<T>` pattern with `Publish()`, not events with `NotifyAsync()`. `ConfigurationChange` record has `Environment`, `ChangeType`, `Timestamp`. | 🔴 ERROR |
+| `FeatureFlag` is a record not class, `Variants` is `Dictionary<string,string>` not `IReadOnlyList<string>`, `RolloutPercentage` is `int` not `double`. | 🟡 WARNING |
+| `NotificationFeatureFlags` has only `NotificationsEnabled` constant, not separate `AckNotifications`/`NackNotifications`. | 🟡 WARNING |
+
+### Tutorial 45 — Performance Profiling
+
+| Issue | Severity |
+|-------|----------|
+| `CpuProfiler` does not exist. Actual is `ContinuousProfiler` with synchronous `CaptureSnapshot()`. | 🔴 ERROR |
+| `MemoryProfiler` does not exist. Memory profiling is in `GcMonitor` returning `GcSnapshot`. | 🔴 ERROR |
+
+### Tutorial 48 — Notification Use Cases
+
+| Issue | Severity |
+|-------|----------|
+| `INotificationMapper` takes `(Guid messageId, Guid correlationId)`, not `IntegrationEnvelope`. `MapNack` has 3 params. Uses `SecurityElement.Escape()`. | 🔴 ERROR |
+
+### Tutorial 49 — Testing Integrations
+
+| Issue | Severity |
+|-------|----------|
+| Claims "1,181+ unit tests" but actual count is **1,400** unit tests (1,538 total .NET tests). | 🟡 WARNING |
+
+### Tutorial 50 — Best Practices
+
+| Issue | Severity |
+|-------|----------|
+| Inherits incorrect "1,181+ unit tests" claim from Tutorial 49. | 🟡 WARNING |
+
+### Tutorials Passing Audit (No Issues Found)
+
+✅ Tutorial 01 — Introduction  
+✅ Tutorial 02 — Environment Setup  
+✅ Tutorial 05 — Message Brokers  
+✅ Tutorial 07 — Temporal Workflows (minor simplification)  
+✅ Tutorial 09 — Content-Based Router  
+✅ Tutorial 11 — Dynamic Router  
+✅ Tutorial 12 — Recipient List  
+✅ Tutorial 15 — Message Translator  
+✅ Tutorial 16 — Transform Pipeline  
+✅ Tutorial 17 — Normalizer  
+✅ Tutorial 18 — Content Enricher  
+✅ Tutorial 19 — Content Filter  
+✅ Tutorial 20 — Splitter  
+✅ Tutorial 21 — Aggregator  
+✅ Tutorial 22 — Scatter-Gather  
+✅ Tutorial 23 — Request-Reply  
+✅ Tutorial 24 — Retry Framework  
+✅ Tutorial 25 — Dead Letter Queue  
+✅ Tutorial 43 — Kubernetes Deployment  
+✅ Tutorial 44 — Disaster Recovery  
+✅ Tutorial 46 — Complete Integration  
+✅ Tutorial 47 — Saga Compensation  
+
+### Summary
+
+| Category | Count |
+|----------|-------|
+| 🔴 ERROR (code won't compile or API mismatch) | ~90 |
+| 🟡 WARNING (incomplete or misleading) | ~15 |
+| Tutorials with errors | 28 of 50 |
+| Tutorials passing | 22 of 50 |
+
+**Most affected tutorials (by error count):**
+1. Tutorial 30 (Rule Engine) — 9 errors
+2. Tutorial 31 (Event Sourcing) — 7 errors
+3. Tutorial 40 (RAG with Ollama) — 6 errors
+4. Tutorial 28 (Competing Consumers) — 5 errors
+5. Tutorial 08 (Activities and the Pipeline) — 5 errors
+6. Tutorial 29 (Throttle & Rate Limiting) — 6 errors
+7. Tutorial 39 (Message Lifecycle) — 5 errors
+
+**Root cause pattern:** Tutorials show idealized/designed API signatures that differ from actual implementations. Method names, parameter types, return types, enum values, and class structures frequently don't match the real code.
+
+**Recommended next steps:**
+1. Fix tutorials/README.md — correct Tutorial 48 link to `48-notification-use-cases.md` and update title
+2. Update all tutorial code snippets to match actual API signatures
+3. Correct test count claims to reflect actual 1,400 unit tests / 1,538 total
+4. Prioritize fixing Tutorials 03, 06, 08 (beginner path) to avoid confusing new developers
+
+---
+
 For detailed completion history, files created, and notes see `rules/completion-log.md`.
