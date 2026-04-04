@@ -147,7 +147,7 @@ The course is grounded in three pillars:
 |---|----------|-------------|
 | 46 | [Building a Complete Integration](46-complete-integration.md) | End-to-end: receive HTTP → transform → route → deliver SFTP. |
 | 47 | [Saga Compensation Pattern](47-saga-compensation.md) | Distributed transactions with automatic rollback. |
-| 48 | [Migrating from BizTalk](48-migrating-from-biztalk.md) | Step-by-step migration strategy for BizTalk Server users. |
+| 48 | [Notification Use Cases](48-notification-use-cases.md) | The 5 notification use cases and how the Channel Adapter pattern drives them. |
 | 49 | [Testing Your Integrations](49-testing-integrations.md) | Unit tests, contract tests, integration tests, and load tests. |
 | 50 | [Best Practices and Patterns](50-best-practices.md) | Design guidelines, anti-patterns, and production checklist. |
 

@@ -68,7 +68,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-All phases complete. See `rules/completion-log.md` for full history.
+066 — Tutorial documentation audit follow-up
 
 ---
 
@@ -83,6 +83,12 @@ All phases complete. See `rules/completion-log.md` for full history.
 ### Phase 12 – Documentation
 
 ✅ Phase 12 complete — see completion-log.md
+
+### Phase 13 – Tutorial Audit Follow-up
+
+| Chunk | Goal | Status |
+|---|---|---|
+| 066 | Tutorial audit follow-up. Verified Tutorial 02 commands work as documented (`dotnet restore`, `dotnet build`, `dotnet test`, `npm test`, and `src/AppHost` startup). Remaining doc issues: conceptual snippets in tutorials 34-37 and 40-42 reference `src/...` files or types that do not exist in the current codebase and should be aligned or clearly marked as simplified examples. | not-started |
 
 ---
 
