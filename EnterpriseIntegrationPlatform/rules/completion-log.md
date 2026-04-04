@@ -4,6 +4,44 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 061 – Admin.Web (Vue 3)
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Vue 3 admin dashboard frontend for Admin.Api — tenant/queue/endpoint throttle control, rate limit status, DLQ management, message inspection, policy CRUD, DR drill execution, profiling snapshots
+- **Architecture**:
+  - Admin.Web is an ASP.NET Core web project (`Microsoft.NET.Sdk.Web`) that serves a self-contained Vue 3 SPA as an embedded HTML string constant — same pattern as OpenClaw.Web
+  - Vue 3 loaded from CDN (`unpkg.com/vue@3/dist/vue.global.prod.js`) — no Node.js build toolchain required
+  - Server-side proxy endpoints forward all `/api/admin/*` requests to Admin.Api with the `X-Api-Key` header, keeping the API key server-side only (never exposed to browser)
+  - 17 proxy endpoints covering: platform status, messages, faults, DLQ resubmit, throttle CRUD, rate limit status, DR drills/history, profiling snapshots/GC, events
+  - Vue 3 SPA has 7 pages: Dashboard (platform health), Throttle Policies (CRUD table + form), Rate Limiting (config display), DLQ Management (resubmit form), Message Inspector (search by ID/key), DR Drills (trigger + history), Profiling (snapshot capture + GC)
+  - Dark-themed responsive UI matching OpenClaw.Web visual style
+  - `AdminWebMarker` public class enables `WebApplicationFactory<T>` usage in tests without ambiguity with OpenClaw.Web's `Program` class
+  - Registered in Aspire AppHost as `admin-web` with environment variables for Admin.Api base address and API key
+  - Port 15090 following the 15xxx convention
+- **Files created**:
+  - `src/Admin.Web/Admin.Web.csproj` — Web SDK project referencing ServiceDefaults
+  - `src/Admin.Web/Program.cs` — 17 proxy endpoints + Vue 3 SPA serving at root
+  - `src/Admin.Web/AdminDashboardHtml.cs` — Full embedded Vue 3 dashboard HTML (dark theme, sidebar nav, 7 sections)
+  - `src/Admin.Web/AdminWebMarker.cs` — Public marker class for WebApplicationFactory test support
+  - `src/Admin.Web/Properties/launchSettings.json` — Port 15090
+  - `src/Admin.Web/appsettings.json` — AdminApi base address and API key config
+  - `src/Admin.Web/appsettings.Development.json` — Development logging config
+  - `tests/PlaywrightTests/AdminDashboardTests.cs` — 11 Playwright tests for Admin.Web dashboard
+- **Files modified**:
+  - `EnterpriseIntegrationPlatform.sln` — Added Admin.Web project
+  - `src/AppHost/AppHost.csproj` — Added Admin.Web project reference
+  - `src/AppHost/Program.cs` — Registered `admin-web` with Aspire, passing AdminApi__BaseAddress and AdminApi__ApiKey
+  - `tests/PlaywrightTests/PlaywrightTests.csproj` — Added Admin.Web project reference
+  - `tests/PlaywrightTests/OpenClawUiTests.cs` — Updated WebApplicationFactory to use `OpenClaw.Web.DemoDataSeeder` to avoid Program class ambiguity
+  - `rules/milestones.md` — Removed chunk 061 row, updated Next Chunk to 062
+- **Tests**: UnitTests 1,379, ContractTests 58, WorkflowTests 24, IntegrationTests 17, PlaywrightTests 24 (+11), LoadTests 10 = **1,512 total**
+- **Notes**:
+  - 11 new Playwright tests covering: dashboard load/title, sidebar navigation with all 7 sections, active state switching, DLQ resubmit form, throttle table + add policy form, DR drill form + history, message inspector search, profiling snapshot controls, rate limit page
+  - Exceeds the ≥8 minimum by 3 tests
+  - Admin.Web proxies all API calls server-side to avoid exposing API keys to the browser — a production-ready security pattern
+  - Vue 3 SPA is fully self-contained (no build step, no npm, no node_modules) — same architectural pattern as OpenClaw.Web
+
 ## Chunk 060 – Test Coverage Hardening
 
 - **Date**: 2026-04-04

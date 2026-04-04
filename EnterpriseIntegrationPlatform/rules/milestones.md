@@ -68,7 +68,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 061** (Admin.Web Vue 3) is next.
+**Chunk 062** (RAG Knowledge Base) is next.
 
 ---
 
@@ -80,7 +80,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Tests Required |
 |-------|------|------|----------------|
-| 061 | Admin.Web (Vue 3) | Vue 3 admin dashboard frontend for Admin.Api — tenant/queue/endpoint throttle control, rate limit status, DLQ management, message inspection, policy CRUD, DR drill execution, profiling snapshots | PlaywrightTests: ≥8 new (dashboard load, DLQ list, throttle CRUD, DR drill trigger) |
 | 062 | RAG Knowledge Base | XML-based RAG knowledge store under docs/rag/ with platform documentation indexed for RagFlow retrieval. Deployable with Aspire or standalone. Covers all EIP patterns, usage guides, and implementation reference | UnitTests: ≥5 (RAG document parsing, index generation, query matching) |
 
 ### Phase 12 – Documentation
