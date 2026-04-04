@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ragKnowledgeBase xmlns="urn:eip:rag:v1" category="Messaging Endpoints">
+
+  <document id="messaging-gateway" title="Messaging Gateway" pattern="Messaging Gateway">
+    <summary>Encapsulates access to the messaging system from the rest of the application via a simple interface.</summary>
+    <implementation>Gateway.Api — IMessagingGateway + HttpMessagingGateway provides a clean HTTP API for submitting messages.</implementation>
+    <components>Gateway.Api</components>
+    <tags>gateway api http entry-point</tags>
+  </document>
+
+  <document id="messaging-mapper" title="Messaging Mapper" pattern="Messaging Mapper">
+    <summary>Maps domain objects to and from messaging-specific objects (envelopes) without the domain depending on messaging.</summary>
+    <implementation>Contracts — IMessagingMapper + JsonMessagingMapper serializes/deserializes domain objects to IntegrationEnvelope payloads.</implementation>
+    <components>Contracts</components>
+    <tags>mapper serialization domain-to-message</tags>
+  </document>
+
+  <document id="transactional-client" title="Transactional Client" pattern="Transactional Client">
+    <summary>The client controls its transactions with the messaging system, sending/receiving within transaction boundaries.</summary>
+    <implementation>Ingestion — ITransactionalClient + BrokerTransactionalClient wraps produce/consume in transactional scopes.</implementation>
+    <components>Ingestion</components>
+    <tags>transactional client transaction boundary</tags>
+  </document>
+
+  <document id="polling-consumer" title="Polling Consumer" pattern="Polling Consumer">
+    <summary>The application explicitly checks for messages on a schedule rather than being notified.</summary>
+    <implementation>Ingestion — IPollingConsumer + PollingConsumer with configurable poll interval.</implementation>
+    <components>Ingestion</components>
+    <tags>polling consumer schedule pull</tags>
+  </document>
+
+  <document id="event-driven-consumer" title="Event-Driven Consumer" pattern="Event-Driven Consumer">
+    <summary>The application is automatically notified when a message arrives, through a callback or event handler.</summary>
+    <implementation>Ingestion — IEventDrivenConsumer + EventDrivenConsumer with push-based message delivery.</implementation>
+    <components>Ingestion</components>
+    <tags>event-driven consumer push callback</tags>
+  </document>
+
+  <document id="competing-consumers" title="Competing Consumers" pattern="Competing Consumers">
+    <summary>Multiple consumers compete to read from the same channel, enabling parallel processing and load balancing.</summary>
+    <implementation>Processing.CompetingConsumers uses Kafka consumer groups or NATS queue groups for parallel processing.</implementation>
+    <components>Processing.CompetingConsumers</components>
+    <tags>competing consumers parallel load-balance</tags>
+  </document>
+
+  <document id="message-dispatcher" title="Message Dispatcher" pattern="Message Dispatcher">
+    <summary>Dispatches messages to the appropriate handler based on message type.</summary>
+    <implementation>Processing.Dispatcher.MessageDispatcher routes messages to registered IMessageHandler implementations by type.</implementation>
+    <components>Processing.Dispatcher</components>
+    <tags>dispatcher handler type-based routing</tags>
+  </document>
+
+  <document id="selective-consumer" title="Selective Consumer" pattern="Selective Consumer">
+    <summary>A consumer that filters which messages it receives based on selection criteria.</summary>
+    <implementation>Ingestion — ISelectiveConsumer + SelectiveConsumer applies predicate filters at the consumer level.</implementation>
+    <components>Ingestion</components>
+    <tags>selective consumer filter predicate</tags>
+  </document>
+
+  <document id="durable-subscriber" title="Durable Subscriber" pattern="Durable Subscriber">
+    <summary>A subscriber that does not miss messages published while it is disconnected.</summary>
+    <implementation>Ingestion — IDurableSubscriber + DurableSubscriber leverages Kafka/NATS persistent subscriptions.</implementation>
+    <components>Ingestion</components>
+    <tags>durable subscriber persistent offline</tags>
+  </document>
+
+  <document id="idempotent-receiver" title="Idempotent Receiver" pattern="Idempotent Receiver">
+    <summary>Handles duplicate messages gracefully by tracking processed message IDs.</summary>
+    <implementation>Storage.Cassandra deduplication table stores processed message IDs to prevent reprocessing.</implementation>
+    <components>Storage.Cassandra</components>
+    <tags>idempotent dedup duplicate receiver</tags>
+  </document>
+
+  <document id="service-activator" title="Service Activator" pattern="Service Activator">
+    <summary>Connects a service to the messaging system. Receives a message, invokes the service, and optionally sends a reply.</summary>
+    <implementation>Processing.Dispatcher.ServiceActivator invokes registered service methods and publishes reply messages.</implementation>
+    <components>Processing.Dispatcher</components>
+    <tags>service-activator invoke reply</tags>
+  </document>
+
+</ragKnowledgeBase>

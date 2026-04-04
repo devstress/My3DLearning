@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ragKnowledgeBase xmlns="urn:eip:rag:v1" category="System Management">
+
+  <document id="control-bus" title="Control Bus" pattern="Control Bus">
+    <summary>A dedicated channel for system management messages that control and monitor the integration platform.</summary>
+    <implementation>SystemManagement.ControlBusPublisher publishes control messages to manage platform components.</implementation>
+    <components>SystemManagement</components>
+    <tags>control-bus management monitoring</tags>
+  </document>
+
+  <document id="detour" title="Detour" pattern="Detour">
+    <summary>Routes messages through additional processing steps for debugging or testing, without modifying the original route.</summary>
+    <implementation>Processing.Routing.Detour inserts a configurable detour into message routes, controllable via the Control Bus.</implementation>
+    <components>Processing.Routing</components>
+    <tags>detour debug test intercept</tags>
+  </document>
+
+  <document id="wire-tap" title="Wire Tap" pattern="Wire Tap">
+    <summary>Inserts a simple recipient list that publishes each message to both the main channel and a monitoring channel.</summary>
+    <implementation>OpenTelemetry distributed tracing and Observability module — every message is traced and logged without affecting flow.</implementation>
+    <components>Observability</components>
+    <tags>wire-tap monitoring tracing telemetry</tags>
+  </document>
+
+  <document id="message-history" title="Message History" pattern="Message History">
+    <summary>Appends processing history to each message so you can trace the path it took through the system.</summary>
+    <implementation>Contracts.MessageHistoryHelper appends processing step records to IntegrationEnvelope headers.</implementation>
+    <components>Contracts</components>
+    <tags>history trace audit path</tags>
+  </document>
+
+  <document id="message-store" title="Message Store" pattern="Message Store">
+    <summary>Stores a copy of every message in a central location for auditing and replay.</summary>
+    <implementation>SystemManagement.MessageStore persists messages to Cassandra for audit trails and replay.</implementation>
+    <components>SystemManagement, Storage.Cassandra</components>
+    <tags>store audit persistence replay</tags>
+  </document>
+
+  <document id="smart-proxy" title="Smart Proxy" pattern="Smart Proxy">
+    <summary>Tracks request-reply correlations and routes replies back to the original requester.</summary>
+    <implementation>SystemManagement.SmartProxy maintains a correlation table and routes reply messages.</implementation>
+    <components>SystemManagement</components>
+    <tags>smart-proxy correlation reply routing</tags>
+  </document>
+
+  <document id="test-message" title="Test Message" pattern="Test Message">
+    <summary>Generates test messages to verify the system is working end-to-end.</summary>
+    <implementation>SystemManagement.TestMessageGenerator produces synthetic test messages for system verification.</implementation>
+    <components>SystemManagement</components>
+    <tags>test-message verification synthetic</tags>
+  </document>
+
+  <document id="channel-purger" title="Channel Purger" pattern="Channel Purger">
+    <summary>Removes all messages from a channel to prepare for testing or reset state.</summary>
+    <implementation>Ingestion.ChannelPurger clears messages from specified channels/topics.</implementation>
+    <components>Ingestion</components>
+    <tags>purger clear reset channel</tags>
+  </document>
+
+</ragKnowledgeBase>

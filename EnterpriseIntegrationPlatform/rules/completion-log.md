@@ -4,6 +4,47 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 062 – RAG Knowledge Base
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: XML-based RAG knowledge store under docs/rag/ with platform documentation indexed for RagFlow retrieval. Covers all 65 EIP patterns, platform architecture, and implementation reference. New AI.RagKnowledge library with document parser, in-memory index, and query matcher.
+- **Architecture**:
+  - 9 XML knowledge documents under `docs/rag/` following the `urn:eip:rag:v1` schema, organized by EIP book category
+  - `AI.RagKnowledge` library with: `RagDocumentParser` (XML → RagDocument), `RagKnowledgeIndex` (in-memory tag/category/ID index), `RagQueryMatcher` (keyword extraction, scoring, ranked results)
+  - DI registration via `RagKnowledgeServiceExtensions.AddRagKnowledge()` with optional directory pre-loading
+  - `InternalsVisibleTo` for UnitTests to test `ExtractKeywords` internal method
+  - 20 new unit tests covering parsing (valid/invalid/empty/missing-fields), indexing (add/getById/getByTag/getByCategory/getAllTags), query matching (ranked/no-match/maxResults/normalized-scores/keywords/DLQ), and record types
+- **Files created**:
+  - `docs/rag/integration-styles.xml` — 4 Integration Styles patterns
+  - `docs/rag/messaging-systems.xml` — 6 Messaging Systems patterns
+  - `docs/rag/messaging-channels.xml` — 9 Messaging Channels patterns
+  - `docs/rag/message-construction.xml` — 9 Message Construction patterns
+  - `docs/rag/message-routing.xml` — 12 Message Routing patterns
+  - `docs/rag/message-transformation.xml` — 6 Message Transformation patterns
+  - `docs/rag/messaging-endpoints.xml` — 11 Messaging Endpoints patterns
+  - `docs/rag/system-management.xml` — 8 System Management patterns
+  - `docs/rag/platform-architecture.xml` — 11 Platform Architecture documents
+  - `src/AI.RagKnowledge/AI.RagKnowledge.csproj` — Library project
+  - `src/AI.RagKnowledge/RagDocument.cs` — Record type for knowledge documents
+  - `src/AI.RagKnowledge/RagDocumentParser.cs` — XML parser
+  - `src/AI.RagKnowledge/RagKnowledgeIndex.cs` — In-memory search index
+  - `src/AI.RagKnowledge/RagQueryMatcher.cs` — Natural-language query matcher
+  - `src/AI.RagKnowledge/RagKnowledgeServiceExtensions.cs` — DI registration
+  - `tests/UnitTests/RagKnowledgeTests.cs` — 20 unit tests
+- **Files modified**:
+  - `EnterpriseIntegrationPlatform.sln` — Added AI.RagKnowledge project
+  - `tests/UnitTests/UnitTests.csproj` — Added AI.RagKnowledge reference
+  - `rules/milestones.md` — Removed chunk 062 row, updated Next Chunk to 063-fix
+  - `rules/completion-log.md` — Added chunk 062 entry
+- **Test counts**:
+  - UnitTests: 1,399 (+20)
+  - Total tests: 1,532 across 6 test projects (UnitTests 1399, ContractTests 58, WorkflowTests 29, IntegrationTests 17, PlaywrightTests 24, LoadTests 10; note: 8 Playwright tests currently [Ignore]d pending chunk 063-fix)
+- **Notes**:
+  - 48 src projects (added AI.RagKnowledge)
+  - All 65 EIP patterns from the book are covered in the XML knowledge base
+  - Query matcher uses keyword extraction with stop-word removal and normalized scoring (0.0–1.0)
+
 ## Chunk 061 – Admin.Web (Vue 3)
 
 - **Date**: 2026-04-04

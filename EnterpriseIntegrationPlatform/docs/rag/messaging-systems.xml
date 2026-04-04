@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ragKnowledgeBase xmlns="urn:eip:rag:v1" category="Messaging Systems">
+
+  <document id="message-channel" title="Message Channel" pattern="Message Channel">
+    <summary>A Message Channel is a virtual pipe that connects a sender to a receiver. The platform abstracts broker-specific channels behind IMessageChannel.</summary>
+    <implementation>Ingestion broker abstraction (IKafkaProducer, INatsPublisher). Kafka topics and NATS JetStream subjects serve as message channels.</implementation>
+    <components>Ingestion.Kafka, Ingestion.Nats</components>
+    <tags>channel broker ingestion</tags>
+  </document>
+
+  <document id="message" title="Message" pattern="Message">
+    <summary>A Message is a discrete unit of data sent over a channel. The platform uses IntegrationEnvelope as the universal message wrapper.</summary>
+    <implementation>IntegrationEnvelope&lt;T&gt; in Contracts — includes headers, correlation ID, business key, intent, timestamps, and typed payload.</implementation>
+    <components>Contracts</components>
+    <tags>envelope message contracts</tags>
+  </document>
+
+  <document id="pipes-and-filters" title="Pipes and Filters" pattern="Pipes and Filters">
+    <summary>Divide processing into independent steps (filters) connected by channels (pipes). Temporal activity chains implement this pattern.</summary>
+    <implementation>Temporal workflow activities form filter chains. Processing.Transform provides ContentEnricher, ContentFilter, MessageNormalizer as composable filters.</implementation>
+    <components>Workflow.Temporal, Processing.Transform</components>
+    <tags>pipeline filter transform temporal</tags>
+  </document>
+
+  <document id="message-router" title="Message Router" pattern="Message Router">
+    <summary>A Message Router consumes a message from one channel and republishes it to a different channel depending on conditions.</summary>
+    <implementation>Processing.Routing with ContentBasedRouter, DynamicRouter, RecipientListRouter, RoutingSlipRouter.</implementation>
+    <components>Processing.Routing</components>
+    <tags>routing router content-based</tags>
+  </document>
+
+  <document id="message-translator" title="Message Translator" pattern="Message Translator">
+    <summary>Translates a message from one format to another so that systems with different data formats can communicate.</summary>
+    <implementation>Processing.Translator with IMessageTranslator interface. Processing.Transform provides ContentEnricher and ContentFilter for field-level transformation.</implementation>
+    <components>Processing.Translator, Processing.Transform</components>
+    <tags>translator transform mapping</tags>
+  </document>
+
+  <document id="message-endpoint" title="Message Endpoint" pattern="Message Endpoint">
+    <summary>An application connects to a messaging channel using a Message Endpoint. The platform formalizes endpoints as consumers and gateways.</summary>
+    <implementation>Ingestion layer: PollingConsumer, EventDrivenConsumer, SelectiveConsumer, DurableSubscriber. Gateway.Api provides HttpMessagingGateway.</implementation>
+    <components>Ingestion, Gateway.Api</components>
+    <tags>endpoint consumer gateway</tags>
+  </document>
+
+</ragKnowledgeBase>

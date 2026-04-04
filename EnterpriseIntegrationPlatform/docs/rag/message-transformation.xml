@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ragKnowledgeBase xmlns="urn:eip:rag:v1" category="Message Transformation">
+
+  <document id="envelope-wrapper" title="Envelope Wrapper" pattern="Envelope Wrapper">
+    <summary>Wraps application data in a messaging-system-specific envelope for transport.</summary>
+    <implementation>IntegrationEnvelope&lt;T&gt; is the universal wrapper — typed payload, headers, correlation ID, business key, timestamps.</implementation>
+    <components>Contracts</components>
+    <tags>envelope wrapper transport</tags>
+  </document>
+
+  <document id="content-enricher" title="Content Enricher" pattern="Content Enricher">
+    <summary>Augments a message with additional data from an external source.</summary>
+    <implementation>Processing.Transform.ContentEnricher adds enrichment data via configurable enrichment functions.</implementation>
+    <components>Processing.Transform</components>
+    <tags>enricher augment external-data</tags>
+  </document>
+
+  <document id="content-filter" title="Content Filter" pattern="Content Filter">
+    <summary>Removes unwanted data from a message before forwarding.</summary>
+    <implementation>Processing.Transform.ContentFilter strips fields or sections based on filter rules.</implementation>
+    <components>Processing.Transform</components>
+    <tags>filter strip remove fields</tags>
+  </document>
+
+  <document id="claim-check" title="Claim Check" pattern="Claim Check">
+    <summary>Store message data in persistent storage and pass a claim check (reference) instead of the full data.</summary>
+    <implementation>Storage.Cassandra stores large payloads; the message carries a claim-check ID for retrieval.</implementation>
+    <components>Storage.Cassandra</components>
+    <tags>claim-check store reference large-payload</tags>
+  </document>
+
+  <document id="normalizer" title="Normalizer" pattern="Normalizer">
+    <summary>Routes each message type through the appropriate translator to produce a common canonical format.</summary>
+    <implementation>Processing.Transform.MessageNormalizer applies type-specific transforms to produce a canonical IntegrationEnvelope.</implementation>
+    <components>Processing.Transform</components>
+    <tags>normalizer canonical standard format</tags>
+  </document>
+
+  <document id="canonical-data-model" title="Canonical Data Model" pattern="Canonical Data Model">
+    <summary>Define a common data model shared across all applications to reduce coupling.</summary>
+    <implementation>IntegrationEnvelope&lt;T&gt; is the canonical model — all messages flow through the platform as typed envelopes.</implementation>
+    <components>Contracts</components>
+    <tags>canonical model standard shared</tags>
+  </document>
+
+</ragKnowledgeBase>
