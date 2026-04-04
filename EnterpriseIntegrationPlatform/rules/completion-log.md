@@ -10,23 +10,44 @@ See `milestones.md` for current phase status and next chunk.
 - **Status**: done
 - **Goal**: Vue 3 admin dashboard frontend for Admin.Api — tenant/queue/endpoint throttle control, rate limit status, DLQ management, message inspection, policy CRUD, DR drill execution, profiling snapshots
 - **Architecture**:
-  - Admin.Web is an ASP.NET Core web project (`Microsoft.NET.Sdk.Web`) that serves a self-contained Vue 3 SPA as an embedded HTML string constant — same pattern as OpenClaw.Web
-  - Vue 3 loaded from CDN (`unpkg.com/vue@3/dist/vue.global.prod.js`) — no Node.js build toolchain required
+  - Admin.Web is an ASP.NET Core web project (`Microsoft.NET.Sdk.Web`) that serves a Vite-built Vue 3 SPA from the `wwwroot/` directory
+  - The Vue 3 frontend lives in `src/Admin.Web/clientapp/` as a standalone Vite project with proper Single File Components (SFCs), Vitest tests, and development server with API proxy
+  - MSBuild target `BuildClientApp` in the `.csproj` runs `npm install && npm run build` automatically before each .NET build, outputting to `wwwroot/`
+  - Vite dev server proxy forwards `/api/admin/*` to the ASP.NET backend during development, enabling hot module replacement
   - Server-side proxy endpoints forward all `/api/admin/*` requests to Admin.Api with the `X-Api-Key` header, keeping the API key server-side only (never exposed to browser)
   - 17 proxy endpoints covering: platform status, messages, faults, DLQ resubmit, throttle CRUD, rate limit status, DR drills/history, profiling snapshots/GC, events
-  - Vue 3 SPA has 7 pages: Dashboard (platform health), Throttle Policies (CRUD table + form), Rate Limiting (config display), DLQ Management (resubmit form), Message Inspector (search by ID/key), DR Drills (trigger + history), Profiling (snapshot capture + GC)
-  - Dark-themed responsive UI matching OpenClaw.Web visual style
+  - Vue 3 SPA has 7 page components: DashboardPage, ThrottlePage, RateLimitPage, DlqPage, MessagesPage, DrDrillsPage, ProfilingPage
+  - Dark-themed responsive UI with CSS custom properties
+  - Shared `api.js` utility module with `apiFetch()`, `formatDuration()`, `formatDate()` helper functions
   - `AdminWebMarker` public class enables `WebApplicationFactory<T>` usage in tests without ambiguity with OpenClaw.Web's `Program` class
   - Registered in Aspire AppHost as `admin-web` with environment variables for Admin.Api base address and API key
   - Port 15090 following the 15xxx convention
 - **Files created**:
-  - `src/Admin.Web/Admin.Web.csproj` — Web SDK project referencing ServiceDefaults
-  - `src/Admin.Web/Program.cs` — 17 proxy endpoints + Vue 3 SPA serving at root
-  - `src/Admin.Web/AdminDashboardHtml.cs` — Full embedded Vue 3 dashboard HTML (dark theme, sidebar nav, 7 sections)
+  - `src/Admin.Web/Admin.Web.csproj` — Web SDK project with BuildClientApp MSBuild target
+  - `src/Admin.Web/Program.cs` — 17 proxy endpoints + static file serving + SPA fallback
   - `src/Admin.Web/AdminWebMarker.cs` — Public marker class for WebApplicationFactory test support
   - `src/Admin.Web/Properties/launchSettings.json` — Port 15090
   - `src/Admin.Web/appsettings.json` — AdminApi base address and API key config
   - `src/Admin.Web/appsettings.Development.json` — Development logging config
+  - `src/Admin.Web/clientapp/` — Vite + Vue 3 SPA project:
+    - `package.json` — Dependencies: vue, vite, @vitejs/plugin-vue, vitest, @vue/test-utils, jsdom
+    - `vite.config.js` — Build output to ../wwwroot, API proxy, Vitest config
+    - `index.html` — SPA entry point
+    - `src/main.js` — Vue 3 app bootstrap
+    - `src/style.css` — Dark theme CSS with CSS custom properties
+    - `src/api.js` — Shared API fetch utility with formatDuration/formatDate helpers
+    - `src/App.vue` — Root component with sidebar navigation (7 sections)
+    - `src/components/DashboardPage.vue` — Platform health status with component table
+    - `src/components/ThrottlePage.vue` — Throttle policy CRUD with form
+    - `src/components/RateLimitPage.vue` — Rate limit configuration display
+    - `src/components/DlqPage.vue` — DLQ resubmission form
+    - `src/components/MessagesPage.vue` — Message search by ID/correlation/business key
+    - `src/components/DrDrillsPage.vue` — DR drill execution form + history
+    - `src/components/ProfilingPage.vue` — Performance snapshot capture + GC diagnostics
+    - `src/__tests__/api.test.js` — 7 tests for formatDuration and formatDate utilities
+    - `src/__tests__/App.test.js` — 7 tests for sidebar navigation and page switching
+    - `src/__tests__/DlqPage.test.js` — 2 tests for DLQ page component rendering
+    - `src/__tests__/ThrottlePage.test.js` — 3 tests for throttle page CRUD form
   - `tests/PlaywrightTests/AdminDashboardTests.cs` — 11 Playwright tests for Admin.Web dashboard
 - **Files modified**:
   - `EnterpriseIntegrationPlatform.sln` — Added Admin.Web project
@@ -35,12 +56,12 @@ See `milestones.md` for current phase status and next chunk.
   - `tests/PlaywrightTests/PlaywrightTests.csproj` — Added Admin.Web project reference
   - `tests/PlaywrightTests/OpenClawUiTests.cs` — Updated WebApplicationFactory to use `OpenClaw.Web.DemoDataSeeder` to avoid Program class ambiguity
   - `rules/milestones.md` — Removed chunk 061 row, updated Next Chunk to 062
-- **Tests**: UnitTests 1,379, ContractTests 58, WorkflowTests 24, IntegrationTests 17, PlaywrightTests 24 (+11), LoadTests 10 = **1,512 total**
+- **Tests**: UnitTests 1,379, ContractTests 58, WorkflowTests 24, IntegrationTests 17, PlaywrightTests 24 (+11), LoadTests 10, **Vitest 19 (new)** = **1,531 total**
 - **Notes**:
-  - 11 new Playwright tests covering: dashboard load/title, sidebar navigation with all 7 sections, active state switching, DLQ resubmit form, throttle table + add policy form, DR drill form + history, message inspector search, profiling snapshot controls, rate limit page
-  - Exceeds the ≥8 minimum by 3 tests
+  - 11 Playwright tests covering: dashboard load/title, sidebar navigation with all 7 sections, active state switching, DLQ resubmit form, throttle table + add policy form, DR drill form + history, message inspector search, profiling snapshot controls, rate limit page
+  - 19 Vitest tests covering: API utility functions (7), App navigation (7), DLQ page rendering (2), Throttle page CRUD form (3)
   - Admin.Web proxies all API calls server-side to avoid exposing API keys to the browser — a production-ready security pattern
-  - Vue 3 SPA is fully self-contained (no build step, no npm, no node_modules) — same architectural pattern as OpenClaw.Web
+  - Vite separation provides: independent frontend development with HMR, isolated frontend testing with Vitest, proper Vue SFC components instead of monolithic HTML string, standard npm toolchain for frontend dependencies
 
 ## Chunk 060 – Test Coverage Hardening
 
