@@ -48,5 +48,6 @@
     <ProjectReference Include="..\..\src\RuleEngine\RuleEngine.csproj" />
     <ProjectReference Include="..\..\src\Activities\Activities.csproj" />
     <ProjectReference Include="..\..\src\Workflow.Temporal\Workflow.Temporal.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Resequencer\Processing.Resequencer.csproj" />
   </ItemGroup>
 </Project>

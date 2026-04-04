@@ -64,7 +64,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 049** (Message Filter) is next.
+**Chunk 052** (Content Enricher + Content Filter) is next.
 
 ---
 
@@ -80,9 +80,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Tests Required |
 |-------|------|------|----------------|
-| 049 | Message Filter | Add `IMessageFilter` and `MessageFilter` in Processing.Routing/ that evaluates a predicate against an envelope and either passes it through or discards it (with optional DLQ routing for discarded messages). Reuse `RuleCondition` from RuleEngine for predicate definition. | UnitTests: ≥8 (pass-through, discard, discard-to-DLQ, multiple predicates AND/OR) |
-| 050 | Routing Slip | Add `RoutingSlip` record to Contracts/ containing an ordered list of processing step descriptors. Add `IRoutingSlipRouter` in Processing.Routing/ that reads the slip from the envelope metadata, executes the current step, and forwards to the next step. Each step consumes its entry from the slip. Enables dynamic, per-message processing pipelines — replaces BizTalk dynamic send ports. | UnitTests: ≥12 (execute step, advance slip, empty slip completion, step failure handling) |
-| 051 | Resequencer | Add `IResequencer` and `MessageResequencer` in Processing/ that buffers out-of-order messages by `CorrelationId` + `SequenceNumber`, and releases them in order once the sequence is complete or a configurable timeout expires. Uses `SequenceNumber` and `TotalCount` from envelope (added in chunk 045). | UnitTests: ≥12 (in-order passthrough, out-of-order buffering, timeout release, duplicate sequence detection) |
 | 052 | Content Enricher + Content Filter | (a) Add `IContentEnricher` and `ContentEnricher` in Processing.Transform/ that augments an envelope's payload with data fetched from an external source (e.g., HTTP lookup, Cassandra query). (b) Add `IContentFilter` and `ContentFilter` that strips fields from a payload, keeping only specified paths — the inverse of enrichment. Both are Temporal activities. | UnitTests: ≥12 (enrich with HTTP mock, enrich with missing data fallback, filter keep-fields, filter nested paths) |
 | 053 | Normalizer + Canonical Data Model | (a) Add `INormalizer` and `MessageNormalizer` in Processing.Transform/ that detects incoming format (JSON, XML, CSV, flat-file) and converts to a canonical JSON representation using existing Transform pipeline steps. (b) Document the Canonical Data Model pattern as `IntegrationEnvelope<T>` itself — the envelope IS the canonical model. | UnitTests: ≥10 (normalize XML→JSON, CSV→JSON, already-JSON passthrough, unknown format error) |
 
@@ -163,7 +160,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 **Message Routing:**
 - ✅ Content-Based Router (Processing.Routing)
-- 🔲 Message Filter (chunk 049)
+- ✅ Message Filter (Processing.Routing.MessageFilter)
 - ✅ Dynamic Router (Processing.Routing.DynamicRouter)
 - ✅ Recipient List (Processing.Routing.RecipientListRouter)
 - ✅ Splitter (Processing.Splitter)
@@ -171,7 +168,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 - 🔲 Resequencer (chunk 051)
 - ✅ Composed Message Processor (Splitter + Transform + Aggregator pipeline)
 - ✅ Scatter-Gather (Processing.ScatterGather)
-- 🔲 Routing Slip (chunk 050)
+- ✅ Routing Slip (Processing.Routing.RoutingSlipRouter)
 - ✅ Process Manager (Temporal Workflows)
 - — Message Broker (the platform IS the broker)
 
