@@ -4,6 +4,41 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 056 – Polling Consumer + Event-Driven Consumer + Selective Consumer + Durable Subscriber
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Formalize four EIP consumer patterns in Ingestion/: (a) PollingConsumer (pull-based, Kafka model), (b) EventDrivenConsumer (push-based, NATS/Pulsar model), (c) SelectiveConsumer (predicate-filtered consumption), (d) DurableSubscriber (subscription state survives restarts).
+
+### Architecture
+
+- **IPollingConsumer / PollingConsumer** — Pull-based consumer with `PollAsync` returning batches. Uses timeout and maxMessages to control polling pace. Wraps `IMessageBrokerConsumer`.
+- **IEventDrivenConsumer / EventDrivenConsumer** — Push-based consumer with `StartAsync`. Delegates directly to broker's subscribe mechanism.
+- **ISelectiveConsumer / SelectiveConsumer** — Wraps `IMessageBrokerConsumer` with a `Func<IntegrationEnvelope<T>, bool>` predicate. Only matching messages reach the handler.
+- **IDurableSubscriber / DurableSubscriber** — Wraps `IMessageBrokerConsumer` with `IsConnected` state tracking and named subscription. Subscription state identified by `subscriptionName`.
+
+### Files created
+
+- `src/Ingestion/IPollingConsumer.cs`
+- `src/Ingestion/PollingConsumer.cs`
+- `src/Ingestion/IEventDrivenConsumer.cs`
+- `src/Ingestion/EventDrivenConsumer.cs`
+- `src/Ingestion/ISelectiveConsumer.cs`
+- `src/Ingestion/SelectiveConsumer.cs`
+- `src/Ingestion/IDurableSubscriber.cs`
+- `src/Ingestion/DurableSubscriber.cs`
+- `tests/UnitTests/ConsumerPatternTests.cs`
+
+### Files modified
+
+- `rules/milestones.md` — removed chunk 056, updated next chunk, updated EIP checklist
+- `rules/completion-log.md` — added chunk 056 entry
+
+### Test counts
+
+- **New tests**: 14 (polling consume, zero maxMessages, null consumer, null topic, event-driven delegate, null handler, selective matching, selective skip, null predicate, durable IsConnected, durable dispose, null subscription name, constructor validation)
+- **Total UnitTests**: 1229 (was 1215)
+
 ## Chunk 055 – Transactional Client
 
 - **Date**: 2026-04-04
