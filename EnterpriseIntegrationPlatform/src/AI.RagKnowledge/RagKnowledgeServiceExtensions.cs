@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace EnterpriseIntegrationPlatform.AI.RagKnowledge;
 
@@ -16,26 +15,24 @@ public static class RagKnowledgeServiceExtensions
     /// <param name="services">The service collection.</param>
     /// <param name="knowledgeDirectory">
     /// Optional path to the docs/rag/ directory. When provided, XML documents
-    /// are parsed and indexed during registration.
+    /// are parsed and indexed at first resolution of <see cref="RagKnowledgeIndex"/>.
     /// </param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddRagKnowledge(this IServiceCollection services, string? knowledgeDirectory = null)
     {
         services.AddSingleton<RagDocumentParser>();
-        services.AddSingleton<RagKnowledgeIndex>();
-        services.AddSingleton<RagQueryMatcher>();
-
-        if (!string.IsNullOrWhiteSpace(knowledgeDirectory))
+        services.AddSingleton(sp =>
         {
-            services.AddSingleton(sp =>
+            var index = new RagKnowledgeIndex(sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<RagKnowledgeIndex>>());
+            if (!string.IsNullOrWhiteSpace(knowledgeDirectory))
             {
                 var parser = sp.GetRequiredService<RagDocumentParser>();
-                var index = sp.GetRequiredService<RagKnowledgeIndex>();
                 var docs = parser.ParseDirectory(knowledgeDirectory);
                 index.AddDocuments(docs);
-                return index;
-            });
-        }
+            }
+            return index;
+        });
+        services.AddSingleton<RagQueryMatcher>();
 
         return services;
     }

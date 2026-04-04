@@ -333,6 +333,14 @@ public class RagQueryMatcherTests
         Assert.That(results, Is.Not.Empty);
         Assert.That(results[0].Document.Id, Is.EqualTo("dlq"));
     }
+
+    [Test]
+    public void ExtractKeywords_OnlyStopWords_ReturnsEmpty()
+    {
+        var keywords = RagQueryMatcher.ExtractKeywords("the is a an in for to of on by");
+
+        Assert.That(keywords, Is.Empty);
+    }
 }
 
 [TestFixture]
