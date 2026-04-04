@@ -18,7 +18,7 @@
 
 ```
   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
-  │ Received │──▶│ Routed   │──▶│Delivered │──▶│  Acked   │
+  │ Pending  │──▶│ InFlight │──▶│Delivered │   │  Failed  │
   └──────────┘   └──────────┘   └──────────┘   └──────────┘
        │              │              │              │
        ▼              ▼              ▼              ▼
@@ -27,6 +27,8 @@
   │  (queryable by CorrelationId / BusinessKey / MsgId)  │
   └──────────────────────────────────────────────────────┘
 ```
+
+`DeliveryStatus` enum: `Pending`, `InFlight`, `Delivered`, `Failed`, `Retrying`, `DeadLettered`.
 
 Every pipeline stage records a `MessageEvent` when a message transitions between states. The full lifecycle is queryable for operational visibility, debugging, and compliance.
 
@@ -40,15 +42,22 @@ Every pipeline stage records a `MessageEvent` when a message transitions between
 // src/Observability/MessageEvent.cs
 public sealed record MessageEvent
 {
-    public required string MessageId { get; init; }
-    public required string CorrelationId { get; init; }
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public required Guid MessageId { get; init; }
+    public required Guid CorrelationId { get; init; }
+    public required string MessageType { get; init; }
+    public required string Source { get; init; }
+    public required string Stage { get; init; }
+    public required DeliveryStatus Status { get; init; }
+    public DateTimeOffset RecordedAt { get; init; } = DateTimeOffset.UtcNow;
+    public string? Details { get; init; }
     public string? BusinessKey { get; init; }
-    public required string State { get; init; }       // Received, Routed, Transformed, Delivered, Acked, Nacked, DeadLettered
-    public required string Component { get; init; }   // e.g. "Router", "HttpConnector"
-    public required DateTimeOffset Timestamp { get; init; }
-    public IDictionary<string, string>? Details { get; init; }
+    public string? TraceId { get; init; }
+    public string? SpanId { get; init; }
 }
 ```
+
+IDs are `Guid`, not `string`. `Stage` names the processing step (e.g. "Ingestion", "Routing", "Delivery"). `Status` is a `DeliveryStatus` enum value (`Pending`, `InFlight`, `Delivered`, `Failed`, `Retrying`, `DeadLettered`). `TraceId` and `SpanId` link each event to the corresponding OpenTelemetry span (Tutorial 38).
 
 ### IMessageStateStore
 
@@ -56,22 +65,27 @@ public sealed record MessageEvent
 // src/Observability/IMessageStateStore.cs
 public interface IMessageStateStore
 {
-    Task RecordAsync(MessageEvent messageEvent, CancellationToken ct);
-
-    Task<IReadOnlyList<MessageEvent>> GetByMessageIdAsync(
-        string messageId, CancellationToken ct);
+    Task RecordAsync(MessageEvent messageEvent, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<MessageEvent>> GetByCorrelationIdAsync(
-        string correlationId, CancellationToken ct);
+        Guid correlationId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<MessageEvent>> GetByBusinessKeyAsync(
-        string businessKey, CancellationToken ct);
+        string businessKey, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MessageEvent>> GetByMessageIdAsync(
+        Guid messageId, CancellationToken cancellationToken = default);
+
+    Task<MessageEvent?> GetLatestByCorrelationIdAsync(
+        Guid correlationId, CancellationToken cancellationToken = default);
 }
 ```
 
+All ID parameters are `Guid`. `GetLatestByCorrelationIdAsync` returns the most recent event, representing the current known state of a message.
+
 ### MessageLifecycleRecorder
 
-The `MessageLifecycleRecorder` provides convenience methods — `RecordReceivedAsync`, `RecordRoutedAsync`, `RecordDeliveredAsync`, `RecordDeadLetteredAsync` — that create `MessageEvent` records and persist them via `IMessageStateStore`. Each method captures the envelope's identity, the pipeline component name, and optional details (e.g. routing destination, dead-letter reason).
+The `MessageLifecycleRecorder` records events to **both** the production `IMessageStateStore` and the isolated `IObservabilityEventLog`, and emits OpenTelemetry traces and metrics. It provides convenience methods — `RecordReceivedAsync`, `RecordProcessingAsync`, `RecordDeliveredAsync`, `RecordFailedAsync`, `RecordRetryAsync`, `RecordDeadLetteredAsync` — that create `MessageEvent` records with the correct `Stage` and `DeliveryStatus` values. Each method captures the envelope's identity, the pipeline stage name, and optional details (e.g. delivery duration, dead-letter reason).
 
 ### ITraceAnalyzer and TraceAnalyzer
 
@@ -79,24 +93,15 @@ The `MessageLifecycleRecorder` provides convenience methods — `RecordReceivedA
 // src/Observability/ITraceAnalyzer.cs
 public interface ITraceAnalyzer
 {
-    Task<TraceAnalysis> AnalyzeAsync(string messageId, CancellationToken ct);
+    Task<string> AnalyseTraceAsync(
+        string traceContextJson, CancellationToken cancellationToken = default);
+
+    Task<string> WhereIsMessageAsync(
+        Guid correlationId, string knownState, CancellationToken cancellationToken = default);
 }
-
-public sealed record TraceAnalysis(
-    string MessageId,
-    TimeSpan TotalDuration,
-    string CurrentState,
-    IReadOnlyList<StageTimings> Stages,
-    IReadOnlyList<string> Anomalies);
-
-public sealed record StageTimings(
-    string Component,
-    string State,
-    DateTimeOffset Timestamp,
-    TimeSpan? DurationSinceLastStage);
 ```
 
-The `TraceAnalyzer` loads all events for a message, calculates inter-stage durations, and flags anomalies (e.g. a stage taking >10× the average, messages stuck in a state for too long).
+Both methods return AI-generated natural-language strings (not structured records). `AnalyseTraceAsync` accepts a JSON trace snapshot and returns a diagnostic summary. `WhereIsMessageAsync` answers "where is my message?" given a correlation ID and known state payload. The `TraceAnalyzer` implementation delegates to `IOllamaService` (Tutorial 40) for LLM-powered analysis.
 
 ### IObservabilityEventLog and LokiObservabilityEventLog
 
@@ -104,18 +109,23 @@ The `TraceAnalyzer` loads all events for a message, calculates inter-stage durat
 // src/Observability/IObservabilityEventLog.cs
 public interface IObservabilityEventLog
 {
-    Task WriteAsync(MessageEvent messageEvent, CancellationToken ct);
-    Task<IReadOnlyList<MessageEvent>> QueryAsync(string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct);
+    Task RecordAsync(MessageEvent messageEvent, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MessageEvent>> GetByBusinessKeyAsync(
+        string businessKey, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MessageEvent>> GetByCorrelationIdAsync(
+        Guid correlationId, CancellationToken cancellationToken = default);
 }
 ```
 
-`LokiObservabilityEventLog` pushes events to Grafana Loki for centralized, searchable log aggregation. Combined with OpenTelemetry traces (Tutorial 38), this provides full observability across the platform.
+`IObservabilityEventLog` is **separate** from `IMessageStateStore` — it provides isolated observability storage backed by Grafana Loki. The method is `RecordAsync` (not `WriteAsync`). `GetByCorrelationIdAsync` accepts a `Guid`. Combined with OpenTelemetry traces (Tutorial 38), this provides full observability across the platform.
 
 ---
 
 ## Scalability Dimension
 
-The state store is **write-heavy** — every pipeline stage writes an event per message. Production deployments should use a time-series or append-optimized store (Loki, ClickHouse). `InMemoryMessageStateStore` uses a `ConcurrentDictionary<string, List<MessageEvent>>` with secondary indexes on `CorrelationId` and `BusinessKey`.
+The state store is **write-heavy** — every pipeline stage writes an event per message. Production deployments should use a time-series or append-optimized store (Loki, ClickHouse). `InMemoryMessageStateStore` uses a `ConcurrentDictionary<Guid, List<MessageEvent>>` with secondary indexes on `CorrelationId` and `BusinessKey`.
 
 ---
 
@@ -127,7 +137,7 @@ Lifecycle recording is a **best-effort side effect** — it must not block or fa
 
 ## Exercises
 
-1. A message was received 30 minutes ago but never reached "Delivered" state. Use the `ITraceAnalyzer` to identify which stage it is stuck in.
+1. A message was received 30 minutes ago but never reached "Delivered" status. Use `ITraceAnalyzer.WhereIsMessageAsync` to identify which stage it is stuck in.
 
 2. Design a retention policy for the message state store that keeps 7 days of detailed events and 90 days of summary events.
 

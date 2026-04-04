@@ -5,9 +5,8 @@
 - The EIP Channel Adapter pattern applied to email delivery
 - How `IEmailConnector` sends integration messages as email notifications
 - SMTP and SMTPS (TLS) transport configuration
-- Liquid templates for dynamic subject lines and email bodies
-- Attachment support from envelope payload or external references
-- Single and multiple recipient routing
+- `Func<T, string>` body builders for dynamic email content
+- Single and multiple recipient overloads
 
 ---
 
@@ -18,17 +17,17 @@
 ```
   ┌──────────────┐     ┌──────────────────┐     ┌──────────────┐
   │  Pipeline    │────▶│  Email Connector  │────▶│  SMTP Server │
-  │  (envelope)  │     │  (template +     │     │              │
+  │  (envelope)  │     │  (build body +   │     │              │
   └──────────────┘     │   send)          │     └──────┬───────┘
                        └──────────────────┘            │
-                              │                        ▼
-                       ┌──────┴──────┐          ┌─────────────┐
-                       │ Liquid      │          │ Recipients  │
-                       │ Templates   │          │ (inbox)     │
-                       └─────────────┘          └─────────────┘
+                                                       ▼
+                                                 ┌─────────────┐
+                                                 │ Recipients  │
+                                                 │ (inbox)     │
+                                                 └─────────────┘
 ```
 
-Email is a common notification channel in enterprise integration. The connector bridges the messaging pipeline and email delivery, using templates to generate human-readable messages from structured data.
+Email is a common notification channel in enterprise integration. The connector bridges the messaging pipeline and email delivery, using `Func<T, string>` body builders to generate human-readable messages from structured data.
 
 ---
 
@@ -40,12 +39,23 @@ Email is a common notification channel in enterprise integration. The connector 
 // src/Connector.Email/IEmailConnector.cs
 public interface IEmailConnector
 {
-    Task<ConnectorResult> SendAsync(
-        IntegrationEnvelope<string> envelope,
-        EmailConnectorOptions options,
-        CancellationToken cancellationToken = default);
+    Task SendAsync<T>(
+        IntegrationEnvelope<T> envelope,
+        string toAddress,
+        string? subject,
+        Func<T, string> bodyBuilder,
+        CancellationToken ct);
+
+    Task SendAsync<T>(
+        IntegrationEnvelope<T> envelope,
+        IReadOnlyList<string> toAddresses,
+        string? subject,
+        Func<T, string> bodyBuilder,
+        CancellationToken ct);
 }
 ```
+
+Both overloads are generic over `T` and return `Task` (not `ConnectorResult`). When `subject` is `null`, the configured `DefaultSubjectTemplate` is used. The `bodyBuilder` function converts the envelope payload into the email body string.
 
 ### EmailConnectorOptions
 
@@ -53,66 +63,38 @@ public interface IEmailConnector
 // src/Connector.Email/EmailConnectorOptions.cs
 public sealed class EmailConnectorOptions
 {
-    public required string SmtpHost { get; init; }
-    public int SmtpPort { get; init; } = 587;
-    public bool UseTls { get; init; } = true;
-    public required string Username { get; init; }
-    public required string Password { get; init; }
-    public required string FromAddress { get; init; }
-    public string? FromDisplayName { get; init; }
-    public required IReadOnlyList<string> ToAddresses { get; init; }
-    public IReadOnlyList<string>? CcAddresses { get; init; }
-    public IReadOnlyList<string>? BccAddresses { get; init; }
-    public required string SubjectTemplate { get; init; }
-    public required string BodyTemplate { get; init; }
-    public bool IsHtml { get; init; } = true;
-    public IReadOnlyList<EmailAttachment>? Attachments { get; init; }
+    public string SmtpHost { get; set; } = string.Empty;
+    public int SmtpPort { get; set; } = 587;
+    public bool UseTls { get; set; } = true;
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string DefaultFrom { get; set; } = string.Empty;
+    public string DefaultSubjectTemplate { get; set; } = "{MessageType} notification";
 }
 ```
 
-### Liquid Templates
+### Body Builders
 
-Subject and body use [Liquid](https://shopify.github.io/liquid/) template syntax with the envelope as the data model:
-
-**Subject template:**
-```liquid
-Order {{ envelope.CorrelationId }} — {{ envelope.MessageType }} Notification
-```
-
-**Body template:**
-```liquid
-<h2>Integration Notification</h2>
-<p>Message ID: {{ envelope.MessageId }}</p>
-<p>Source: {{ envelope.Source }}</p>
-<p>Received: {{ envelope.CreatedAt | date: "%Y-%m-%d %H:%M" }}</p>
-<hr/>
-<pre>{{ envelope.Payload }}</pre>
-```
-
-The connector parses the envelope into a Liquid context, renders both templates, and constructs the email message.
-
-### EmailAttachment
+Instead of a template engine, the connector uses `Func<T, string>` body builders that the caller provides. This gives full control over how the payload is rendered into an email body:
 
 ```csharp
-// src/Connector.Email/EmailAttachment.cs
-public sealed record EmailAttachment(
-    string FileName,
-    string ContentType,
-    byte[] Content);
-```
+// Example: build an order confirmation email body
+Func<OrderPayload, string> bodyBuilder = order =>
+    $"<h2>Order Confirmation</h2>" +
+    $"<p>Order ID: {order.OrderId}</p>" +
+    $"<p>Total: {order.Total:C}</p>";
 
-Attachments can be derived from the envelope payload (e.g. a PDF or CSV) or from external references resolved before sending.
+await emailConnector.SendAsync(envelope, "ops@example.com", null, bodyBuilder, ct);
+```
 
 ### Recipient Routing
 
-The connector supports multiple delivery strategies:
+The connector supports two delivery patterns via its overloads:
 
-| Strategy | Configuration | Use Case |
-|----------|--------------|----------|
-| Single recipient | One `ToAddresses` entry | Direct notification to a specific user |
-| Multiple recipients | Multiple `ToAddresses` entries | Team-wide alerts |
-| CC/BCC | `CcAddresses` / `BccAddresses` | Compliance copies, audit trails |
-| Dynamic | Template: `{{ envelope.Metadata.NotifyEmail }}` | Recipient determined per message |
+| Strategy | Method Overload | Use Case |
+|----------|----------------|----------|
+| Single recipient | `SendAsync<T>(..., string toAddress, ...)` | Direct notification to a specific user |
+| Multiple recipients | `SendAsync<T>(..., IReadOnlyList<string> toAddresses, ...)` | Team-wide alerts |
 
 ---
 
@@ -124,17 +106,17 @@ Email sending is **I/O-bound** and relatively slow compared to broker-based deli
 
 ## Atomicity Dimension
 
-The source message is **Acked only after SMTP confirmation**. If the SMTP server rejects the email (invalid recipient, authentication failure), the connector returns a failure `ConnectorResult` and the message is retried or dead-lettered. Liquid template rendering failures are caught before sending — a malformed template results in an immediate Nack with a clear error message. Attachments are validated for size before sending.
+The source message is **Acked only after SMTP confirmation**. If the SMTP server rejects the email (invalid recipient, authentication failure), the `SendAsync` method throws and the message is retried or dead-lettered. Body builder failures are caught before sending — a failing builder results in an immediate Nack with a clear error message.
 
 ---
 
 ## Exercises
 
-1. Write a `SubjectTemplate` and `BodyTemplate` for an order confirmation email that includes the order ID from `CorrelationId` and the order total from the payload.
+1. Write a `Func<T, string>` body builder for an order confirmation email that includes the order ID and total from the payload.
 
 2. An SMTP server limits sending to 100 emails per minute. How would you integrate the throttle from Tutorial 29?
 
-3. Why does the connector render templates before attempting SMTP delivery rather than during the SMTP transaction?
+3. Why does the connector use `Func<T, string>` body builders rather than a template engine?
 
 ---
 

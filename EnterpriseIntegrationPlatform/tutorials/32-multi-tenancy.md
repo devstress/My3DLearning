@@ -44,34 +44,27 @@ Every message entering the platform passes through tenant resolution. The resolv
 // src/MultiTenancy/ITenantResolver.cs
 public interface ITenantResolver
 {
-    Task<TenantContext> ResolveAsync(
-        IntegrationEnvelope<string> envelope,
-        CancellationToken cancellationToken = default);
-
-    Task<TenantContext> ResolveFromHeadersAsync(
-        IDictionary<string, string> headers,
-        CancellationToken cancellationToken = default);
+    TenantContext Resolve(IReadOnlyDictionary<string, string> metadata);
+    TenantContext Resolve(string? tenantId);
 }
 ```
 
-The resolver checks (in order): the `X-Tenant-Id` header, envelope metadata `TenantId` key, and the authenticated identity's tenant claim. If no tenant is found, it returns the **anonymous tenant context**.
+Both `Resolve` overloads are synchronous. The metadata overload checks (in order): the `X-Tenant-Id` header, the `TenantId` metadata key, and the authenticated identity's tenant claim. The string overload resolves directly from a tenant ID. If no tenant is found, either overload returns the **anonymous tenant context** (`TenantContext.Anonymous`).
 
 ### TenantContext
 
 ```csharp
 // src/MultiTenancy/TenantContext.cs
-public sealed record TenantContext
+public sealed class TenantContext
 {
     public required string TenantId { get; init; }
-    public required string TenantName { get; init; }
-    public bool IsAnonymous { get; init; }
-    public IDictionary<string, string>? Properties { get; init; }
+    public string? TenantName { get; init; }
+    public bool IsResolved { get; init; }
 
     public static TenantContext Anonymous => new()
     {
         TenantId = "anonymous",
-        TenantName = "Anonymous",
-        IsAnonymous = true
+        IsResolved = false
     };
 }
 ```
@@ -82,8 +75,7 @@ public sealed record TenantContext
 // src/MultiTenancy/ITenantIsolationGuard.cs
 public interface ITenantIsolationGuard
 {
-    void Validate(TenantContext current, TenantContext target);
-    void ValidateEnvelope(IntegrationEnvelope<string> envelope, TenantContext context);
+    void Enforce<T>(IntegrationEnvelope<T> envelope, string expectedTenantId);
 }
 ```
 
@@ -93,13 +85,13 @@ public interface ITenantIsolationGuard
 // src/MultiTenancy/TenantIsolationException.cs
 public sealed class TenantIsolationException : Exception
 {
-    public string SourceTenantId { get; }
-    public string TargetTenantId { get; }
-    public string Operation { get; }
+    public Guid MessageId { get; }
+    public string? ActualTenantId { get; }
+    public string ExpectedTenantId { get; }
 }
 ```
 
-When a message from Tenant A attempts to access Tenant B's data or topics, the guard throws `TenantIsolationException`. This is **non-retryable** — the message goes directly to the DLQ.
+When a message's actual tenant does not match the expected tenant, the guard throws `TenantIsolationException` with the `MessageId`, `ActualTenantId`, and `ExpectedTenantId`. This is **non-retryable** — the message goes directly to the DLQ.
 
 ### MultiTenancy.Onboarding
 
@@ -126,7 +118,7 @@ Onboarding provisions: tenant-specific broker topics, throttle policies (Tutoria
 
 ## Scalability Dimension
 
-Tenant isolation enables **horizontal scaling by tenant**. High-volume tenants can be assigned dedicated consumer groups and broker partitions while small tenants share resources. The `TenantContext.Properties` dictionary can carry tenant-specific quotas and feature flags, enabling per-tenant scaling decisions in the competing consumers orchestrator (Tutorial 28).
+Tenant isolation enables **horizontal scaling by tenant**. High-volume tenants can be assigned dedicated consumer groups and broker partitions while small tenants share resources. The `TenantContext.TenantId` and `TenantName` identify each tenant, while `IsResolved` distinguishes resolved tenants from anonymous ones. Per-tenant quotas and feature flags can be managed through external configuration, enabling per-tenant scaling decisions in the competing consumers orchestrator (Tutorial 28).
 
 ---
 

@@ -7,7 +7,7 @@
 - Grouping by `CorrelationId` with ordering by `SequenceNumber`
 - Timeout-based release to prevent indefinite buffering
 - The `ActiveSequenceCount` metric for monitoring open sequences
-- `ResequencerOptions` for buffer size, timeout, and gap policy
+- `ResequencerOptions` for concurrent-sequence limits and release timeout
 
 ---
 
@@ -39,15 +39,13 @@ Distributed systems deliver messages out of order. The Resequencer collects mess
 // src/Processing.Resequencer/IResequencer.cs
 public interface IResequencer
 {
-    Task<IReadOnlyList<IntegrationEnvelope<string>>> SubmitAsync(
-        IntegrationEnvelope<string> envelope,
-        CancellationToken cancellationToken = default);
-
+    IReadOnlyList<IntegrationEnvelope<T>> Accept<T>(IntegrationEnvelope<T> envelope);
+    IReadOnlyList<IntegrationEnvelope<T>> ReleaseOnTimeout<T>(Guid correlationId);
     int ActiveSequenceCount { get; }
 }
 ```
 
-`SubmitAsync` accepts a single message and returns zero or more messages ready for release. If the submitted message completes a contiguous run, the entire run is returned. If gaps remain, an empty list is returned and the message is buffered.
+`Accept` is synchronous — it accepts a single message and returns zero or more messages ready for release. If the submitted message completes a contiguous run, the entire run is returned. If gaps remain, an empty list is returned and the message is buffered. `ReleaseOnTimeout` forces release of all buffered messages for a given `CorrelationId` when the timeout fires.
 
 ### MessageResequencer (concrete)
 
@@ -65,31 +63,19 @@ When a message arrives whose `SequenceNumber` equals the expected value, the res
 // src/Processing.Resequencer/ResequencerOptions.cs
 public sealed class ResequencerOptions
 {
-    public int MaxBufferSize { get; init; } = 1000;
-    public TimeSpan SequenceTimeout { get; init; } = TimeSpan.FromMinutes(5);
-    public GapPolicy GapPolicy { get; init; } = GapPolicy.WaitForTimeout;
-}
-
-public enum GapPolicy
-{
-    WaitForTimeout,
-    ReleasePartial,
-    DeadLetter
+    public TimeSpan ReleaseTimeout { get; set; } = TimeSpan.FromSeconds(30);
+    public int MaxConcurrentSequences { get; set; } = 10_000;
 }
 ```
 
 | Option | Purpose |
 |--------|---------|
-| `MaxBufferSize` | Maximum messages buffered per correlation before triggering overflow policy |
-| `SequenceTimeout` | How long to wait for missing sequence numbers before releasing or dead-lettering |
-| `GapPolicy` | What to do when timeout fires: wait longer, release partial, or send to DLQ |
+| `ReleaseTimeout` | How long to wait for missing sequence numbers before releasing buffered messages (default 30 s) |
+| `MaxConcurrentSequences` | Maximum number of distinct sequences tracked concurrently (default 10,000) |
 
 ### Timeout-Based Release
 
-A background timer scans active sequences. When `SequenceTimeout` elapses since the last message arrived for a correlation, the `GapPolicy` determines the outcome:
-- **WaitForTimeout** — extend the deadline (useful for slow producers)
-- **ReleasePartial** — release whatever is buffered in order, skipping gaps
-- **DeadLetter** — send all buffered messages to the DLQ for manual inspection
+A background timer scans active sequences. When `ReleaseTimeout` elapses since the last message arrived for a correlation, the resequencer calls `ReleaseOnTimeout` to release whatever is buffered in sequence order.
 
 ---
 
@@ -101,15 +87,15 @@ The resequencer is **stateful** — it must buffer messages until a sequence is 
 
 ## Atomicity Dimension
 
-Messages are **Acked only after successful release** to the downstream topic. If the resequencer crashes, buffered messages are redelivered by the broker (they were never Acked). On restart, the resequencer rebuilds its buffer from redelivered messages. The `SequenceTimeout` acts as a safety valve — it ensures no message is buffered indefinitely, preventing memory leaks and silent message loss.
+Messages are **Acked only after successful release** to the downstream topic. If the resequencer crashes, buffered messages are redelivered by the broker (they were never Acked). On restart, the resequencer rebuilds its buffer from redelivered messages. The `ReleaseTimeout` acts as a safety valve — it ensures no message is buffered indefinitely, preventing memory leaks and silent message loss.
 
 ---
 
 ## Exercises
 
-1. Three messages arrive for `CorrelationId = "order-42"` in this order: #3, #1, #2. Trace the calls to `SubmitAsync` and describe the return value for each call.
+1. Three messages arrive for `CorrelationId = "order-42"` in this order: #3, #1, #2. Trace the calls to `Accept` and describe the return value for each call.
 
-2. A sequence has messages #1, #2, #4 buffered and `SequenceTimeout` fires. Compare the behavior under each `GapPolicy` value.
+2. A sequence has messages #1, #2, #4 buffered and `ReleaseTimeout` fires. Describe what `ReleaseOnTimeout` returns and what happens to the gap at #3.
 
 3. Why must all messages for a `CorrelationId` be routed to the same resequencer instance? What broker feature enables this?
 

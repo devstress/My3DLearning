@@ -42,16 +42,38 @@ Every pipeline stage emits telemetry as a side effect. The Wire Tap pattern ensu
 // src/Observability/PlatformActivitySource.cs
 public static class PlatformActivitySource
 {
-    public static readonly ActivitySource Source = new("EIP.Platform", "1.0.0");
+    public const string TagMessageId = "eip.message.id";
+    public const string TagCorrelationId = "eip.message.correlation_id";
+    public const string TagCausationId = "eip.message.causation_id";
+    public const string TagMessageType = "eip.message.type";
+    public const string TagSource = "eip.message.source";
+    public const string TagPriority = "eip.message.priority";
+    public const string TagStage = "eip.processing.stage";
+    public const string TagDeliveryStatus = "eip.delivery.status";
 
     public static Activity? StartActivity(
-        string operationName,
+        string stageName,
         ActivityKind kind = ActivityKind.Internal)
     {
-        return Source.StartActivity(operationName, kind);
+        return DiagnosticsConfig.ActivitySource.StartActivity(stageName, kind);
+    }
+
+    public static Activity? StartActivity<T>(
+        string stageName,
+        IntegrationEnvelope<T> envelope,
+        ActivityKind kind = ActivityKind.Internal)
+    {
+        var activity = DiagnosticsConfig.ActivitySource.StartActivity(stageName, kind);
+        if (activity is not null)
+        {
+            TraceEnricher.Enrich(activity, envelope);
+        }
+        return activity;
     }
 }
 ```
+
+`PlatformActivitySource` does **not** directly expose an `ActivitySource` property. Instead it delegates to `DiagnosticsConfig.ActivitySource` internally and provides two factory methods. The generic overload automatically enriches the span with envelope metadata via `TraceEnricher`.
 
 Each pipeline stage starts an `Activity` (OpenTelemetry span):
 - `eip.ingress.receive` — message received at Gateway API
@@ -65,21 +87,24 @@ Each pipeline stage starts an `Activity` (OpenTelemetry span):
 // src/Observability/PlatformMeters.cs
 public static class PlatformMeters
 {
-    private static readonly Meter Meter = new("EIP.Platform", "1.0.0");
+    public static readonly Counter<long> MessagesReceived   = /* "eip.messages.received"          */;
+    public static readonly Counter<long> MessagesProcessed  = /* "eip.messages.processed"         */;
+    public static readonly Counter<long> MessagesFailed     = /* "eip.messages.failed"             */;
+    public static readonly Counter<long> MessagesDeadLettered = /* "eip.messages.dead_lettered"   */;
+    public static readonly Counter<long> MessagesRetried    = /* "eip.messages.retried"            */;
+    public static readonly Histogram<double> ProcessingDuration = /* "eip.messages.processing_duration" (ms) */;
+    public static readonly UpDownCounter<long> MessagesInFlight = /* "eip.messages.in_flight"     */;
 
-    public static readonly Counter<long> MessagesReceived =
-        Meter.CreateCounter<long>("eip.messages.received");
-
-    public static readonly Counter<long> MessagesDelivered =
-        Meter.CreateCounter<long>("eip.messages.delivered");
-
-    public static readonly Counter<long> MessagesFailed =
-        Meter.CreateCounter<long>("eip.messages.failed");
-
-    public static readonly Histogram<double> ProcessingDuration =
-        Meter.CreateHistogram<double>("eip.processing.duration", "ms");
+    // Static helper methods for recording with consistent tags:
+    public static void RecordReceived(string messageType, string source);
+    public static void RecordProcessed(string messageType, double durationMs);
+    public static void RecordFailed(string messageType);
+    public static void RecordDeadLettered(string messageType);
+    public static void RecordRetry(string messageType, int retryCount);
 }
 ```
+
+All instruments are created from `DiagnosticsConfig.Meter`. The static helper methods ensure consistent tagging (e.g. `eip.message.type`, `eip.message.source`) and manage the `MessagesInFlight` gauge automatically.
 
 ### DiagnosticsConfig
 
@@ -99,25 +124,32 @@ public sealed class DiagnosticsConfig
 
 ```csharp
 // src/Observability/CorrelationPropagator.cs
-public sealed class CorrelationPropagator
+public static class CorrelationPropagator
 {
-    public void Inject(Activity? activity, IntegrationEnvelope<string> envelope)
+    public static IntegrationEnvelope<T> InjectTraceContext<T>(
+        IntegrationEnvelope<T> envelope)
     {
-        if (activity is null) return;
-        envelope.Metadata["traceparent"] = activity.Id!;
-        envelope.Metadata["tracestate"] = activity.TraceStateString ?? "";
+        var activity = Activity.Current;
+        if (activity is null) return envelope;
+
+        envelope.Metadata[MessageHeaders.TraceId] = activity.TraceId.ToString();
+        envelope.Metadata[MessageHeaders.SpanId]  = activity.SpanId.ToString();
+        return envelope;
     }
 
-    public ActivityContext? Extract(IntegrationEnvelope<string> envelope)
+    public static Activity? ExtractAndStart<T>(
+        IntegrationEnvelope<T> envelope,
+        string stageName,
+        ActivityKind kind = ActivityKind.Consumer)
     {
-        if (!envelope.Metadata.TryGetValue("traceparent", out var traceparent))
-            return null;
-        return ActivityContext.Parse(traceparent, envelope.Metadata.GetValueOrDefault("tracestate"));
+        // Rebuilds an ActivityContext from envelope metadata and starts
+        // a child Activity linked to the upstream trace.
+        ...
     }
 }
 ```
 
-The propagator embeds W3C `traceparent` and `tracestate` headers into envelope metadata. When a message crosses service boundaries (broker → consumer), the trace context is preserved so all spans for a single message form a connected distributed trace.
+`CorrelationPropagator` is a **static** class. `InjectTraceContext<T>` captures the current `Activity`'s trace and span IDs into envelope metadata and returns the same envelope. `ExtractAndStart<T>` reads those headers back, creates a parent `ActivityContext`, and starts a new `Activity` linked to the upstream trace. When a message crosses service boundaries (broker → consumer), this preserves the distributed trace chain.
 
 ### TraceEnricher
 

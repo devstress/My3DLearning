@@ -38,102 +38,111 @@ The RAG pipeline: (1) embed the question, (2) retrieve relevant documents from t
 
 ## Platform Implementation
 
-### AI.Ollama — Embedding Provider
+### AI.Ollama — Self-Hosted LLM Service
 
 ```csharp
-// src/AI.Ollama/IOllamaEmbeddingProvider.cs
-public interface IOllamaEmbeddingProvider
+// src/AI.Ollama/IOllamaService.cs
+public interface IOllamaService
 {
-    Task<float[]> GenerateEmbeddingAsync(string text, CancellationToken ct);
-    Task<IReadOnlyList<float[]>> GenerateEmbeddingsAsync(IReadOnlyList<string> texts, CancellationToken ct);
+    Task<string> GenerateAsync(
+        string prompt,
+        string model = "llama3.2",
+        CancellationToken cancellationToken = default);
+
+    Task<string> AnalyseAsync(
+        string systemPrompt,
+        string context,
+        string model = "llama3.2",
+        CancellationToken cancellationToken = default);
+
+    Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default);
 }
 
-// src/AI.Ollama/OllamaOptions.cs
-public sealed class OllamaOptions
+// src/AI.Ollama/OllamaSettings.cs
+public sealed class OllamaSettings
 {
-    public required Uri Endpoint { get; init; }
-    public string EmbeddingModel { get; init; } = "nomic-embed-text";
-    public string GenerationModel { get; init; } = "llama3";
-    public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(60);
+    public string Model { get; set; } = "llama3.2";
 }
 ```
 
-Ollama runs as a container managed by Aspire, serving both embedding and generation endpoints over a local HTTP API.
+Ollama runs as a container managed by Aspire, serving generation endpoints over a local HTTP API. `GenerateAsync` sends a prompt and returns the generated text. `AnalyseAsync` accepts a system prompt plus structured context (e.g. JSON trace data) for diagnostic analysis. `OllamaSettings` is bound from the `Ollama` configuration section.
 
-### AI.RagFlow — Retrieval Pipeline
+### AI.RagFlow — Retrieval-Augmented Generation
 
 ```csharp
-// src/AI.RagFlow/IRagPipeline.cs
-public interface IRagPipeline
+// src/AI.RagFlow/IRagFlowService.cs
+public interface IRagFlowService
 {
-    Task<RagResponse> AskAsync(
+    Task<string> RetrieveAsync(
+        string query,
+        IReadOnlyList<string>? datasetIds = null,
+        CancellationToken cancellationToken = default);
+
+    Task<RagFlowChatResponse> ChatAsync(
         string question,
-        RagOptions? options = null,
+        string? conversationId = null,
         CancellationToken cancellationToken = default);
 
-    Task IndexDocumentAsync(
-        string documentId,
-        string content,
-        IDictionary<string, string>? metadata = null,
+    Task<IReadOnlyList<RagFlowDataset>> ListDatasetsAsync(
         CancellationToken cancellationToken = default);
+
+    Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default);
 }
 
-// src/AI.RagFlow/RagResponse.cs
-public sealed record RagResponse(
+// Response records (defined in IRagFlowService.cs)
+public sealed record RagFlowChatResponse(
     string Answer,
-    IReadOnlyList<RetrievedDocument> Sources,
-    float Confidence);
+    string? ConversationId,
+    IReadOnlyList<RagFlowReference> References);
 
-public sealed record RetrievedDocument(
-    string DocumentId,
-    string Excerpt,
-    float Score,
-    IDictionary<string, string>? Metadata);
+public sealed record RagFlowReference(
+    string Content,
+    string? DocumentName,
+    double Score);
+
+public sealed record RagFlowDataset(
+    string Id,
+    string Name,
+    int DocumentCount);
 ```
 
-### RagOptions
+`RetrieveAsync` returns relevant context chunks as a plain string. `ChatAsync` combines retrieval and LLM generation in a single call, returning a `RagFlowChatResponse` with the answer, a conversation ID for multi-turn chat, and source references.
+
+### RagFlowOptions
 
 ```csharp
-// src/AI.RagFlow/RagOptions.cs
-public sealed class RagOptions
+// src/AI.RagFlow/RagFlowOptions.cs
+public sealed class RagFlowOptions
 {
-    public int TopK { get; init; } = 5;
-    public float MinScore { get; init; } = 0.7f;
-    public string? TenantFilter { get; init; }
-    public bool IncludeMessageHistory { get; init; } = true;
+    public const string SectionName = "RagFlow";
+
+    public string BaseAddress { get; set; } = "http://localhost:15380";
+    public string? ApiKey { get; set; }
+    public string? AssistantId { get; set; }
 }
 ```
 
 | Option | Purpose |
 |--------|---------|
-| `TopK` | Number of documents to retrieve |
-| `MinScore` | Minimum similarity score threshold |
-| `TenantFilter` | Restrict results to a tenant |
-| `IncludeMessageHistory` | Include lifecycle data in corpus |
+| `BaseAddress` | RagFlow API base URL |
+| `ApiKey` | API key for authentication |
+| `AssistantId` | RagFlow assistant ID for chat completion |
 
-### Aspire & Developer AI Provider
+### Aspire Orchestration
 
-The platform uses .NET Aspire to manage the Ollama container and vector store (Qdrant). Developers can connect their own AI provider by implementing `IGenerationProvider`:
-
-```csharp
-// src/AI.RagFlow/IGenerationProvider.cs
-public interface IGenerationProvider
-{
-    Task<string> GenerateAsync(string prompt, string context, CancellationToken ct);
-}
-```
+The platform uses .NET Aspire to manage the Ollama container and the RagFlow service. Services are registered via extension methods (`AddOllamaService`, `AddRagFlowService`) that read base addresses and configuration from Aspire's environment variables or `appsettings.json`.
 
 ---
 
 ## Scalability Dimension
 
-Ollama runs on GPU-enabled nodes for fast inference. The vector store (Qdrant) scales horizontally with sharding. Embedding generation is the bottleneck — batch `GenerateEmbeddingsAsync` reduces round-trips. The RAG API is stateless and replicable behind a load balancer.
+Ollama runs on GPU-enabled nodes for fast inference. The RagFlow service manages chunking, indexing, and retrieval internally. `RetrieveAsync` supports scoping queries by dataset IDs to reduce search space. The RAG API is stateless and replicable behind a load balancer.
 
 ---
 
 ## Atomicity Dimension
 
-RAG is a **read-only, advisory feature** — it does not modify messages or pipeline state. Index updates are eventually consistent. The `Confidence` score helps consumers assess answer reliability. All data stays on-premises — no message content is sent to external AI providers unless the developer explicitly configures a cloud `IGenerationProvider`.
+RAG is a **read-only, advisory feature** — it does not modify messages or pipeline state. Index updates are eventually consistent. The `RagFlowReference.Score` helps consumers assess source relevance. All data stays on-premises — no message content is sent to external AI providers unless the developer explicitly configures a cloud provider.
 
 ---
 
