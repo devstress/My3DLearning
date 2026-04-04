@@ -4,6 +4,47 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 057 – Message Dispatcher + Service Activator
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: (a) Add `IMessageDispatcher` in Processing/ that receives messages from a single channel and distributes to specific handlers based on message type (like a multiplexer). (b) Add `IServiceActivator` that invokes a service operation (sync or async) from a message and optionally publishes the reply. Key pattern for request-reply orchestration.
+
+### Architecture
+
+- **IMessageDispatcher / MessageDispatcher** — Thread-safe message dispatcher using `ConcurrentDictionary<string, Delegate>` for handler registration. Dispatches by `MessageType` (case-insensitive). Supports dynamic handler registration/unregistration, configurable unknown-type behavior (return failure or throw), and graceful handler-exception capture.
+- **IServiceActivator / ServiceActivator** — Connects messaging infrastructure to application services. Two overloads: (1) request-response with optional reply publishing when `ReplyTo` is set, and (2) fire-and-forget. Reply envelopes preserve `CorrelationId` and set `CausationId` to the request's `MessageId`.
+- **DispatchResult** — Immutable record with `MessageType`, `HandlerFound`, `Succeeded`, `FailureReason`.
+- **ServiceActivatorResult** — Immutable record with `Succeeded`, `ReplySent`, `ReplyTopic`, `FailureReason`.
+- **MessageDispatcherOptions** — `ThrowOnUnknownType` toggle (default false).
+- **ServiceActivatorOptions** — `ReplySource` and `ReplyMessageType` configuration.
+- **DispatcherServiceExtensions** — DI registration for both `IMessageDispatcher` and `IServiceActivator`.
+
+### Files created
+
+- `src/Processing.Dispatcher/Processing.Dispatcher.csproj`
+- `src/Processing.Dispatcher/IMessageDispatcher.cs`
+- `src/Processing.Dispatcher/MessageDispatcher.cs`
+- `src/Processing.Dispatcher/MessageDispatcherOptions.cs`
+- `src/Processing.Dispatcher/DispatchResult.cs`
+- `src/Processing.Dispatcher/IServiceActivator.cs`
+- `src/Processing.Dispatcher/ServiceActivator.cs`
+- `src/Processing.Dispatcher/ServiceActivatorOptions.cs`
+- `src/Processing.Dispatcher/ServiceActivatorResult.cs`
+- `src/Processing.Dispatcher/DispatcherServiceExtensions.cs`
+- `tests/UnitTests/MessageDispatcherTests.cs`
+
+### Files modified
+
+- `EnterpriseIntegrationPlatform.sln` — added Processing.Dispatcher project
+- `tests/UnitTests/UnitTests.csproj` — added Processing.Dispatcher reference
+- `rules/milestones.md` — updated next chunk, removed 057 row, updated EIP checklist
+- `rules/completion-log.md` — added chunk 057 entry
+
+### Test counts
+
+- UnitTests: 1,254 (was 1,229, added 25 — 14 dispatcher + 11 activator)
+
 ## Chunk 056 – Polling Consumer + Event-Driven Consumer + Selective Consumer + Durable Subscriber
 
 - **Date**: 2026-04-04

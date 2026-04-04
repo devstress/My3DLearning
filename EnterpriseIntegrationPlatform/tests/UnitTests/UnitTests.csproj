@@ -49,5 +49,6 @@
     <ProjectReference Include="..\..\src\Activities\Activities.csproj" />
     <ProjectReference Include="..\..\src\Workflow.Temporal\Workflow.Temporal.csproj" />
     <ProjectReference Include="..\..\src\Processing.Resequencer\Processing.Resequencer.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Dispatcher\Processing.Dispatcher.csproj" />
   </ItemGroup>
 </Project>
