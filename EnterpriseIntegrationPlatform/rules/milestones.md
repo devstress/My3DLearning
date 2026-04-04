@@ -61,10 +61,12 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 ✅ Phase 4 (Hardening, chunks 023-028) complete — see completion-log.md  
 ✅ Phase 5 (Production Readiness, chunks 029-034) complete — see completion-log.md  
 ✅ Phase 6 (Advanced Patterns & Scale, chunks 035-040) complete — see completion-log.md
+✅ Phase 7 (Missing EIP Patterns – Messaging Channels & Construction, chunks 044-051) complete — see completion-log.md
+✅ Phase 8 (Missing EIP Patterns – Routing & Transformation, chunks 052-053) complete — see completion-log.md
 
 ## Next Chunk
 
-**Chunk 052** (Content Enricher + Content Filter) is next.
+**Chunk 054** (Messaging Gateway + Messaging Mapper) is next.
 
 ---
 
@@ -78,10 +80,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ### Phase 8 – Missing EIP Patterns (Routing & Transformation)
 
-| Chunk | Name | Goal | Tests Required |
-|-------|------|------|----------------|
-| 052 | Content Enricher + Content Filter | (a) Add `IContentEnricher` and `ContentEnricher` in Processing.Transform/ that augments an envelope's payload with data fetched from an external source (e.g., HTTP lookup, Cassandra query). (b) Add `IContentFilter` and `ContentFilter` that strips fields from a payload, keeping only specified paths — the inverse of enrichment. Both are Temporal activities. | UnitTests: ≥12 (enrich with HTTP mock, enrich with missing data fallback, filter keep-fields, filter nested paths) |
-| 053 | Normalizer + Canonical Data Model | (a) Add `INormalizer` and `MessageNormalizer` in Processing.Transform/ that detects incoming format (JSON, XML, CSV, flat-file) and converts to a canonical JSON representation using existing Transform pipeline steps. (b) Document the Canonical Data Model pattern as `IntegrationEnvelope<T>` itself — the envelope IS the canonical model. | UnitTests: ≥10 (normalize XML→JSON, CSV→JSON, already-JSON passthrough, unknown format error) |
+✅ Phase 8 complete — see completion-log.md
 
 ### Phase 9 – Missing EIP Patterns (Endpoints & System Management)
 
@@ -174,11 +173,11 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 **Message Transformation:**
 - ✅ Envelope Wrapper (IntegrationEnvelope)
-- 🔲 Content Enricher (chunk 052)
-- 🔲 Content Filter (chunk 052)
+- ✅ Content Enricher (Processing.Transform.ContentEnricher)
+- ✅ Content Filter (Processing.Transform.ContentFilter)
 - ✅ Claim Check (Storage.Cassandra)
-- 🔲 Normalizer (chunk 053)
-- 🔲 Canonical Data Model (chunk 053 — document)
+- ✅ Normalizer (Processing.Transform.MessageNormalizer)
+- ✅ Canonical Data Model (IntegrationEnvelope<T> — documented)
 
 **Messaging Endpoints:**
 - 🔲 Messaging Gateway (chunk 054)
