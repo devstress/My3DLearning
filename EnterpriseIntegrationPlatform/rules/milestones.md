@@ -67,7 +67,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 059** (Connectors unification) is next.
+**Chunk 060** (Test coverage hardening) is next.
 
 ---
 
@@ -91,7 +91,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Tests Required |
 |-------|------|------|----------------|
-| 059 | Connectors unification | Register Connector.Http/Sftp/Email/File adapters into unified `IConnectorRegistry` + `IConnectorFactory` from src/Connectors/. Runtime connector resolution by name and type. Health check aggregation across all registered connectors. | UnitTests: ≥12 (register, resolve by name, resolve by type, factory create, health aggregation) |
 | 060 | Test coverage hardening | Close all test coverage gaps: (a) AI.Ollama — ≥8 unit tests (client wrapper, embedding generation, health check). (b) Admin.Api — ≥10 endpoint tests (DLQ list/replay/discard, throttle CRUD, rate-limit status, DR endpoints). (c) Configuration — ≥8 tests (feature flag evaluation, environment override, change notification). (d) InMemoryRuleStore — expand to ≥5 more edge-case tests. (e) Connectors unified project — ≥10 tests (registry CRUD, factory, descriptor). (f) AI.RagFlow — expand to ≥5 more tests. | UnitTests: ≥46 new tests total |
 
 ### Phase 11 – Admin Dashboard & RAG

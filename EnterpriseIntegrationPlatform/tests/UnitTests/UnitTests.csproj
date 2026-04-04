@@ -51,5 +51,6 @@
     <ProjectReference Include="..\..\src\Processing.Resequencer\Processing.Resequencer.csproj" />
     <ProjectReference Include="..\..\src\Processing.Dispatcher\Processing.Dispatcher.csproj" />
     <ProjectReference Include="..\..\src\SystemManagement\SystemManagement.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Connectors.csproj" />
   </ItemGroup>
 </Project>

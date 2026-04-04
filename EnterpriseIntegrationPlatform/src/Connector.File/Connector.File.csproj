@@ -4,6 +4,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\Connectors\Connectors.csproj" />
     <ProjectReference Include="..\Ingestion\Ingestion.csproj" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace EnterpriseIntegrationPlatform.Connectors;
 
@@ -73,6 +74,37 @@ public static class ConnectorServiceExtensions
             registry.Register(connector);
             return connector;
         });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="ConnectorHealthAggregator"/> as a named health check
+    /// that probes all connectors in the <see cref="IConnectorRegistry"/>.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="name">Health check name. Defaults to <c>"connectors"</c>.</param>
+    /// <param name="failureStatus">
+    /// The <see cref="HealthStatus"/> that should be reported when the health check fails.
+    /// Defaults to <see cref="HealthStatus.Unhealthy"/>.
+    /// </param>
+    /// <param name="tags">Optional tags for the health check.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddConnectorHealthCheck(
+        this IServiceCollection services,
+        string name = "connectors",
+        HealthStatus? failureStatus = null,
+        IEnumerable<string>? tags = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddSingleton<ConnectorHealthAggregator>();
+        services.AddHealthChecks()
+            .Add(new HealthCheckRegistration(
+                name,
+                sp => sp.GetRequiredService<ConnectorHealthAggregator>(),
+                failureStatus,
+                tags));
 
         return services;
     }
