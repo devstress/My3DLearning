@@ -20,7 +20,7 @@ public class OpenClawUiTests
 {
     private IPlaywright? _playwright;
     private IBrowser? _browser;
-    private WebApplicationFactory<Program>? _factory;
+    private WebApplicationFactory<OpenClaw.Web.DemoDataSeeder>? _factory;
     private HttpClient? _httpClient;
     private string? _baseUrl;
     private bool _browsersAvailable;
@@ -44,7 +44,7 @@ public class OpenClawUiTests
             return;
         }
 
-        _factory = new WebApplicationFactory<Program>();
+        _factory = new WebApplicationFactory<OpenClaw.Web.DemoDataSeeder>();
         _httpClient = _factory.CreateClient();
         _baseUrl = _httpClient.BaseAddress!.ToString().TrimEnd('/');
     }

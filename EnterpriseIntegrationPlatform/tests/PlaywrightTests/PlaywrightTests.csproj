@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\OpenClaw.Web\OpenClaw.Web.csproj" />
+    <ProjectReference Include="..\..\src\Admin.Web\Admin.Web.csproj" />
     <ProjectReference Include="..\..\src\Observability\Observability.csproj" />
   </ItemGroup>
 </Project>
