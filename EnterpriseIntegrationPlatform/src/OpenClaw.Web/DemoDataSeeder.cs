@@ -17,6 +17,13 @@ public sealed class DemoDataSeeder : BackgroundService
     private readonly IObservabilityEventLog _observabilityLog;
     private readonly ILogger<DemoDataSeeder> _logger;
 
+    /// <summary>
+    /// Gets a value indicating whether demo data has been fully seeded.
+    /// Used by the <c>/api/health/seeder</c> endpoint to allow Playwright
+    /// tests to poll for readiness before querying seeded data.
+    /// </summary>
+    public static volatile bool IsSeeded;
+
     public DemoDataSeeder(
         IObservabilityEventLog observabilityLog,
         ILogger<DemoDataSeeder> logger)
@@ -84,6 +91,8 @@ public sealed class DemoDataSeeder : BackgroundService
 
         _logger.LogInformation(
             "Demo data seeded: order-02 (delivered), shipment-123 (in-flight), invoice-001 (retrying)");
+
+        IsSeeded = true;
     }
 
     private async Task SeedEventAsync(

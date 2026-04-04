@@ -96,6 +96,23 @@ jobs:
           cache: 'npm'
           cache-dependency-path: EnterpriseIntegrationPlatform/src/Admin.Web/clientapp/package-lock.json
 
+      - name: Install Ollama
+        run: curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Start Ollama and pull model
+        run: |
+          ollama serve &
+          # Wait for the server to be ready
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:11434/ > /dev/null 2>&1 && break
+            sleep 1
+          done
+          # Pull a small model suitable for CPU-only CI runners
+          ollama pull qwen2.5:0.5b
+          # Pre-warm the model (first inference loads weights into RAM)
+          curl -sf http://localhost:11434/api/generate \
+            -d '{"model":"qwen2.5:0.5b","prompt":"hello","stream":false}' > /dev/null
+
       - name: Restore dependencies
         run: dotnet restore
 
@@ -106,6 +123,9 @@ jobs:
         run: pwsh tests/PlaywrightTests/bin/Release/net10.0/playwright.ps1 install --with-deps
 
       - name: Run Playwright E2E tests
+        env:
+          Ollama__BaseAddress: http://localhost:11434
+          Ollama__Model: "qwen2.5:0.5b"
         run: >
           dotnet test tests/PlaywrightTests/PlaywrightTests.csproj
           --no-build --configuration Release --verbosity normal

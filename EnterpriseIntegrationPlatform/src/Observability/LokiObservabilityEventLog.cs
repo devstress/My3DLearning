@@ -22,6 +22,15 @@ public sealed class LokiObservabilityEventLog : IObservabilityEventLog
     private readonly HttpClient _httpClient;
     private readonly ILogger<LokiObservabilityEventLog> _logger;
 
+    // In-memory fallback store for when Loki is unavailable (e.g. in CI/test
+    // environments or before the Grafana stack is ready).  Because
+    // AddHttpClient registers this type as transient, the store must be
+    // static so that all injected instances share the same data.  Each child
+    // server process (e.g. Playwright's dotnet-exec child) gets its own
+    // static memory, so data does not leak across test runs.
+    private static readonly List<MessageEvent> FallbackStore = [];
+    private static readonly object FallbackLock = new();
+
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -46,6 +55,13 @@ public sealed class LokiObservabilityEventLog : IObservabilityEventLog
     /// <inheritdoc />
     public async Task RecordAsync(MessageEvent messageEvent, CancellationToken cancellationToken = default)
     {
+        // Always store in the in-memory fallback so events are available even
+        // when Loki is unreachable.
+        lock (FallbackLock)
+        {
+            FallbackStore.Add(messageEvent);
+        }
+
         var timestampNs = checked(messageEvent.RecordedAt.ToUnixTimeMilliseconds() * 1_000_000);
         var logLine = JsonSerializer.Serialize(messageEvent, SerializerOptions);
 
@@ -80,15 +96,25 @@ public sealed class LokiObservabilityEventLog : IObservabilityEventLog
 
         try
         {
-            var response = await _httpClient.PostAsync("loki/api/v1/push", content, cancellationToken);
+            // Use a short per-push timeout so the seeder doesn't block for
+            // minutes waiting for the Standard Resilience Handler's retries
+            // when Loki is unreachable.
+            using var pushCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            pushCts.CancelAfter(TimeSpan.FromSeconds(2));
+            var response = await _httpClient.PostAsync("loki/api/v1/push", content, pushCts.Token);
             response.EnsureSuccessStatusCode();
             _logger.LogDebug("Pushed event {EventId} to Loki for CorrelationId={CorrelationId}",
                 messageEvent.EventId, messageEvent.CorrelationId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to push event {EventId} to Loki", messageEvent.EventId);
-            throw;
+            // Log but do NOT re-throw.  The event is safely stored in the
+            // in-memory fallback.  Re-throwing here would crash any
+            // BackgroundService caller (e.g. DemoDataSeeder) and bring down
+            // the entire host, because the default
+            // BackgroundServiceExceptionBehavior is StopHost.
+            _logger.LogWarning(ex, "Failed to push event {EventId} to Loki; event is available in memory fallback",
+                messageEvent.EventId);
         }
     }
 
@@ -99,7 +125,19 @@ public sealed class LokiObservabilityEventLog : IObservabilityEventLog
     {
         // LogQL: select all streams where business_key matches (case-insensitive via regex)
         var query = $"{{job=\"eip-observability\", business_key=~\"(?i)^{EscapeLogQL(businessKey)}$\"}}";
-        return await QueryEventsAsync(query, cancellationToken);
+        var lokiResults = await QueryEventsAsync(query, cancellationToken);
+        if (lokiResults.Count > 0)
+            return lokiResults;
+
+        // Loki returned no results — either it's unreachable or no data was pushed.
+        // Fall back to the in-memory store.
+        lock (FallbackLock)
+        {
+            return FallbackStore
+                .Where(e => string.Equals(e.BusinessKey, businessKey, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(e => e.RecordedAt)
+                .ToList();
+        }
     }
 
     /// <inheritdoc />
@@ -108,7 +146,18 @@ public sealed class LokiObservabilityEventLog : IObservabilityEventLog
         CancellationToken cancellationToken = default)
     {
         var query = $"{{job=\"eip-observability\", correlation_id=\"{correlationId}\"}}";
-        return await QueryEventsAsync(query, cancellationToken);
+        var lokiResults = await QueryEventsAsync(query, cancellationToken);
+        if (lokiResults.Count > 0)
+            return lokiResults;
+
+        // Fall back to the in-memory store.
+        lock (FallbackLock)
+        {
+            return FallbackStore
+                .Where(e => e.CorrelationId == correlationId)
+                .OrderBy(e => e.RecordedAt)
+                .ToList();
+        }
     }
 
     private async Task<IReadOnlyList<MessageEvent>> QueryEventsAsync(

@@ -50,6 +50,13 @@ public sealed class TraceAnalyzer : ITraceAnalyzer
         {
             return await _ollama.AnalyseAsync(SystemPrompt, traceContextJson, cancellationToken: cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            // Propagate cancellation so callers can detect timeouts and mark
+            // Ollama as unavailable (e.g. MessageStateInspector uses a CTS to
+            // cap trace analysis time).
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "AI trace analysis unavailable; returning fallback response");
@@ -71,6 +78,12 @@ public sealed class TraceAnalyzer : ITraceAnalyzer
         try
         {
             return await _ollama.AnalyseAsync(SystemPrompt, prompt, cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Propagate cancellation so callers can detect timeouts and mark
+            // Ollama as unavailable.
+            throw;
         }
         catch (Exception ex)
         {

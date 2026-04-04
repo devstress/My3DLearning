@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace EnterpriseIntegrationPlatform.AI.Ollama;
 
@@ -13,6 +14,7 @@ public sealed class OllamaService : IOllamaService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<OllamaService> _logger;
+    private readonly string _defaultModel;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -25,13 +27,15 @@ public sealed class OllamaService : IOllamaService
     /// </summary>
     /// <param name="httpClient">
     /// An <see cref="HttpClient"/> whose <see cref="HttpClient.BaseAddress"/>
-    /// points to the Ollama API (e.g. <c>http://localhost:15434</c>).
+    /// points to the Ollama API (e.g. <c>http://localhost:11434</c>).
     /// </param>
+    /// <param name="settings">Ollama configuration including the default model name.</param>
     /// <param name="logger">Logger instance.</param>
-    public OllamaService(HttpClient httpClient, ILogger<OllamaService> logger)
+    public OllamaService(HttpClient httpClient, IOptions<OllamaSettings> settings, ILogger<OllamaService> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _defaultModel = settings.Value.Model;
     }
 
     /// <inheritdoc />
@@ -40,7 +44,9 @@ public sealed class OllamaService : IOllamaService
         string model = "llama3.2",
         CancellationToken cancellationToken = default)
     {
-        var request = new OllamaGenerateRequest { Model = model, Prompt = prompt, Stream = false };
+        // Always use the configured model — the parameter default exists only
+        // for interface backward compatibility.
+        var request = new OllamaGenerateRequest { Model = _defaultModel, Prompt = prompt, Stream = false };
 
         _logger.LogDebug("Sending generate request to Ollama model {Model}", model);
 
@@ -71,7 +77,11 @@ public sealed class OllamaService : IOllamaService
     {
         try
         {
-            var response = await _httpClient.GetAsync(string.Empty, cancellationToken);
+            // Use a short timeout for health checks so the UI doesn't hang
+            // when Ollama is unavailable (e.g. in CI or before Ollama starts).
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
+            var response = await _httpClient.GetAsync(string.Empty, cts.Token);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)

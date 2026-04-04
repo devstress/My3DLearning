@@ -68,7 +68,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 063-fix** (Playwright E2E Test Fixes) is next.
+All phases complete. See `rules/completion-log.md` for full history.
 
 ---
 
@@ -78,17 +78,11 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ### Phase 11 – Admin Dashboard & RAG
 
-| Chunk | Name | Goal | Tests Required |
-|-------|------|------|----------------|
-| 063-fix | Playwright E2E Test Fixes | Debug and fix 8 failing Playwright E2E tests: 7 OpenClaw (search/seeded-data/Ollama-status assertions fail because DemoDataSeeder runs async and Ollama is unavailable in test env) + 1 Admin ThrottlePage (policy table visibility). Root-cause each failure, add proper wait/retry logic or environment-aware assertions. | All 24 Playwright tests must pass |
+✅ Phase 11 complete — see completion-log.md
 
 ### Phase 12 – Documentation
 
-| Chunk | Name | Goal | Tests Required |
-|-------|------|------|----------------|
-| 063 | EIP Pattern Documentation | docs/ folder covering ALL Enterprise Integration Patterns implemented — full mapping from book TOC to platform components with usage examples from actual implementation. Must cover all 65 patterns from the EIP book. | N/A (documentation only) |
-| 064 | Platform Usage Guide | End-to-end usage documentation: getting started, configuration, deployment (K8s/Docker), connector setup, throttle/rate-limit tuning, multi-tenancy, security, observability — focused on EnterpriseIntegrationPlatform features only | N/A (documentation only) |
-| 065 | API Reference | Complete API reference for Admin.Api, Gateway.Api, OpenClaw.Web endpoints with request/response examples, authentication, and rate limit/throttle admin operations | N/A (documentation only) |
+✅ Phase 12 complete — see completion-log.md
 
 ---
 

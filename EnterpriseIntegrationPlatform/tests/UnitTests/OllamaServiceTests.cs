@@ -4,6 +4,7 @@ using System.Text.Json;
 using EnterpriseIntegrationPlatform.AI.Ollama;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using NUnit.Framework;
@@ -16,6 +17,7 @@ public class OllamaServiceTests
     private FakeHttpMessageHandler _handler = null!;
     private HttpClient _httpClient = null!;
     private ILogger<OllamaService> _logger = null!;
+    private IOptions<OllamaSettings> _settings = null!;
     private OllamaService _sut = null!;
 
     [SetUp]
@@ -24,7 +26,8 @@ public class OllamaServiceTests
         _handler = new FakeHttpMessageHandler();
         _httpClient = new HttpClient(_handler) { BaseAddress = new Uri(OllamaServiceExtensions.DefaultBaseAddress) };
         _logger = Substitute.For<ILogger<OllamaService>>();
-        _sut = new OllamaService(_httpClient, _logger);
+        _settings = Options.Create(new OllamaSettings { Model = "llama3.2" });
+        _sut = new OllamaService(_httpClient, _settings, _logger);
     }
 
     [TearDown]
@@ -131,7 +134,7 @@ public class OllamaServiceTests
     [Test]
     public void DefaultBaseAddress_IsCorrect()
     {
-        Assert.That(OllamaServiceExtensions.DefaultBaseAddress, Is.EqualTo("http://localhost:15434"));
+        Assert.That(OllamaServiceExtensions.DefaultBaseAddress, Is.EqualTo("http://localhost:11434"));
     }
 
     private sealed class FakeHttpMessageHandler : HttpMessageHandler

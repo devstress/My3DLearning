@@ -4,6 +4,120 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 065 – API Reference
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Complete API reference for Admin.Api, Gateway.Api, and OpenClaw.Web endpoints with request/response examples, authentication details, and rate limit/throttle admin operations.
+- **Architecture**:
+  - New `docs/api-reference.md` with comprehensive endpoint documentation for all 3 API services
+  - **Admin.Api** (45+ endpoints): Platform status, message queries, fault queries, observability events, DLQ management, throttle CRUD, rate limiting, configuration, feature flags, tenant management, disaster recovery, performance profiling
+  - **Gateway.Api** (3 endpoints): Service metadata, versioned route proxy, aggregated health
+  - **OpenClaw.Web** (12 endpoints): Message inspection (business key, correlation, ask), health checks (Ollama, RagFlow, seeder, metrics), RAG code generation (integration, connector, schema, chat, datasets)
+  - Every endpoint documented with: HTTP method, path, parameters, request body, response body with JSON examples
+  - Authentication section covering API key, JWT, and per-service security
+  - Admin.Web proxy endpoint mapping table
+- **Files created**:
+  - `docs/api-reference.md` — Complete API reference (60+ endpoints documented)
+- **Files modified**:
+  - `rules/milestones.md` — Removed chunk 065 row, marked Phase 12 complete
+  - `rules/completion-log.md` — Added chunk 065 entry
+- **Test counts**:
+  - UnitTests: 1,400 (unchanged — documentation only)
+  - Total tests: 1,537 across 6 test projects (unchanged)
+- **Notes**:
+  - 48 src projects (unchanged)
+  - All phases (1–12) now complete
+  - 65 chunks + 1 fix chunk delivered (chunks 001–065 + 063-fix)
+  - Platform documentation suite: eip-mapping.md (65 patterns), platform-usage-guide.md (14 sections), api-reference.md (60+ endpoints)
+
+## Chunk 064 – Platform Usage Guide
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: End-to-end usage documentation covering getting started, configuration, deployment, connector setup, throttle/rate-limit tuning, multi-tenancy, security, observability, disaster recovery, AI-driven integration generation, and troubleshooting.
+- **Architecture**:
+  - New `docs/platform-usage-guide.md` with 14 sections covering all operational aspects
+  - Complements existing docs (developer-setup.md, architecture-overview.md, operations-runbook.md) by focusing on practical workflows, configuration, and day-to-day tasks
+  - Includes configuration examples for all 4 connector types (HTTP, SFTP, Email, File)
+  - Throttle tuning guidelines with scenario-based recommendations
+  - Multi-tenancy section covering isolation levels, onboarding, and configuration
+  - Security section covering authentication methods, secrets management, and best practices
+  - Observability section with key metrics, alert thresholds, and diagnostic endpoints
+  - DR drills and backup strategy documentation
+  - RAG API developer workflow documentation
+  - Troubleshooting guide with common issues and log analysis examples
+- **Files created**:
+  - `docs/platform-usage-guide.md` — Complete platform usage guide (14 sections)
+- **Files modified**:
+  - `rules/milestones.md` — Removed chunk 064 row, updated Next Chunk to 065
+  - `rules/completion-log.md` — Added chunk 064 entry
+- **Test counts**:
+  - UnitTests: 1,400 (unchanged — documentation only)
+  - Total tests: 1,537 across 6 test projects (unchanged)
+- **Notes**:
+  - 48 src projects (unchanged)
+  - Guide designed to complement existing architecture and setup docs
+  - Focuses on operator and developer workflows rather than implementation details
+
+## Chunk 063 – EIP Pattern Documentation
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Comprehensive documentation mapping ALL 65 Enterprise Integration Patterns from the EIP book (Hohpe & Woolf) to platform implementations with usage descriptions.
+- **Architecture**:
+  - Complete rewrite of `docs/eip-mapping.md` from a partial 30-pattern table to a full 65-pattern reference document
+  - Quick Reference table mapping all 65 patterns to their platform components and project paths
+  - 8 detailed sections following the EIP book structure: Integration Styles (4), Messaging Systems (6), Messaging Channels (9), Message Construction (9), Message Routing (12), Message Transformation (6), Messaging Endpoints (11), System Management (8)
+  - Each pattern includes: book definition, implementation description, and usage notes
+  - Architecture notes section with broker selection guide, message flow diagram, and Ack/Nack loopback explanation
+- **Files modified**:
+  - `docs/eip-mapping.md` — Complete rewrite covering all 65 EIP patterns
+  - `rules/milestones.md` — Removed chunk 063 row, updated Next Chunk to 064
+  - `rules/completion-log.md` — Added chunk 063 entry
+- **Test counts**:
+  - UnitTests: 1,400 (unchanged — documentation only)
+  - Total tests: 1,537 across 6 test projects (unchanged)
+- **Notes**:
+  - 48 src projects (unchanged)
+  - All 65 EIP book patterns mapped with implementation details
+  - Document structure follows the book's table of contents for easy cross-reference
+
+## Chunk 063-fix – Playwright E2E Test Fixes
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Debug and fix 8 failing Playwright E2E tests (7 OpenClaw + 1 Admin). Root-cause each failure, add proper wait/retry logic and environment-aware timeouts.
+- **Architecture**:
+  - **Root Cause 1 — Ollama timeout**: Ollama HttpClient had 120-second timeout. When Ollama is unavailable in CI, `IsHealthyAsync()` and `WhereIsMessageAsync()` hung for up to 120 seconds, causing Playwright assertions to timeout while waiting for `#result` div or `#ollamaStatus` class change.
+  - **Root Cause 2 — DemoDataSeeder async**: `BackgroundService.ExecuteAsync()` runs asynchronously after startup. Tests queried seeded data before seeding completed.
+  - **Root Cause 3 — Admin.Api unavailable**: Admin.Web proxy to Admin.Api threw unhandled `HttpRequestException` when Admin.Api wasn't running, returning a 500 error page. ThrottlePage's `throttleLoading` stayed true during the long timeout.
+  - **Fix 1**: Added 3-second `CancellationTokenSource` to `OllamaService.IsHealthyAsync()` so health checks fail fast.
+  - **Fix 2**: Added 5-second `CancellationTokenSource` to `MessageStateInspector.BuildResultAsync()` for Ollama trace analysis so search results return quickly with graceful fallback.
+  - **Fix 3**: Added `DemoDataSeeder.IsSeeded` static property and `/api/health/seeder` endpoint for test readiness polling.
+  - **Fix 4**: Added `AbortSignal.timeout(5000)` to the JS `checkOllamaHealth()` fetch call in OpenClaw HTML.
+  - **Fix 5**: Added try-catch to Admin.Web throttle policies proxy endpoint, returning empty array on `HttpRequestException`.
+  - **Fix 6**: Removed all 8 `[Ignore]` attributes. Added `WaitForSeederAsync()` helper for seeded-data tests. Increased Playwright assertion timeouts to 10–15 seconds for server-side operations.
+- **Files modified**:
+  - `src/AI.Ollama/OllamaService.cs` — Added 3-second CTS to `IsHealthyAsync`
+  - `src/Observability/MessageStateInspector.cs` — Added 5-second CTS to trace analysis call
+  - `src/OpenClaw.Web/DemoDataSeeder.cs` — Added `IsSeeded` static property
+  - `src/OpenClaw.Web/Program.cs` — Added `/api/health/seeder` endpoint, JS fetch timeout
+  - `src/Admin.Web/Program.cs` — Added try-catch on throttle proxy endpoint
+  - `tests/PlaywrightTests/OpenClawUiTests.cs` — Removed 7 `[Ignore]`, added `WaitForSeederAsync`, increased timeouts
+  - `tests/PlaywrightTests/AdminDashboardTests.cs` — Removed 1 `[Ignore]`, increased timeout
+  - `rules/milestones.md` — Removed chunk 063-fix row, updated Next Chunk to 063
+  - `rules/completion-log.md` — Added chunk 063-fix entry
+- **Test counts**:
+  - UnitTests: 1,400 (unchanged)
+  - PlaywrightTests: 24 (all 24 now active — 0 [Ignore]d)
+  - Total tests: 1,537 across 6 test projects (UnitTests 1400, ContractTests 58, WorkflowTests 29, IntegrationTests 17, PlaywrightTests 24, LoadTests 10; note: 1 Vitest test count unchanged at 19)
+- **Notes**:
+  - 48 src projects (unchanged)
+  - All 8 previously-ignored Playwright tests are now enabled
+  - Server-side Ollama timeouts reduced from 120s to 3s (health) / 5s (trace analysis)
+  - Tests poll `/api/health/seeder` before querying seeded data for reliability
+
 ## Chunk 062 – RAG Knowledge Base
 
 - **Date**: 2026-04-04

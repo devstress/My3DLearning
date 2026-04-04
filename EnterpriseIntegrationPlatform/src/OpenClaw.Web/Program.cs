@@ -11,7 +11,8 @@ builder.AddServiceDefaults();
 // variable (Ollama__BaseAddress) or config, with localhost fallback for local dev
 var ollamaBaseAddress = builder.Configuration["Ollama:BaseAddress"]
                         ?? OllamaServiceExtensions.DefaultBaseAddress;
-builder.Services.AddOllamaService(ollamaBaseAddress);
+var ollamaModel = builder.Configuration["Ollama:Model"] ?? "llama3.2";
+builder.Services.AddOllamaService(ollamaBaseAddress, ollamaModel);
 
 // Register platform observability — Loki URL is injected by Aspire (Loki__BaseAddress)
 var lokiBaseAddress = builder.Configuration["Loki:BaseAddress"]
@@ -80,6 +81,16 @@ app.MapGet("/api/health/ragflow", async (IRagFlowService ragFlow, CancellationTo
     return Results.Ok(new { available = healthy, service = "ragflow" });
 })
 .WithName("RagFlowHealth");
+
+// ── Seeder readiness endpoint ─────────────────────────────────────────────────
+// Allows E2E tests to poll until demo data seeding has completed before
+// querying for seeded business keys like "order-02" or "shipment-123".
+
+app.MapGet("/api/health/seeder", () =>
+{
+    return Results.Ok(new { seeded = DemoDataSeeder.IsSeeded });
+})
+.WithName("SeederHealth");
 
 // ── RAG context retrieval endpoints ───────────────────────────────────────────
 // Developers use their own preferred AI provider (Copilot, Codex, Claude Code)
@@ -372,7 +383,7 @@ internal static class OpenClawHtml
             async function checkOllamaHealth() {
                 const el = document.getElementById('ollamaStatus');
                 try {
-                    const res = await fetch('/api/health/ollama');
+                    const res = await fetch('/api/health/ollama', { signal: AbortSignal.timeout(5000) });
                     const data = await res.json();
                     if (data.available) {
                         el.textContent = 'Ollama: connected';
