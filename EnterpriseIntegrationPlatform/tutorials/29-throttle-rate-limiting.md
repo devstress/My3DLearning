@@ -41,15 +41,17 @@ The token bucket allows short bursts above the steady-state rate while enforcing
 // src/Processing.Throttle/IMessageThrottle.cs
 public interface IMessageThrottle
 {
-    Task<ThrottleDecision> AcquireAsync(
-        string partitionKey,
-        CancellationToken cancellationToken = default);
+    Task<ThrottleResult> AcquireAsync<T>(
+        IntegrationEnvelope<T> envelope,
+        CancellationToken ct = default);
 
-    ThrottleMetrics GetMetrics(string partitionKey);
+    double AvailableTokens { get; }
+
+    ThrottleMetrics GetMetrics();
 }
 ```
 
-`AcquireAsync` returns a `ThrottleDecision` indicating whether the message can proceed immediately, must wait, or should be rejected.
+`AcquireAsync` returns a `ThrottleResult` indicating whether the message can proceed immediately, must wait, or should be rejected.
 
 ### TokenBucketThrottle (concrete)
 
@@ -63,34 +65,32 @@ public sealed class TokenBucketThrottle : IMessageThrottle
 }
 ```
 
-### ThrottlePolicy
+### ThrottleResult
 
 ```csharp
-// src/Processing.Throttle/ThrottlePolicy.cs
-public sealed record ThrottlePolicy
-{
-    public required string Name { get; init; }
-    public required ThrottlePartitionStrategy PartitionStrategy { get; init; }
-    public required int RefillRate { get; init; }      // tokens per second
-    public required int BurstSize { get; init; }       // max token capacity
-    public TimeSpan MaxWait { get; init; } = TimeSpan.FromSeconds(5);
-}
-
-public enum ThrottlePartitionStrategy
-{
-    Global,
-    BySource,
-    ByRecipient,
-    ByCorrelationId
-}
+// src/Processing.Throttle/ThrottleResult.cs
+public sealed record ThrottleResult(
+    bool Permitted,
+    TimeSpan WaitTime,
+    double RemainingTokens,
+    string? RejectionReason = null);
 ```
 
-| Strategy | Partition Key | Use Case |
-|----------|--------------|----------|
-| `Global` | `"global"` | Protect a shared downstream system |
-| `BySource` | `envelope.Source` | Fair share per sending system |
-| `ByRecipient` | `envelope.Recipient` | Protect each receiver independently |
-| `ByCorrelationId` | `envelope.CorrelationId` | Throttle within a business transaction |
+### ThrottlePartitionKey
+
+```csharp
+// src/Processing.Throttle/ThrottlePartitionKey.cs
+public sealed record ThrottlePartitionKey(
+    string? TenantId = null,
+    string? Queue = null,
+    string? Endpoint = null);
+```
+
+| Key Property | Use Case |
+|-------------|----------|
+| `TenantId` | Fair share per tenant |
+| `Queue` | Protect a specific queue |
+| `Endpoint` | Throttle per downstream endpoint |
 
 ### IThrottleRegistry
 
@@ -98,9 +98,11 @@ public enum ThrottlePartitionStrategy
 // src/Processing.Throttle/IThrottleRegistry.cs
 public interface IThrottleRegistry
 {
-    void Register(ThrottlePolicy policy);
-    ThrottlePolicy? Resolve(IntegrationEnvelope<string> envelope);
-    IReadOnlyList<ThrottlePolicy> GetAll();
+    ThrottlePolicy Resolve(ThrottlePartitionKey key);
+    void SetPolicy(ThrottlePolicy policy);
+    void RemovePolicy(string policyId);
+    IReadOnlyList<ThrottlePolicy> GetAllPolicies();
+    ThrottlePolicy? GetPolicy(string policyId);
 }
 ```
 
@@ -108,7 +110,13 @@ public interface IThrottleRegistry
 
 ```csharp
 // src/Processing.Throttle/ThrottleMetrics.cs
-public sealed record ThrottleMetrics(string PartitionKey, int AvailableTokens, int TotalThrottled, TimeSpan AverageWaitTime);
+public sealed record ThrottleMetrics(
+    long TotalAcquired,
+    long TotalRejected,
+    double AvailableTokens,
+    double BurstCapacity,
+    double RefillRate,
+    TimeSpan TotalWaitTime);
 ```
 
 ### Rate Limiting vs Throttling
@@ -126,7 +134,7 @@ Rate limiting protects the **platform** from external overload. Throttling prote
 
 ## Scalability Dimension
 
-Per-tenant partitioning ensures one noisy tenant cannot consume all throughput. Each tenant's `BySource` bucket is independent. The `ThrottleMetrics` feed into the competing consumers orchestrator (Tutorial 28): if wait times climb, the orchestrator adds consumers.
+Per-tenant partitioning (via `ThrottlePartitionKey.TenantId`) ensures one noisy tenant cannot consume all throughput. Each tenant's bucket is independent. The `ThrottleMetrics` feed into the competing consumers orchestrator (Tutorial 28): if wait times climb, the orchestrator adds consumers.
 
 ---
 
@@ -138,11 +146,11 @@ When `AcquireAsync` delays a message, the message remains **uncommitted** — no
 
 ## Exercises
 
-1. Design a `ThrottlePolicy` that allows a partner system to send 50 messages/second with bursts up to 200. Which `PartitionStrategy` would you choose?
+1. Design a `ThrottlePolicy` that allows a partner system to send 50 messages/second with bursts up to 200. Which `ThrottlePartitionKey` fields would you set?
 
 2. The `TokenBucketThrottle` has 0 available tokens and a `MaxWait` of 5 seconds. A message arrives. Describe the sequence of events.
 
-3. Explain why the platform uses `BySource` throttling by default for multi-tenant deployments rather than a single `Global` throttle.
+3. Explain why the platform uses per-`TenantId` throttling by default for multi-tenant deployments rather than a single global throttle.
 
 ---
 

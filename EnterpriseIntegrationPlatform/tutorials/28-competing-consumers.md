@@ -48,20 +48,23 @@ public sealed class CompetingConsumerOrchestrator : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            var lag = await _lagMonitor.GetCurrentLagAsync(stoppingToken);
+            var lagInfo = await _lagMonitor.GetLagAsync(
+                _options.TargetTopic, _options.ConsumerGroup, stoppingToken);
 
-            if (lag > _options.ScaleUpThreshold)
-                await _scaler.ScaleUpAsync(1, stoppingToken);
-            else if (lag < _options.ScaleDownThreshold && _scaler.CurrentCount > _options.MinConsumers)
-                await _scaler.ScaleDownAsync(1, stoppingToken);
+            if (lagInfo.TotalLag > _options.ScaleUpThreshold)
+                await _scaler.ScaleAsync(
+                    Math.Min(_scaler.CurrentCount + 1, _options.MaxConsumers), stoppingToken);
+            else if (lagInfo.TotalLag < _options.ScaleDownThreshold
+                     && _scaler.CurrentCount > _options.MinConsumers)
+                await _scaler.ScaleAsync(_scaler.CurrentCount - 1, stoppingToken);
 
-            await Task.Delay(_options.EvaluationInterval, stoppingToken);
+            await Task.Delay(_options.CooldownMs, stoppingToken);
         }
     }
 }
 ```
 
-The orchestrator runs as a hosted `BackgroundService`. On each evaluation cycle it reads the consumer lag, compares against thresholds, and scales up or down.
+The orchestrator runs as a hosted `BackgroundService`. On each evaluation cycle it reads the consumer lag via `GetLagAsync`, compares against thresholds, and calls `ScaleAsync` with the desired consumer count.
 
 ### IConsumerLagMonitor
 
@@ -69,9 +72,16 @@ The orchestrator runs as a hosted `BackgroundService`. On each evaluation cycle 
 // src/Processing.CompetingConsumers/IConsumerLagMonitor.cs
 public interface IConsumerLagMonitor
 {
-    Task<long> GetCurrentLagAsync(CancellationToken ct);
-    Task<IDictionary<string, long>> GetLagByPartitionAsync(CancellationToken ct);
+    Task<ConsumerLagInfo> GetLagAsync(
+        string topic,
+        string consumerGroup,
+        CancellationToken ct = default);
 }
+
+public sealed record ConsumerLagInfo(
+    long TotalLag,
+    int ActiveConsumers,
+    DateTimeOffset MeasuredAt);
 ```
 
 ### IConsumerScaler
@@ -81,8 +91,7 @@ public interface IConsumerLagMonitor
 public interface IConsumerScaler
 {
     int CurrentCount { get; }
-    Task ScaleUpAsync(int count, CancellationToken ct);
-    Task ScaleDownAsync(int count, CancellationToken ct);
+    Task ScaleAsync(int desiredCount, CancellationToken ct = default);
 }
 ```
 
@@ -92,13 +101,13 @@ public interface IConsumerScaler
 // src/Processing.CompetingConsumers/IBackpressureSignal.cs
 public interface IBackpressureSignal
 {
-    bool IsActive { get; }
-    void Activate(string reason);
-    void Deactivate();
+    bool IsBackpressured { get; }
+    void Signal();
+    void Release();
 }
 ```
 
-When backpressure is active, the orchestrator pauses scale-down and can signal upstream producers (via broker flow control or HTTP 429) to slow ingestion.
+When `IsBackpressured` is true, the orchestrator pauses scale-down and can signal upstream producers (via broker flow control or HTTP 429) to slow ingestion.
 
 ### CompetingConsumerOptions
 
@@ -106,16 +115,17 @@ When backpressure is active, the orchestrator pauses scale-down and can signal u
 // src/Processing.CompetingConsumers/CompetingConsumerOptions.cs
 public sealed class CompetingConsumerOptions
 {
-    public int MinConsumers { get; init; } = 1;
-    public int MaxConsumers { get; init; } = 10;
-    public long ScaleUpThreshold { get; init; } = 1000;
-    public long ScaleDownThreshold { get; init; } = 100;
-    public TimeSpan EvaluationInterval { get; init; } = TimeSpan.FromSeconds(30);
-    public TimeSpan CooldownPeriod { get; init; } = TimeSpan.FromMinutes(2);
+    public int MinConsumers { get; set; } = 1;
+    public int MaxConsumers { get; set; } = 10;
+    public long ScaleUpThreshold { get; set; } = 1000;
+    public long ScaleDownThreshold { get; set; } = 100;
+    public int CooldownMs { get; set; } = 30_000;
+    public string TargetTopic { get; set; } = string.Empty;
+    public string ConsumerGroup { get; set; } = string.Empty;
 }
 ```
 
-The `CooldownPeriod` prevents flapping — after a scale event, no further scaling occurs until the cooldown expires. This avoids rapid oscillation when lag hovers near a threshold.
+The `CooldownMs` prevents flapping — after a scale event, no further scaling occurs until the cooldown expires. This avoids rapid oscillation when lag hovers near a threshold.
 
 ---
 
@@ -135,7 +145,7 @@ Each consumer processes messages independently and Acks them individually. If a 
 
 1. A topic has 8 partitions and `MaxConsumers = 12`. What happens when the orchestrator tries to scale beyond 8 consumers? Why is `MaxConsumers` still useful?
 
-2. Consumer lag oscillates between 900 and 1100 with `ScaleUpThreshold = 1000`. Without `CooldownPeriod`, what behavior would you observe? How does cooldown fix it?
+2. Consumer lag oscillates between 900 and 1100 with `ScaleUpThreshold = 1000`. Without `CooldownMs`, what behavior would you observe? How does cooldown fix it?
 
 3. Design an `IBackpressureSignal` integration that returns HTTP 429 from the Gateway API when backpressure is active.
 
