@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ragKnowledgeBase xmlns="urn:eip:rag:v1" category="Message Construction">
+
+  <document id="command-message" title="Command Message" pattern="Command Message">
+    <summary>A message that tells the receiver to perform an operation. Uses IntegrationEnvelope.Intent = Command.</summary>
+    <implementation>IntegrationEnvelope with Intent property set to MessageIntent.Command. Processed by ServiceActivator or workflow activities.</implementation>
+    <components>Contracts, Processing.Dispatcher</components>
+    <tags>command intent action</tags>
+  </document>
+
+  <document id="document-message" title="Document Message" pattern="Document Message">
+    <summary>A message that carries data for the receiver to process. Uses IntegrationEnvelope.Intent = Document.</summary>
+    <implementation>IntegrationEnvelope with Intent property set to MessageIntent.Document. Payload contains the full data document.</implementation>
+    <components>Contracts</components>
+    <tags>document data payload</tags>
+  </document>
+
+  <document id="event-message" title="Event Message" pattern="Event Message">
+    <summary>A message that notifies receivers about something that happened. Uses IntegrationEnvelope.Intent = Event.</summary>
+    <implementation>IntegrationEnvelope with Intent property set to MessageIntent.Event. Published to Kafka for fan-out streaming.</implementation>
+    <components>Contracts, Ingestion.Kafka</components>
+    <tags>event notification publish</tags>
+  </document>
+
+  <document id="request-reply" title="Request-Reply" pattern="Request-Reply">
+    <summary>Send a request message and receive a reply message. Correlates request and response via correlation ID.</summary>
+    <implementation>Processing.RequestReply.RequestReplyCorrelator manages reply correlation using IntegrationEnvelope.CorrelationId and ReplyTo header.</implementation>
+    <components>Processing.RequestReply</components>
+    <tags>request reply correlation synchronous</tags>
+  </document>
+
+  <document id="return-address" title="Return Address" pattern="Return Address">
+    <summary>The request message contains a return address that indicates where to send the reply.</summary>
+    <implementation>IntegrationEnvelope.ReplyTo field specifies the reply channel/address.</implementation>
+    <components>Contracts</components>
+    <tags>return-address reply-to header</tags>
+  </document>
+
+  <document id="correlation-id" title="Correlation Identifier" pattern="Correlation Identifier">
+    <summary>Each reply message contains a correlation identifier that links it to the original request.</summary>
+    <implementation>IntegrationEnvelope.CorrelationId — a GUID that links related messages across the pipeline.</implementation>
+    <components>Contracts</components>
+    <tags>correlation identifier tracking</tags>
+  </document>
+
+  <document id="message-sequence" title="Message Sequence" pattern="Message Sequence">
+    <summary>Large data sets are split into a sequence of messages, each carrying a portion of the data.</summary>
+    <implementation>IntegrationEnvelope.SequenceNumber and TotalCount fields. Processing.Resequencer.MessageResequencer reassembles ordered sequences.</implementation>
+    <components>Contracts, Processing.Resequencer</components>
+    <tags>sequence ordering split reassemble</tags>
+  </document>
+
+  <document id="message-expiration" title="Message Expiration" pattern="Message Expiration">
+    <summary>A message is given a time-to-live; it should be discarded if not consumed before expiry.</summary>
+    <implementation>IntegrationEnvelope.ExpiresAt timestamp + MessageExpirationChecker that validates TTL before processing.</implementation>
+    <components>Contracts</components>
+    <tags>expiration ttl timeout discard</tags>
+  </document>
+
+  <document id="format-indicator" title="Format Indicator" pattern="Format Indicator">
+    <summary>Messages include a format indicator so the receiver knows how to parse the data.</summary>
+    <implementation>MessageHeaders.ContentType header — e.g. application/json, application/xml, text/csv.</implementation>
+    <components>Contracts</components>
+    <tags>format content-type header media-type</tags>
+  </document>
+
+</ragKnowledgeBase>

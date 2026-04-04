@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ragKnowledgeBase xmlns="urn:eip:rag:v1" category="Integration Styles">
+
+  <document id="file-transfer" title="File Transfer" pattern="File Transfer">
+    <summary>Applications integrate by exchanging files. The platform supports file-based integration through Connector.File.</summary>
+    <implementation>Connector.File implements IConnector for file system polling, reading, and writing. Supports local and network file shares.</implementation>
+    <components>Connector.File</components>
+    <tags>file transfer connector polling</tags>
+  </document>
+
+  <document id="shared-database" title="Shared Database" pattern="Shared Database">
+    <summary>Applications share data through a common database. Cassandra serves as the distributed shared store.</summary>
+    <implementation>Storage.Cassandra provides CassandraMessageStore, deduplication, and claim-check storage accessible by all platform services.</implementation>
+    <components>Storage.Cassandra</components>
+    <tags>shared database cassandra persistence</tags>
+  </document>
+
+  <document id="remote-procedure" title="Remote Procedure Invocation" pattern="Remote Procedure Invocation">
+    <summary>Applications invoke operations on remote services. The platform uses HTTP connectors for RPI-style integration.</summary>
+    <implementation>Connector.Http implements IConnector for HTTP/REST API calls with retry, authentication, and circuit breaker support.</implementation>
+    <components>Connector.Http</components>
+    <tags>rpc http rest api connector</tags>
+  </document>
+
+  <document id="messaging-style" title="Messaging" pattern="Messaging">
+    <summary>Applications exchange messages asynchronously through a messaging middleware. This is the core architecture of the platform.</summary>
+    <implementation>The entire EnterpriseIntegrationPlatform is built around messaging — Kafka for event streams, NATS JetStream for task queues, Temporal for workflow orchestration.</implementation>
+    <components>Platform Architecture</components>
+    <tags>messaging asynchronous middleware core</tags>
+  </document>
+
+</ragKnowledgeBase>

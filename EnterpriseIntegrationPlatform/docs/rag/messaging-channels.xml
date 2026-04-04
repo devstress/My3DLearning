@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ragKnowledgeBase xmlns="urn:eip:rag:v1" category="Messaging Channels">
+
+  <document id="point-to-point" title="Point-to-Point Channel" pattern="Point-to-Point Channel">
+    <summary>Ensures that only one receiver consumes each message. Queue semantics with competing consumers.</summary>
+    <implementation>Ingestion.Channels.PointToPointChannel wraps NATS JetStream queue groups or Kafka consumer groups.</implementation>
+    <components>Ingestion.Channels</components>
+    <tags>point-to-point queue consumer-group</tags>
+  </document>
+
+  <document id="publish-subscribe" title="Publish-Subscribe Channel" pattern="Publish-Subscribe Channel">
+    <summary>Broadcasts a message to all subscribers. Each subscriber gets its own copy.</summary>
+    <implementation>Ingestion.Channels.PublishSubscribeChannel wraps Kafka fan-out topics or NATS subjects.</implementation>
+    <components>Ingestion.Channels</components>
+    <tags>publish-subscribe broadcast fan-out</tags>
+  </document>
+
+  <document id="datatype-channel" title="Datatype Channel" pattern="Datatype Channel">
+    <summary>Each channel carries messages of only one data type. Strongly typed channel routing.</summary>
+    <implementation>Ingestion.Channels.DatatypeChannel routes messages to type-specific channels based on IntegrationEnvelope.MessageType.</implementation>
+    <components>Ingestion.Channels</components>
+    <tags>datatype typed channel</tags>
+  </document>
+
+  <document id="invalid-message" title="Invalid Message Channel" pattern="Invalid Message Channel">
+    <summary>Messages that cannot be processed are routed to a special channel for investigation.</summary>
+    <implementation>Ingestion.Channels.InvalidMessageChannel captures malformed or unparseable messages.</implementation>
+    <components>Ingestion.Channels</components>
+    <tags>invalid error poison</tags>
+  </document>
+
+  <document id="dead-letter" title="Dead Letter Channel" pattern="Dead Letter Channel">
+    <summary>Messages that fail all retry attempts are moved to a dead letter queue for manual intervention.</summary>
+    <implementation>Processing.DeadLetter with DLQ persistence and Admin.Api DLQ resubmission endpoint.</implementation>
+    <components>Processing.DeadLetter, Admin.Api</components>
+    <tags>dead-letter dlq retry failure</tags>
+  </document>
+
+  <document id="guaranteed-delivery" title="Guaranteed Delivery" pattern="Guaranteed Delivery">
+    <summary>Ensures messages are not lost even if the messaging system fails. Built into Kafka and Temporal durable storage.</summary>
+    <implementation>Kafka acks=all for producer durability. Temporal workflow persistence for in-flight messages. NATS JetStream file-based storage.</implementation>
+    <components>Ingestion.Kafka, Workflow.Temporal</components>
+    <tags>guaranteed delivery durable persistence</tags>
+  </document>
+
+  <document id="channel-adapter" title="Channel Adapter" pattern="Channel Adapter">
+    <summary>Connects an application to the messaging system by translating between the application's API and the messaging infrastructure.</summary>
+    <implementation>Connectors: Connector.Http, Connector.Sftp, Connector.Email, Connector.File — each implements IConnector.</implementation>
+    <components>Connector.Http, Connector.Sftp, Connector.Email, Connector.File</components>
+    <tags>adapter connector bridge external</tags>
+  </document>
+
+  <document id="messaging-bridge" title="Messaging Bridge" pattern="Messaging Bridge">
+    <summary>Connects two messaging systems so they can share messages. Bridges Kafka and NATS JetStream.</summary>
+    <implementation>Ingestion.Channels.MessagingBridge transfers messages between broker implementations.</implementation>
+    <components>Ingestion.Channels</components>
+    <tags>bridge cross-broker transfer</tags>
+  </document>
+
+  <document id="message-bus" title="Message Bus" pattern="Message Bus">
+    <summary>A shared messaging infrastructure that all applications use to exchange messages.</summary>
+    <implementation>The EnterpriseIntegrationPlatform itself IS the message bus — Kafka + NATS JetStream + Temporal as the backbone.</implementation>
+    <components>Platform Architecture</components>
+    <tags>bus infrastructure platform</tags>
+  </document>
+
+</ragKnowledgeBase>

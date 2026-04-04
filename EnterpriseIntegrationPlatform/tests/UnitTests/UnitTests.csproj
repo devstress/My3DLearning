@@ -52,5 +52,6 @@
     <ProjectReference Include="..\..\src\Processing.Dispatcher\Processing.Dispatcher.csproj" />
     <ProjectReference Include="..\..\src\SystemManagement\SystemManagement.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Connectors.csproj" />
+    <ProjectReference Include="..\..\src\AI.RagKnowledge\AI.RagKnowledge.csproj" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ragKnowledgeBase xmlns="urn:eip:rag:v1" category="Message Routing">
+
+  <document id="content-based-router" title="Content-Based Router" pattern="Content-Based Router">
+    <summary>Routes a message to the correct channel based on the message content.</summary>
+    <implementation>Processing.Routing.ContentBasedRouter evaluates message properties and routes to destination channels.</implementation>
+    <components>Processing.Routing</components>
+    <tags>content-based routing rules</tags>
+  </document>
+
+  <document id="message-filter" title="Message Filter" pattern="Message Filter">
+    <summary>Eliminates undesired messages from a channel based on criteria.</summary>
+    <implementation>Processing.Routing.MessageFilter applies predicate-based filtering to discard or redirect messages.</implementation>
+    <components>Processing.Routing</components>
+    <tags>filter discard predicate</tags>
+  </document>
+
+  <document id="dynamic-router" title="Dynamic Router" pattern="Dynamic Router">
+    <summary>A router that can self-configure based on control messages from participating destinations.</summary>
+    <implementation>Processing.Routing.DynamicRouter maintains a dynamic routing table updated at runtime via control messages.</implementation>
+    <components>Processing.Routing</components>
+    <tags>dynamic routing runtime configuration</tags>
+  </document>
+
+  <document id="recipient-list" title="Recipient List" pattern="Recipient List">
+    <summary>Routes a message to a list of dynamically specified recipients.</summary>
+    <implementation>Processing.Routing.RecipientListRouter sends copies to each recipient in the list.</implementation>
+    <components>Processing.Routing</components>
+    <tags>recipient list multicast</tags>
+  </document>
+
+  <document id="splitter" title="Splitter" pattern="Splitter">
+    <summary>Breaks a composite message into individual messages, each containing one item.</summary>
+    <implementation>Processing.Splitter splits batch messages into individual IntegrationEnvelopes.</implementation>
+    <components>Processing.Splitter</components>
+    <tags>splitter decompose batch individual</tags>
+  </document>
+
+  <document id="aggregator" title="Aggregator" pattern="Aggregator">
+    <summary>Combines multiple related messages into a single message.</summary>
+    <implementation>Processing.Aggregator collects messages by correlation ID and merges when completeness condition is met.</implementation>
+    <components>Processing.Aggregator</components>
+    <tags>aggregator combine merge correlation</tags>
+  </document>
+
+  <document id="resequencer" title="Resequencer" pattern="Resequencer">
+    <summary>Puts out-of-order messages back into the correct sequence.</summary>
+    <implementation>Processing.Resequencer.MessageResequencer uses SequenceNumber to buffer and emit messages in order.</implementation>
+    <components>Processing.Resequencer</components>
+    <tags>resequencer order sequence buffer</tags>
+  </document>
+
+  <document id="composed-msg-processor" title="Composed Message Processor" pattern="Composed Message Processor">
+    <summary>Split a composite message, process each part individually, then aggregate the results.</summary>
+    <implementation>Splitter + Transform + Aggregator pipeline composed in Temporal workflow activities.</implementation>
+    <components>Processing.Splitter, Processing.Transform, Processing.Aggregator</components>
+    <tags>composed split transform aggregate pipeline</tags>
+  </document>
+
+  <document id="scatter-gather" title="Scatter-Gather" pattern="Scatter-Gather">
+    <summary>Broadcast a message to multiple recipients and re-aggregate the responses.</summary>
+    <implementation>Processing.ScatterGather sends to parallel recipients and aggregates responses with timeout.</implementation>
+    <components>Processing.ScatterGather</components>
+    <tags>scatter gather parallel broadcast</tags>
+  </document>
+
+  <document id="routing-slip" title="Routing Slip" pattern="Routing Slip">
+    <summary>Attach a routing slip to each message specifying the sequence of processing steps.</summary>
+    <implementation>Processing.Routing.RoutingSlipRouter reads the slip from message headers and forwards to the next step.</implementation>
+    <components>Processing.Routing</components>
+    <tags>routing-slip itinerary steps</tags>
+  </document>
+
+  <document id="process-manager" title="Process Manager" pattern="Process Manager">
+    <summary>A central coordinator that manages the state and sequencing of a multi-step business process.</summary>
+    <implementation>Temporal Workflows act as process managers — maintaining state, handling signals, and orchestrating activities.</implementation>
+    <components>Workflow.Temporal</components>
+    <tags>process-manager orchestration workflow temporal</tags>
+  </document>
+
+  <document id="message-broker-pattern" title="Message Broker" pattern="Message Broker">
+    <summary>A central component that decouples senders from receivers. The platform IS the message broker.</summary>
+    <implementation>The EnterpriseIntegrationPlatform itself acts as the message broker — Kafka, NATS, and Temporal together provide complete broker functionality.</implementation>
+    <components>Platform Architecture</components>
+    <tags>broker decoupling middleware</tags>
+  </document>
+
+</ragKnowledgeBase>

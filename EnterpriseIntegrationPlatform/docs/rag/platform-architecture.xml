@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ragKnowledgeBase xmlns="urn:eip:rag:v1" category="Platform Architecture">
+
+  <document id="aspire-orchestration" title="Aspire Orchestration" pattern="Infrastructure">
+    <summary>The platform uses .NET Aspire 13.1.2 to orchestrate all local services, containers, and dependencies.</summary>
+    <implementation>AppHost project registers Ollama, RagFlow, Loki, Grafana, Temporal, Cassandra, NATS, Kafka as containers. Application projects (OpenClaw.Web, Admin.Api, Admin.Web, Gateway.Api, Demo.Pipeline) are registered with environment bindings.</implementation>
+    <components>AppHost</components>
+    <tags>aspire orchestration containers local-dev</tags>
+  </document>
+
+  <document id="ack-nack" title="Ack/Nack Notification Loopback" pattern="Reliability">
+    <summary>Every integration implements atomic notification semantics: all-or-nothing. On success, publish Ack. On failure, publish Nack with saga compensation.</summary>
+    <implementation>AtomicPipelineWorkflow in Workflow.Temporal. SagaCompensationActivities handle rollback on Nack. Downstream systems subscribe to Ack/Nack queues.</implementation>
+    <components>Workflow.Temporal, Activities</components>
+    <tags>ack nack atomic saga compensation rollback</tags>
+  </document>
+
+  <document id="zero-message-loss" title="Zero Message Loss" pattern="Reliability">
+    <summary>Every accepted message is either delivered or routed to DLQ. No silent drops. Survives restarts and outages.</summary>
+    <implementation>Kafka durable persistence + Temporal workflow durability + NATS JetStream file storage + DLQ fallback for all failed messages.</implementation>
+    <components>Ingestion, Processing.DeadLetter, Workflow.Temporal</components>
+    <tags>zero-loss durability reliability restart</tags>
+  </document>
+
+  <document id="multi-tenancy" title="Multi-Tenancy" pattern="Scalability">
+    <summary>The platform supports millions of tenants with lightweight topic/subject isolation per tenant.</summary>
+    <implementation>MultiTenancy project with ITenantResolver. MultiTenancy.Onboarding for automated tenant provisioning. NATS subjects and Kafka topics partitioned by tenant.</implementation>
+    <components>MultiTenancy, MultiTenancy.Onboarding</components>
+    <tags>multi-tenancy tenant isolation scalability</tags>
+  </document>
+
+  <document id="observability" title="Observability Stack" pattern="Observability">
+    <summary>Full observability with distributed tracing, metrics, and centralized logging.</summary>
+    <implementation>OpenTelemetry SDK for traces and metrics. Loki for log aggregation. Grafana dashboards. Prometheus metrics endpoint.</implementation>
+    <components>Observability, AppHost</components>
+    <tags>observability tracing metrics logging grafana</tags>
+  </document>
+
+  <document id="security" title="Security Architecture" pattern="Security">
+    <summary>JWT authentication, API key management, secrets management, and transport encryption.</summary>
+    <implementation>Security project with JWT validation. Security.Secrets for secret storage. Admin.Api uses API key authentication. TLS for all broker connections.</implementation>
+    <components>Security, Security.Secrets, Admin.Api</components>
+    <tags>security jwt api-key secrets tls</tags>
+  </document>
+
+  <document id="disaster-recovery" title="Disaster Recovery" pattern="Availability">
+    <summary>DR drills, region failover, and recovery testing capabilities.</summary>
+    <implementation>DisasterRecovery project with drill execution, history tracking, and region failover simulation. Admin.Web DR page for drill management.</implementation>
+    <components>DisasterRecovery, Admin.Web</components>
+    <tags>disaster-recovery dr drills failover</tags>
+  </document>
+
+  <document id="performance-profiling" title="Performance Profiling" pattern="Performance">
+    <summary>Runtime performance profiling with snapshot capture and GC diagnostics.</summary>
+    <implementation>Performance.Profiling project with snapshot capture, GC collection triggers, and profiling data export.</implementation>
+    <components>Performance.Profiling</components>
+    <tags>profiling performance gc snapshot diagnostics</tags>
+  </document>
+
+  <document id="rule-engine" title="Rule Engine" pattern="Processing">
+    <summary>Configurable rule evaluation for message routing and transformation decisions.</summary>
+    <implementation>RuleEngine project with rule definitions, evaluation engine, and integration with routing/transform pipelines.</implementation>
+    <components>RuleEngine</components>
+    <tags>rules engine evaluation configuration</tags>
+  </document>
+
+  <document id="event-sourcing" title="Event Sourcing" pattern="Persistence">
+    <summary>Store state changes as a sequence of events rather than current state.</summary>
+    <implementation>EventSourcing project with event store, snapshot support, and event replay for state reconstruction.</implementation>
+    <components>EventSourcing</components>
+    <tags>event-sourcing events state replay</tags>
+  </document>
+
+  <document id="rag-system" title="Self-Hosted RAG System" pattern="AI">
+    <summary>Self-hosted Retrieval-Augmented Generation using RagFlow + Ollama for platform documentation context.</summary>
+    <implementation>AI.RagFlow service interfaces with RagFlow API. AI.Ollama provides LLM capabilities. AI.RagKnowledge stores XML-based knowledge documents for indexing.</implementation>
+    <components>AI.RagFlow, AI.Ollama, AI.RagKnowledge</components>
+    <tags>rag ragflow ollama ai knowledge</tags>
+  </document>
+
+</ragKnowledgeBase>
