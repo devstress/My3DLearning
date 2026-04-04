@@ -4,6 +4,29 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 063 – EIP Pattern Documentation
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Comprehensive documentation mapping ALL 65 Enterprise Integration Patterns from the EIP book (Hohpe & Woolf) to platform implementations with usage descriptions.
+- **Architecture**:
+  - Complete rewrite of `docs/eip-mapping.md` from a partial 30-pattern table to a full 65-pattern reference document
+  - Quick Reference table mapping all 65 patterns to their platform components and project paths
+  - 8 detailed sections following the EIP book structure: Integration Styles (4), Messaging Systems (6), Messaging Channels (9), Message Construction (9), Message Routing (12), Message Transformation (6), Messaging Endpoints (11), System Management (8)
+  - Each pattern includes: book definition, implementation description, and usage notes
+  - Architecture notes section with broker selection guide, message flow diagram, and Ack/Nack loopback explanation
+- **Files modified**:
+  - `docs/eip-mapping.md` — Complete rewrite covering all 65 EIP patterns
+  - `rules/milestones.md` — Removed chunk 063 row, updated Next Chunk to 064
+  - `rules/completion-log.md` — Added chunk 063 entry
+- **Test counts**:
+  - UnitTests: 1,400 (unchanged — documentation only)
+  - Total tests: 1,537 across 6 test projects (unchanged)
+- **Notes**:
+  - 48 src projects (unchanged)
+  - All 65 EIP book patterns mapped with implementation details
+  - Document structure follows the book's table of contents for easy cross-reference
+
 ## Chunk 063-fix – Playwright E2E Test Fixes
 
 - **Date**: 2026-04-04

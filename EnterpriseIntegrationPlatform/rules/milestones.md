@@ -68,7 +68,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 063** (EIP Pattern Documentation) is next.
+**Chunk 064** (Platform Usage Guide) is next.
 
 ---
 
@@ -84,7 +84,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Tests Required |
 |-------|------|------|----------------|
-| 063 | EIP Pattern Documentation | docs/ folder covering ALL Enterprise Integration Patterns implemented — full mapping from book TOC to platform components with usage examples from actual implementation. Must cover all 65 patterns from the EIP book. | N/A (documentation only) |
 | 064 | Platform Usage Guide | End-to-end usage documentation: getting started, configuration, deployment (K8s/Docker), connector setup, throttle/rate-limit tuning, multi-tenancy, security, observability — focused on EnterpriseIntegrationPlatform features only | N/A (documentation only) |
 | 065 | API Reference | Complete API reference for Admin.Api, Gateway.Api, OpenClaw.Web endpoints with request/response examples, authentication, and rate limit/throttle admin operations | N/A (documentation only) |
 
