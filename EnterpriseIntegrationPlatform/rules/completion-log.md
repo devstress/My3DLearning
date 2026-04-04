@@ -4,6 +4,95 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 048 – Recipient List
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: Add `IRecipientList` and `RecipientListRouter` in Processing.Routing/ that resolves a list of target destinations for each message based on configurable rules or message metadata. Publishes the message to ALL resolved recipients (fan-out).
+
+### Architecture
+
+- **IRecipientList** — Interface for fan-out routing to multiple destinations.
+- **RecipientListRouter** — Production implementation that evaluates all matching rules and aggregates destinations. Supports rule-based and metadata-based resolution. Deduplicates destinations (case-insensitive). Publishes concurrently to all resolved destinations.
+- **RecipientListRule** — Record defining a rule that contributes destinations (FieldName, Operator, Value, Destinations list).
+- **RecipientListOptions** — Configuration: Rules list, optional MetadataRecipientsKey for dynamic metadata-based resolution.
+- **RecipientListResult** — Record with Destinations list, ResolvedCount, DuplicatesRemoved.
+
+### Files created
+
+- `src/Processing.Routing/IRecipientList.cs`
+- `src/Processing.Routing/RecipientListRouter.cs`
+- `src/Processing.Routing/RecipientListRule.cs`
+- `src/Processing.Routing/RecipientListOptions.cs`
+- `src/Processing.Routing/RecipientListResult.cs`
+- `tests/UnitTests/RecipientListRouterTests.cs`
+
+### Files modified
+
+- `src/Processing.Routing/RoutingServiceExtensions.cs` — Added `AddRecipientList` extension method
+- `rules/milestones.md` — Removed chunk 048 row, updated Next Chunk to 049, updated EIP checklist
+- `rules/completion-log.md` — Added chunk 048 entry
+
+### Test counts after chunk
+
+| Suite | Count |
+|-------|-------|
+| UnitTests | 1078 |
+| ContractTests | 58 |
+| WorkflowTests | 24 |
+| IntegrationTests | 17 |
+| PlaywrightTests | 13 |
+| LoadTests | 10 |
+| **Total** | **1200** |
+
+---
+
+## Chunk 047 – Dynamic Router
+
+- **Date**: 2026-04-03
+- **Status**: done
+- **Goal**: Add `IDynamicRouter` and `DynamicRouter` in Processing.Routing/ that maintains a routing table updated at runtime by downstream participants via control messages. Unlike ContentBasedRouter (static rules), Dynamic Router learns destinations. Participants register/unregister via `IRouterControlChannel`.
+
+### Architecture
+
+- **IDynamicRouter** — Interface for routing envelopes using a runtime routing table. Extracts a condition value from the envelope (configurable field) and looks it up in the routing table to determine the destination topic.
+- **IRouterControlChannel** — Interface for participant registration/unregistration. Downstream systems call `RegisterAsync` to advertise their handling capabilities and `UnregisterAsync` to remove them.
+- **DynamicRouter** — Production implementation implementing both `IDynamicRouter` and `IRouterControlChannel`. Uses `ConcurrentDictionary` for lock-free concurrent routing table access. Supports configurable condition fields (MessageType, Source, Priority, Metadata.{key}, Payload.{path}).
+- **DynamicRouteEntry** — Record describing a single routing table entry (ConditionKey, Destination, ParticipantId, RegisteredAtUtc).
+- **DynamicRoutingDecision** — Record describing the outcome of a dynamic routing evaluation (Destination, MatchedEntry, IsFallback, ConditionValue).
+- **DynamicRouterOptions** — Configuration: ConditionField (default MessageType), FallbackTopic, CaseInsensitive (default true).
+- **DI Registration** — Both IDynamicRouter and IRouterControlChannel resolve to the same DynamicRouter singleton, ensuring routing table is shared.
+
+### Files created
+
+- `src/Processing.Routing/IDynamicRouter.cs`
+- `src/Processing.Routing/IRouterControlChannel.cs`
+- `src/Processing.Routing/DynamicRouter.cs`
+- `src/Processing.Routing/DynamicRouteEntry.cs`
+- `src/Processing.Routing/DynamicRoutingDecision.cs`
+- `src/Processing.Routing/DynamicRouterOptions.cs`
+- `tests/UnitTests/DynamicRouterTests.cs`
+
+### Files modified
+
+- `src/Processing.Routing/RoutingServiceExtensions.cs` — Added `AddDynamicRouter` extension method
+- `rules/milestones.md` — Removed chunk 047 row, updated Next Chunk to 048, updated EIP checklist
+- `rules/completion-log.md` — Added chunk 047 entry
+
+### Test counts after chunk
+
+| Suite | Count |
+|-------|-------|
+| UnitTests | 1066 |
+| ContractTests | 58 |
+| WorkflowTests | 24 |
+| IntegrationTests | 17 |
+| PlaywrightTests | 13 |
+| LoadTests | 10 |
+| **Total** | **1188** |
+
+---
+
 ## Chunk 046 – Message Construction — Request-Reply
 
 - **Date**: 2026-04-03
