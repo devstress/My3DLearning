@@ -22,4 +22,11 @@ public sealed class BrokerOptions
     /// For Pulsar: <c>pulsar://localhost:6650</c>.
     /// </summary>
     public string ConnectionString { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Maximum time in seconds for a transactional client operation to complete.
+    /// If the transaction does not commit within this window, it is aborted and
+    /// published messages are compensated. Defaults to 30 seconds.
+    /// </summary>
+    public int TransactionTimeoutSeconds { get; set; } = 30;
 }

@@ -4,6 +4,109 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 056 – Polling Consumer + Event-Driven Consumer + Selective Consumer + Durable Subscriber
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Formalize four EIP consumer patterns in Ingestion/: (a) PollingConsumer (pull-based, Kafka model), (b) EventDrivenConsumer (push-based, NATS/Pulsar model), (c) SelectiveConsumer (predicate-filtered consumption), (d) DurableSubscriber (subscription state survives restarts).
+
+### Architecture
+
+- **IPollingConsumer / PollingConsumer** — Pull-based consumer with `PollAsync` returning batches. Uses timeout and maxMessages to control polling pace. Wraps `IMessageBrokerConsumer`.
+- **IEventDrivenConsumer / EventDrivenConsumer** — Push-based consumer with `StartAsync`. Delegates directly to broker's subscribe mechanism.
+- **ISelectiveConsumer / SelectiveConsumer** — Wraps `IMessageBrokerConsumer` with a `Func<IntegrationEnvelope<T>, bool>` predicate. Only matching messages reach the handler.
+- **IDurableSubscriber / DurableSubscriber** — Wraps `IMessageBrokerConsumer` with `IsConnected` state tracking and named subscription. Subscription state identified by `subscriptionName`.
+
+### Files created
+
+- `src/Ingestion/IPollingConsumer.cs`
+- `src/Ingestion/PollingConsumer.cs`
+- `src/Ingestion/IEventDrivenConsumer.cs`
+- `src/Ingestion/EventDrivenConsumer.cs`
+- `src/Ingestion/ISelectiveConsumer.cs`
+- `src/Ingestion/SelectiveConsumer.cs`
+- `src/Ingestion/IDurableSubscriber.cs`
+- `src/Ingestion/DurableSubscriber.cs`
+- `tests/UnitTests/ConsumerPatternTests.cs`
+
+### Files modified
+
+- `rules/milestones.md` — removed chunk 056, updated next chunk, updated EIP checklist
+- `rules/completion-log.md` — added chunk 056 entry
+
+### Test counts
+
+- **New tests**: 14 (polling consume, zero maxMessages, null consumer, null topic, event-driven delegate, null handler, selective matching, selective skip, null predicate, durable IsConnected, durable dispose, null subscription name, constructor validation)
+- **Total UnitTests**: 1229 (was 1215)
+
+## Chunk 055 – Transactional Client
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add `ITransactionalClient` in Ingestion/ that wraps publish+consume in a transactional scope. For Kafka (native transactions), uses init/begin/commit/abort semantics. For NATS/Pulsar, implements publish-then-confirm with compensation on failure.
+
+### Architecture
+
+- **ITransactionalClient** — Interface for the Transactional Client EIP pattern. Defines `ExecuteAsync` that runs operations within a transactional scope with atomic commit/rollback semantics. Exposes `SupportsNativeTransactions` property.
+- **ITransactionScope** — Interface for publishing messages within a transaction scope. Messages are tracked for compensation on rollback.
+- **BrokerTransactionalClient** — Broker-aware implementation. Tracks published messages via `TrackingTransactionScope`. On failure/timeout, publishes compensating tombstone messages to DLQ topics. Uses `Stopwatch` for duration tracking.
+- **TransactionResult** — Record with `Committed`, `MessageCount`, `Error`, `Exception`, and `Duration` properties. Factory methods `Success` and `Failure`.
+- **BrokerOptions.TransactionTimeoutSeconds** — New configuration property (default 30s).
+
+### Files created
+
+- `src/Ingestion/ITransactionalClient.cs`
+- `src/Ingestion/ITransactionScope.cs`
+- `src/Ingestion/TransactionResult.cs`
+- `src/Ingestion/BrokerTransactionalClient.cs`
+- `tests/UnitTests/TransactionalClientTests.cs`
+
+### Files modified
+
+- `src/Ingestion/BrokerOptions.cs` — added TransactionTimeoutSeconds property
+- `rules/milestones.md` — removed chunk 055, updated next chunk, updated EIP checklist
+- `rules/completion-log.md` — added chunk 055 entry
+
+### Test counts
+
+- **New tests**: 17 (commit success, multi-publish commit, rollback on operation failure, rollback on producer failure, compensation publishing, timeout, native transaction support for Kafka/NATS/Pulsar, empty transaction, duration tracking, constructor validation, null operations, TransactionResult factories)
+- **Total UnitTests**: 1215 (was 1198)
+
+## Chunk 054 – Messaging Gateway + Messaging Mapper
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: (a) Formalize `Gateway.Api` as the Messaging Gateway pattern — add `IMessagingGateway` interface and `HttpMessagingGateway` implementation encapsulating all broker access behind a clean HTTP API. (b) Add `IMessagingMapper<TDomain>` interface in Contracts/ for mapping domain objects to/from `IntegrationEnvelope`. Provide a `JsonMessagingMapper` implementation with metadata preservation and child envelope correlation.
+
+### Architecture
+
+- **IMessagingGateway** — Interface for the Messaging Gateway EIP pattern. Defines `SendAsync` for fire-and-forget and `SendAndReceiveAsync` for request-reply through the gateway.
+- **HttpMessagingGateway** — HTTP-based implementation using `IHttpClientFactory`. Handles correlation ID propagation, error responses (502/504), and structured logging.
+- **GatewayResponse / GatewayResponse<T>** — Gateway response records with correlation ID, success status, status code, error details, and optional typed payload.
+- **IMessagingMapper<TDomain>** — Interface for mapping domain objects to/from `IntegrationEnvelope<TDomain>`. Supports `ToEnvelope`, `FromEnvelope`, and `ToChildEnvelope` (preserving correlation chain).
+- **JsonMessagingMapper<TDomain>** — JSON-based implementation. Sets `content-type` and `clr-type` metadata, preserves custom metadata, supports child envelope creation with parent correlation/causation chain.
+
+### Files created
+
+- `src/Gateway.Api/IMessagingGateway.cs`
+- `src/Gateway.Api/HttpMessagingGateway.cs`
+- `src/Gateway.Api/GatewayResponse.cs`
+- `src/Contracts/IMessagingMapper.cs`
+- `src/Contracts/JsonMessagingMapper.cs`
+- `tests/UnitTests/JsonMessagingMapperTests.cs`
+
+### Files modified
+
+- `src/Contracts/Contracts.csproj` — added Microsoft.Extensions.Logging.Abstractions dependency
+- `src/Gateway.Api/GatewayServiceExtensions.cs` — registered IMessagingGateway in DI
+- `rules/milestones.md` — removed chunk 054, updated next chunk, updated EIP checklist
+- `rules/completion-log.md` — added chunk 054 entry
+
+### Test counts
+
+- **New tests**: 17 (domain→envelope mapping, envelope→domain extraction, null handling, metadata preservation, content-type metadata, CLR type metadata, child envelope correlation, child envelope metadata inheritance, round-trip fidelity, constructor validation)
+- **Total UnitTests**: 1198 (was 1181)
+
 ## Chunk 053 – Normalizer + Canonical Data Model
 
 - **Date**: 2026-04-04
