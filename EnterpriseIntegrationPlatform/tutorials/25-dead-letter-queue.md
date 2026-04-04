@@ -140,4 +140,4 @@ Dead-lettering is the **last resort** — it runs only after all retries are exh
 
 ---
 
-**Previous: [← Tutorial 24 — Retry Framework](24-retry-framework.md)** | **Next: [Tutorial 26 →](26-next-topic.md)**
+**Previous: [← Tutorial 24 — Retry Framework](24-retry-framework.md)** | **Next: [Tutorial 26 — Message Replay →](26-message-replay.md)**
