@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Playwright;
 using NUnit.Framework;
 
@@ -25,7 +24,7 @@ public class AdminDashboardTests
 {
     private IPlaywright? _playwright;
     private IBrowser? _browser;
-    private WebApplicationFactory<AdminWeb.AdminWebMarker>? _factory;
+    private PlaywrightWebAppFactory<AdminWeb.AdminWebMarker>? _factory;
     private HttpClient? _httpClient;
     private string? _baseUrl;
     private bool _browsersAvailable;
@@ -48,9 +47,9 @@ public class AdminDashboardTests
             return;
         }
 
-        _factory = new WebApplicationFactory<AdminWeb.AdminWebMarker>();
-        _httpClient = _factory.CreateClient();
-        _baseUrl = _httpClient.BaseAddress!.ToString().TrimEnd('/');
+        _factory = new PlaywrightWebAppFactory<AdminWeb.AdminWebMarker>();
+        _baseUrl = _factory.ServerAddress;
+        _httpClient = _factory.HttpClient;
     }
 
     [TearDown]
