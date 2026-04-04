@@ -4,6 +4,106 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 058 – System Management — Control Bus, Detour, Message History, Message Store, Smart Proxy, Test Message, Channel Purger
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: (a) Formalize Admin.Api as the Control Bus pattern with explicit control-message publish/subscribe. (b) Add IDetour in Processing.Routing/ for conditional routing through debug/test pipeline. (c) Add MessageHistory record type in Contracts/ tracking processing step chain. (d) Formalize Storage.Cassandra as the Message Store pattern. (e) Add ISmartProxy for request-reply correlation tracking. (f) Add ITestMessageGenerator for synthetic test messages. (g) Add IChannelPurger in Ingestion/ for draining topics.
+
+### Architecture
+
+- **IControlBus / ControlBusPublisher** — Publishes control commands to dedicated control topic with Command intent. Subscribes to control channel filtering by message type. Uses IMessageBrokerProducer + IMessageBrokerConsumer.
+- **IDetour / Detour** — Conditional routing with global toggle (volatile bool for thread-safe reads) and per-message metadata key activation. Routes to detour or output topic via IMessageBrokerProducer.
+- **MessageHistoryEntry / MessageHistoryHelper** — Immutable record with ActivityName, Timestamp, Status, Detail. Helper serializes/deserializes JSON array in envelope Metadata["message-history"]. Append-only chain.
+- **IMessageStore / MessageStore** — Wraps IMessageRepository with system-management query methods: GetTrailAsync (by correlation), GetByIdAsync, GetFaultCountAsync. Returns MessageStoreEntry records.
+- **ISmartProxy / SmartProxy** — ConcurrentDictionary tracking outstanding request-reply correlations by CorrelationId. TrackRequest stores ReplyTo address; CorrelateReply matches and removes entry.
+- **ITestMessageGenerator / TestMessageGenerator** — Publishes synthetic test messages with "eip-test-message" metadata marker. Supports default string payload or custom typed payload.
+- **IChannelPurger / ChannelPurger** — Drains messages from a topic by subscribing with a short-lived consumer. Configurable drain timeout (default 2s). Returns purge count.
+- **DetourOptions** — DetourTopic, OutputTopic, EnabledAtStartup, DetourMetadataKey.
+- **ControlBusOptions** — ControlTopic, ConsumerGroup, Source.
+
+### Files created
+
+- `src/SystemManagement/SystemManagement.csproj`
+- `src/SystemManagement/IControlBus.cs`
+- `src/SystemManagement/ControlBusPublisher.cs`
+- `src/SystemManagement/ControlBusOptions.cs`
+- `src/SystemManagement/ControlBusResult.cs`
+- `src/SystemManagement/IMessageStore.cs`
+- `src/SystemManagement/MessageStore.cs`
+- `src/SystemManagement/MessageStoreEntry.cs`
+- `src/SystemManagement/ISmartProxy.cs`
+- `src/SystemManagement/SmartProxy.cs`
+- `src/SystemManagement/SmartProxyCorrelation.cs`
+- `src/SystemManagement/ITestMessageGenerator.cs`
+- `src/SystemManagement/TestMessageGenerator.cs`
+- `src/SystemManagement/TestMessageResult.cs`
+- `src/SystemManagement/SystemManagementServiceExtensions.cs`
+- `src/Contracts/MessageHistoryEntry.cs`
+- `src/Contracts/MessageHistoryHelper.cs`
+- `src/Processing.Routing/IDetour.cs`
+- `src/Processing.Routing/Detour.cs`
+- `src/Processing.Routing/DetourOptions.cs`
+- `src/Processing.Routing/DetourResult.cs`
+- `src/Ingestion/IChannelPurger.cs`
+- `src/Ingestion/ChannelPurger.cs`
+- `src/Ingestion/ChannelPurgeResult.cs`
+- `tests/UnitTests/SystemManagementTests.cs`
+
+### Files modified
+
+- `src/Contracts/MessageHeaders.cs` — added MessageHistory constant
+- `src/Processing.Routing/RoutingServiceExtensions.cs` — added AddDetour extension
+- `EnterpriseIntegrationPlatform.sln` — added SystemManagement project
+- `tests/UnitTests/UnitTests.csproj` — added SystemManagement reference
+- `rules/milestones.md` — updated next chunk, removed 058 row, marked Phase 9 complete, updated EIP checklist
+- `rules/completion-log.md` — added chunk 058 entry
+
+### Test counts
+
+- UnitTests: 1,288 (was 1,254, added 34 — 6 detour + 6 history + 4 test-message + 3 channel-purger + 7 smart-proxy + 4 control-bus + 4 message-store)
+
+## Chunk 057 – Message Dispatcher + Service Activator
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: (a) Add `IMessageDispatcher` in Processing/ that receives messages from a single channel and distributes to specific handlers based on message type (like a multiplexer). (b) Add `IServiceActivator` that invokes a service operation (sync or async) from a message and optionally publishes the reply. Key pattern for request-reply orchestration.
+
+### Architecture
+
+- **IMessageDispatcher / MessageDispatcher** — Thread-safe message dispatcher using `ConcurrentDictionary<string, Delegate>` for handler registration. Dispatches by `MessageType` (case-insensitive). Supports dynamic handler registration/unregistration, configurable unknown-type behavior (return failure or throw), and graceful handler-exception capture.
+- **IServiceActivator / ServiceActivator** — Connects messaging infrastructure to application services. Two overloads: (1) request-response with optional reply publishing when `ReplyTo` is set, and (2) fire-and-forget. Reply envelopes preserve `CorrelationId` and set `CausationId` to the request's `MessageId`.
+- **DispatchResult** — Immutable record with `MessageType`, `HandlerFound`, `Succeeded`, `FailureReason`.
+- **ServiceActivatorResult** — Immutable record with `Succeeded`, `ReplySent`, `ReplyTopic`, `FailureReason`.
+- **MessageDispatcherOptions** — `ThrowOnUnknownType` toggle (default false).
+- **ServiceActivatorOptions** — `ReplySource` and `ReplyMessageType` configuration.
+- **DispatcherServiceExtensions** — DI registration for both `IMessageDispatcher` and `IServiceActivator`.
+
+### Files created
+
+- `src/Processing.Dispatcher/Processing.Dispatcher.csproj`
+- `src/Processing.Dispatcher/IMessageDispatcher.cs`
+- `src/Processing.Dispatcher/MessageDispatcher.cs`
+- `src/Processing.Dispatcher/MessageDispatcherOptions.cs`
+- `src/Processing.Dispatcher/DispatchResult.cs`
+- `src/Processing.Dispatcher/IServiceActivator.cs`
+- `src/Processing.Dispatcher/ServiceActivator.cs`
+- `src/Processing.Dispatcher/ServiceActivatorOptions.cs`
+- `src/Processing.Dispatcher/ServiceActivatorResult.cs`
+- `src/Processing.Dispatcher/DispatcherServiceExtensions.cs`
+- `tests/UnitTests/MessageDispatcherTests.cs`
+
+### Files modified
+
+- `EnterpriseIntegrationPlatform.sln` — added Processing.Dispatcher project
+- `tests/UnitTests/UnitTests.csproj` — added Processing.Dispatcher reference
+- `rules/milestones.md` — updated next chunk, removed 057 row, updated EIP checklist
+- `rules/completion-log.md` — added chunk 057 entry
+
+### Test counts
+
+- UnitTests: 1,254 (was 1,229, added 25 — 14 dispatcher + 11 activator)
+
 ## Chunk 056 – Polling Consumer + Event-Driven Consumer + Selective Consumer + Durable Subscriber
 
 - **Date**: 2026-04-04

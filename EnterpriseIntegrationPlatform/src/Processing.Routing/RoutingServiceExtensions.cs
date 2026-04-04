@@ -109,4 +109,27 @@ public static class RoutingServiceExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Registers the <see cref="IDetour"/> implementation, binding
+    /// <see cref="DetourOptions"/> from the <c>Detour</c> configuration section.
+    /// </summary>
+    /// <remarks>
+    /// An <see cref="Ingestion.IMessageBrokerProducer"/> must be registered separately
+    /// (e.g. via <c>AddNatsJetStreamBroker</c>) before calling this method.
+    /// </remarks>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">Application configuration.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddDetour(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<DetourOptions>(
+            configuration.GetSection(DetourOptions.SectionName));
+
+        services.AddSingleton<IDetour, Detour>();
+
+        return services;
+    }
 }

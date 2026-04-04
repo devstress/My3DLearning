@@ -63,10 +63,11 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 ✅ Phase 6 (Advanced Patterns & Scale, chunks 035-040) complete — see completion-log.md
 ✅ Phase 7 (Missing EIP Patterns – Messaging Channels & Construction, chunks 044-051) complete — see completion-log.md
 ✅ Phase 8 (Missing EIP Patterns – Routing & Transformation, chunks 052-053) complete — see completion-log.md
+✅ Phase 9 (Missing EIP Patterns – Endpoints & System Management, chunks 054-058) complete — see completion-log.md
 
 ## Next Chunk
 
-**Chunk 057** (Message Dispatcher + Service Activator) is next.
+**Chunk 059** (Connectors unification) is next.
 
 ---
 
@@ -84,10 +85,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ### Phase 9 – Missing EIP Patterns (Endpoints & System Management)
 
-| Chunk | Name | Goal | Tests Required |
-|-------|------|------|----------------|
-| 057 | Message Dispatcher + Service Activator | (a) Add `IMessageDispatcher` in Processing/ that receives messages from a single channel and distributes to specific handlers based on message type (like a multiplexer). (b) Add `IServiceActivator` that invokes a service operation (sync or async) from a message and optionally publishes the reply. Key pattern for request-reply orchestration. | UnitTests: ≥10 (dispatch by type, unknown type handling, activator invoke+reply, activator invoke-only) |
-| 058 | System Management — Control Bus, Detour, Message History, Message Store, Smart Proxy, Test Message, Channel Purger | (a) Formalize `Admin.Api` as the **Control Bus** pattern — admin endpoints already exist, add explicit control-message publish/subscribe for runtime config changes. (b) Add `IDetour` in Processing.Routing/ — conditional routing through validation/debug/test pipeline before normal processing. (c) Add `MessageHistory` record type in Contracts/ tracking processing step chain (activity name + timestamp + status) — attach to envelope metadata. (d) Formalize `Storage.Cassandra` message tables as the **Message Store** pattern. (e) Add `ISmartProxy` that tracks outstanding request-reply and correlates Return Address responses. (f) Add `ITestMessageGenerator` that publishes synthetic test messages through the pipeline for health verification. (g) Add `IChannelPurger` in Ingestion/ that drains all messages from a specified topic/subject. | UnitTests: ≥20 (detour routing, message history chain, test message generation, channel purge, smart proxy correlation) |
+✅ Phase 9 complete — see completion-log.md
 
 ### Phase 10 – Connectors & Test Coverage Hardening
 
@@ -183,21 +181,21 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 - ✅ Polling Consumer (Ingestion — IPollingConsumer + PollingConsumer)
 - ✅ Event-Driven Consumer (Ingestion — IEventDrivenConsumer + EventDrivenConsumer)
 - ✅ Competing Consumers (Processing.CompetingConsumers)
-- 🔲 Message Dispatcher (chunk 057)
+- ✅ Message Dispatcher (Processing.Dispatcher.MessageDispatcher)
 - ✅ Selective Consumer (Ingestion — ISelectiveConsumer + SelectiveConsumer)
 - ✅ Durable Subscriber (Ingestion — IDurableSubscriber + DurableSubscriber)
 - ✅ Idempotent Receiver (Storage.Cassandra dedup)
-- 🔲 Service Activator (chunk 057)
+- ✅ Service Activator (Processing.Dispatcher.ServiceActivator)
 
 **System Management:**
-- 🔲 Control Bus (chunk 058)
-- 🔲 Detour (chunk 058)
+- ✅ Control Bus (SystemManagement.ControlBusPublisher)
+- ✅ Detour (Processing.Routing.Detour)
 - ✅ Wire Tap (OpenTelemetry / Observability)
-- 🔲 Message History (chunk 058)
-- 🔲 Message Store (chunk 058 — formalize)
-- 🔲 Smart Proxy (chunk 058)
-- 🔲 Test Message (chunk 058)
-- 🔲 Channel Purger (chunk 058)
+- ✅ Message History (Contracts.MessageHistoryHelper)
+- ✅ Message Store (SystemManagement.MessageStore)
+- ✅ Smart Proxy (SystemManagement.SmartProxy)
+- ✅ Test Message (SystemManagement.TestMessageGenerator)
+- ✅ Channel Purger (Ingestion.ChannelPurger)
 
 ---
 
