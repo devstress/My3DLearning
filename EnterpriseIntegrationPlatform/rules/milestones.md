@@ -64,34 +64,17 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 ✅ Phase 7 (Missing EIP Patterns – Messaging Channels & Construction, chunks 044-051) complete — see completion-log.md
 ✅ Phase 8 (Missing EIP Patterns – Routing & Transformation, chunks 052-053) complete — see completion-log.md
 ✅ Phase 9 (Missing EIP Patterns – Endpoints & System Management, chunks 054-058) complete — see completion-log.md
+✅ Phase 10 (Connectors & Test Coverage Hardening, chunks 059-060) complete — see completion-log.md
 
 ## Next Chunk
 
-**Chunk 060** (Test coverage hardening) is next.
+**Chunk 061** (Admin.Web Vue 3) is next.
 
 ---
 
-### Phase 6 – Advanced Patterns & Scale
-
-✅ Phase 6 complete — see completion-log.md
-
-### Phase 7 – Missing EIP Patterns (Messaging Channels & Construction)
-
-✅ Phase 7 complete — see completion-log.md
-
-### Phase 8 – Missing EIP Patterns (Routing & Transformation)
-
-✅ Phase 8 complete — see completion-log.md
-
-### Phase 9 – Missing EIP Patterns (Endpoints & System Management)
-
-✅ Phase 9 complete — see completion-log.md
-
 ### Phase 10 – Connectors & Test Coverage Hardening
 
-| Chunk | Name | Goal | Tests Required |
-|-------|------|------|----------------|
-| 060 | Test coverage hardening | Close all test coverage gaps: (a) AI.Ollama — ≥8 unit tests (client wrapper, embedding generation, health check). (b) Admin.Api — ≥10 endpoint tests (DLQ list/replay/discard, throttle CRUD, rate-limit status, DR endpoints). (c) Configuration — ≥8 tests (feature flag evaluation, environment override, change notification). (d) InMemoryRuleStore — expand to ≥5 more edge-case tests. (e) Connectors unified project — ≥10 tests (registry CRUD, factory, descriptor). (f) AI.RagFlow — expand to ≥5 more tests. | UnitTests: ≥46 new tests total |
+✅ Phase 10 complete — see completion-log.md
 
 ### Phase 11 – Admin Dashboard & RAG
 

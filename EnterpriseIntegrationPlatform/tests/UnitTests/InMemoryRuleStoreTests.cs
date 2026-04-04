@@ -156,4 +156,88 @@ public class InMemoryRuleStoreTests
         Assert.ThrowsAsync<ArgumentNullException>(
             async () => await _store.RemoveAsync(null!));
     }
+
+    [Test]
+    public async Task GetAllAsync_EmptyStore_ReturnsEmptyList()
+    {
+        var result = await _store.GetAllAsync();
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result, Is.Empty);
+    }
+
+    [Test]
+    public void GetAllAsync_CancellationRequested_ThrowsOperationCanceledException()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await _store.GetAllAsync(cts.Token));
+    }
+
+    [Test]
+    public void GetByNameAsync_CancellationRequested_ThrowsOperationCanceledException()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await _store.GetByNameAsync("AnyRule", cts.Token));
+    }
+
+    [Test]
+    public void AddOrUpdateAsync_CancellationRequested_ThrowsOperationCanceledException()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await _store.AddOrUpdateAsync(CreateRule("R1"), cts.Token));
+    }
+
+    [Test]
+    public void RemoveAsync_CancellationRequested_ThrowsOperationCanceledException()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await _store.RemoveAsync("AnyRule", cts.Token));
+    }
+
+    [Test]
+    public void CountAsync_CancellationRequested_ThrowsOperationCanceledException()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await _store.CountAsync(cts.Token));
+    }
+
+    [Test]
+    public async Task AddOrUpdateAsync_ConcurrentAdds_AllSucceed()
+    {
+        var tasks = Enumerable.Range(1, 100)
+            .Select(i => _store.AddOrUpdateAsync(CreateRule($"Rule{i}", i)))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+
+        var count = await _store.CountAsync();
+        Assert.That(count, Is.EqualTo(100));
+
+        var all = await _store.GetAllAsync();
+        Assert.That(all, Has.Count.EqualTo(100));
+        Assert.That(all[0].Priority, Is.EqualTo(1));
+        Assert.That(all[99].Priority, Is.EqualTo(100));
+    }
+
+    [Test]
+    public void RemoveAsync_EmptyName_ThrowsArgumentException()
+    {
+        Assert.ThrowsAsync<ArgumentException>(
+            async () => await _store.RemoveAsync(""));
+    }
 }
