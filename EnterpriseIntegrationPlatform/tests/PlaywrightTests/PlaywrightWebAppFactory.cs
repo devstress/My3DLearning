@@ -39,20 +39,13 @@ internal sealed class PlaywrightWebAppFactory<TEntryPoint> : IDisposable
         var assembly = typeof(TEntryPoint).Assembly;
         var dllPath = assembly.Location;
 
-        // Resolve the source project directory from the DLL path.
-        // The DLL is at <repo>/tests/PlaywrightTests/bin/<config>/<tfm>/<Project>.dll
-        // (copied via ProjectReference).  The source project is at <repo>/src/<Project>/.
-        // We navigate up to the repo root (5 levels) then into src/<Project>.
-        var dllDir = Path.GetDirectoryName(dllPath)!;
-        var repoRoot = Path.GetFullPath(Path.Combine(dllDir, "..", "..", "..", "..", ".."));
+        // Resolve the source project directory by searching upward from the DLL
+        // for the repository root (identified by a .sln file), then descending
+        // into src/<ProjectName>/.  This is more robust than counting directory
+        // levels, which would break if the build output structure ever changes.
         var projectName = Path.GetFileNameWithoutExtension(dllPath);
-        var contentRoot = Path.Combine(repoRoot, "src", projectName);
-
-        if (!Directory.Exists(contentRoot))
-        {
-            // Fallback: use the DLL directory itself.
-            contentRoot = dllDir;
-        }
+        var contentRoot = FindProjectRoot(dllPath, projectName)
+            ?? Path.GetDirectoryName(dllPath)!;
 
         _process = new Process
         {
@@ -108,11 +101,38 @@ internal sealed class PlaywrightWebAppFactory<TEntryPoint> : IDisposable
         return port;
     }
 
-    private static void WaitForServer(int port, TimeSpan timeout)
+    /// <summary>
+    /// Searches upward from <paramref name="startPath"/> for a directory
+    /// containing a <c>.sln</c> file (the repo root), then returns
+    /// <c>{repoRoot}/src/{projectName}</c> if it exists.
+    /// </summary>
+    private static string? FindProjectRoot(string startPath, string projectName)
+    {
+        var dir = Path.GetDirectoryName(startPath);
+        while (dir is not null)
+        {
+            if (Directory.GetFiles(dir, "*.sln").Length > 0)
+            {
+                var candidate = Path.Combine(dir, "src", projectName);
+                return Directory.Exists(candidate) ? candidate : null;
+            }
+            dir = Path.GetDirectoryName(dir);
+        }
+        return null;
+    }
+
+    private void WaitForServer(int port, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
+            if (_process.HasExited)
+            {
+                throw new InvalidOperationException(
+                    $"Server process exited with code {_process.ExitCode} " +
+                    "before accepting connections.");
+            }
+
             try
             {
                 using var tcp = new TcpClient();
