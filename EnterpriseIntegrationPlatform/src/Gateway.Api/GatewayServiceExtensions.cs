@@ -33,6 +33,9 @@ public static class GatewayServiceExtensions
             .GetSection(GatewayOptions.SectionName)
             .Get<GatewayOptions>() ?? new GatewayOptions();
 
+        // ── Messaging Gateway (EIP pattern) ──────────────────────────────────
+        services.AddSingleton<IMessagingGateway, HttpMessagingGateway>();
+
         // ── Routing ───────────────────────────────────────────────────────────
         services.AddSingleton<IRouteResolver, RouteResolver>();
 

@@ -4,6 +4,41 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 054 – Messaging Gateway + Messaging Mapper
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: (a) Formalize `Gateway.Api` as the Messaging Gateway pattern — add `IMessagingGateway` interface and `HttpMessagingGateway` implementation encapsulating all broker access behind a clean HTTP API. (b) Add `IMessagingMapper<TDomain>` interface in Contracts/ for mapping domain objects to/from `IntegrationEnvelope`. Provide a `JsonMessagingMapper` implementation with metadata preservation and child envelope correlation.
+
+### Architecture
+
+- **IMessagingGateway** — Interface for the Messaging Gateway EIP pattern. Defines `SendAsync` for fire-and-forget and `SendAndReceiveAsync` for request-reply through the gateway.
+- **HttpMessagingGateway** — HTTP-based implementation using `IHttpClientFactory`. Handles correlation ID propagation, error responses (502/504), and structured logging.
+- **GatewayResponse / GatewayResponse<T>** — Gateway response records with correlation ID, success status, status code, error details, and optional typed payload.
+- **IMessagingMapper<TDomain>** — Interface for mapping domain objects to/from `IntegrationEnvelope<TDomain>`. Supports `ToEnvelope`, `FromEnvelope`, and `ToChildEnvelope` (preserving correlation chain).
+- **JsonMessagingMapper<TDomain>** — JSON-based implementation. Sets `content-type` and `clr-type` metadata, preserves custom metadata, supports child envelope creation with parent correlation/causation chain.
+
+### Files created
+
+- `src/Gateway.Api/IMessagingGateway.cs`
+- `src/Gateway.Api/HttpMessagingGateway.cs`
+- `src/Gateway.Api/GatewayResponse.cs`
+- `src/Contracts/IMessagingMapper.cs`
+- `src/Contracts/JsonMessagingMapper.cs`
+- `tests/UnitTests/JsonMessagingMapperTests.cs`
+
+### Files modified
+
+- `src/Contracts/Contracts.csproj` — added Microsoft.Extensions.Logging.Abstractions dependency
+- `src/Gateway.Api/GatewayServiceExtensions.cs` — registered IMessagingGateway in DI
+- `rules/milestones.md` — removed chunk 054, updated next chunk, updated EIP checklist
+- `rules/completion-log.md` — added chunk 054 entry
+
+### Test counts
+
+- **New tests**: 17 (domain→envelope mapping, envelope→domain extraction, null handling, metadata preservation, content-type metadata, CLR type metadata, child envelope correlation, child envelope metadata inheritance, round-trip fidelity, constructor validation)
+- **Total UnitTests**: 1198 (was 1181)
+
 ## Chunk 053 – Normalizer + Canonical Data Model
 
 - **Date**: 2026-04-04

@@ -66,7 +66,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 054** (Messaging Gateway + Messaging Mapper) is next.
+**Chunk 055** (Transactional Client) is next.
 
 ---
 
@@ -86,7 +86,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Tests Required |
 |-------|------|------|----------------|
-| 054 | Messaging Gateway + Messaging Mapper | (a) Formalize `Gateway.Api` as the Messaging Gateway pattern — verify it encapsulates all broker access behind a clean HTTP API. (b) Add `IMessagingMapper<TDomain, TMessage>` interface in Contracts/ for mapping domain objects to/from `IntegrationEnvelope`. Provide a `JsonMessagingMapper` implementation. | UnitTests: ≥8 (domain→envelope mapping, envelope→domain mapping, null handling, metadata preservation) |
 | 055 | Transactional Client | Add `ITransactionalClient` in Ingestion/ that wraps publish+consume in a transactional scope — for brokers that support transactions (Kafka). For NATS/Pulsar, implement via Temporal workflow (publish-then-confirm pattern). Ensures produce-and-consume atomicity. | UnitTests: ≥8 (commit success, rollback on failure, timeout, non-transactional broker fallback) |
 | 056 | Polling Consumer + Event-Driven Consumer + Selective Consumer + Durable Subscriber | (a) Formalize `PollingConsumer` and `EventDrivenConsumer` as named wrappers in Ingestion/ — Kafka consumer = Polling, NATS push = Event-Driven. (b) Add `ISelectiveConsumer` that wraps `IMessageBrokerConsumer` with a predicate filter (consume only messages matching criteria). (c) Add `DurableSubscriber` wrapper ensuring subscription state survives restarts (already inherent in Kafka/NATS/Pulsar — formalize with interface + tests). | UnitTests: ≥12 (polling consume, event-driven consume, selective filter, durable reconnect) |
 | 057 | Message Dispatcher + Service Activator | (a) Add `IMessageDispatcher` in Processing/ that receives messages from a single channel and distributes to specific handlers based on message type (like a multiplexer). (b) Add `IServiceActivator` that invokes a service operation (sync or async) from a message and optionally publishes the reply. Key pattern for request-reply orchestration. | UnitTests: ≥10 (dispatch by type, unknown type handling, activator invoke+reply, activator invoke-only) |
@@ -180,8 +179,8 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 - ✅ Canonical Data Model (IntegrationEnvelope<T> — documented)
 
 **Messaging Endpoints:**
-- 🔲 Messaging Gateway (chunk 054)
-- 🔲 Messaging Mapper (chunk 054)
+- ✅ Messaging Gateway (Gateway.Api — IMessagingGateway + HttpMessagingGateway)
+- ✅ Messaging Mapper (Contracts — IMessagingMapper + JsonMessagingMapper)
 - 🔲 Transactional Client (chunk 055)
 - 🔲 Polling Consumer (chunk 056)
 - 🔲 Event-Driven Consumer (chunk 056)
