@@ -4,6 +4,35 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 064 – Platform Usage Guide
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: End-to-end usage documentation covering getting started, configuration, deployment, connector setup, throttle/rate-limit tuning, multi-tenancy, security, observability, disaster recovery, AI-driven integration generation, and troubleshooting.
+- **Architecture**:
+  - New `docs/platform-usage-guide.md` with 14 sections covering all operational aspects
+  - Complements existing docs (developer-setup.md, architecture-overview.md, operations-runbook.md) by focusing on practical workflows, configuration, and day-to-day tasks
+  - Includes configuration examples for all 4 connector types (HTTP, SFTP, Email, File)
+  - Throttle tuning guidelines with scenario-based recommendations
+  - Multi-tenancy section covering isolation levels, onboarding, and configuration
+  - Security section covering authentication methods, secrets management, and best practices
+  - Observability section with key metrics, alert thresholds, and diagnostic endpoints
+  - DR drills and backup strategy documentation
+  - RAG API developer workflow documentation
+  - Troubleshooting guide with common issues and log analysis examples
+- **Files created**:
+  - `docs/platform-usage-guide.md` — Complete platform usage guide (14 sections)
+- **Files modified**:
+  - `rules/milestones.md` — Removed chunk 064 row, updated Next Chunk to 065
+  - `rules/completion-log.md` — Added chunk 064 entry
+- **Test counts**:
+  - UnitTests: 1,400 (unchanged — documentation only)
+  - Total tests: 1,537 across 6 test projects (unchanged)
+- **Notes**:
+  - 48 src projects (unchanged)
+  - Guide designed to complement existing architecture and setup docs
+  - Focuses on operator and developer workflows rather than implementation details
+
 ## Chunk 063 – EIP Pattern Documentation
 
 - **Date**: 2026-04-04
