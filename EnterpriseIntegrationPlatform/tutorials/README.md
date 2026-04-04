@@ -1,10 +1,37 @@
 # Enterprise Integration Platform — Complete Tutorial Course
 
-> **From Beginner to Expert: Learn Enterprise Integration Patterns with a Modern .NET 10 Platform**
+> **From Beginner to Expert: Master Enterprise Integration Patterns, Scalability, and Atomic Processing with a Modern .NET 10 Platform**
 
 This tutorial series takes you from zero to expert with the Enterprise Integration Platform (EIP). Every tutorial builds on the previous one, introducing one concept at a time with clear explanations, architecture diagrams, and real code examples from the platform.
 
-The course is based on the patterns defined in [*Enterprise Integration Patterns*](https://www.enterpriseintegrationpatterns.com/) by Gregor Hohpe and Bobby Woolf — the definitive reference for messaging-based integration.
+The course is grounded in three pillars:
+
+### 🏛️ Three Pillars of This Course
+
+**1. Enterprise Integration Patterns (EIP)** — Every tutorial maps directly to patterns from [*Enterprise Integration Patterns*](https://www.enterpriseintegrationpatterns.com/) by Gregor Hohpe and Bobby Woolf. You'll learn the 65 canonical patterns and how each is implemented in a modern .NET 10 platform. The EIP book is the design blueprint; this platform is the implementation.
+
+**2. Scalability** — Enterprise integration must handle millions of messages without bottlenecks. Every tutorial explains the scalability dimension: how competing consumers distribute load, how broker partitioning avoids head-of-line blocking, how NATS/Pulsar ensure Recipient A never blocks Recipient B, and how the platform scales horizontally from a single node to thousands.
+
+**3. Atomicity** — Zero message loss, guaranteed. Every message is either delivered or routed to a Dead Letter Queue — no silent drops. The Ack/Nack notification loopback ensures senders always know the outcome. Temporal workflows provide durable execution with saga compensation for distributed transactions. This all-or-nothing guarantee is the foundation of enterprise-grade reliability.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Three Pillars                                 │
+│                                                                 │
+│   EIP Patterns          Scalability          Atomicity          │
+│   ┌───────────┐        ┌───────────┐        ┌───────────┐      │
+│   │ 65 book   │        │ Competing │        │ Ack/Nack  │      │
+│   │ patterns  │        │ consumers │        │ loopback  │      │
+│   │ Content   │        │ Broker    │        │ Saga      │      │
+│   │ Router    │        │ partition │        │ compensate│      │
+│   │ Splitter  │        │ Horizontal│        │ Zero loss │      │
+│   │ Aggregator│        │ scale     │        │ Durable   │      │
+│   │ ...65 more│        │ No HOL    │        │ execution │      │
+│   └───────────┘        └───────────┘        └───────────┘      │
+│                                                                 │
+│   "What to build"      "How to scale"      "Never lose data"   │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
