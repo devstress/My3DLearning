@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.Json;
-using AdminWeb;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -185,9 +184,12 @@ proxy.MapGet("/events/business/{businessKey}", async (
     return Results.Content(content, "application/json", statusCode: (int)response.StatusCode);
 }).WithName("ProxyGetEventsByBusinessKey");
 
-// ── Serve the Vue 3 SPA ──────────────────────────────────────────────────────
+// ── Serve the Vue 3 SPA from Vite build output (wwwroot/) ─────────────────────
+// In production, the Vite-built assets are served from wwwroot/.
+// The SPA fallback ensures client-side routing works for all non-API paths.
 
-app.MapGet("/", () => Results.Content(AdminDashboardHtml.Page, "text/html"))
-   .ExcludeFromDescription();
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.MapFallbackToFile("index.html");
 
 app.Run();
