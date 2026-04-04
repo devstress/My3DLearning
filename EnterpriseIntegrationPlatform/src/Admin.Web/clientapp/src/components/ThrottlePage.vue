@@ -130,7 +130,7 @@ export default {
       this.throttleError = null
       this.throttleSuccess = null
       try {
-        await fetch(`/api/admin/throttle/policies/${encodeURIComponent(policyId)}`, { method: 'DELETE' })
+        await apiFetch(`/api/admin/throttle/policies/${encodeURIComponent(policyId)}`, { method: 'DELETE' })
         this.throttleSuccess = `Policy '${policyId}' deleted.`
         await this.loadThrottlePolicies()
       } catch (e) {
