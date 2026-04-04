@@ -22,7 +22,7 @@ public sealed class DemoDataSeeder : BackgroundService
     /// Used by the <c>/api/health/seeder</c> endpoint to allow Playwright
     /// tests to poll for readiness before querying seeded data.
     /// </summary>
-    public static bool IsSeeded { get; private set; }
+    public static volatile bool IsSeeded;
 
     public DemoDataSeeder(
         IObservabilityEventLog observabilityLog,

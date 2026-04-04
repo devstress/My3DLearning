@@ -257,22 +257,12 @@ public class OpenClawUiTests
     {
         if (SkipIfNoBrowsers()) return;
 
-        // Poll until the demo seeder has completed rather than using a fixed delay.
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        HttpResponseMessage seederResponse;
-        string seederContent;
-        do
-        {
-            seederResponse = await _httpClient!.GetAsync("/api/health/seeder");
-            seederContent = await seederResponse.Content.ReadAsStringAsync();
-            if (seederContent.Contains("\"seeded\":true", StringComparison.OrdinalIgnoreCase))
-                break;
-            await Task.Delay(100);
-        } while (DateTime.UtcNow < deadline);
+        // Wait for demo seeder to complete before querying seeded data
+        await WaitForSeederAsync();
 
         HttpResponseMessage response;
         string content;
-        deadline = DateTime.UtcNow.AddSeconds(10);
+        var deadline = DateTime.UtcNow.AddSeconds(10);
         do
         {
             response = await _httpClient!.GetAsync("/api/inspect/business/order-02");
@@ -331,9 +321,13 @@ public class OpenClawUiTests
                 if (content.Contains("\"seeded\":true", StringComparison.OrdinalIgnoreCase))
                     return;
             }
-            catch
+            catch (HttpRequestException)
             {
-                // Server may not be ready yet
+                // Server may not be ready yet — retry
+            }
+            catch (TaskCanceledException)
+            {
+                // Request timed out — retry
             }
             await Task.Delay(100);
         }
