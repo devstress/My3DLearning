@@ -165,7 +165,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 - ✅ Recipient List (Processing.Routing.RecipientListRouter)
 - ✅ Splitter (Processing.Splitter)
 - ✅ Aggregator (Processing.Aggregator)
-- 🔲 Resequencer (chunk 051)
+- ✅ Resequencer (Processing.Resequencer.MessageResequencer)
 - ✅ Composed Message Processor (Splitter + Transform + Aggregator pipeline)
 - ✅ Scatter-Gather (Processing.ScatterGather)
 - ✅ Routing Slip (Processing.Routing.RoutingSlipRouter)
