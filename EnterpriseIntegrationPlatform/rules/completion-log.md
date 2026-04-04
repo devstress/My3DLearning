@@ -4,6 +4,119 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 051 – Resequencer
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add `IResequencer` and `MessageResequencer` in Processing.Resequencer/ that buffers out-of-order messages by `CorrelationId` + `SequenceNumber`, and releases them in order once the sequence is complete or a configurable timeout expires.
+
+### Architecture
+
+- **IResequencer** — Interface for buffering and reordering messages by sequence number.
+- **MessageResequencer** — Thread-safe implementation using ConcurrentDictionary. Buffers messages keyed by CorrelationId, indexed by SequenceNumber. Releases in order when sequence is complete (all TotalCount messages arrived) or on timeout. Detects and ignores duplicates.
+- **ResequencerOptions** — Configuration: ReleaseTimeout (default 30s), MaxConcurrentSequences (default 10,000).
+
+### Files created
+
+- `src/Processing.Resequencer/Processing.Resequencer.csproj`
+- `src/Processing.Resequencer/IResequencer.cs`
+- `src/Processing.Resequencer/MessageResequencer.cs`
+- `src/Processing.Resequencer/ResequencerOptions.cs`
+- `tests/UnitTests/ResequencerTests.cs`
+
+### Tests
+
+- UnitTests: 12 new (in-order release, out-of-order reorder, single message, duplicate ignore, no sequence throws, zero total throws, null throws, timeout release incomplete, timeout unknown correlation, timeout clears buffer, active sequence count, multiple independent sequences)
+
+---
+
+## Chunk 050 – Routing Slip
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add `RoutingSlip` record to Contracts/ containing an ordered list of processing step descriptors. Add `IRoutingSlipRouter` in Processing.Routing/ that reads the slip from the envelope metadata, executes the current step, and forwards to the next step. Each step consumes its entry from the slip.
+
+### Architecture
+
+- **RoutingSlip** — Immutable record with ordered Steps list. Supports `CurrentStep`, `Advance()`, and `IsComplete`. Stored as serialised JSON in envelope Metadata under key `RoutingSlip`.
+- **RoutingSlipStep** — Record with StepName, optional DestinationTopic, optional Parameters dictionary.
+- **IRoutingSlipRouter** — Interface for executing the current step and advancing the slip.
+- **RoutingSlipRouter** — Production implementation. Deserializes slip from metadata, resolves handler by name from DI, executes handler, advances slip, optionally forwards to destination topic.
+- **IRoutingSlipStepHandler** — Interface for step-specific logic. Implementations register in DI.
+- **RoutingSlipStepResult** — Result record with StepName, Succeeded, FailureReason, RemainingSlip, ForwardedToTopic.
+
+### Files created
+
+- `src/Contracts/RoutingSlip.cs`
+- `src/Contracts/RoutingSlipStep.cs`
+- `src/Processing.Routing/IRoutingSlipRouter.cs`
+- `src/Processing.Routing/IRoutingSlipStepHandler.cs`
+- `src/Processing.Routing/RoutingSlipRouter.cs`
+- `src/Processing.Routing/RoutingSlipStepResult.cs`
+- `tests/UnitTests/RoutingSlipTests.cs`
+
+### Tests
+
+- UnitTests: 21 new (RoutingSlip: 9 tests — IsComplete, CurrentStep, Advance, Advance single, Advance empty throws, Parameters, MetadataKey; RoutingSlipRouter: 12 tests — execute step, forward to topic, in-process step, last step complete, handler failure, handler throws, no handler, no slip throws, empty slip throws, null throws, parameters passed, metadata updated)
+
+---
+
+## Chunk 049 – Message Filter
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add unit tests for existing `IMessageFilter` and `MessageFilter` in Processing.Routing/ that evaluates predicates against envelopes and either passes through or discards (with optional DLQ routing).
+
+### Architecture
+
+- MessageFilter and IMessageFilter already existed (implementation from previous chunk). This chunk adds comprehensive unit test coverage.
+
+### Files created
+
+- `tests/UnitTests/MessageFilterTests.cs`
+
+### Tests
+
+- UnitTests: 14 new (no conditions passthrough, matching condition pass, non-matching silent discard, non-matching discard-to-DLQ, AND logic all match, AND logic one fails, OR logic any suffices, regex match, contains match, In operator, GreaterThan numeric, metadata field, payload JSON field, null envelope throws)
+
+---
+
+## Atomic Pipeline Integration Test
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add `AtomicPipelineWorkflow` combining pipeline orchestration with saga compensation. When a Nack occurs (validation failure), all previously ack'd steps are compensated in reverse order before the Nack is published. Comprehensive Temporal workflow integration tests verify end-to-end atomic semantics.
+
+### Architecture
+
+- **AtomicPipelineWorkflow** — Temporal workflow that tracks completed steps. On success: Persist → Log Received → Validate → Update Delivered → Ack. On failure: compensates all completed steps in reverse order (LogReceived before PersistMessage), saves fault, updates status to Failed, publishes Nack.
+- **AtomicPipelineResult** — Result record with MessageId, IsSuccess, FailureReason, CompensatedSteps list.
+
+### Files created
+
+- `src/Workflow.Temporal/Workflows/AtomicPipelineWorkflow.cs`
+- `tests/WorkflowTests/AtomicPipelineWorkflowTests.cs`
+
+### Tests
+
+- WorkflowTests: 5 new (success path with Ack, validation failure with Nack + compensation of prior steps, correct execution order verification, partial compensation failure still publishes Nack, success path activity order verification)
+
+---
+
+## Test counts after chunks 049-051 + atomic pipeline test
+
+| Suite | Count |
+|-------|-------|
+| UnitTests | 1125 |
+| ContractTests | 58 |
+| WorkflowTests | 29 |
+| IntegrationTests | 17 |
+| PlaywrightTests | 13 |
+| LoadTests | 10 |
+| **Total** | **1252** |
+
+---
+
 ## Chunk 048 – Recipient List
 
 - **Date**: 2026-04-03
