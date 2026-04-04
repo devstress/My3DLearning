@@ -6,8 +6,8 @@
 - `IFeatureFlagService` for toggling features with variants, rollout, and tenant targeting
 - `InMemoryConfigurationStore` with versioning for development and testing
 - `FeatureFlag` with multi-variant support and gradual rollout
-- `ConfigurationChangeNotifier` for broadcasting updates to running services
-- `EnvironmentOverrideProvider` and `NotificationFeatureFlags` for Ack/Nack toggle
+- `ConfigurationChangeNotifier` for broadcasting updates to running services via `IObservable<T>`
+- `EnvironmentOverrideProvider` and `NotificationFeatureFlags` for notification toggle
 
 ---
 
@@ -42,10 +42,11 @@ Configuration changes flow through the store and notifier to all running service
 // src/Configuration/IConfigurationStore.cs
 public interface IConfigurationStore
 {
-    Task<ConfigurationEntry?> GetAsync(string key, CancellationToken ct);
-    Task SetAsync(string key, string value, CancellationToken ct);
-    Task<IReadOnlyList<ConfigurationEntry>> GetAllAsync(CancellationToken ct);
-    Task<IReadOnlyList<ConfigurationEntry>> GetHistoryAsync(string key, CancellationToken ct);
+    Task<ConfigurationEntry?> GetAsync(string key, string environment, CancellationToken ct = default);
+    Task SetAsync(ConfigurationEntry entry, CancellationToken ct = default);
+    Task<bool> DeleteAsync(string key, string environment, CancellationToken ct = default);
+    Task<IReadOnlyList<ConfigurationEntry>> ListAsync(string? environment = null, CancellationToken ct = default);
+    IAsyncEnumerable<ConfigurationChange> WatchAsync(CancellationToken ct = default);
 }
 
 public sealed record ConfigurationEntry(
@@ -53,7 +54,7 @@ public sealed record ConfigurationEntry(
     DateTimeOffset UpdatedAt, string? UpdatedBy);
 ```
 
-Every `SetAsync` increments the `Version` and preserves the previous value. `InMemoryConfigurationStore` uses a `ConcurrentDictionary` for version history, queryable via `GetHistoryAsync`.
+Every `SetAsync` increments the `Version` and preserves the previous value. `InMemoryConfigurationStore` uses a `ConcurrentDictionary` for version tracking. `WatchAsync` streams changes as they occur.
 
 ### IFeatureFlagService
 
@@ -61,9 +62,12 @@ Every `SetAsync` increments the `Version` and preserves the previous value. `InM
 // src/Configuration/IFeatureFlagService.cs
 public interface IFeatureFlagService
 {
-    Task<bool> IsEnabledAsync(string flagName, CancellationToken ct);
-    Task<string?> GetVariantAsync(string flagName, string? tenantId, CancellationToken ct);
-    Task<IReadOnlyList<FeatureFlag>> GetAllFlagsAsync(CancellationToken ct);
+    Task<bool> IsEnabledAsync(string flagName, string? tenantId = null, CancellationToken ct = default);
+    Task<string?> GetVariantAsync(string flagName, string? tenantId = null, CancellationToken ct = default);
+    Task<FeatureFlag?> GetAsync(string name, CancellationToken ct = default);
+    Task SetAsync(FeatureFlag flag, CancellationToken ct = default);
+    Task<bool> DeleteAsync(string name, CancellationToken ct = default);
+    Task<IReadOnlyList<FeatureFlag>> ListAsync(CancellationToken ct = default);
 }
 ```
 
@@ -71,40 +75,41 @@ public interface IFeatureFlagService
 
 ```csharp
 // src/Configuration/FeatureFlag.cs
-public sealed class FeatureFlag
+public sealed record FeatureFlag
 {
     public required string Name { get; init; }
-    public bool IsEnabled { get; init; } = false;
-    public IReadOnlyList<string>? Variants { get; init; }
-    public double RolloutPercentage { get; init; } = 100.0;
-    public IReadOnlyList<string>? TargetTenants { get; init; }
+    public bool IsEnabled { get; init; }
+    public Dictionary<string, string> Variants { get; init; } = new();
+    public int RolloutPercentage { get; init; } = 100;
+    public IReadOnlyList<string> TargetTenants { get; init; } = Array.Empty<string>();
 }
 ```
 
 | Property | Purpose |
 |----------|---------|
 | `IsEnabled` | Master toggle — `false` disables for everyone |
-| `Variants` | Named variants for A/B testing |
-| `RolloutPercentage` | Gradual rollout — 25.0 means 25% of traffic |
+| `Variants` | Named variant keys mapped to values for A/B testing |
+| `RolloutPercentage` | Gradual rollout — 25 means 25% of traffic |
 | `TargetTenants` | Tenant IDs that always get the feature |
 
 ### ConfigurationChangeNotifier
 
 ```csharp
 // src/Configuration/ConfigurationChangeNotifier.cs
-public sealed class ConfigurationChangeNotifier
+public sealed class ConfigurationChangeNotifier : IObservable<ConfigurationChange>
 {
-    public event Func<ConfigurationChange, Task>? OnChange;
-    public async Task NotifyAsync(ConfigurationChange change)
-    {
-        if (OnChange is not null) await OnChange.Invoke(change);
-    }
+    public void Publish(ConfigurationChange change);
+    public IDisposable Subscribe(IObserver<ConfigurationChange> observer);
 }
 
-public sealed record ConfigurationChange(string Key, string? OldValue, string NewValue, int NewVersion);
+public sealed record ConfigurationChange(
+    string Key, string? Value, string Environment,
+    ConfigurationChangeType ChangeType, DateTimeOffset Timestamp);
+
+public enum ConfigurationChangeType { Created, Updated, Deleted }
 ```
 
-Services subscribe to `OnChange` at startup. When a configuration value is updated, the notifier broadcasts the change so services can reload without restarting.
+Services subscribe via `Subscribe` at startup, receiving an `IDisposable` to unsubscribe later. When a configuration value is updated, the notifier broadcasts the change via `Publish` so services can reload without restarting.
 
 ### EnvironmentOverrideProvider
 
@@ -116,12 +121,11 @@ The `EnvironmentOverrideProvider` reads environment variables using the conventi
 // src/Configuration/NotificationFeatureFlags.cs
 public static class NotificationFeatureFlags
 {
-    public const string AckNotifications = "notifications.ack.enabled";
-    public const string NackNotifications = "notifications.nack.enabled";
+    public const string NotificationsEnabled = "notifications.enabled";
 }
 ```
 
-These flags control whether the platform sends notifications when messages are Acked or Nacked. Toggleable per tenant via `TargetTenants`.
+This flag controls whether the platform sends notifications. Toggleable per tenant via `TargetTenants`.
 
 ---
 
