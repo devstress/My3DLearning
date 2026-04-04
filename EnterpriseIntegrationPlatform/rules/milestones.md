@@ -68,7 +68,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 065** (API Reference) is next.
+All phases complete. See `rules/completion-log.md` for full history.
 
 ---
 
@@ -82,9 +82,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ### Phase 12 – Documentation
 
-| Chunk | Name | Goal | Tests Required |
-|-------|------|------|----------------|
-| 065 | API Reference | Complete API reference for Admin.Api, Gateway.Api, OpenClaw.Web endpoints with request/response examples, authentication, and rate limit/throttle admin operations | N/A (documentation only) |
+✅ Phase 12 complete — see completion-log.md
 
 ---
 

@@ -4,6 +4,33 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 065 – API Reference
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Complete API reference for Admin.Api, Gateway.Api, and OpenClaw.Web endpoints with request/response examples, authentication details, and rate limit/throttle admin operations.
+- **Architecture**:
+  - New `docs/api-reference.md` with comprehensive endpoint documentation for all 3 API services
+  - **Admin.Api** (45+ endpoints): Platform status, message queries, fault queries, observability events, DLQ management, throttle CRUD, rate limiting, configuration, feature flags, tenant management, disaster recovery, performance profiling
+  - **Gateway.Api** (3 endpoints): Service metadata, versioned route proxy, aggregated health
+  - **OpenClaw.Web** (12 endpoints): Message inspection (business key, correlation, ask), health checks (Ollama, RagFlow, seeder, metrics), RAG code generation (integration, connector, schema, chat, datasets)
+  - Every endpoint documented with: HTTP method, path, parameters, request body, response body with JSON examples
+  - Authentication section covering API key, JWT, and per-service security
+  - Admin.Web proxy endpoint mapping table
+- **Files created**:
+  - `docs/api-reference.md` — Complete API reference (60+ endpoints documented)
+- **Files modified**:
+  - `rules/milestones.md` — Removed chunk 065 row, marked Phase 12 complete
+  - `rules/completion-log.md` — Added chunk 065 entry
+- **Test counts**:
+  - UnitTests: 1,400 (unchanged — documentation only)
+  - Total tests: 1,537 across 6 test projects (unchanged)
+- **Notes**:
+  - 48 src projects (unchanged)
+  - All phases (1–12) now complete
+  - 65 chunks + 1 fix chunk delivered (chunks 001–065 + 063-fix)
+  - Platform documentation suite: eip-mapping.md (65 patterns), platform-usage-guide.md (14 sections), api-reference.md (60+ endpoints)
+
 ## Chunk 064 – Platform Usage Guide
 
 - **Date**: 2026-04-04
