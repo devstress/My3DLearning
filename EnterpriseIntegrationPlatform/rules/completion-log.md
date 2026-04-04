@@ -4,6 +4,65 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 058 – System Management — Control Bus, Detour, Message History, Message Store, Smart Proxy, Test Message, Channel Purger
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: (a) Formalize Admin.Api as the Control Bus pattern with explicit control-message publish/subscribe. (b) Add IDetour in Processing.Routing/ for conditional routing through debug/test pipeline. (c) Add MessageHistory record type in Contracts/ tracking processing step chain. (d) Formalize Storage.Cassandra as the Message Store pattern. (e) Add ISmartProxy for request-reply correlation tracking. (f) Add ITestMessageGenerator for synthetic test messages. (g) Add IChannelPurger in Ingestion/ for draining topics.
+
+### Architecture
+
+- **IControlBus / ControlBusPublisher** — Publishes control commands to dedicated control topic with Command intent. Subscribes to control channel filtering by message type. Uses IMessageBrokerProducer + IMessageBrokerConsumer.
+- **IDetour / Detour** — Conditional routing with global toggle (volatile bool for thread-safe reads) and per-message metadata key activation. Routes to detour or output topic via IMessageBrokerProducer.
+- **MessageHistoryEntry / MessageHistoryHelper** — Immutable record with ActivityName, Timestamp, Status, Detail. Helper serializes/deserializes JSON array in envelope Metadata["message-history"]. Append-only chain.
+- **IMessageStore / MessageStore** — Wraps IMessageRepository with system-management query methods: GetTrailAsync (by correlation), GetByIdAsync, GetFaultCountAsync. Returns MessageStoreEntry records.
+- **ISmartProxy / SmartProxy** — ConcurrentDictionary tracking outstanding request-reply correlations by CorrelationId. TrackRequest stores ReplyTo address; CorrelateReply matches and removes entry.
+- **ITestMessageGenerator / TestMessageGenerator** — Publishes synthetic test messages with "eip-test-message" metadata marker. Supports default string payload or custom typed payload.
+- **IChannelPurger / ChannelPurger** — Drains messages from a topic by subscribing with a short-lived consumer. Configurable drain timeout (default 2s). Returns purge count.
+- **DetourOptions** — DetourTopic, OutputTopic, EnabledAtStartup, DetourMetadataKey.
+- **ControlBusOptions** — ControlTopic, ConsumerGroup, Source.
+
+### Files created
+
+- `src/SystemManagement/SystemManagement.csproj`
+- `src/SystemManagement/IControlBus.cs`
+- `src/SystemManagement/ControlBusPublisher.cs`
+- `src/SystemManagement/ControlBusOptions.cs`
+- `src/SystemManagement/ControlBusResult.cs`
+- `src/SystemManagement/IMessageStore.cs`
+- `src/SystemManagement/MessageStore.cs`
+- `src/SystemManagement/MessageStoreEntry.cs`
+- `src/SystemManagement/ISmartProxy.cs`
+- `src/SystemManagement/SmartProxy.cs`
+- `src/SystemManagement/SmartProxyCorrelation.cs`
+- `src/SystemManagement/ITestMessageGenerator.cs`
+- `src/SystemManagement/TestMessageGenerator.cs`
+- `src/SystemManagement/TestMessageResult.cs`
+- `src/SystemManagement/SystemManagementServiceExtensions.cs`
+- `src/Contracts/MessageHistoryEntry.cs`
+- `src/Contracts/MessageHistoryHelper.cs`
+- `src/Processing.Routing/IDetour.cs`
+- `src/Processing.Routing/Detour.cs`
+- `src/Processing.Routing/DetourOptions.cs`
+- `src/Processing.Routing/DetourResult.cs`
+- `src/Ingestion/IChannelPurger.cs`
+- `src/Ingestion/ChannelPurger.cs`
+- `src/Ingestion/ChannelPurgeResult.cs`
+- `tests/UnitTests/SystemManagementTests.cs`
+
+### Files modified
+
+- `src/Contracts/MessageHeaders.cs` — added MessageHistory constant
+- `src/Processing.Routing/RoutingServiceExtensions.cs` — added AddDetour extension
+- `EnterpriseIntegrationPlatform.sln` — added SystemManagement project
+- `tests/UnitTests/UnitTests.csproj` — added SystemManagement reference
+- `rules/milestones.md` — updated next chunk, removed 058 row, marked Phase 9 complete, updated EIP checklist
+- `rules/completion-log.md` — added chunk 058 entry
+
+### Test counts
+
+- UnitTests: 1,288 (was 1,254, added 34 — 6 detour + 6 history + 4 test-message + 3 channel-purger + 7 smart-proxy + 4 control-bus + 4 message-store)
+
 ## Chunk 057 – Message Dispatcher + Service Activator
 
 - **Date**: 2026-04-04

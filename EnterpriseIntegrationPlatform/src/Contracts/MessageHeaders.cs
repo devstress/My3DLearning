@@ -45,4 +45,7 @@ public static class MessageHeaders
 
     /// <summary>Message intent — Command, Document, or Event.</summary>
     public const string Intent = "intent";
+
+    /// <summary>JSON-serialised array of <see cref="MessageHistoryEntry"/> tracking each processing step.</summary>
+    public const string MessageHistory = "message-history";
 }
