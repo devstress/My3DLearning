@@ -4,6 +4,69 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 053 – Normalizer + Canonical Data Model
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add `INormalizer` and `MessageNormalizer` in Processing.Transform/ that detects incoming format (JSON, XML, CSV) and converts to a canonical JSON representation. Document the Canonical Data Model pattern as `IntegrationEnvelope<T>` itself.
+
+### Architecture
+
+- **INormalizer** — Interface for normalizing payloads to canonical JSON format.
+- **MessageNormalizer** — Production implementation that detects format from content type (with optional best-effort content inspection) and converts XML→JSON, CSV→JSON, or passes JSON through unchanged. Thread-safe, designed as a Temporal activity.
+- **NormalizationResult** — Record with Payload, OriginalContentType, DetectedFormat, WasTransformed.
+- **NormalizerOptions** — Configuration: StrictContentType (default true), CsvDelimiter (default ','), CsvHasHeaders (default true), XmlRootName (default "Root").
+- **Canonical Data Model** — `IntegrationEnvelope<T>` IS the canonical data model. All messages flowing through the platform are wrapped in this envelope. The normalizer handles payload format conversion that precedes envelope wrapping.
+
+### Files created
+
+- `src/Processing.Transform/INormalizer.cs`
+- `src/Processing.Transform/MessageNormalizer.cs`
+- `src/Processing.Transform/NormalizationResult.cs`
+- `src/Processing.Transform/NormalizerOptions.cs`
+- `tests/UnitTests/MessageNormalizerTests.cs`
+
+### Files modified
+
+- `src/Processing.Transform/TransformServiceExtensions.cs` (added `AddNormalizer` extension method)
+
+### Tests
+
+- UnitTests: 16 new (JSON passthrough, XML→JSON, XML nested, XML repeated elements→array, CSV with headers, CSV quoted fields, CSV without headers, unknown content type strict, unknown content type non-strict JSON detection, unknown content type non-strict XML detection, null payload, empty content type, cancellation, JSON array passthrough, CSV custom delimiter, content type with charset)
+
+## Chunk 052 – Content Enricher + Content Filter
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add `IContentEnricher` and `ContentEnricher` in Processing.Transform/ that augments an envelope's payload with data fetched from an external HTTP source. Add `IContentFilter` and `ContentFilter` that strips fields from a payload, keeping only specified paths. Both are designed as Temporal activities.
+
+### Architecture
+
+- **IContentEnricher** — Interface for enriching JSON payloads with external data.
+- **ContentEnricher** — Production implementation using `IHttpClientFactory`. Extracts a lookup key from the payload via dot-path, substitutes into URL template, performs HTTP GET, merges response at configured target path. Supports fallback on failure with optional static fallback value. Thread-safe.
+- **ContentEnricherOptions** — Configuration: EndpointUrlTemplate, LookupKeyPath, MergeTargetPath, Timeout (default 10s), FallbackOnFailure (default true), FallbackValue.
+- **IContentFilter** — Interface for filtering JSON payloads to retain only specified fields.
+- **ContentFilter** — Production implementation using dot-separated keep-paths. Extracts matched fields from source JSON and produces a new JSON object. Missing paths silently skipped. Thread-safe.
+
+### Files created
+
+- `src/Processing.Transform/IContentEnricher.cs`
+- `src/Processing.Transform/ContentEnricher.cs`
+- `src/Processing.Transform/ContentEnricherOptions.cs`
+- `src/Processing.Transform/IContentFilter.cs`
+- `src/Processing.Transform/ContentFilter.cs`
+- `tests/UnitTests/ContentEnricherTests.cs`
+- `tests/UnitTests/ContentFilterTests.cs`
+
+### Files modified
+
+- `src/Processing.Transform/Processing.Transform.csproj` (added Microsoft.Extensions.Http.Resilience)
+- `src/Processing.Transform/TransformServiceExtensions.cs` (added `AddContentEnricher` and `AddContentFilter` extension methods)
+
+### Tests
+
+- UnitTests: 26 new (12 enricher: HTTP success merge, missing key fallback, missing key throws, HTTP error fallback, HTTP error with static fallback, HTTP error throws, numeric key substitution, nested merge path, null payload, invalid JSON, cancellation, overwrite existing target; 14 filter: single field, multiple fields, nested path, mixed top-level and nested, missing path skipped, array preserved, boolean values, empty paths throws, null payload, null paths, non-object payload, cancellation, deeply nested, object value preserved)
+
 ## Chunk 051 – Resequencer
 
 - **Date**: 2026-04-04
