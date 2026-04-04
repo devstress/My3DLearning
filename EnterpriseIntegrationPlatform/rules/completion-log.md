@@ -4,6 +4,35 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 060 – Test Coverage Hardening
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Close all test coverage gaps across AI.Ollama, Admin.Api, Configuration, InMemoryRuleStore, Connectors, and AI.RagFlow with ≥46 new unit tests total.
+- **Architecture**:
+  - AI.Ollama tests cover OllamaService (GenerateAsync, AnalyseAsync, IsHealthyAsync with success and failure paths) and OllamaHealthCheck (Healthy/Degraded)
+  - Admin.Api tests cover AdminApiOptions defaults and properties, PlatformStatusService (healthy/unhealthy/exception paths), DlqManagementService (delegation to IMessageReplayer), and AdminAuditLogger (masked keys, principal claims)
+  - Configuration tests cover InMemoryFeatureFlagService (rollout, targeting, variants, CRUD, case sensitivity) and EnvironmentOverrideProvider (cascade resolution, fallback, multi-key resolution)
+  - InMemoryRuleStore edge-case tests cover cancellation token propagation, concurrent adds, empty store, and validation guards
+  - Connectors tests cover ConnectorResult factory methods, ConnectorSendOptions defaults, ConnectorDescriptor defaults, ConnectorType enum, ConnectorRegistry validation (whitespace name), and ConnectorFactory constructor validation
+  - AI.RagFlow tests cover RagFlowHealthCheck (Healthy/Degraded) and RagFlowService success paths (RetrieveAsync chunk joining, ChatAsync with references, ListDatasetsAsync mapping, IsHealthyAsync success)
+- **Files created**:
+  - `tests/UnitTests/OllamaServiceTests.cs` — 10 unit tests for OllamaService, OllamaHealthCheck, OllamaServiceExtensions
+  - `tests/UnitTests/AdminApiServiceTests.cs` — 12 unit tests for AdminApiOptions, PlatformStatusService, DlqManagementService, AdminAuditLogger
+  - `tests/UnitTests/ConfigurationServiceTests.cs` — 15 unit tests for InMemoryFeatureFlagService, EnvironmentOverrideProvider
+  - `tests/UnitTests/ConnectorModelTests.cs` — 14 unit tests for ConnectorResult, ConnectorSendOptions, ConnectorDescriptor, ConnectorType, ConnectorRegistry/Factory edge cases
+- **Files modified**:
+  - `tests/UnitTests/InMemoryRuleStoreTests.cs` — Added 8 edge-case tests (cancellation, concurrent, empty store, validation)
+  - `tests/UnitTests/RagFlowServiceTests.cs` — Added 7 tests (RagFlowHealthCheck, success paths with SuccessHttpHandler)
+  - `rules/milestones.md` — Removed chunk 060 row, marked Phase 10 complete, updated Next Chunk to 061
+- **Tests**: UnitTests 1,379 (+66), ContractTests 58, WorkflowTests 24, IntegrationTests 17, PlaywrightTests 13, LoadTests 10 = **1,501 total**
+- **Notes**:
+  - 66 new tests across 6 areas: AI.Ollama (10), Admin.Api (12), Configuration (15), InMemoryRuleStore (8), Connectors (14), AI.RagFlow (7)
+  - Exceeds the ≥46 minimum by 20 tests
+  - Uses FakeHttpMessageHandler and SuccessHttpHandler patterns for HTTP stubbing without external dependencies
+  - NSubstitute mocks used for HealthCheckService, IMessageReplayer, IRagFlowService, IConfigurationStore
+  - All 1,379 unit tests pass with zero failures
+
 ## Chunk 059 – Connectors Unification
 
 - **Date**: 2026-04-04
