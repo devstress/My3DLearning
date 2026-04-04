@@ -4,6 +4,39 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 055 – Transactional Client
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add `ITransactionalClient` in Ingestion/ that wraps publish+consume in a transactional scope. For Kafka (native transactions), uses init/begin/commit/abort semantics. For NATS/Pulsar, implements publish-then-confirm with compensation on failure.
+
+### Architecture
+
+- **ITransactionalClient** — Interface for the Transactional Client EIP pattern. Defines `ExecuteAsync` that runs operations within a transactional scope with atomic commit/rollback semantics. Exposes `SupportsNativeTransactions` property.
+- **ITransactionScope** — Interface for publishing messages within a transaction scope. Messages are tracked for compensation on rollback.
+- **BrokerTransactionalClient** — Broker-aware implementation. Tracks published messages via `TrackingTransactionScope`. On failure/timeout, publishes compensating tombstone messages to DLQ topics. Uses `Stopwatch` for duration tracking.
+- **TransactionResult** — Record with `Committed`, `MessageCount`, `Error`, `Exception`, and `Duration` properties. Factory methods `Success` and `Failure`.
+- **BrokerOptions.TransactionTimeoutSeconds** — New configuration property (default 30s).
+
+### Files created
+
+- `src/Ingestion/ITransactionalClient.cs`
+- `src/Ingestion/ITransactionScope.cs`
+- `src/Ingestion/TransactionResult.cs`
+- `src/Ingestion/BrokerTransactionalClient.cs`
+- `tests/UnitTests/TransactionalClientTests.cs`
+
+### Files modified
+
+- `src/Ingestion/BrokerOptions.cs` — added TransactionTimeoutSeconds property
+- `rules/milestones.md` — removed chunk 055, updated next chunk, updated EIP checklist
+- `rules/completion-log.md` — added chunk 055 entry
+
+### Test counts
+
+- **New tests**: 17 (commit success, multi-publish commit, rollback on operation failure, rollback on producer failure, compensation publishing, timeout, native transaction support for Kafka/NATS/Pulsar, empty transaction, duration tracking, constructor validation, null operations, TransactionResult factories)
+- **Total UnitTests**: 1215 (was 1198)
+
 ## Chunk 054 – Messaging Gateway + Messaging Mapper
 
 - **Date**: 2026-04-04

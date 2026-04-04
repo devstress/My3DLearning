@@ -66,7 +66,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 ## Next Chunk
 
-**Chunk 055** (Transactional Client) is next.
+**Chunk 056** (Polling Consumer + Event-Driven Consumer + Selective Consumer + Durable Subscriber) is next.
 
 ---
 
@@ -86,7 +86,6 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 
 | Chunk | Name | Goal | Tests Required |
 |-------|------|------|----------------|
-| 055 | Transactional Client | Add `ITransactionalClient` in Ingestion/ that wraps publish+consume in a transactional scope — for brokers that support transactions (Kafka). For NATS/Pulsar, implement via Temporal workflow (publish-then-confirm pattern). Ensures produce-and-consume atomicity. | UnitTests: ≥8 (commit success, rollback on failure, timeout, non-transactional broker fallback) |
 | 056 | Polling Consumer + Event-Driven Consumer + Selective Consumer + Durable Subscriber | (a) Formalize `PollingConsumer` and `EventDrivenConsumer` as named wrappers in Ingestion/ — Kafka consumer = Polling, NATS push = Event-Driven. (b) Add `ISelectiveConsumer` that wraps `IMessageBrokerConsumer` with a predicate filter (consume only messages matching criteria). (c) Add `DurableSubscriber` wrapper ensuring subscription state survives restarts (already inherent in Kafka/NATS/Pulsar — formalize with interface + tests). | UnitTests: ≥12 (polling consume, event-driven consume, selective filter, durable reconnect) |
 | 057 | Message Dispatcher + Service Activator | (a) Add `IMessageDispatcher` in Processing/ that receives messages from a single channel and distributes to specific handlers based on message type (like a multiplexer). (b) Add `IServiceActivator` that invokes a service operation (sync or async) from a message and optionally publishes the reply. Key pattern for request-reply orchestration. | UnitTests: ≥10 (dispatch by type, unknown type handling, activator invoke+reply, activator invoke-only) |
 | 058 | System Management — Control Bus, Detour, Message History, Message Store, Smart Proxy, Test Message, Channel Purger | (a) Formalize `Admin.Api` as the **Control Bus** pattern — admin endpoints already exist, add explicit control-message publish/subscribe for runtime config changes. (b) Add `IDetour` in Processing.Routing/ — conditional routing through validation/debug/test pipeline before normal processing. (c) Add `MessageHistory` record type in Contracts/ tracking processing step chain (activity name + timestamp + status) — attach to envelope metadata. (d) Formalize `Storage.Cassandra` message tables as the **Message Store** pattern. (e) Add `ISmartProxy` that tracks outstanding request-reply and correlates Return Address responses. (f) Add `ITestMessageGenerator` that publishes synthetic test messages through the pipeline for health verification. (g) Add `IChannelPurger` in Ingestion/ that drains all messages from a specified topic/subject. | UnitTests: ≥20 (detour routing, message history chain, test message generation, channel purge, smart proxy correlation) |
@@ -181,7 +180,7 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 **Messaging Endpoints:**
 - ✅ Messaging Gateway (Gateway.Api — IMessagingGateway + HttpMessagingGateway)
 - ✅ Messaging Mapper (Contracts — IMessagingMapper + JsonMessagingMapper)
-- 🔲 Transactional Client (chunk 055)
+- ✅ Transactional Client (Ingestion — ITransactionalClient + BrokerTransactionalClient)
 - 🔲 Polling Consumer (chunk 056)
 - 🔲 Event-Driven Consumer (chunk 056)
 - ✅ Competing Consumers (Processing.CompetingConsumers)
