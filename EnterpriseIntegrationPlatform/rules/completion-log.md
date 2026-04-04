@@ -4,6 +4,44 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 059 – Connectors Unification
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Register Connector.Http/Sftp/Email/File adapters into unified `IConnectorRegistry` + `IConnectorFactory` from src/Connectors/. Runtime connector resolution by name and type. Health check aggregation across all registered connectors.
+- **Architecture**:
+  - Each transport (HTTP, SFTP, Email, File) now has an adapter implementing `IConnector` from the unified Connectors project
+  - `HttpConnectorAdapter` wraps `IHttpConnector` and delegates `SendAsync` via HTTP POST and `TestConnectionAsync` via GET health probe
+  - `SftpConnectorAdapter` wraps `ISftpConnector` and `ISftpClient`, delegates upload for send and connect/disconnect for health
+  - `EmailConnectorAdapter` wraps `IEmailConnector` and `ISmtpClientWrapper`, delegates email send and SMTP connectivity for health
+  - `FileConnectorAdapter` wraps `IFileConnector` and `IFileSystem`, delegates file write for send and directory creation for health
+  - `ConnectorHealthAggregator` implements `IHealthCheck` and probes all registered connectors: Healthy when all pass, Degraded when some fail, Unhealthy when all fail or none registered
+  - `ConnectorServiceExtensions.AddConnectorHealthCheck()` registers the aggregator as a named health check in the DI container
+  - Each Connector.Xxx project now references the Connectors project for `IConnector` access
+- **Files created**:
+  - `src/Connector.Http/HttpConnectorAdapter.cs` — HTTP adapter implementing `IConnector`
+  - `src/Connector.Sftp/SftpConnectorAdapter.cs` — SFTP adapter implementing `IConnector`
+  - `src/Connector.Email/EmailConnectorAdapter.cs` — Email adapter implementing `IConnector`
+  - `src/Connector.File/FileConnectorAdapter.cs` — File adapter implementing `IConnector`
+  - `src/Connectors/ConnectorHealthAggregator.cs` — Health check aggregator implementing `IHealthCheck`
+  - `tests/UnitTests/ConnectorUnificationTests.cs` — 25 unit tests for registry, factory, and health aggregation
+- **Files modified**:
+  - `Directory.Packages.props` — Added `Microsoft.Extensions.Diagnostics.HealthChecks` and Abstractions packages
+  - `src/Connectors/Connectors.csproj` — Added health checks package reference
+  - `src/Connectors/ConnectorServiceExtensions.cs` — Added `AddConnectorHealthCheck()` extension method
+  - `src/Connector.Http/Connector.Http.csproj` — Added Connectors project reference
+  - `src/Connector.Sftp/Connector.Sftp.csproj` — Added Connectors project reference
+  - `src/Connector.Email/Connector.Email.csproj` — Added Connectors project reference
+  - `src/Connector.File/Connector.File.csproj` — Added Connectors project reference
+  - `tests/UnitTests/UnitTests.csproj` — Added Connectors project reference
+  - `rules/milestones.md` — Removed chunk 059 row, updated Next Chunk to 060
+- **Tests**: UnitTests 1,313 (+25), ContractTests 58, WorkflowTests 24, IntegrationTests 17, PlaywrightTests 13, LoadTests 10 = **1,435 total**
+- **Notes**:
+  - 25 new tests: 13 ConnectorRegistryTests, 6 ConnectorFactoryTests, 6 ConnectorHealthAggregatorTests
+  - Adapters follow the Adapter pattern (GoF) — wrapping transport-specific interfaces behind the unified `IConnector` contract
+  - Health aggregator follows the same pattern as Gateway.Api's `DownstreamHealthAggregator` but operates on registered connectors
+  - Case-insensitive connector lookup verified in tests
+
 ## Chunk 058 – System Management — Control Bus, Detour, Message History, Message Store, Smart Proxy, Test Message, Channel Purger
 
 - **Date**: 2026-04-04
