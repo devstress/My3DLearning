@@ -83,14 +83,20 @@ public sealed class SftpConnectorAdapter : IConnector
         try
         {
             _sftpClient.Connect();
-            var connected = _sftpClient.IsConnected;
-            _sftpClient.Disconnect();
+            try
+            {
+                var connected = _sftpClient.IsConnected;
 
-            _logger.LogDebug(
-                "Health probe for SFTP connector '{ConnectorName}': {Status}",
-                Name, connected ? "Healthy" : "Unhealthy");
+                _logger.LogDebug(
+                    "Health probe for SFTP connector '{ConnectorName}': {Status}",
+                    Name, connected ? "Healthy" : "Unhealthy");
 
-            return Task.FromResult(connected);
+                return Task.FromResult(connected);
+            }
+            finally
+            {
+                _sftpClient.Disconnect();
+            }
         }
         catch (Exception ex)
         {

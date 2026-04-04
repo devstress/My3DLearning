@@ -82,7 +82,7 @@ public sealed class EmailConnectorAdapter : IConnector
     }
 
     /// <inheritdoc />
-    public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default)
+    public Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -91,16 +91,16 @@ public sealed class EmailConnectorAdapter : IConnector
                 _logger.LogDebug(
                     "Health probe for email connector '{ConnectorName}': Healthy (already connected)",
                     Name);
-                return true;
+                return Task.FromResult(true);
             }
 
-            return await Task.FromResult(true);
+            return Task.FromResult(true);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
                 "Health probe for email connector '{ConnectorName}' failed", Name);
-            return false;
+            return Task.FromResult(false);
         }
     }
 }
