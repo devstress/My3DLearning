@@ -23,7 +23,8 @@
 │  ┌─────────────────────────────────────────────────┐   │
 │  │          Performance.Profiling Module            │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌─────────────────┐ │   │
-│  │  │ CPU Prof │ │ Mem Prof │ │ GC Diagnostics  │ │   │
+│  │  │Continuous│ │GcMonitor │ │ GC Diagnostics  │ │   │
+│  │  │ Profiler │ │          │ │                 │ │   │
 │  │  └──────────┘ └──────────┘ └─────────────────┘ │   │
 │  └─────────────────────────────────────────────────┘   │
 │         │                                              │
@@ -36,47 +37,56 @@
 
 ## CPU Profiling Snapshots
 
-Capture CPU profiles to identify hot paths:
+Capture CPU and runtime profiling snapshots to identify hot paths:
 
 ```csharp
-public class CpuProfiler
+public sealed class ContinuousProfiler
 {
-    public async Task<ProfileSnapshot> CaptureAsync(
-        TimeSpan duration, CancellationToken ct)
+    public ContinuousProfiler(IOptions<ProfilingOptions> options) { /* ... */ }
+
+    public ProfilingSnapshot CaptureSnapshot()
     {
-        var session = new DiagnosticsSession(processId);
-        session.EnableProvider("Microsoft-DotNETCore-SampleProfiler");
-        await Task.Delay(duration, ct);
-        session.Stop();
-        return new ProfileSnapshot
+        // Captures a point-in-time snapshot of CPU and runtime metrics
+        return new ProfilingSnapshot
         {
-            FilePath = session.OutputPath,
-            Duration = duration,
-            TopMethods = AnalyzeHotPaths(session.OutputPath)
+            CpuUsagePercent = GetCpuUsage(),
+            WorkingSetMb = GetWorkingSet(),
+            GcGen0Collections = GC.CollectionCount(0),
+            GcGen1Collections = GC.CollectionCount(1),
+            GcGen2Collections = GC.CollectionCount(2),
+            ThreadCount = GetThreadCount(),
+            Timestamp = DateTimeOffset.UtcNow
         };
     }
+
+    public IReadOnlyList<ProfilingSnapshot> GetSnapshots(int count = 10) { /* ... */ }
+    public ProfilingSnapshot? GetLatestSnapshot() { /* ... */ }
 }
 ```
 
 ## Memory Profiling
 
-Track allocations and detect leaks:
+Track GC activity and detect memory issues:
 
 ```csharp
-public class MemoryProfiler
+public sealed class GcMonitor
 {
-    public HeapSnapshot CaptureHeapSnapshot()
+    public GcSnapshot CaptureSnapshot()
     {
-        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
-        return new HeapSnapshot
+        return new GcSnapshot
         {
-            TotalBytes = GC.GetTotalMemory(forceFullCollection: false),
-            Gen0Collections = GC.CollectionCount(0),
-            Gen1Collections = GC.CollectionCount(1),
-            Gen2Collections = GC.CollectionCount(2),
-            LargeObjectHeapSize = GC.GetGCMemoryInfo().HeapSizeBytes
+            Gen0 = GC.CollectionCount(0),
+            Gen1 = GC.CollectionCount(1),
+            Gen2 = GC.CollectionCount(2),
+            TotalMemoryMb = GC.GetTotalMemory(forceFullCollection: false) / (1024.0 * 1024.0),
+            IsServerGc = GCSettings.IsServerGC,
+            Timestamp = DateTimeOffset.UtcNow
         };
     }
+
+    public IReadOnlyList<string> GetRecommendations() { /* ... */ }
+    public IReadOnlyList<GcSnapshot> GetHistory(int count = 10) { /* ... */ }
+    public void ClearHistory() { /* ... */ }
 }
 ```
 
