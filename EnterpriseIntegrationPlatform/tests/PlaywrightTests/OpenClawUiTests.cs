@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Playwright;
 using NUnit.Framework;
 
@@ -20,7 +19,7 @@ public class OpenClawUiTests
 {
     private IPlaywright? _playwright;
     private IBrowser? _browser;
-    private WebApplicationFactory<Program>? _factory;
+    private PlaywrightWebAppFactory<OpenClaw.Web.DemoDataSeeder>? _factory;
     private HttpClient? _httpClient;
     private string? _baseUrl;
     private bool _browsersAvailable;
@@ -44,9 +43,9 @@ public class OpenClawUiTests
             return;
         }
 
-        _factory = new WebApplicationFactory<Program>();
-        _httpClient = _factory.CreateClient();
-        _baseUrl = _httpClient.BaseAddress!.ToString().TrimEnd('/');
+        _factory = new PlaywrightWebAppFactory<OpenClaw.Web.DemoDataSeeder>();
+        _baseUrl = _factory.ServerAddress;
+        _httpClient = _factory.HttpClient;
     }
 
     [TearDown]

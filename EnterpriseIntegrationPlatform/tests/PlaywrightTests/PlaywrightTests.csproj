@@ -9,10 +9,10 @@
     <PackageReference Include="NUnit3TestAdapter" />
     <PackageReference Include="NUnit.Analyzers" />
     <PackageReference Include="Microsoft.Playwright" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\OpenClaw.Web\OpenClaw.Web.csproj" />
+    <ProjectReference Include="..\..\src\Admin.Web\Admin.Web.csproj" />
     <ProjectReference Include="..\..\src\Observability\Observability.csproj" />
   </ItemGroup>
 </Project>

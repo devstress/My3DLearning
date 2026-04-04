@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <!-- The Vite SPA lives in clientapp/ and builds to wwwroot/ -->
+    <SpaRoot>clientapp</SpaRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
+  </ItemGroup>
+  <!-- Build the Vite frontend before the .NET publish step -->
+  <Target Name="BuildClientApp" BeforeTargets="Build" Condition="Exists('$(SpaRoot)/package.json')">
+    <Exec WorkingDirectory="$(SpaRoot)" Command="npm install --prefer-offline --no-audit" />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="npm run build" />
+  </Target>
+  <!-- Exclude node_modules and clientapp source from publish output -->
+  <ItemGroup>
+    <Content Remove="$(SpaRoot)/**" />
+    <None Remove="$(SpaRoot)/**" />
+  </ItemGroup>
+</Project>
