@@ -215,41 +215,45 @@ All five envelopes share the same `CorrelationId`. This lets you:
 
 ---
 
-## Lab Exercise
+## Lab
 
-**Objective:** Construct envelopes with identity, sequencing, and expiration fields, then verify immutability using C# `with` expressions.
+**Objective:** Build causation chains and sequenced message sets that demonstrate how the Envelope Wrapper pattern preserves **atomicity** and **traceability** across a multi-step integration pipeline.
 
-### Step 1: Build a Causation Chain
+### Step 1: Build a Causation Chain (Message Lineage)
 
-Write code that simulates a three-step processing pipeline. Start by creating an original envelope with `IntegrationEnvelope<string>.Create()`. Then create a second envelope (representing a transformation result) using a `with` expression — set its `CausationId` to the first envelope's `MessageId` and keep the same `CorrelationId`. Create a third envelope whose `CausationId` is the second envelope's `MessageId`. Print or assert that all three share the same `CorrelationId` but have distinct `MessageId` values.
+Write code that simulates a three-step processing pipeline. Create an original envelope with `IntegrationEnvelope<string>.Create()`. Then create a second envelope (transformation result) using a `with` expression — set its `CausationId` to the first envelope's `MessageId` and keep the same `CorrelationId`. Create a third envelope whose `CausationId` is the second. Verify all three share the same `CorrelationId` but have distinct `MessageId` values.
 
-### Step 2: Use Sequencing and Expiration Fields
+This lineage is essential for **atomicity**: if step 3 fails, the saga compensation engine uses the `CausationId` chain to identify and roll back exactly the right upstream steps.
 
-Create a set of three envelopes representing a split message. For each, use `with` expressions to set `SequenceNumber` (1, 2, 3) and `TotalCount` (3). Also set `ExpiresAt` to `DateTimeOffset.UtcNow.AddMinutes(5)` on one envelope and verify that its `IsExpired` property returns `false`. Then create another envelope with `ExpiresAt` in the past and confirm `IsExpired` returns `true`.
+### Step 2: Model a Splitter Output with Sequencing
 
-### Step 3: Write a Unit Test
+Create three envelopes representing a Splitter's output. Use `with` expressions to set `SequenceNumber` (0, 1, 2) and `TotalCount` (3). Also set `ExpiresAt` on one envelope to 5 minutes from now, and on another to a time in the past. Verify `IsExpired` returns the correct value.
 
-In `tests/UnitTests/`, create a test class named `IntegrationEnvelopeImmutabilityTests`. Add a test method called `WithExpression_ModifyingSource_DoesNotMutateOriginal` that creates an envelope via `IntegrationEnvelope<string>.Create()`, produces a modified copy using `with { Source = "NewService" }`, and asserts that the original envelope's `Source` is unchanged while the copy has the new value.
+Explain why the **Message Expiration** pattern is critical for scalability: in a high-throughput system, stale messages must be routed to the Dead Letter Queue rather than consuming resources processing outdated data.
 
-## Knowledge Check
+### Step 3: Design an Atomicity Scenario
+
+Imagine an order message is split into 3 line-item messages. Line-item 2 fails delivery. Using the envelope fields (`CorrelationId`, `CausationId`, `SequenceNumber`, `TotalCount`), describe how the platform can: (a) identify all 3 messages as belonging to the same operation, (b) determine which specific message failed, and (c) trigger compensation for line-items 1 and 3 that already succeeded.
+
+## Exam
 
 1. Why is `IntegrationEnvelope<T>` defined as a C# `record` rather than a `class`?
    - A) Records are faster to serialize than classes
-   - B) Records provide value-based equality and immutability via `with` expressions, ensuring envelopes are never accidentally mutated during processing
+   - B) Records provide immutability via `with` expressions, ensuring envelopes are never accidentally mutated during concurrent processing — critical for thread-safe scalability
    - C) The .NET runtime requires records for generic types
    - D) Records automatically encrypt their properties
 
 2. In a causation chain where message A is split into messages B₁, B₂, and B₃, what value should the `CausationId` of each split message contain?
    - A) Its own `MessageId`
    - B) The `CorrelationId` of message A
-   - C) The `MessageId` of message A (the parent that caused the split)
+   - C) The `MessageId` of message A — the parent that caused the split
    - D) A new randomly generated `Guid`
 
-3. What happens when a component checks `IsExpired` on an `IntegrationEnvelope<T>` whose `ExpiresAt` is in the past?
-   - A) The envelope is automatically deleted from memory
-   - B) An exception is thrown by the runtime
-   - C) `IsExpired` returns `true`, signaling that the message should not be processed further
-   - D) The envelope's `Priority` is downgraded to `Low`
+3. How does the `IsExpired` check contribute to the platform's **zero message loss** guarantee?
+   - A) Expired messages are silently dropped to save resources
+   - B) Expired messages are routed to the Dead Letter Queue with reason "expired", ensuring they are never silently lost but also don't consume processing capacity for stale data
+   - C) The broker automatically deletes expired messages
+   - D) `IsExpired` prevents messages from being published in the first place
 
 ---
 

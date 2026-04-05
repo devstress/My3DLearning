@@ -232,40 +232,58 @@ Is this task delivery (process and acknowledge)?
 
 ---
 
-## Lab Exercise
+## Lab
 
-**Objective:** Design a NATS subject hierarchy, publish messages through the broker abstraction, and verify broker-agnostic behavior with a unit test.
+**Objective:** Design a broker topic hierarchy for a multi-tenant system and analyze how different broker architectures affect **scalability** and **message ordering guarantees**.
 
-### Step 1: Design a NATS Subject Hierarchy
+### Step 1: Design a Multi-Region Topic Hierarchy
 
-On paper or in a text file, design a subject hierarchy for a multi-region e-commerce system. Use the NATS wildcard conventions (`.` for level separation, `*` for single-level wildcard, `>` for multi-level wildcard). Your hierarchy should support: orders, payments, and refunds across three regions (US, EU, APAC). Example starting point: `eip.us.orders.created`. Write a subscriber pattern that captures all events in the EU region using a wildcard: `eip.eu.>`.
+Design a NATS subject hierarchy for a multi-region e-commerce system with: orders, payments, and refunds across three regions (US, EU, APAC). Use NATS conventions (`.` for levels, `*` for single-level wildcard, `>` for multi-level wildcard):
 
-### Step 2: Publish Through the Broker Abstraction
+```
+eip.{region}.{domain}.{event}
+Example: eip.us.orders.created
+```
 
-Write code that creates an `IntegrationEnvelope<string>` with `Source = "PaymentService"` and `MessageType = "payment.completed"`. Using NSubstitute, create a mock `IMessageBrokerProducer` and call `PublishAsync` with the topic `"eip.us.payments.completed"`. Use `Received(1)` to verify the producer was called exactly once with the correct topic argument.
+Write subscriber patterns for: (a) all events in EU: `eip.eu.>`, (b) all order events globally: `eip.*.orders.*`, (c) only payment completions in APAC: `eip.apac.payments.completed`.
 
-### Step 3: Write a Unit Test
+Explain how this hierarchy enables **horizontal scalability** — new regions can be added without changing existing subscribers.
 
-In `tests/UnitTests/`, create a test class named `BrokerAbstractionTests`. Add a test method called `PublishAsync_WithMockedProducer_InvokesProducerWithCorrectTopic` that creates a mock `IMessageBrokerProducer` via NSubstitute, builds an `IntegrationEnvelope<string>`, calls `PublishAsync` with a specific topic string, and asserts using `Received(1)` that `PublishAsync` was invoked exactly once with the expected topic.
+### Step 2: Compare Broker Scalability Characteristics
 
-## Knowledge Check
+Create a comparison table for Kafka, NATS JetStream, and Pulsar:
 
-1. What is head-of-line (HOL) blocking in the context of message brokers, and which broker architecture avoids it?
-   - A) HOL blocking occurs when a slow message in a partition delays all subsequent messages in that partition; NATS queue groups avoid it because any available consumer can pick up any message
+| Characteristic | Kafka | NATS JetStream | Pulsar |
+|---------------|-------|----------------|--------|
+| Ordering guarantee | Per-partition | Per-subject | Per-key (Key_Shared) |
+| HOL blocking risk | ? | ? | ? |
+| Multi-tenant isolation | ? | ? | ? |
+| Scale-out mechanism | ? | ? | ? |
+
+For each cell, explain the implication for a platform processing 10,000 messages/second from 50 tenants.
+
+### Step 3: Design for Atomicity Across Broker Switches
+
+The platform uses `IMessageBrokerProducer` / `IMessageBrokerConsumer` to abstract the broker. Describe a scenario where switching from NATS to Kafka for a specific message type would change the **atomicity** guarantees (hint: Kafka's transactional producer vs. NATS at-least-once). What compensating design would the platform need?
+
+## Exam
+
+1. What is head-of-line (HOL) blocking and why is it a **scalability** problem?
+   - A) HOL blocking occurs when a slow message in a partition delays all subsequent messages; NATS queue groups avoid it because any available consumer can pick up any message
    - B) HOL blocking is a network-layer issue that all brokers handle identically
-   - C) HOL blocking only affects messages with `MessagePriority.Low`; Kafka avoids it with replication
-   - D) HOL blocking means messages are delivered out of order; Pulsar avoids it with schema enforcement
+   - C) HOL blocking only affects messages with `MessagePriority.Low`
+   - D) HOL blocking means messages are delivered out of order
 
 2. Why does the platform define `IMessageBrokerProducer` and `IMessageBrokerConsumer` as abstractions rather than coding directly against a specific broker SDK?
    - A) The broker SDKs do not support .NET 10
-   - B) It allows the broker implementation (Kafka, NATS, or Pulsar) to be swapped at deployment time without changing application code
+   - B) It allows the broker implementation to be swapped at deployment time without changing application code — enabling different scalability and atomicity trade-offs per workload
    - C) Abstractions are required by the C# compiler for async methods
-   - D) Each broker uses a different serialization format that must be hidden
+   - D) Each broker uses a different serialization format
 
-3. When would you choose Apache Pulsar's Key_Shared subscription over Kafka's partition-based consumption?
-   - A) When you need messages delivered in strict global order across all keys
-   - B) When you want per-key ordering without cross-key head-of-line blocking, especially in multi-tenant scenarios where one tenant's slow processing should not affect others
-   - C) When your messages do not have any key and need round-robin delivery
+3. When would you choose Apache Pulsar's Key_Shared subscription over Kafka's partition-based consumption for **multi-tenant scalability**?
+   - A) When you need strict global order across all keys
+   - B) When you want per-key ordering without cross-key head-of-line blocking — one tenant's slow processing should not affect others
+   - C) When your messages do not have any key
    - D) When you require messages to be stored for less than 24 hours
 
 ---
