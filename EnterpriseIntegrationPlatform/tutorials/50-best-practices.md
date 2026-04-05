@@ -55,7 +55,7 @@ same result regardless of how many times they process the same message.
 
 ```
 Pre-Production Verification:
-  □ All 1,472 unit tests passing (Tutorial 49)
+  □ All unit tests passing (Tutorial 49)
   □ Integration tests green with Testcontainers
   □ Load tests meet throughput/latency SLAs
   □ Helm chart validated with deploy/validate.sh (Tutorial 43)

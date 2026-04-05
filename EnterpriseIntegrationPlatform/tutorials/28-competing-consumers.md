@@ -48,23 +48,72 @@ public sealed class CompetingConsumerOrchestrator : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            var lagInfo = await _lagMonitor.GetLagAsync(
-                _options.TargetTopic, _options.ConsumerGroup, stoppingToken);
+            try
+            {
+                await EvaluateAndScaleAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during competing consumer orchestration cycle");
+            }
 
-            if (lagInfo.CurrentLag >= _options.ScaleUpThreshold)
-                await _scaler.ScaleAsync(
-                    Math.Min(_scaler.CurrentCount + 1, _options.MaxConsumers), stoppingToken);
-            else if (lagInfo.CurrentLag <= _options.ScaleDownThreshold
-                     && _scaler.CurrentCount > _options.MinConsumers)
-                await _scaler.ScaleAsync(_scaler.CurrentCount - 1, stoppingToken);
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(_options.CooldownMs), _timeProvider, stoppingToken);
+        }
+    }
 
-            await Task.Delay(_options.CooldownMs, stoppingToken);
+    internal async Task EvaluateAndScaleAsync(CancellationToken cancellationToken)
+    {
+        var lagInfo = await _lagMonitor.GetLagAsync(
+            _options.TargetTopic, _options.ConsumerGroup, cancellationToken);
+
+        var currentCount = _scaler.CurrentCount;
+        var now = _timeProvider.GetUtcNow();
+        var cooldown = TimeSpan.FromMilliseconds(_options.CooldownMs);
+
+        if (lagInfo.CurrentLag >= _options.ScaleUpThreshold)
+        {
+            if (currentCount >= _options.MaxConsumers)
+            {
+                _backpressure.Signal();  // signal backpressure when at capacity
+                return;
+            }
+
+            _backpressure.Release();
+            if ((now - _lastScaleTime) < cooldown) return;  // cooldown guard
+
+            var desired = Math.Min(currentCount + 1, _options.MaxConsumers);
+            await _scaler.ScaleAsync(desired, cancellationToken);
+            _lastScaleTime = now;
+        }
+        else if (lagInfo.CurrentLag <= _options.ScaleDownThreshold)
+        {
+            _backpressure.Release();
+            if (currentCount <= _options.MinConsumers) return;
+            if (_backpressure.IsBackpressured) return;  // pause scale-down under backpressure
+            if ((now - _lastScaleTime) < cooldown) return;
+
+            var desired = Math.Max(currentCount - 1, _options.MinConsumers);
+            await _scaler.ScaleAsync(desired, cancellationToken);
+            _lastScaleTime = now;
+        }
+        else
+        {
+            _backpressure.Release();
         }
     }
 }
 ```
 
-The orchestrator runs as a hosted `BackgroundService`. On each evaluation cycle it reads the consumer lag via `GetLagAsync`, compares against thresholds, and calls `ScaleAsync` with the desired consumer count.
+The orchestrator runs as a hosted `BackgroundService`. On each evaluation cycle it reads the consumer lag via `GetLagAsync`, compares against thresholds, and calls `ScaleAsync` with the desired consumer count. Key features:
+
+- **Backpressure signaling** — when at max capacity, signals backpressure to upstream producers
+- **Cooldown guard** — prevents scaling flapping with a configurable cooldown period
+- **Backpressure-aware scale-down** — won't scale down while backpressure is active
 
 ### IConsumerLagMonitor
 

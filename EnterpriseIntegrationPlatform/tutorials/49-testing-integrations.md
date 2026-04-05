@@ -9,7 +9,7 @@
 - Integration tests using Testcontainers
 - End-to-end browser tests with Playwright
 - Load and performance benchmarks via the LoadTests project
-- Testing conventions: `[SetUp]`, `Assert.That`, 1,472 unit tests
+- Testing conventions: `[SetUp]`, `Assert.That`
 
 ## The Test Pyramid
 
@@ -27,35 +27,35 @@
                 │   ContractTests    │  API contracts
                ┌┴───────────────────┴┐
                │     UnitTests        │  NUnit 4.4 + NSubstitute
-               │   1,472 tests       │  (fastest, most numerous)
+               │  (fastest, most)     │  (fastest, most numerous)
                └──────────────────────┘
 ```
 
 ## Unit Tests (NUnit 4.4 + NSubstitute)
 
-The foundation with 1,472 tests covering all core logic:
+The foundation of the test pyramid, covering all core logic:
 
 ```csharp
 [TestFixture]
 public class XmlNotificationMapperTests
 {
-    private XmlNotificationMapper _mapper;
+    private XmlNotificationMapper _sut = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _mapper = new XmlNotificationMapper();
+        _sut = new XmlNotificationMapper();
     }
 
     [Test]
-    public void MapAck_ReturnsExpectedXml()
+    public void MapAck_ReturnsXmlAckOk()
     {
         var messageId = Guid.NewGuid();
         var correlationId = Guid.NewGuid();
 
-        var result = _mapper.MapAck(messageId, correlationId);
+        var result = _sut.MapAck(messageId, correlationId);
 
-        Assert.That(result, Does.Contain("Ack"));
+        Assert.That(result, Is.EqualTo("<Ack>ok</Ack>"));
     }
 
     [Test]
@@ -64,7 +64,7 @@ public class XmlNotificationMapperTests
         var messageId = Guid.NewGuid();
         var correlationId = Guid.NewGuid();
 
-        var result = _mapper.MapNack(messageId, correlationId, "timeout");
+        var result = _sut.MapNack(messageId, correlationId, "timeout");
 
         Assert.That(result, Does.Contain("timeout"));
     }
@@ -245,7 +245,7 @@ Results:
 
 ```
 tests/
-├── UnitTests/              # 1,472 fast, isolated tests
+├── UnitTests/              # Fast, isolated tests (most numerous)
 ├── ContractTests/          # API serialization contracts
 ├── WorkflowTests/          # Temporal workflow tests
 ├── IntegrationTests/       # Testcontainers-based tests

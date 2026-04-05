@@ -103,11 +103,10 @@ public sealed class SagaCompensationActivities
     public async Task<bool> CompensateStepAsync(Guid correlationId, string stepName)
     {
         await _logging.LogAsync(correlationId, stepName, $"CompensationStarted:{stepName}");
-        var result = await _compensation.CompensateAsync(correlationId, stepName);
-        await _logging.LogAsync(correlationId, stepName, result
-            ? $"CompensationSucceeded:{stepName}"
-            : $"CompensationFailed:{stepName}");
-        return result;
+        var success = await _compensationService.CompensateAsync(correlationId, stepName);
+        var stage = success ? $"CompensationSucceeded:{stepName}" : $"CompensationFailed:{stepName}";
+        await _logging.LogAsync(correlationId, stepName, stage);
+        return success;
     }
 }
 ```

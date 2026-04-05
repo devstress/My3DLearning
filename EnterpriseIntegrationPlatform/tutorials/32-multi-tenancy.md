@@ -61,10 +61,10 @@ public sealed class TenantContext
     public string? TenantName { get; init; }
     public bool IsResolved { get; init; }
 
-    public static TenantContext Anonymous => new()
+    public static readonly TenantContext Anonymous = new()
     {
         TenantId = "anonymous",
-        IsResolved = false
+        IsResolved = false,
     };
 }
 ```

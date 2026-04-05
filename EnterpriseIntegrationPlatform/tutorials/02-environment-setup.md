@@ -76,7 +76,7 @@ This downloads all NuGet packages defined in `Directory.Packages.props` (central
 dotnet build EnterpriseIntegrationPlatform.sln
 ```
 
-A clean build should complete with **0 errors**. The solution contains 44+ projects — this takes 30–60 seconds on first build.
+A clean build should complete with **0 errors**. The solution contains many projects — this takes 30–60 seconds on first build.
 
 ### Step 4: Run the Tests
 
@@ -86,14 +86,14 @@ dotnet test EnterpriseIntegrationPlatform.sln
 
 The test suite includes:
 
-| Test Project | Count | Description |
-|-------------|-------|-------------|
-| UnitTests | 1,100+ | Fast, isolated tests for every component |
-| ContractTests | 58 | Contract verification between services |
-| WorkflowTests | 29 | Temporal workflow behavior tests |
-| IntegrationTests | 17 | Testcontainers-based tests with real infrastructure |
-| PlaywrightTests | 13 | End-to-end browser tests for OpenClaw UI |
-| LoadTests | 10 | Performance and throughput benchmarks |
+| Test Project | Description |
+|-------------|-------------|
+| UnitTests | Fast, isolated tests for every component (most numerous) |
+| ContractTests | Contract verification between services |
+| WorkflowTests | Temporal workflow behavior tests |
+| IntegrationTests | Testcontainers-based tests with real infrastructure |
+| PlaywrightTests | End-to-end browser tests for OpenClaw UI |
+| LoadTests | Performance and throughput benchmarks |
 
 > **Note:** IntegrationTests and PlaywrightTests require Docker to be running.
 
@@ -144,7 +144,7 @@ The dashboard at `https://localhost:15888` (or the URL shown in console output) 
 
 ```
 EnterpriseIntegrationPlatform/
-├── src/                          # Source code (44+ projects)
+├── src/                          # Source code
 │   ├── AppHost/                  # .NET Aspire orchestrator
 │   ├── ServiceDefaults/          # Shared OpenTelemetry & health checks
 │   ├── Contracts/                # IntegrationEnvelope & shared interfaces

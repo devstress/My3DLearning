@@ -64,6 +64,7 @@ public sealed class MessageFilterOptions
     public RuleLogicOperator Logic { get; init; } = RuleLogicOperator.And;
     public required string OutputTopic { get; init; }
     public string? DiscardTopic { get; init; }
+    public bool RequireDiscardTopic { get; init; }
 }
 ```
 

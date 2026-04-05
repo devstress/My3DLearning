@@ -108,7 +108,8 @@ public sealed class MessageExpirationChecker<T> : IMessageExpirationChecker<T>
 
         await _deadLetterPublisher.PublishAsync(
             envelope, DeadLetterReason.MessageExpired,
-            $"Message expired at {envelope.ExpiresAt.Value:O}.", 0, cancellationToken);
+            $"Message expired at {envelope.ExpiresAt.Value:O}. Current time: {now:O}.",
+            0, cancellationToken);
         return true;
     }
 }
