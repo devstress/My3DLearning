@@ -24,7 +24,7 @@
 
 ✅ Phases 1–21 complete — see `rules/completion-log.md` for full history.
 
-**Current stats:** 1,483 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,616 total tests**. 48 src projects.
+**Current stats:** 1,486 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,619 total tests**. 48 src projects.
 
 ---
 
@@ -45,17 +45,6 @@
 ### Phase 22 — Implement Unfulfilled Tutorial Promises
 
 **Scope:** Audit of all 50 tutorials against source code found 13 features that tutorials promise but are not implemented. These chunks implement the missing features so that every tutorial claim is backed by working code.
-
-#### Chunk 082 — MessageFilter No-Silent-Drop Enforcement
-
-| Field | Value |
-|-------|-------|
-| Status | `not-started` |
-| Tutorial | 10 — Message Filter (line 94) |
-| Claim | "The platform enforces no silent drops in production deployments." and "If the DLQ publish fails, the source message is Nacked and redelivered." |
-| Current State | `MessageFilter.FilterAsync()` silently discards when `DiscardTopic` is null. No Nack-on-DLQ-failure logic exists. |
-| Implementation | Add `RequireDiscardTopic` boolean (default false) to `MessageFilterOptions`. When true, throw `InvalidOperationException` if `DiscardTopic` is not set. Wrap the discard publish in try-catch; on failure, throw so the caller can Nack. Add unit tests for both behaviors. |
-| Files | `src/Processing.Routing/MessageFilterOptions.cs`, `src/Processing.Routing/MessageFilter.cs`, `tests/UnitTests/MessageFilterTests.cs` |
 
 #### Chunk 083 — Content Enricher: Database and Cache Sources
 
@@ -169,7 +158,7 @@
 
 ## Next Chunk
 
-**Chunk 082** — MessageFilter No-Silent-Drop Enforcement
+**Chunk 083** — Content Enricher: Database and Cache Sources
 
 ---
 

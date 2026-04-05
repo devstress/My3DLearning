@@ -309,4 +309,71 @@ public class MessageFilterTests
         Assert.ThrowsAsync<ArgumentNullException>(
             () => filter.FilterAsync<string>(null!));
     }
+
+    [Test]
+    public void FilterAsync_RequireDiscardTopic_NoDiscardTopic_ThrowsInvalidOperation()
+    {
+        var filter = CreateFilter(new MessageFilterOptions
+        {
+            Conditions =
+            [
+                new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "ShipmentCreated" },
+            ],
+            OutputTopic = "output",
+            DiscardTopic = null,
+            RequireDiscardTopic = true,
+        });
+
+        var envelope = CreateEnvelope(messageType: "OrderCreated");
+
+        var ex = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await filter.FilterAsync(envelope));
+
+        Assert.That(ex!.Message, Does.Contain("RequireDiscardTopic"));
+        Assert.That(ex.Message, Does.Contain("DiscardTopic"));
+    }
+
+    [Test]
+    public async Task FilterAsync_RequireDiscardTopic_WithDiscardTopic_RoutesNormally()
+    {
+        var filter = CreateFilter(new MessageFilterOptions
+        {
+            Conditions =
+            [
+                new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "ShipmentCreated" },
+            ],
+            OutputTopic = "output",
+            DiscardTopic = "dlq",
+            RequireDiscardTopic = true,
+        });
+
+        var envelope = CreateEnvelope(messageType: "OrderCreated");
+        var result = await filter.FilterAsync(envelope);
+
+        Assert.That(result.Passed, Is.False);
+        Assert.That(result.OutputTopic, Is.EqualTo("dlq"));
+        await _producer.Received(1).PublishAsync(envelope, "dlq", Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public void FilterAsync_DiscardPublishFails_ExceptionPropagatesForNack()
+    {
+        _producer.PublishAsync(Arg.Any<IntegrationEnvelope<JsonElement>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("Broker unavailable"));
+
+        var filter = CreateFilter(new MessageFilterOptions
+        {
+            Conditions =
+            [
+                new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "ShipmentCreated" },
+            ],
+            OutputTopic = "output",
+            DiscardTopic = "dlq",
+        });
+
+        var envelope = CreateEnvelope(messageType: "OrderCreated");
+
+        Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await filter.FilterAsync(envelope));
+    }
 }

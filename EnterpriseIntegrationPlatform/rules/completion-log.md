@@ -33,6 +33,19 @@ See `milestones.md` for current phase status and next chunk.
   - `tests/UnitTests/IngestionServiceExtensionsTests.cs` — Added 4 new tests: `AddIngestion_NatsJetStream_RegistersProducerAndConsumer`, `AddIngestion_Kafka_RegistersProducerAndConsumer`, `AddIngestion_Pulsar_RegistersProducerAndConsumer`, `AddIngestion_NullConfigure_ThrowsArgumentNullException`.
 - **Test counts**: 1,483 UnitTests (+4). 1,616 total tests.
 
+## Chunk 082 – MessageFilter No-Silent-Drop Enforcement
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Enforce no-silent-drop semantics as promised by tutorial 10 (line 94): "The platform enforces no silent drops in production deployments" and "If the DLQ publish fails, the source message is Nacked and redelivered."
+- **Architecture**: Added `RequireDiscardTopic` boolean (default false) to `MessageFilterOptions`. When true and no `DiscardTopic` is configured, the filter throws `InvalidOperationException` instead of silently dropping. DLQ publish failures propagate naturally (no catch) so the caller can Nack.
+- **Files modified**:
+  - `src/Processing.Routing/MessageFilterOptions.cs` — Added `RequireDiscardTopic` property with xmldoc.
+  - `src/Processing.Routing/MessageFilter.cs` — Added no-silent-drop enforcement when `RequireDiscardTopic` is true. Added comment clarifying DLQ publish failure propagation.
+  - `tests/UnitTests/MessageFilterTests.cs` — Added 3 new tests: `RequireDiscardTopic_NoDiscardTopic_ThrowsInvalidOperation`, `RequireDiscardTopic_WithDiscardTopic_RoutesNormally`, `DiscardPublishFails_ExceptionPropagatesForNack`.
+- **Test counts**: 1,486 UnitTests (+3). 1,619 total tests.
+
 ## Chunk 075 – Fix Tutorials 05, 06, 07
 
 - **Date**: 2026-04-05

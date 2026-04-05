@@ -31,7 +31,16 @@ public sealed class MessageFilterOptions
 
     /// <summary>
     /// Optional topic for discarded messages (e.g. a DLQ topic).
-    /// When <see langword="null"/> or empty, discarded messages are silently dropped.
+    /// When <see langword="null"/> or empty, discarded messages are silently dropped
+    /// unless <see cref="RequireDiscardTopic"/> is <see langword="true"/>.
     /// </summary>
     public string? DiscardTopic { get; init; }
+
+    /// <summary>
+    /// When <see langword="true"/>, the filter throws <see cref="InvalidOperationException"/>
+    /// if a message fails the predicate and no <see cref="DiscardTopic"/> is configured.
+    /// This enforces no-silent-drop semantics in production deployments.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    public bool RequireDiscardTopic { get; init; }
 }

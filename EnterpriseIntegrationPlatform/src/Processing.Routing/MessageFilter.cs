@@ -71,6 +71,7 @@ public sealed class MessageFilter : IMessageFilter
         // Discarded
         if (!string.IsNullOrWhiteSpace(_options.DiscardTopic))
         {
+            // If the DLQ publish fails, the exception propagates so the caller can Nack.
             await _producer.PublishAsync(envelope, _options.DiscardTopic, cancellationToken);
 
             _logger.LogDebug(
@@ -81,6 +82,15 @@ public sealed class MessageFilter : IMessageFilter
                 Passed: false,
                 OutputTopic: _options.DiscardTopic,
                 Reason: "Predicate did not match — routed to discard topic");
+        }
+
+        // No discard topic configured — enforce no-silent-drop when required.
+        if (_options.RequireDiscardTopic)
+        {
+            throw new InvalidOperationException(
+                $"Message {envelope.MessageId} (type={envelope.MessageType}) failed the filter " +
+                "predicate, but no DiscardTopic is configured and RequireDiscardTopic is true. " +
+                "Configure a DiscardTopic to prevent silent message loss.");
         }
 
         _logger.LogDebug(
