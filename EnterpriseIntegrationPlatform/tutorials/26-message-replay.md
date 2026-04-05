@@ -81,12 +81,14 @@ public record ReplayFilter
 
 ```csharp
 // src/Processing.Replay/ReplayResult.cs
-public sealed record ReplayResult(
-    int ReplayedCount,
-    int SkippedCount,
-    int FailedCount,
-    DateTimeOffset StartedAt,
-    DateTimeOffset CompletedAt);
+public record ReplayResult
+{
+    public required int ReplayedCount { get; init; }
+    public required int SkippedCount { get; init; }
+    public required int FailedCount { get; init; }
+    public required DateTimeOffset StartedAt { get; init; }
+    public required DateTimeOffset CompletedAt { get; init; }
+}
 ```
 
 Every replayed message receives a `ReplayId` header (a GUID) linking it back to the replay operation. This separates replayed traffic from live traffic in dashboards and audit logs.

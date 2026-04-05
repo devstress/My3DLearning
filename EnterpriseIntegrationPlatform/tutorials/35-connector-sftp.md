@@ -75,7 +75,7 @@ public sealed class SftpConnectorOptions
 
 ## Scalability Dimension
 
-SFTP connections are **expensive** — each connection requires a TCP handshake and SSH negotiation. The connector pools connections per host and reuses them across requests. Multiple consumer replicas can upload concurrently, but the remote server's connection limit must be respected. Using unique filenames (e.g. based on `MessageId`) avoids filename collisions across replicas.
+SFTP connections are **expensive** — each connection requires a TCP handshake and SSH negotiation. Multiple consumer replicas can upload concurrently, but the remote server's connection limit must be respected. Production deployments should implement connection pooling at the infrastructure level or limit the number of concurrent SFTP consumers. Using unique filenames (e.g. based on `MessageId`) avoids filename collisions across replicas.
 
 ---
 

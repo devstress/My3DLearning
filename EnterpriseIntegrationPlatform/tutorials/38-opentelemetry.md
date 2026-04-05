@@ -87,13 +87,33 @@ Each pipeline stage starts an `Activity` (OpenTelemetry span):
 // src/Observability/PlatformMeters.cs
 public static class PlatformMeters
 {
-    public static readonly Counter<long> MessagesReceived   = /* "eip.messages.received"          */;
-    public static readonly Counter<long> MessagesProcessed  = /* "eip.messages.processed"         */;
-    public static readonly Counter<long> MessagesFailed     = /* "eip.messages.failed"             */;
-    public static readonly Counter<long> MessagesDeadLettered = /* "eip.messages.dead_lettered"   */;
-    public static readonly Counter<long> MessagesRetried    = /* "eip.messages.retried"            */;
-    public static readonly Histogram<double> ProcessingDuration = /* "eip.messages.processing_duration" (ms) */;
-    public static readonly UpDownCounter<long> MessagesInFlight = /* "eip.messages.in_flight"     */;
+    public static readonly Counter<long> MessagesReceived =
+        DiagnosticsConfig.Meter.CreateCounter<long>("eip.messages.received",
+            unit: "{message}", description: "Total number of messages received by the platform.");
+
+    public static readonly Counter<long> MessagesProcessed =
+        DiagnosticsConfig.Meter.CreateCounter<long>("eip.messages.processed",
+            unit: "{message}", description: "Total number of messages processed successfully.");
+
+    public static readonly Counter<long> MessagesFailed =
+        DiagnosticsConfig.Meter.CreateCounter<long>("eip.messages.failed",
+            unit: "{message}", description: "Total number of messages that failed processing.");
+
+    public static readonly Counter<long> MessagesDeadLettered =
+        DiagnosticsConfig.Meter.CreateCounter<long>("eip.messages.dead_lettered",
+            unit: "{message}", description: "Total number of messages sent to the dead-letter store.");
+
+    public static readonly Counter<long> MessagesRetried =
+        DiagnosticsConfig.Meter.CreateCounter<long>("eip.messages.retried",
+            unit: "{message}", description: "Total number of message retry attempts.");
+
+    public static readonly Histogram<double> ProcessingDuration =
+        DiagnosticsConfig.Meter.CreateHistogram<double>("eip.messages.processing_duration",
+            unit: "ms", description: "Duration of end-to-end message processing in milliseconds.");
+
+    public static readonly UpDownCounter<long> MessagesInFlight =
+        DiagnosticsConfig.Meter.CreateUpDownCounter<long>("eip.messages.in_flight",
+            unit: "{message}", description: "Number of messages currently in-flight.");
 
     // Static helper methods for recording with consistent tags:
     public static void RecordReceived(string messageType, string source);

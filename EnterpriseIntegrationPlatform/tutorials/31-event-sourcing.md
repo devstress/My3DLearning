@@ -107,7 +107,7 @@ public static class TemporalQuery
         DateTimeOffset pointInTime,
         TState initialState,
         int maxEventsPerRead = 1000,
-        CancellationToken cancellationToken = default) where TState : notnull;
+        CancellationToken cancellationToken = default);
 }
 ```
 
