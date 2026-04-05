@@ -26,7 +26,7 @@
 
 **Current stats:** 1,518 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,651 total tests**. 48 src projects.
 
-**Next chunk:** Chunk 092 — Kustomize Base Directory Structure
+**Next chunk:** Phase 22 complete — all 13 chunks (080-092) done.
 
 ---
 
@@ -63,16 +63,16 @@
 
 | Field | Value |
 |-------|-------|
-| Status | `not-started` |
+| Status | `done` |
 | Tutorial | 43 — Kubernetes Deployment (lines 91-104) |
 | Claim | Tutorial shows flat `base/` with `deployment.yaml` and `service.yaml`. |
 | Current State | Actual structure has `base/admin-api/` and `base/openclaw-web/` subdirectories. |
-| Implementation | Update tutorial 43 to match the actual directory structure (service-specific subdirectories). This is a documentation fix, not code — the actual structure is correct and better organized. |
+| Implementation | Updated tutorial 43 to match the actual directory structure (service-specific subdirectories, namespace.yaml, prod PDB files). |
 | Files | `tutorials/43-kubernetes-deployment.md` |
 
 ## Next Chunk
 
-**Chunk 091** — DR Status Endpoint and Profiling API Endpoints
+Phase 22 complete — all 13 chunks (080-092) done.
 
 ---
 

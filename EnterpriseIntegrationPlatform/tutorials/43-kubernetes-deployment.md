@@ -92,15 +92,22 @@ Kustomize overlays at `deploy/kustomize/` customize per environment:
 deploy/kustomize/
 ├── base/
 │   ├── kustomization.yaml
-│   ├── deployment.yaml
-│   └── service.yaml
+│   ├── namespace.yaml
+│   ├── admin-api/
+│   │   ├── deployment.yaml
+│   │   └── service.yaml
+│   └── openclaw-web/
+│       ├── deployment.yaml
+│       └── service.yaml
 ├── overlays/
 │   ├── dev/
-│   │   └── kustomization.yaml      # 1 replica, debug logging
+│   │   └── kustomization.yaml        # 1 replica, debug logging
 │   ├── staging/
-│   │   └── kustomization.yaml      # 2 replicas, info logging
+│   │   └── kustomization.yaml        # 2 replicas, info logging
 │   └── prod/
-│       └── kustomization.yaml      # 3+ replicas, warn logging
+│       ├── kustomization.yaml        # 3+ replicas, warn logging
+│       ├── pdb-admin-api.yaml        # PodDisruptionBudget
+│       └── pdb-openclaw-web.yaml     # PodDisruptionBudget
 ```
 
 Apply an overlay:

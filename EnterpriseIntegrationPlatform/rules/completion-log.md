@@ -4,6 +4,17 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 092 – Kustomize Base Directory Structure
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Fix tutorial 43 Kustomize directory tree to match actual `deploy/kustomize/` layout (service-specific subdirectories under `base/`, `namespace.yaml`, prod PDB files).
+- **Files modified**:
+  - `tutorials/43-kubernetes-deployment.md` — Updated directory tree to show `base/admin-api/`, `base/openclaw-web/`, `namespace.yaml`, and prod PDB files.
+- **Test counts**: 1,518 UnitTests. 1,651 total tests. (Documentation-only change, no new tests.)
+- **Notes**: Phase 22 now fully complete — all 13 chunks (080-092) done.
+
 ## Chunk 080 – SFTP Connection Pooling
 
 - **Date**: 2026-04-05
