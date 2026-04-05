@@ -26,6 +26,8 @@
 
 **Current stats:** 1,518 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,651 total tests**. 48 src projects.
 
+**Next chunk:** Chunk 092 — Kustomize Base Directory Structure
+
 ---
 
 ### Phase 19 — Tutorial Audit as New Developer (Round 6)
@@ -56,17 +58,6 @@
 | Current State | `EnvironmentOverrideProvider` only does cascading resolution from the `IConfigurationStore`. It never reads `System.Environment.GetEnvironmentVariable()`. |
 | Implementation | In `ResolveAsync`, before falling back to the store, check `Environment.GetEnvironmentVariable($"EIP__{key.Replace(":", "__")}")`. If found, return a synthetic `ConfigurationEntry` with that value. Add `ResolveManyAsync` override similarly. Add unit tests using environment variable injection. |
 | Files | `src/Configuration/EnvironmentOverrideProvider.cs`, `tests/UnitTests/EnvironmentOverrideProviderTests.cs` |
-
-#### Chunk 091 — DR Status Endpoint and Profiling API Endpoints
-
-| Field | Value |
-|-------|-------|
-| Status | `not-started` |
-| Tutorial | 44 — Disaster Recovery (line 103), 45 — Performance Profiling (lines 153-157) |
-| Claims | Tutorial 44: `GET /api/admin/dr/status` endpoint. Tutorial 45: `GET /api/admin/profiling/status`, `POST /api/admin/profiling/cpu/start`, `POST /api/admin/profiling/cpu/stop`, `POST /api/admin/profiling/memory/snap`, `GET /api/admin/profiling/gc/stats`. |
-| Current State | DR endpoints exist but no `/api/admin/dr/status`. Profiling has different endpoint structure (`/snapshot`, `/hotspots`, `/operations`, `/gc`, etc.) — none of the 5 claimed endpoints exist. |
-| Implementation | **DR**: Add `GET /api/admin/dr/status` that aggregates region health from `IFailoverManager.GetAllRegionsAsync()` + primary region + replication status. **Profiling**: Add the 5 endpoints: `status` (returns whether profiling is active), `cpu/start` (starts continuous profiling), `cpu/stop` (stops + returns latest snapshot), `memory/snap` (captures heap snapshot via `ContinuousProfiler`), `gc/stats` (delegates to `IGcMonitor`). Add contract tests. |
-| Files | `src/Admin.Api/Program.cs`, `tests/ContractTests/` |
 
 #### Chunk 092 — Kustomize Base Directory Structure
 

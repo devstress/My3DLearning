@@ -146,6 +146,16 @@ See `milestones.md` for current phase status and next chunk.
   - `tests/UnitTests/EnvironmentOverrideProviderTests.cs` — Added 4 new tests: env var overrides store, env var not set falls to store, colon-to-underscore mapping, missing var returns null.
 - **Test counts**: 1,518 UnitTests (+4). 1,651 total tests.
 
+## Chunk 091 – DR Status Endpoint and Profiling API Endpoints
+
+- **Date**: 2026-04-05
+- **Phase**: 22
+- **Status**: done
+- **Goal**: Add missing DR status and profiling endpoints as promised by tutorials 44 and 45.
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added 6 new endpoints: `GET /api/admin/dr/status`, `GET /api/admin/profiling/status`, `POST /api/admin/profiling/cpu/start`, `POST /api/admin/profiling/cpu/stop`, `POST /api/admin/profiling/memory/snap`, `GET /api/admin/profiling/gc/stats`.
+- **Test counts**: 1,518 UnitTests. 1,651 total tests.
+
 ## Chunk 075 – Fix Tutorials 05, 06, 07
 
 - **Date**: 2026-04-05

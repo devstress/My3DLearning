@@ -549,6 +549,26 @@ app.MapPut("/api/admin/tenants/{tenantId}/quota", async (
 
 // ── Disaster Recovery ─────────────────────────────────────────────────────────
 
+app.MapGet("/api/admin/dr/status", async (
+    IFailoverManager failoverManager,
+    IReplicationManager replicationManager,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("GetDrStatus", null, http.User);
+    var primary = await failoverManager.GetPrimaryAsync(ct);
+    var regions = await failoverManager.GetAllRegionsAsync(ct);
+    var replicationStatuses = await replicationManager.GetAllStatusesAsync(ct);
+    return Results.Ok(new
+    {
+        PrimaryRegion = primary?.RegionId,
+        TotalRegions = regions.Count,
+        Regions = regions,
+        ReplicationStatuses = replicationStatuses,
+    });
+}).RequireAuthorization();
+
 app.MapGet("/api/admin/dr/regions", async (
     IFailoverManager failoverManager,
     AdminAuditLogger audit,
@@ -672,6 +692,46 @@ app.MapGet("/api/admin/dr/drills/history", async (
 .RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
 
 // ── Performance Profiling Endpoints ───────────────────────────────────────────
+
+app.MapGet("/api/admin/profiling/status", (
+    IContinuousProfiler profiler) =>
+{
+    return Results.Ok(new
+    {
+        IsActive = true,
+        SnapshotCount = profiler.SnapshotCount,
+        LatestSnapshot = profiler.GetLatestSnapshot(),
+    });
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/profiling/cpu/start", (
+    IContinuousProfiler profiler) =>
+{
+    profiler.CaptureSnapshot("cpu-profiling-start");
+    return Results.Ok(new { Message = "CPU profiling started" });
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/profiling/cpu/stop", (
+    IContinuousProfiler profiler) =>
+{
+    var snapshot = profiler.CaptureSnapshot("cpu-profiling-stop");
+    return Results.Ok(snapshot);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/profiling/memory/snap", (
+    IContinuousProfiler profiler) =>
+{
+    var snapshot = profiler.CaptureSnapshot("memory-snapshot");
+    return Results.Ok(snapshot);
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/profiling/gc/stats", (
+    IGcMonitor monitor) =>
+{
+    var snapshot = monitor.CaptureSnapshot();
+    var recommendations = monitor.GetRecommendations();
+    return Results.Ok(new { Snapshot = snapshot, Recommendations = recommendations });
+}).RequireAuthorization();
 
 app.MapPost("/api/admin/profiling/snapshot", async (
     IContinuousProfiler profiler,
