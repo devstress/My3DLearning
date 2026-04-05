@@ -3,6 +3,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.RuleEngine;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
@@ -693,5 +694,74 @@ public class BusinessRuleEngineTests
 
         Assert.That(result.RulesEvaluated, Is.EqualTo(2));
         Assert.That(result.HasMatch, Is.True);
+    }
+
+    [Test]
+    public async Task EvaluateAsync_CacheEnabled_DoesNotCallStoreOnSecondEvaluation()
+    {
+        var rule = CreateRule("R1", 1, RuleActionType.Route,
+            [new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "OrderCreated" }],
+            targetTopic: "orders");
+        await _store.AddOrUpdateAsync(rule);
+
+        var storeProxy = Substitute.For<IRuleStore>();
+        storeProxy.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<BusinessRule>>([rule]));
+
+        var sut = new BusinessRuleEngine(
+            storeProxy,
+            Options.Create(new RuleEngineOptions { CacheEnabled = true, CacheRefreshIntervalMs = 60_000 }),
+            NullLogger<BusinessRuleEngine>.Instance);
+
+        await sut.EvaluateAsync(BuildEnvelope(messageType: "OrderCreated"));
+        await sut.EvaluateAsync(BuildEnvelope(messageType: "OrderCreated"));
+
+        // Only one call to store — second evaluation uses cache.
+        await storeProxy.Received(1).GetAllAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task EvaluateAsync_CacheDisabled_CallsStoreEveryTime()
+    {
+        var rule = CreateRule("R1", 1, RuleActionType.Route,
+            [new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "OrderCreated" }],
+            targetTopic: "orders");
+
+        var storeProxy = Substitute.For<IRuleStore>();
+        storeProxy.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<BusinessRule>>([rule]));
+
+        var sut = new BusinessRuleEngine(
+            storeProxy,
+            Options.Create(new RuleEngineOptions { CacheEnabled = false }),
+            NullLogger<BusinessRuleEngine>.Instance);
+
+        await sut.EvaluateAsync(BuildEnvelope(messageType: "OrderCreated"));
+        await sut.EvaluateAsync(BuildEnvelope(messageType: "OrderCreated"));
+
+        await storeProxy.Received(2).GetAllAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task EvaluateAsync_CacheExpired_RefreshesFromStore()
+    {
+        var rule = CreateRule("R1", 1, RuleActionType.Route,
+            [new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "OrderCreated" }],
+            targetTopic: "orders");
+
+        var storeProxy = Substitute.For<IRuleStore>();
+        storeProxy.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<BusinessRule>>([rule]));
+
+        var sut = new BusinessRuleEngine(
+            storeProxy,
+            Options.Create(new RuleEngineOptions { CacheEnabled = true, CacheRefreshIntervalMs = 1 }),
+            NullLogger<BusinessRuleEngine>.Instance);
+
+        await sut.EvaluateAsync(BuildEnvelope(messageType: "OrderCreated"));
+        await Task.Delay(20); // let cache expire
+        await sut.EvaluateAsync(BuildEnvelope(messageType: "OrderCreated"));
+
+        await storeProxy.Received(2).GetAllAsync(Arg.Any<CancellationToken>());
     }
 }

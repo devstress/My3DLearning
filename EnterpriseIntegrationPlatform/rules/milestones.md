@@ -24,7 +24,7 @@
 
 ✅ Phases 1–21 complete — see `rules/completion-log.md` for full history.
 
-**Current stats:** 1,498 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,631 total tests**. 48 src projects.
+**Current stats:** 1,501 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,634 total tests**. 48 src projects.
 
 ---
 
@@ -45,17 +45,6 @@
 ### Phase 22 — Implement Unfulfilled Tutorial Promises
 
 **Scope:** Audit of all 50 tutorials against source code found 13 features that tutorials promise but are not implemented. These chunks implement the missing features so that every tutorial claim is backed by working code.
-
-#### Chunk 088 — Rule Engine In-Memory Caching with Periodic Refresh
-
-| Field | Value |
-|-------|-------|
-| Status | `not-started` |
-| Tutorial | 30 — Rule Engine (line 134) |
-| Claim | "Rules are cached in memory and refreshed periodically." |
-| Current State | `BusinessRuleEngine.EvaluateAsync()` calls `_ruleStore.GetAllAsync()` on every single message evaluation. No caching. |
-| Implementation | Add `CacheEnabled` (default true) and `CacheRefreshIntervalMs` (default 60000) to `RuleEngineOptions`. In `BusinessRuleEngine`, maintain a `IReadOnlyList<BusinessRule>? _cachedRules` field and a `DateTimeOffset _lastRefresh`. On `EvaluateAsync`, if cache is stale (elapsed > interval) or null, refresh from store. Add unit tests for cache hit, cache miss, and refresh behavior. |
-| Files | `src/RuleEngine/RuleEngineOptions.cs`, `src/RuleEngine/BusinessRuleEngine.cs`, `tests/UnitTests/BusinessRuleEngineTests.cs` |
 
 #### Chunk 089 — InputSanitizer: Script Tag, SQL Injection, HTML Entity, and Control Character Detection
 
@@ -103,7 +92,7 @@
 
 ## Next Chunk
 
-**Chunk 088** — Rule Engine In-Memory Caching with Periodic Refresh
+**Chunk 089** — InputSanitizer: Script Tag, SQL Injection, HTML Entity, and Control Character Detection
 
 ---
 

@@ -112,6 +112,18 @@ See `milestones.md` for current phase status and next chunk.
   - `tests/UnitTests/MessageReplayerTests.cs` — Added 3 new tests.
 - **Test counts**: 1,498 UnitTests (+3). 1,631 total tests.
 
+## Chunk 088 – Rule Engine In-Memory Caching with Periodic Refresh
+
+- **Date**: 2026-04-05
+- **Phase**: 22
+- **Status**: done
+- **Goal**: Cache rules in memory with periodic refresh as promised by tutorial 30 (line 134).
+- **Files modified**:
+  - `src/RuleEngine/RuleEngineOptions.cs` — Added `CacheEnabled` and `CacheRefreshIntervalMs`.
+  - `src/RuleEngine/BusinessRuleEngine.cs` — Added rule caching with time-based refresh.
+  - `tests/UnitTests/BusinessRuleEngineTests.cs` — Added 3 new tests.
+- **Test counts**: 1,501 UnitTests (+3). 1,634 total tests.
+
 ## Chunk 075 – Fix Tutorials 05, 06, 07
 
 - **Date**: 2026-04-05

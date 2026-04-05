@@ -32,6 +32,11 @@ public sealed class BusinessRuleEngine : IRuleEngine
     private readonly ILogger<BusinessRuleEngine> _logger;
     private readonly TimeSpan _regexTimeout;
 
+    // In-memory rule cache fields.
+    private IReadOnlyList<BusinessRule>? _cachedRules;
+    private DateTimeOffset _lastRefresh = DateTimeOffset.MinValue;
+    private readonly object _cacheLock = new();
+
     /// <summary>Initialises a new instance of <see cref="BusinessRuleEngine"/>.</summary>
     public BusinessRuleEngine(
         IRuleStore ruleStore,
@@ -64,7 +69,7 @@ public sealed class BusinessRuleEngine : IRuleEngine
             return new RuleEvaluationResult([], [], HasMatch: false, RulesEvaluated: 0);
         }
 
-        var allRules = await _ruleStore.GetAllAsync(cancellationToken);
+        var allRules = await GetRulesAsync(cancellationToken);
         var matchedRules = new List<BusinessRule>();
         var actions = new List<RuleAction>();
         var rulesEvaluated = 0;
@@ -109,6 +114,32 @@ public sealed class BusinessRuleEngine : IRuleEngine
         }
 
         return new RuleEvaluationResult(matchedRules, actions, matchedRules.Count > 0, rulesEvaluated);
+    }
+
+    private async Task<IReadOnlyList<BusinessRule>> GetRulesAsync(CancellationToken ct)
+    {
+        if (!_options.CacheEnabled)
+            return await _ruleStore.GetAllAsync(ct);
+
+        var now = DateTimeOffset.UtcNow;
+        var refreshInterval = TimeSpan.FromMilliseconds(
+            _options.CacheRefreshIntervalMs > 0 ? _options.CacheRefreshIntervalMs : 60_000);
+
+        // Fast path: cache is still valid.
+        if (_cachedRules is not null && now - _lastRefresh < refreshInterval)
+            return _cachedRules;
+
+        // Refresh from store.
+        var rules = await _ruleStore.GetAllAsync(ct);
+
+        lock (_cacheLock)
+        {
+            _cachedRules = rules;
+            _lastRefresh = now;
+        }
+
+        _logger.LogDebug("Rule cache refreshed — {Count} rules loaded", rules.Count);
+        return rules;
     }
 
     private bool EvaluateRule<T>(IntegrationEnvelope<T> envelope, BusinessRule rule)
