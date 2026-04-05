@@ -145,13 +145,63 @@ Sanitization runs **before the message is Acked**. Callers can use `IsClean` to 
 
 ---
 
-## Exercises
+## Lab
 
-1. A payload contains `<script>alert('xss')</script>` embedded in a JSON string value. Describe how the sanitizer detects and removes it while preserving valid JSON structure.
+**Objective:** Trace the input sanitization pipeline, analyze how defense-in-depth protects **message atomicity** from injection attacks, and evaluate secret management for **scalable** multi-environment deployments.
 
-2. Why does the platform use a separate `IPayloadSizeGuard` instead of checking size inside `IInputSanitizer`?
+### Step 1: Trace XSS Sanitization
 
-3. Compare `AzureKeyVaultSecretProvider` and `VaultSecretProvider`. When would you choose one over the other?
+A payload contains `<script>alert('xss')</script>` embedded in a JSON string value. Open `src/Security/InputSanitizer.cs` and trace:
+
+1. How does the sanitizer detect the `<script>` tag within a JSON value?
+2. Is the malicious content removed, escaped, or rejected?
+3. Is the rest of the valid JSON preserved?
+4. What happens to the envelope's `MessageId` and `CorrelationId` — are they affected?
+
+Why is sanitization critical for **pipeline atomicity**? (hint: unsanitized payloads could execute scripts in downstream web UIs or corrupt database queries)
+
+### Step 2: Analyze Payload Size Guard
+
+Why does the platform use a separate `IPayloadSizeGuard` instead of checking size inside `IInputSanitizer`?
+
+| Concern | Responsibility | Why Separate? |
+|---------|---------------|---------------|
+| Size validation | `IPayloadSizeGuard` | Cheap check — reject oversized payloads before expensive sanitization |
+| Content sanitization | `IInputSanitizer` | Complex parsing — only runs on right-sized payloads |
+| Schema validation | Activity pipeline | Business logic — runs after sanitization |
+
+How does this layered approach improve **throughput scalability**? (hint: fast rejection of invalid messages at each layer)
+
+### Step 3: Compare Secret Providers for Multi-Environment Deployment
+
+| Provider | Best For | Rotation | Caching |
+|----------|---------|----------|---------|
+| `InMemorySecretProvider` | Development and testing | Manual | No |
+| `CachedSecretProvider` | Production (wraps any provider) | Automatic TTL | Yes |
+| `AzureKeyVaultSecretProvider` | Azure deployments | Azure-managed | Via wrapper |
+| `VaultSecretProvider` | Multi-cloud with HashiCorp Vault | Vault-managed | Via wrapper |
+
+When would you use `CachedSecretProvider` wrapping `AzureKeyVaultSecretProvider`? What is the **scalability** benefit of caching secrets locally?
+
+## Exam
+
+1. Why does the platform sanitize payloads **before** routing or processing?
+   - A) Sanitization improves message routing speed
+   - B) Unsanitized payloads could contain injection attacks (XSS, SQL injection) that execute when consumed by downstream systems — sanitizing at ingress prevents malicious content from propagating through the entire pipeline
+   - C) The broker requires sanitized payloads
+   - D) Sanitization is only needed for XML messages
+
+2. Why does the `IPayloadSizeGuard` run before `IInputSanitizer`?
+   - A) Size checking is always done first by convention
+   - B) Rejecting oversized payloads before sanitization avoids expensive parsing of potentially malicious large payloads — this is a defense-in-depth principle that protects against denial-of-service via payload size
+   - C) The sanitizer cannot handle large payloads
+   - D) Size checking requires less memory
+
+3. How does secret caching with `CachedSecretProvider` improve **operational scalability**?
+   - A) Caching stores more secrets than the vault
+   - B) Frequently accessed secrets are served from memory instead of making network calls to the vault — this reduces latency and eliminates the vault as a bottleneck when many services need secrets simultaneously
+   - C) Caching eliminates the need for secret rotation
+   - D) The vault requires caching for correctness
 
 ---
 

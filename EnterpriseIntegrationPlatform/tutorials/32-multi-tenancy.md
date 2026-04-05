@@ -136,13 +136,62 @@ The isolation guard runs **before any processing** — a cross-tenant message is
 
 ---
 
-## Exercises
+## Lab
 
-1. A message arrives with `X-Tenant-Id: tenant-a` but the JWT claim says `tenant-b`. How should the resolver handle this conflict?
+**Objective:** Trace tenant resolution and isolation enforcement, design the onboarding resource provisioning pipeline, and analyze why tenant isolation is non-negotiable for **multi-tenant scalability**.
 
-2. Describe the self-service flow when a new tenant onboards: what resources are provisioned and in what order?
+### Step 1: Resolve a Tenant Identity Conflict
 
-3. Why is `TenantIsolationException` non-retryable? Under what circumstances could a cross-tenant message be legitimate?
+A message arrives with `X-Tenant-Id: tenant-a` but the JWT claim says `tenant-b`. Open `src/MultiTenancy/` and trace:
+
+1. How does the tenant resolver prioritize these conflicting signals?
+2. Should the resolver trust the header or the JWT? (hint: JWT is cryptographically signed)
+3. What exception is thrown for the conflict? Is it retryable?
+
+Design a resolution policy: When is a conflict legitimate (e.g., admin impersonation) vs. a security violation?
+
+### Step 2: Design the Onboarding Pipeline
+
+When a new tenant onboards, trace the self-service provisioning flow:
+
+| Step | Resource | Class | Atomic? |
+|------|----------|-------|---------|
+| 1 | Create tenant record | `InMemoryTenantOnboardingService` | Yes |
+| 2 | Provision broker namespace | `InMemoryBrokerNamespaceProvisioner` | Yes |
+| 3 | Set quota limits | `InMemoryTenantQuotaManager` | Yes |
+| 4 | Initialize configuration | ConfigurationStore | Yes |
+
+If Step 3 fails, what compensation is needed for Steps 1-2? How does this relate to the Saga pattern?
+
+### Step 3: Analyze Tenant Isolation for Scalability
+
+| Without Isolation | With Isolation |
+|------------------|----------------|
+| Tenant A's traffic spike affects Tenant B | Each tenant has dedicated queues and quotas |
+| One tenant's DLQ overflow blocks all tenants | Isolated DLQ per tenant |
+| Security breach in one tenant exposes all | `TenantIsolationGuard` prevents cross-tenant access |
+
+Why is `TenantIsolationException` non-retryable? Under what circumstances could a cross-tenant message be legitimate?
+
+## Exam
+
+1. Why must tenant resolution trust JWT claims over HTTP headers?
+   - A) HTTP headers are faster to parse
+   - B) JWTs are cryptographically signed and cannot be forged by the caller — headers can be spoofed; trusting unsigned headers would allow any caller to impersonate any tenant, violating isolation
+   - C) The broker requires JWT tokens
+   - D) Headers don't support tenant identifiers
+
+2. Why is `TenantIsolationException` non-retryable?
+   - A) Retries would succeed with different credentials
+   - B) A cross-tenant access attempt is a security violation — retrying won't change the tenant identity; it must be investigated as a potential breach, not automatically retried
+   - C) The exception is transient and self-healing
+   - D) Non-retryable exceptions are faster to process
+
+3. How does per-tenant resource provisioning enable **horizontal scalability**?
+   - A) All tenants share a single resource pool
+   - B) Each tenant gets isolated broker namespaces and quotas — adding tenants doesn't affect existing tenants' performance, and each tenant's resources can be independently scaled based on their usage patterns
+   - C) Resource provisioning is only needed for premium tenants
+   - D) The broker automatically provisions resources
 
 ---
 

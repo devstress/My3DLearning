@@ -85,13 +85,68 @@ The `UploadAsync` method ensures **all-or-nothing delivery**. If the upload fail
 
 ---
 
-## Exercises
+## Lab
 
-1. An SFTP server has a 10-connection limit. You have 20 consumer replicas uploading files. Design a connection pooling strategy.
+**Objective:** Design connection pooling for SFTP under high consumer concurrency, trace the upload lifecycle, and analyze **atomic** file delivery guarantees.
 
-2. `UploadAsync<T>` accepts a `Func<T, byte[]>` serializer. Write a serializer lambda for a JSON payload of type `OrderPayload`.
+### Step 1: Design Connection Pooling
 
-3. Why does the connector return the full remote path from `UploadAsync` rather than a `ConnectorResult`?
+An SFTP server has a 10-connection limit. You have 20 consumer replicas uploading files:
+
+| Without Pooling | With Pooling |
+|-----------------|-------------|
+| 20 connections attempted | Pool of 10 shared connections |
+| 10 fail with connection refused | Consumers wait for available connection |
+| No retry coordination | Queue + semaphore manages access |
+
+Open `src/Connectors.Sftp/SftpConnector.cs` and check: How does the platform pool SFTP connections? What happens when all pool slots are busy?
+
+### Step 2: Trace the Upload Lifecycle
+
+`UploadAsync<T>` accepts a `Func<T, byte[]>` serializer. Write a serializer for a JSON payload:
+
+```csharp
+var remotePath = await sftpConnector.UploadAsync(
+    envelope,
+    remoteDir: "/incoming/orders",
+    serializer: payload => System.Text.Encoding.UTF8.GetBytes(
+        System.Text.Json.JsonSerializer.Serialize(payload)),
+    cancellationToken: ct);
+```
+
+Why does the connector return the full remote path rather than a `ConnectorResult`? How does the caller confirm **atomic** delivery — is the file visible to the receiver immediately or after a rename?
+
+### Step 3: Design Atomic File Delivery
+
+SFTP uploads are not atomic — a partial file can be read by the receiver mid-upload. Design a safe strategy:
+
+```
+1. Upload to temporary path: /incoming/orders/.tmp-{guid}
+2. Rename to final path: /incoming/orders/order-42.json
+3. Return the final path in ConnectorResult
+```
+
+If the upload fails after 50%, the temp file is cleaned up. If the rename fails, the temp file exists but is invisible to the receiver. How does this pattern guarantee **atomic** file visibility?
+
+## Exam
+
+1. Why is connection pooling essential for SFTP connector **scalability**?
+   - A) SFTP servers have unlimited connections
+   - B) SFTP servers have strict connection limits — without pooling, concurrent consumer replicas would exceed the limit and fail; pooling ensures connections are shared efficiently across all consumers
+   - C) Pooling reduces file size
+   - D) Each consumer needs its own dedicated SFTP server
+
+2. How does the temp-file-then-rename pattern ensure **atomic** file delivery?
+   - A) Renaming is faster than uploading
+   - B) The receiver never sees partial files — the temp file is invisible to the receiver's file scanner, and the rename operation is atomic at the filesystem level, so the file transitions from invisible to complete in one step
+   - C) The SFTP protocol guarantees atomicity
+   - D) Temp files are automatically deleted after 30 seconds
+
+3. What happens if the SFTP connection is lost during an upload?
+   - A) The partial file is delivered to the receiver
+   - B) The temp file remains on the server but is not renamed — the connector retries the entire upload; if all retries fail, the message is routed to the DLQ and the orphaned temp file can be cleaned up by a scheduled job
+   - C) The connection automatically reconnects and resumes
+   - D) The broker retries the upload internally
 
 ---
 
