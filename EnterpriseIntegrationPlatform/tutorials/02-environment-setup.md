@@ -246,13 +246,56 @@ You need `Microsoft.NETCore.App 10.x.x` and `Microsoft.AspNetCore.App 10.x.x`.
 
 ---
 
-## Exercises
+## Lab Exercise
 
-1. **Explore the solution**: Open the `.sln` file in your IDE and browse the project list. Count how many `Processing.*` projects exist.
+**Objective:** Build the solution, run the test suite, and launch the .NET Aspire dashboard to verify your development environment is fully operational.
 
-2. **Read the tests**: Open `tests/UnitTests/` and browse the test namespaces. Each namespace corresponds to a `src/` project.
+### Step 1: Build and Run the Test Suite
 
-3. **Explore Aspire**: Launch the AppHost and click through the Aspire dashboard. Find the health check endpoints for each service.
+Open a terminal in the repository root and execute:
+
+```bash
+dotnet restore
+dotnet build --no-restore
+dotnet test --no-build --verbosity normal
+```
+
+Confirm that the build succeeds with zero errors and that all test projects (UnitTests, ContractTests, WorkflowTests) report their results.
+
+### Step 2: Launch the Aspire Dashboard
+
+Start the orchestrator and open the dashboard:
+
+```bash
+cd src/AppHost
+dotnet run
+```
+
+Open the Aspire dashboard URL printed in the console (typically `https://localhost:15888`). Locate the **Gateway.Api**, **Admin.Api**, and **OpenClaw.Web** resources. Click into each resource and verify its health check endpoint returns a healthy status.
+
+### Step 3: Write a Unit Test
+
+In the `tests/UnitTests/` project, create a test class named `EnvironmentVerificationTests`. Add a test method called `AppHost_ServiceDefaultsAssembly_CanBeLoaded` that uses `typeof(EnterpriseIntegrationPlatform.Contracts.IntegrationEnvelope<string>).Assembly` to verify the Contracts assembly loads successfully. Assert that the assembly is not null and that its `GetTypes()` array contains the `IntegrationEnvelope<T>` type.
+
+## Knowledge Check
+
+1. Which command restores NuGet packages for every project in the solution before building?
+   - A) `dotnet build --restore`
+   - B) `dotnet restore`
+   - C) `dotnet nuget install`
+   - D) `dotnet pack`
+
+2. What is the purpose of the `src/AppHost` project in this platform?
+   - A) It hosts the production web application behind a reverse proxy
+   - B) It is the .NET Aspire orchestrator that starts all services and infrastructure containers in the correct order
+   - C) It compiles all projects into a single deployable binary
+   - D) It runs database migrations on startup
+
+3. Why does the platform organize tests into separate projects (UnitTests, ContractTests, IntegrationTests) rather than a single test project?
+   - A) .NET only allows one test framework per project
+   - B) It enables running fast unit tests independently from slow integration tests that require infrastructure like Docker containers
+   - C) Each test project must target a different .NET version
+   - D) NUnit requires separate assemblies for parallel execution
 
 ---
 

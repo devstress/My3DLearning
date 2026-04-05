@@ -232,16 +232,41 @@ Is this task delivery (process and acknowledge)?
 
 ---
 
-## Exercises
+## Lab Exercise
 
-1. **HOL blocking scenario**: You have 1,000 recipients. Recipient 500 has a message that takes 60 seconds to process. With Kafka (10 partitions), how many other recipients are potentially blocked? With NATS queue groups?
+**Objective:** Design a NATS subject hierarchy, publish messages through the broker abstraction, and verify broker-agnostic behavior with a unit test.
 
-2. **Topic design**: Design the topic hierarchy for a system that processes invoices, payments, and refunds across 3 regions (US, EU, APAC). Use NATS subject hierarchy.
+### Step 1: Design a NATS Subject Hierarchy
 
-3. **Broker selection**: For each scenario, choose the best broker:
-   - Real-time analytics dashboard consuming all order events
-   - Processing customer onboarding requests (each takes 5-30 seconds)
-   - Audit trail that must be retained for 7 years
+On paper or in a text file, design a subject hierarchy for a multi-region e-commerce system. Use the NATS wildcard conventions (`.` for level separation, `*` for single-level wildcard, `>` for multi-level wildcard). Your hierarchy should support: orders, payments, and refunds across three regions (US, EU, APAC). Example starting point: `eip.us.orders.created`. Write a subscriber pattern that captures all events in the EU region using a wildcard: `eip.eu.>`.
+
+### Step 2: Publish Through the Broker Abstraction
+
+Write code that creates an `IntegrationEnvelope<string>` with `Source = "PaymentService"` and `MessageType = "payment.completed"`. Using NSubstitute, create a mock `IMessageBrokerProducer` and call `PublishAsync` with the topic `"eip.us.payments.completed"`. Use `Received(1)` to verify the producer was called exactly once with the correct topic argument.
+
+### Step 3: Write a Unit Test
+
+In `tests/UnitTests/`, create a test class named `BrokerAbstractionTests`. Add a test method called `PublishAsync_WithMockedProducer_InvokesProducerWithCorrectTopic` that creates a mock `IMessageBrokerProducer` via NSubstitute, builds an `IntegrationEnvelope<string>`, calls `PublishAsync` with a specific topic string, and asserts using `Received(1)` that `PublishAsync` was invoked exactly once with the expected topic.
+
+## Knowledge Check
+
+1. What is head-of-line (HOL) blocking in the context of message brokers, and which broker architecture avoids it?
+   - A) HOL blocking occurs when a slow message in a partition delays all subsequent messages in that partition; NATS queue groups avoid it because any available consumer can pick up any message
+   - B) HOL blocking is a network-layer issue that all brokers handle identically
+   - C) HOL blocking only affects messages with `MessagePriority.Low`; Kafka avoids it with replication
+   - D) HOL blocking means messages are delivered out of order; Pulsar avoids it with schema enforcement
+
+2. Why does the platform define `IMessageBrokerProducer` and `IMessageBrokerConsumer` as abstractions rather than coding directly against a specific broker SDK?
+   - A) The broker SDKs do not support .NET 10
+   - B) It allows the broker implementation (Kafka, NATS, or Pulsar) to be swapped at deployment time without changing application code
+   - C) Abstractions are required by the C# compiler for async methods
+   - D) Each broker uses a different serialization format that must be hidden
+
+3. When would you choose Apache Pulsar's Key_Shared subscription over Kafka's partition-based consumption?
+   - A) When you need messages delivered in strict global order across all keys
+   - B) When you want per-key ordering without cross-key head-of-line blocking, especially in multi-tenant scenarios where one tenant's slow processing should not affect others
+   - C) When your messages do not have any key and need round-robin delivery
+   - D) When you require messages to be stored for less than 24 hours
 
 ---
 

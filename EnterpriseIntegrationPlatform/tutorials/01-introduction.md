@@ -152,13 +152,41 @@ By the end of this course, you'll understand how to:
 
 ---
 
-## Exercises
+## Lab Exercise
 
-1. **Explore the EIP website**: Visit [enterpriseintegrationpatterns.com](https://www.enterpriseintegrationpatterns.com/patterns/messaging/toc.html) and browse the pattern catalog. Pick three patterns and think about where you've seen them (or could use them) in your own work.
+**Objective:** Explore the platform's project structure and identify how EIP patterns map to concrete source code components.
 
-2. **Review the architecture**: Read [`docs/architecture-overview.md`](../docs/architecture-overview.md) and identify how the platform's data flow maps to the Pipes and Filters pattern.
+### Step 1: Browse the EIP Pattern Mapping
 
-3. **Count the patterns**: Look at [`docs/eip-mapping.md`](../docs/eip-mapping.md) and count how many of the 65 EIP patterns are implemented in the platform.
+Open [`docs/eip-mapping.md`](../docs/eip-mapping.md) and [`docs/architecture-overview.md`](../docs/architecture-overview.md). For each of the following EIP pattern categories — Message Construction, Message Routing, and Message Transformation — find at least one `src/` project that implements it. Record the project name and the primary interface it exposes (e.g., `Processing.Routing` → `IContentBasedRouter`).
+
+### Step 2: Inspect a Processing Project
+
+Open `src/Processing.Routing/` in your IDE. Locate the `IContentBasedRouter` interface and its `RouteAsync` method signature. Then open `src/Processing.Splitter/` and find `IMessageSplitter<T>`. Note how both interfaces accept an `IntegrationEnvelope<T>` — this is the platform's canonical message wrapper from `src/Contracts/`.
+
+### Step 3: Write a Unit Test
+
+Create a test class named `EipPatternDiscoveryTests` in the `tests/UnitTests/` project. Add a test method called `IntegrationEnvelope_ImplementsRecordSemantics_SupportsWithExpressions` that creates an `IntegrationEnvelope<string>` using the `IntegrationEnvelope<string>.Create()` factory method, then uses a `with` expression to change the `Source` property, and asserts that the original envelope is unchanged while the new envelope has the updated source.
+
+## Knowledge Check
+
+1. Which integration style does the Enterprise Integration Patterns book recommend for loosely coupled, asynchronous communication between systems?
+   - A) File Transfer
+   - B) Shared Database
+   - C) Messaging
+   - D) Remote Procedure Invocation
+
+2. In the platform's architecture, what is the role of `IntegrationEnvelope<T>`?
+   - A) It serializes messages to XML for transport over HTTP
+   - B) It serves as the canonical message wrapper carrying payload, identity, and metadata through every processing stage
+   - C) It stores messages in a relational database for auditing
+   - D) It encrypts message payloads before publishing to brokers
+
+3. Why does the platform define processing components behind interfaces such as `IContentBasedRouter` and `IMessageSplitter<T>` rather than concrete classes?
+   - A) Interfaces are required by the .NET runtime for serialization
+   - B) It allows each component to be tested, replaced, and composed independently — following the Pipes and Filters pattern
+   - C) Concrete classes cannot be used with dependency injection in .NET
+   - D) Interfaces automatically provide thread safety
 
 ---
 

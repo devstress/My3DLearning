@@ -266,16 +266,50 @@ public class IntegrationEnvelopeTests
 
 ---
 
-## Exercises
+## Lab Exercise
 
-1. **Trace a CorrelationId**: Imagine you publish a message, it gets split into 5 parts, each part gets transformed, and then they're aggregated back together. Which field ensures they all stay linked? What would `CausationId` be set to on each split message?
+**Objective:** Create an `IntegrationEnvelope<T>`, publish it through `IMessageBrokerProducer`, and consume it with `IMessageBrokerConsumer` using mocked dependencies.
 
-2. **Choose the Intent**: For each scenario, pick the correct `MessageIntent`:
-   - "Process this payment" → ?
-   - "Here is the quarterly report" → ?
-   - "A new customer registered" → ?
+### Step 1: Create an Integration Envelope
 
-3. **Broker independence**: Why does the platform use `IMessageBrokerProducer` instead of calling Kafka/NATS directly? What happens when you switch from NATS to Pulsar?
+In a new or existing C# file, create an `IntegrationEnvelope<string>` using the static factory method:
+
+```csharp
+var envelope = IntegrationEnvelope<string>.Create(
+    payload: "{\"orderId\": 42, \"amount\": 99.95}",
+    source: "OrderService",
+    messageType: "order.created");
+```
+
+Inspect the returned envelope — verify that `MessageId` is a non-empty `Guid`, `Timestamp` is close to `DateTimeOffset.UtcNow`, and `Priority` defaults to `MessagePriority.Normal`.
+
+### Step 2: Mock a Publish-Subscribe Round-Trip
+
+Using NSubstitute, create mocks for `IMessageBrokerProducer` and `IMessageBrokerConsumer`. Call `PublishAsync` on the producer with your envelope and the topic `"eip.orders.created"`. Then set up the consumer's `SubscribeAsync` to capture the handler callback and invoke it with the same envelope. Verify the handler receives an envelope whose `CorrelationId` matches the original.
+
+### Step 3: Write a Unit Test
+
+In `tests/UnitTests/`, create a test class named `FirstMessageTests`. Add a test method called `Create_WithValidParameters_SetsIdentityFieldsCorrectly` that calls `IntegrationEnvelope<string>.Create()` with a payload, source, and message type, then asserts: (1) `MessageId` is not `Guid.Empty`, (2) `CorrelationId` is not `Guid.Empty`, (3) `Source` equals the provided value, and (4) `MessageType` equals the provided value.
+
+## Knowledge Check
+
+1. What is the purpose of the `CorrelationId` field on `IntegrationEnvelope<T>`?
+   - A) It uniquely identifies a single message in the broker's storage
+   - B) It links all messages that belong to the same logical business transaction, even across splits and transformations
+   - C) It stores the consumer group name for load balancing
+   - D) It provides the encryption key for message payloads
+
+2. When the platform publishes a message through `IMessageBrokerProducer`, what allows switching from NATS to Kafka without changing application code?
+   - A) The message is automatically converted to a different format by the broker
+   - B) The `IMessageBrokerProducer` interface abstracts the broker, so a different implementation is injected at deployment time
+   - C) Kafka and NATS use identical wire protocols
+   - D) The `IntegrationEnvelope<T>` handles broker selection internally
+
+3. Which `MessageIntent` value should be assigned to a message that instructs a downstream service to perform an action (e.g., "process this payment")?
+   - A) `MessageIntent.Event`
+   - B) `MessageIntent.Document`
+   - C) `MessageIntent.Command`
+   - D) `MessageIntent.Query`
 
 ---
 

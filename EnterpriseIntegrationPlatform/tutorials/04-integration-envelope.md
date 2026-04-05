@@ -215,13 +215,41 @@ All five envelopes share the same `CorrelationId`. This lets you:
 
 ---
 
-## Exercises
+## Lab Exercise
 
-1. **Design an envelope**: You receive an XML invoice from a partner via SFTP. Design the `IntegrationEnvelope` fields — what would `Source`, `MessageType`, `Intent`, and key metadata entries be?
+**Objective:** Construct envelopes with identity, sequencing, and expiration fields, then verify immutability using C# `with` expressions.
 
-2. **Trace the chain**: A message arrives, gets validated, split into 3 parts, each part is transformed, and all 3 are aggregated. How many envelopes are created total? Draw the `CausationId` chain.
+### Step 1: Build a Causation Chain
 
-3. **Expiration scenario**: A message has `ExpiresAt = now + 5 minutes`. Processing takes 6 minutes. What happens? Which component handles this?
+Write code that simulates a three-step processing pipeline. Start by creating an original envelope with `IntegrationEnvelope<string>.Create()`. Then create a second envelope (representing a transformation result) using a `with` expression — set its `CausationId` to the first envelope's `MessageId` and keep the same `CorrelationId`. Create a third envelope whose `CausationId` is the second envelope's `MessageId`. Print or assert that all three share the same `CorrelationId` but have distinct `MessageId` values.
+
+### Step 2: Use Sequencing and Expiration Fields
+
+Create a set of three envelopes representing a split message. For each, use `with` expressions to set `SequenceNumber` (1, 2, 3) and `TotalCount` (3). Also set `ExpiresAt` to `DateTimeOffset.UtcNow.AddMinutes(5)` on one envelope and verify that its `IsExpired` property returns `false`. Then create another envelope with `ExpiresAt` in the past and confirm `IsExpired` returns `true`.
+
+### Step 3: Write a Unit Test
+
+In `tests/UnitTests/`, create a test class named `IntegrationEnvelopeImmutabilityTests`. Add a test method called `WithExpression_ModifyingSource_DoesNotMutateOriginal` that creates an envelope via `IntegrationEnvelope<string>.Create()`, produces a modified copy using `with { Source = "NewService" }`, and asserts that the original envelope's `Source` is unchanged while the copy has the new value.
+
+## Knowledge Check
+
+1. Why is `IntegrationEnvelope<T>` defined as a C# `record` rather than a `class`?
+   - A) Records are faster to serialize than classes
+   - B) Records provide value-based equality and immutability via `with` expressions, ensuring envelopes are never accidentally mutated during processing
+   - C) The .NET runtime requires records for generic types
+   - D) Records automatically encrypt their properties
+
+2. In a causation chain where message A is split into messages B₁, B₂, and B₃, what value should the `CausationId` of each split message contain?
+   - A) Its own `MessageId`
+   - B) The `CorrelationId` of message A
+   - C) The `MessageId` of message A (the parent that caused the split)
+   - D) A new randomly generated `Guid`
+
+3. What happens when a component checks `IsExpired` on an `IntegrationEnvelope<T>` whose `ExpiresAt` is in the past?
+   - A) The envelope is automatically deleted from memory
+   - B) An exception is thrown by the runtime
+   - C) `IsExpired` returns `true`, signaling that the message should not be processed further
+   - D) The envelope's `Priority` is downgraded to `Low`
 
 ---
 
