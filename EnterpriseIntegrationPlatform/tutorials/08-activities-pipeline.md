@@ -296,13 +296,64 @@ public class PersistenceActivityTests
 
 ---
 
-## Exercises
+## Lab
 
-1. **Design a pipeline**: You receive XML invoices via SFTP. Design the activity sequence: what activities do you need? In what order?
+**Objective:** Design an activity pipeline for a real integration scenario, analyze failure modes, and identify where the Pipes and Filters pattern enables **independent scaling** of each stage.
 
-2. **Failure handling**: Activity 3 (Transform) fails with a transient error. What happens? What if it fails with a permanent error (invalid schema)?
+### Step 1: Design a Pipeline for XML Invoice Processing
 
-3. **Extend the pipeline**: You need to add a "content enrichment" step that looks up customer data from a CRM API. Where in the activity chain would you add it? What interface would the activity use?
+You receive XML invoices via SFTP. Design the complete activity sequence using the platform's activity classes:
+
+| Step | Activity | Class | Purpose |
+|------|----------|-------|---------|
+| 1 | Validate | `IntegrationActivities.ValidateMessageAsync` | Schema + payload checks |
+| 2 | ? | ? | Sanitize input (XSS, SQL injection) |
+| 3 | ? | ? | Transform XML → canonical JSON |
+| 4 | ? | ? | Enrich with customer data from CRM |
+| 5 | ? | ? | Route to correct downstream system |
+| 6 | ? | ? | Deliver via HTTP connector |
+| 7 | ? | ? | Persist to Cassandra |
+| 8 | ? | ? | Send Ack/Nack notification |
+
+Open `src/Activities/` and `src/Workflow.Temporal/Activities/` to find the actual activity classes.
+
+### Step 2: Analyze Failure Modes and Atomicity
+
+For your pipeline above, analyze what happens at each failure point:
+
+- Step 3 fails with a **transient** error (network timeout) — what retry policy applies?
+- Step 3 fails with a **permanent** error (invalid XML schema) — where does the message go?
+- Step 6 fails after Step 7 already persisted — what compensation is needed?
+
+Explain how the Ack/Nack pattern at Step 8 ensures the originating system knows the final outcome, preserving **end-to-end atomicity**.
+
+### Step 3: Evaluate Per-Stage Scalability
+
+The Pipes and Filters pattern allows each activity to scale independently. For your pipeline:
+
+- Which step is likely the bottleneck under high load? (hint: external API calls)
+- How would you scale Step 4 (CRM enrichment) without affecting Steps 1-3?
+- What is the advantage of Temporal's activity-level retry over retrying the entire pipeline?
+
+## Exam
+
+1. In the Pipes and Filters pattern, what property must each filter (activity) maintain to allow **independent scaling**?
+   - A) All filters must share a single database connection
+   - B) Each filter processes the message using only the data in the envelope — no shared mutable state between filters — so multiple instances can run in parallel
+   - C) Filters must execute in a single thread to ensure ordering
+   - D) Each filter must cache results for the next filter
+
+2. Why does the platform split processing into separate activities (Validate, Transform, Route, Deliver) rather than a single monolithic handler?
+   - A) .NET requires separate classes for each async operation
+   - B) Separate activities enable independent retry policies, individual scaling, and granular saga compensation — a failure in Transform doesn't require re-running Validate
+   - C) Temporal cannot execute more than one method per workflow
+   - D) Separate activities reduce the total number of code lines
+
+3. What happens when an activity fails with a permanent error (e.g., invalid schema) in this platform?
+   - A) The workflow retries indefinitely until the message becomes valid
+   - B) The message is routed to the Dead Letter Queue with the failure reason, a Nack notification is sent to the originating system, and the workflow terminates cleanly
+   - C) The activity silently drops the message
+   - D) The Temporal worker crashes and restarts
 
 ---
 

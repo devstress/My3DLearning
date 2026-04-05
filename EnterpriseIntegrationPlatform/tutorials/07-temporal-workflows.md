@@ -345,13 +345,60 @@ public class IntegrationPipelineWorkflowTests
 
 ---
 
-## Exercises
+## Lab
 
-1. **Failure scenario**: A workflow has 4 steps. Step 3 fails. What does Temporal do? What happens if the worker crashes during Step 3's retry?
+**Objective:** Trace how Temporal workflows enforce **atomic processing** with saga compensation, and design a failure recovery strategy for a multi-step integration pipeline.
 
-2. **Saga compensation**: Design compensation for: (1) create customer record, (2) provision email account, (3) send welcome email. What compensates each step?
+### Step 1: Trace a Failure Recovery Path
 
-3. **Ack/Nack design**: An order processing workflow has 5 steps. Step 4 (warehouse check) says "out of stock." Should this be a Nack? What information should the Nack carry?
+A workflow has 4 steps: Validate → Transform → Route → Deliver. Step 3 (Route) fails after Step 2 has already committed its result. Open `src/Workflow.Temporal/` and trace the code path:
+
+1. What does Temporal do when Step 3 throws an exception? (hint: retry policy)
+2. If all retries are exhausted, how does the `AtomicPipelineWorkflow` trigger saga compensation?
+3. What does `SagaCompensationActivities.CompensateStepAsync` do for Steps 1 and 2?
+
+Draw the timeline showing: original steps executed, failure point, compensation steps in reverse order.
+
+### Step 2: Design Compensation for a Business Scenario
+
+Design saga compensation for an order fulfilment workflow:
+
+| Step | Action | Compensation |
+|------|--------|-------------|
+| 1 | Create customer record in CRM | ? |
+| 2 | Reserve inventory in warehouse | ? |
+| 3 | Charge payment via gateway | ? |
+| 4 | Send confirmation email | ? |
+
+For each compensation, identify: Is it idempotent? What happens if the compensation itself fails? How does the `CorrelationId` link the original action to its compensation?
+
+### Step 3: Evaluate Scalability of Workflow Workers
+
+Temporal workers poll task queues for workflow and activity tasks. Consider a scenario with 100 concurrent integrations:
+
+- How many workflow workers should you run? What happens when you add more?
+- What is the relationship between worker count and **throughput**?
+- Why does Temporal's durable execution model prevent duplicate processing even when workers scale horizontally?
+
+## Exam
+
+1. What happens when a Temporal workflow worker crashes in the middle of executing an activity?
+   - A) The message is lost permanently
+   - B) Another worker picks up the activity from the last checkpoint — Temporal's event history ensures exactly-once execution semantics with durable state
+   - C) The entire workflow restarts from Step 1
+   - D) The broker automatically retries the message
+
+2. In the Saga Compensation pattern, why must compensation steps execute in **reverse order**?
+   - A) Reverse order is faster for the runtime to schedule
+   - B) Later steps may depend on earlier steps' state — compensating in reverse ensures each rollback sees a consistent state from the steps that preceded it
+   - C) The EIP book mandates reverse order for all patterns
+   - D) Temporal only supports reverse-order execution
+
+3. How does Temporal's durable execution model ensure **atomicity** across a multi-step integration pipeline?
+   - A) It wraps all steps in a database transaction
+   - B) It persists each step's completion in an event history — if a worker fails, another worker replays the history and resumes from the exact point of failure, never re-executing completed steps
+   - C) It locks the message broker partition until all steps complete
+   - D) It copies messages to a backup queue before processing
 
 ---
 

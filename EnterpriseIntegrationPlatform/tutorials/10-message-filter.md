@@ -96,13 +96,71 @@ The platform enforces **no silent drops** in production deployments. When a `Dis
 
 ---
 
-## Exercises
+## Lab
 
-1. Write a `MessageFilterOptions` configuration that passes only messages where `MessageType = "OrderCreated"` AND `Payload.total > 100`. Specify a `DiscardTopic`.
+**Objective:** Configure message filter rules, analyze the no-silent-drop guarantee with `RequireDiscardTopic`, and design a filter topology for **scalable** multi-stage message processing.
 
-2. A message fails all conditions but no `DiscardTopic` is configured. What happens? How would you change the design to prevent silent drops entirely?
+### Step 1: Configure a Filter with Discard Routing
 
-3. Compare the Message Filter to the Content-Based Router. When would you use a filter instead of a router?
+Write a `MessageFilterOptions` configuration that passes only messages where `MessageType = "OrderCreated"` AND `Payload.total > 100`:
+
+```csharp
+var options = new MessageFilterOptions
+{
+    Conditions = [
+        new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "OrderCreated" },
+        new RuleCondition { FieldName = "Payload.total", Operator = RuleConditionOperator.GreaterThan, Value = "100" }
+    ],
+    Logic = RuleLogicOperator.And,
+    OutputTopic = "high-value-orders",
+    DiscardTopic = "filtered-out.orders",
+    RequireDiscardTopic = true
+};
+```
+
+Explain what happens when `RequireDiscardTopic = true` and no `DiscardTopic` is configured — how does this enforce **zero message loss**?
+
+### Step 2: Trace the Filter's Atomicity Guarantee
+
+Open `src/Processing.Routing/MessageFilter.cs`. Trace the code path for a message that fails all conditions:
+
+1. The filter evaluates conditions → all fail → `MessageFilterResult.Passed = false`
+2. With `DiscardTopic` set → message is published to the discard topic
+3. With `DiscardTopic` null and `RequireDiscardTopic = true` → what exception is thrown?
+
+Draw the decision tree and explain how this guarantees every message is either delivered to `OutputTopic` or explicitly routed to `DiscardTopic` — never silently dropped.
+
+### Step 3: Design a Multi-Stage Filter Pipeline
+
+Design a pipeline with three cascading filters for an insurance claims system:
+
+| Stage | Filter Criteria | Output | Discard |
+|-------|----------------|--------|---------|
+| 1 | Claim amount > $0 and valid policy number | `claims.validated` | `claims.invalid` |
+| 2 | Claim type is "auto" or "home" | `claims.supported` | `claims.unsupported` |
+| 3 | Claim amount < $50,000 (auto-approve threshold) | `claims.auto-approve` | `claims.manual-review` |
+
+How does each filter's **discard topic** become a different team's input? How does this design scale — can each filter stage run independently with its own consumer group?
+
+## Exam
+
+1. A message fails all filter conditions but no `DiscardTopic` is configured and `RequireDiscardTopic = false`. What happens?
+   - A) The filter throws an `InvalidOperationException`
+   - B) The message is silently dropped — the filter logs a warning but takes no further action
+   - C) The message is automatically routed to the Dead Letter Queue
+   - D) The filter retries evaluation with relaxed conditions
+
+2. How does the Message Filter differ from the Content-Based Router in the EIP pattern catalog?
+   - A) They are identical patterns with different names
+   - B) The Router selects one of many output channels based on content; the Filter has a binary decision — pass or discard — making it simpler and more efficient for yes/no criteria
+   - C) The Filter can route to multiple topics simultaneously
+   - D) The Router only works with XML messages
+
+3. Why is `RequireDiscardTopic` essential for **production atomicity** in enterprise integration?
+   - A) It improves message throughput by forcing batch processing
+   - B) It prevents silent message loss — in production, every message must be accounted for, and throwing an exception forces the team to configure a discard destination before deployment
+   - C) It enables faster regex evaluation
+   - D) It is required by the NATS JetStream protocol
 
 ---
 
