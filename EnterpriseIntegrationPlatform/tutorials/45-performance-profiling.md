@@ -74,12 +74,12 @@ public sealed class GcMonitor
     {
         return new GcSnapshot
         {
-            Gen0 = GC.CollectionCount(0),
-            Gen1 = GC.CollectionCount(1),
-            Gen2 = GC.CollectionCount(2),
-            TotalMemoryMb = GC.GetTotalMemory(forceFullCollection: false) / (1024.0 * 1024.0),
+            Gen0Collections = GC.CollectionCount(0),
+            Gen1Collections = GC.CollectionCount(1),
+            Gen2Collections = GC.CollectionCount(2),
+            TotalCommittedBytes = GC.GetTotalMemory(forceFullCollection: false),
             IsServerGc = GCSettings.IsServerGC,
-            Timestamp = DateTimeOffset.UtcNow
+            // ... additional properties: heap sizes, fragmentation, pause times
         };
     }
 

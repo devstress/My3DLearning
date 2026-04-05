@@ -69,11 +69,13 @@ public sealed class TokenBucketThrottle : IMessageThrottle
 
 ```csharp
 // src/Processing.Throttle/ThrottleResult.cs
-public sealed record ThrottleResult(
-    bool Permitted,
-    TimeSpan WaitTime,
-    double RemainingTokens,
-    string? RejectionReason = null);
+public sealed record ThrottleResult
+{
+    public required bool Permitted { get; init; }
+    public required TimeSpan WaitTime { get; init; }
+    public required int RemainingTokens { get; init; }
+    public string? RejectionReason { get; init; }
+}
 ```
 
 ### ThrottlePartitionKey
@@ -110,13 +112,15 @@ public interface IThrottleRegistry
 
 ```csharp
 // src/Processing.Throttle/ThrottleMetrics.cs
-public sealed record ThrottleMetrics(
-    long TotalAcquired,
-    long TotalRejected,
-    double AvailableTokens,
-    double BurstCapacity,
-    double RefillRate,
-    TimeSpan TotalWaitTime);
+public sealed record ThrottleMetrics
+{
+    public required long TotalAcquired { get; init; }
+    public required long TotalRejected { get; init; }
+    public required int AvailableTokens { get; init; }
+    public required int BurstCapacity { get; init; }
+    public required int RefillRate { get; init; }
+    public required TimeSpan TotalWaitTime { get; init; }
+}
 ```
 
 ### Rate Limiting vs Throttling

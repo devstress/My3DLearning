@@ -174,42 +174,59 @@ Activities are the building blocks that workflows orchestrate. Each activity is 
 
 ```csharp
 // src/Workflow.Temporal/Activities/IntegrationActivities.cs (simplified)
+// Handles validation and processing-stage logging
 
 [Activity]
 public class IntegrationActivities
 {
-    [ActivityMethod]
+    [Activity]
+    public async Task<MessageValidationResult> ValidateMessageAsync(
+        string messageType, string payloadJson)
+    {
+        // Validate the message against schema and business rules
+        return await _validation.ValidateAsync(messageType, payloadJson);
+    }
+
+    [Activity]
+    public async Task LogProcessingStageAsync(
+        Guid messageId, string messageType, string stage)
+    {
+        // Record a lifecycle stage for observability
+    }
+}
+
+// src/Workflow.Temporal/Activities/PipelineActivities.cs (simplified)
+// Handles persistence, delivery status, acknowledgments, and faults
+
+[Activity]
+public class PipelineActivities
+{
+    [Activity]
     public async Task PersistMessageAsync(IntegrationPipelineInput input)
     {
         // Save message to Cassandra with status: Pending
-        await _persistence.SaveMessageAsync(input.Envelope, DeliveryStatus.Pending);
+        await _persistence.SaveMessageAsync(input);
     }
 
-    [ActivityMethod]
-    public async Task<ValidationResult> ValidateMessageAsync(
-        IntegrationPipelineInput input)
-    {
-        // Validate the message against schema and business rules
-        return await _validation.ValidateAsync(input.Envelope);
-    }
-
-    [ActivityMethod]
-    public async Task PublishAckAsync(IntegrationPipelineInput input)
+    [Activity]
+    public async Task PublishAckAsync(
+        Guid messageId, Guid correlationId, string topic)
     {
         // Publish acknowledgment to Ack topic
-        await _notification.PublishAckAsync(input.Envelope);
+        await _notification.PublishAckAsync(messageId, correlationId, topic);
     }
 
-    [ActivityMethod]
+    [Activity]
     public async Task PublishNackAsync(
-        IntegrationPipelineInput input,
-        ValidationResult result)
+        Guid messageId, Guid correlationId, string reason, string topic)
     {
         // Publish negative acknowledgment to Nack topic
-        await _notification.PublishNackAsync(input.Envelope, result.Errors);
+        await _notification.PublishNackAsync(messageId, correlationId, reason, topic);
     }
 }
 ```
+
+> **Note:** Activities are split across two classes: `IntegrationActivities` (validation and logging) and `PipelineActivities` (persistence and notifications). A third class, `SagaCompensationActivities`, handles rollback (see Tutorial 47).
 
 ### Activity Design Principles
 
