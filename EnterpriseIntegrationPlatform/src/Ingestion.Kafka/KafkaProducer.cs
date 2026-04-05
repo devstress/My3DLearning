@@ -18,6 +18,8 @@ public sealed class KafkaProducer : IMessageBrokerProducer, IDisposable
     /// <summary>Initialises a new <see cref="KafkaProducer"/>.</summary>
     public KafkaProducer(IProducer<string, byte[]> producer, ILogger<KafkaProducer> logger)
     {
+        ArgumentNullException.ThrowIfNull(producer);
+        ArgumentNullException.ThrowIfNull(logger);
         _producer = producer;
         _logger = logger;
     }

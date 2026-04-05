@@ -53,5 +53,6 @@
     <ProjectReference Include="..\..\src\SystemManagement\SystemManagement.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Connectors.csproj" />
     <ProjectReference Include="..\..\src\AI.RagKnowledge\AI.RagKnowledge.csproj" />
+    <ProjectReference Include="..\..\src\Ingestion.Kafka\Ingestion.Kafka.csproj" />
   </ItemGroup>
 </Project>
