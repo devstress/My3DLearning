@@ -50,19 +50,21 @@ public class XmlNotificationMapperTests
     [Test]
     public void MapAck_ReturnsExpectedXml()
     {
-        var envelope = CreateTestEnvelope();
+        var messageId = Guid.NewGuid();
+        var correlationId = Guid.NewGuid();
 
-        var result = _mapper.MapAck(envelope);
+        var result = _mapper.MapAck(messageId, correlationId);
 
-        Assert.That(result, Is.EqualTo("<Ack>ok</Ack>"));
+        Assert.That(result, Does.Contain("Ack"));
     }
 
     [Test]
     public void MapNack_IncludesErrorMessage()
     {
-        var envelope = CreateTestEnvelope();
+        var messageId = Guid.NewGuid();
+        var correlationId = Guid.NewGuid();
 
-        var result = _mapper.MapNack(envelope, "timeout");
+        var result = _mapper.MapNack(messageId, correlationId, "timeout");
 
         Assert.That(result, Does.Contain("timeout"));
     }

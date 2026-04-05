@@ -42,19 +42,20 @@ Configuration changes flow through the store and notifier to all running service
 // src/Configuration/IConfigurationStore.cs
 public interface IConfigurationStore
 {
-    Task<ConfigurationEntry?> GetAsync(string key, string environment, CancellationToken ct = default);
-    Task SetAsync(ConfigurationEntry entry, CancellationToken ct = default);
-    Task<bool> DeleteAsync(string key, string environment, CancellationToken ct = default);
+    Task<ConfigurationEntry?> GetAsync(string key, string environment = "default", CancellationToken ct = default);
+    Task<ConfigurationEntry> SetAsync(ConfigurationEntry entry, CancellationToken ct = default);
+    Task<bool> DeleteAsync(string key, string environment = "default", CancellationToken ct = default);
     Task<IReadOnlyList<ConfigurationEntry>> ListAsync(string? environment = null, CancellationToken ct = default);
-    IAsyncEnumerable<ConfigurationChange> WatchAsync(CancellationToken ct = default);
+    IObservable<ConfigurationChange> WatchAsync();
 }
 
 public sealed record ConfigurationEntry(
-    string Key, string Value, int Version,
-    DateTimeOffset UpdatedAt, string? UpdatedBy);
+    string Key, string Value, string Environment = "default",
+    int Version = 1, DateTimeOffset LastModified = default,
+    string? ModifiedBy = null);
 ```
 
-Every `SetAsync` increments the `Version` and preserves the previous value. `InMemoryConfigurationStore` uses a `ConcurrentDictionary` for version tracking. `WatchAsync` streams changes as they occur.
+Every `SetAsync` increments the `Version` and preserves the previous value. `InMemoryConfigurationStore` uses a `ConcurrentDictionary` for version tracking. `WatchAsync` returns an `IObservable<ConfigurationChange>` that broadcasts changes as they occur.
 
 ### IFeatureFlagService
 
@@ -62,8 +63,8 @@ Every `SetAsync` increments the `Version` and preserves the previous value. `InM
 // src/Configuration/IFeatureFlagService.cs
 public interface IFeatureFlagService
 {
-    Task<bool> IsEnabledAsync(string flagName, string? tenantId = null, CancellationToken ct = default);
-    Task<string?> GetVariantAsync(string flagName, string? tenantId = null, CancellationToken ct = default);
+    Task<bool> IsEnabledAsync(string name, string? tenantId = null, CancellationToken ct = default);
+    Task<string?> GetVariantAsync(string name, string variantKey, CancellationToken ct = default);
     Task<FeatureFlag?> GetAsync(string name, CancellationToken ct = default);
     Task SetAsync(FeatureFlag flag, CancellationToken ct = default);
     Task<bool> DeleteAsync(string name, CancellationToken ct = default);

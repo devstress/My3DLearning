@@ -38,7 +38,7 @@ File-based integration is common in batch processing, legacy system interop, and
 ### IFileConnector
 
 ```csharp
-// src/Connector.FileSystem/IFileConnector.cs
+// src/Connector.File/IFileConnector.cs
 public interface IFileConnector
 {
     Task<string> WriteAsync<T>(
@@ -60,7 +60,7 @@ public interface IFileConnector
 ### FileConnectorOptions
 
 ```csharp
-// src/Connector.FileSystem/FileConnectorOptions.cs
+// src/Connector.File/FileConnectorOptions.cs
 public sealed class FileConnectorOptions
 {
     public string RootDirectory { get; set; } = string.Empty;

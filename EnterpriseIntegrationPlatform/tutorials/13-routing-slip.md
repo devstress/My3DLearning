@@ -3,7 +3,7 @@
 ## What You'll Learn
 
 - The EIP Routing Slip pattern for per-message dynamic pipelines
-- How `RoutingSlip` and `RoutingStep` attach a processing plan to a message
+- How `RoutingSlip` and `RoutingSlipStep` attach a processing plan to a message
 - How `IRoutingSlipRouter` executes the current step and calls `Advance()`
 - How `IRoutingSlipStepHandler` dispatches to named step implementations
 - The difference between a routing slip and a fixed pipeline
@@ -31,29 +31,28 @@ Unlike a fixed pipeline where every message follows the same path, a routing sli
 
 ## Platform Implementation
 
-### RoutingSlip & RoutingStep (Contracts)
+### RoutingSlip & RoutingSlipStep (Contracts)
 
 ```csharp
 // src/Contracts/RoutingSlip.cs
-public sealed record RoutingSlip(IReadOnlyList<RoutingStep> Steps)
+public sealed record RoutingSlip(IReadOnlyList<RoutingSlipStep> Steps)
 {
-    public static readonly string MetadataKey = "RoutingSlip";
+    public const string MetadataKey = "RoutingSlip";
 
-    public bool IsComplete => !Steps.Any();
+    public bool IsComplete => Steps.Count == 0;
 
-    public RoutingStep CurrentStep => Steps.FirstOrDefault()
-        ?? throw new InvalidOperationException("Routing slip is complete; no current step.");
+    public RoutingSlipStep? CurrentStep => Steps.Count > 0 ? Steps[0] : null;
 
     public RoutingSlip Advance()
     {
         if (IsComplete)
             throw new InvalidOperationException("Cannot advance a completed routing slip.");
-        return new RoutingSlip(Steps.Skip(1).ToList());
+        return new RoutingSlip(Steps.Skip(1).ToList().AsReadOnly());
     }
 }
 
-// src/Contracts/RoutingStep.cs
-public sealed record RoutingStep(
+// src/Contracts/RoutingSlipStep.cs
+public sealed record RoutingSlipStep(
     string StepName,
     string? DestinationTopic = null,
     IReadOnlyDictionary<string, string>? Parameters = null);

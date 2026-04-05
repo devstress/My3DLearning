@@ -99,8 +99,8 @@ The platform abstracts all three brokers behind two interfaces:
 public interface IMessageBrokerProducer
 {
     Task PublishAsync<T>(
-        string topic,
         IntegrationEnvelope<T> envelope,
+        string topic,
         CancellationToken cancellationToken = default);
 }
 
@@ -133,7 +133,7 @@ Your publishing and consuming code stays identical:
 
 ```csharp
 // This code works with ANY broker
-await producer.PublishAsync("orders.created", envelope);
+await producer.PublishAsync(envelope, "orders.created");
 
 await consumer.SubscribeAsync<OrderPayload>(
     "orders.created", "processors", HandleOrder);

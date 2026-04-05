@@ -45,7 +45,7 @@ public interface IMessageThrottle
         IntegrationEnvelope<T> envelope,
         CancellationToken ct = default);
 
-    double AvailableTokens { get; }
+    int AvailableTokens { get; }
 
     ThrottleMetrics GetMetrics();
 }
@@ -98,11 +98,11 @@ public sealed record ThrottlePartitionKey(
 // src/Processing.Throttle/IThrottleRegistry.cs
 public interface IThrottleRegistry
 {
-    ThrottlePolicy Resolve(ThrottlePartitionKey key);
+    IMessageThrottle Resolve(ThrottlePartitionKey key);
     void SetPolicy(ThrottlePolicy policy);
-    void RemovePolicy(string policyId);
-    IReadOnlyList<ThrottlePolicy> GetAllPolicies();
-    ThrottlePolicy? GetPolicy(string policyId);
+    bool RemovePolicy(string policyId);
+    IReadOnlyList<ThrottlePolicyStatus> GetAllPolicies();
+    ThrottlePolicyStatus? GetPolicy(string policyId);
 }
 ```
 

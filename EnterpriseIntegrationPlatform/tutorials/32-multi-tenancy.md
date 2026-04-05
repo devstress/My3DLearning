@@ -99,20 +99,24 @@ When a message's actual tenant does not match the expected tenant, the guard thr
 // src/MultiTenancy.Onboarding/ITenantOnboardingService.cs
 public interface ITenantOnboardingService
 {
-    Task<TenantContext> OnboardAsync(
+    Task<TenantOnboardingResult> ProvisionAsync(
         TenantOnboardingRequest request,
-        CancellationToken ct);
+        CancellationToken cancellationToken = default);
 
-    Task OffboardAsync(string tenantId, CancellationToken ct);
+    Task<TenantOnboardingResult> DeprovisionAsync(
+        string tenantId,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record TenantOnboardingRequest(
+    string TenantId,
     string TenantName,
+    TenantPlan Plan,
     string AdminEmail,
-    IDictionary<string, string>? Properties = null);
+    IReadOnlyDictionary<string, string>? Metadata = null);
 ```
 
-Onboarding provisions: tenant-specific broker topics, throttle policies (Tutorial 29), configuration namespaces, and an admin user. Offboarding archives data and removes access.
+Onboarding provisions: tenant-specific broker topics, throttle policies (Tutorial 29), configuration namespaces, and an admin user. Deprovisioning archives data and removes access.
 
 ---
 

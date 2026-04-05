@@ -4,6 +4,62 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 075 – Fix Tutorials 05, 06, 07
+
+- **Date**: 2026-04-05
+- **Status**: done
+- **Goal**: Fix compilation errors in core-concept tutorials (message broker parameter order, missing channel params, non-existent factory methods).
+- **Files modified**:
+  - `tutorials/05-message-brokers.md` — Fixed `PublishAsync` parameter order from `(topic, envelope)` to `(envelope, topic)` in interface definition and example code.
+  - `tutorials/06-messaging-channels.md` — Added missing `string channel` parameter to `IPublishSubscribeChannel.PublishAsync` and `SubscribeAsync`. Fixed `RouteInvalidAsync` parameter name from `validationError` to `reason`.
+  - `tutorials/07-temporal-workflows.md` — Replaced non-existent `IntegrationPipelineResult.Succeeded()` and `.Failed()` factory methods with record constructor `new IntegrationPipelineResult(messageId, isSuccess, failureReason)`.
+- **Test counts**: No source changes — documentation only.
+
+## Chunk 076 – Fix Tutorials 13, 14, 29
+
+- **Date**: 2026-04-05
+- **Status**: done
+- **Goal**: Fix routing slip class name, saga logging method, and throttle type mismatches.
+- **Files modified**:
+  - `tutorials/13-routing-slip.md` — Renamed `RoutingStep` → `RoutingSlipStep`, fixed file path to `src/Contracts/RoutingSlipStep.cs`, fixed `MetadataKey` from `static readonly string` to `const string`, fixed `IsComplete` from `!Steps.Any()` to `Steps.Count == 0`, fixed `CurrentStep` to nullable `RoutingSlipStep?`, fixed `Advance()` return to include `.AsReadOnly()`.
+  - `tutorials/14-process-manager.md` — Fixed `_logging.RecordStage(correlationId, msg)` to `await _logging.LogAsync(correlationId, stepName, msg)` (correct method name, 3 params, async).
+  - `tutorials/29-throttle-rate-limiting.md` — Fixed `AvailableTokens` type from `double` to `int`. Fixed `IThrottleRegistry.RemovePolicy` return from `void` to `bool`. Fixed `Resolve` return from `ThrottlePolicy` to `IMessageThrottle`. Fixed `GetAllPolicies`/`GetPolicy` return types to `ThrottlePolicyStatus`.
+- **Test counts**: No source changes — documentation only.
+
+## Chunk 077 – Fix Tutorials 31, 32, 37, 38
+
+- **Date**: 2026-04-05
+- **Status**: done
+- **Goal**: Fix event sourcing projection method, multi-tenancy onboarding API, file connector path, and DiagnosticsConfig class type.
+- **Files modified**:
+  - `tutorials/31-event-sourcing.md` — Fixed `IEventProjection<TState>.Apply()` → `ProjectAsync()` (async, correct name, adds CancellationToken). Fixed `TemporalQuery` param from `batchSize = 100` to `maxEventsPerRead = 1000`.
+  - `tutorials/32-multi-tenancy.md` — Fixed `ITenantOnboardingService.OnboardAsync` → `ProvisionAsync`, `OffboardAsync` → `DeprovisionAsync`, return types to `TenantOnboardingResult`. Fixed `TenantOnboardingRequest` to include `TenantId`, `TenantPlan Plan`, renamed `Properties` → `Metadata` with `IReadOnlyDictionary`.
+  - `tutorials/37-connector-file.md` — Fixed file paths from `src/Connector.FileSystem/` to `src/Connector.File/`.
+  - `tutorials/38-opentelemetry.md` — Fixed `DiagnosticsConfig` from instance class with `init` properties to `static` class with `const`/`static readonly` members.
+- **Test counts**: No source changes — documentation only.
+
+## Chunk 078 – Fix Tutorials 42, 44, 45, 46
+
+- **Date**: 2026-04-05
+- **Status**: done
+- **Goal**: Fix configuration API signatures, disaster recovery class names, performance profiling types, and end-to-end connector references.
+- **Files modified**:
+  - `tutorials/42-configuration.md` — Fixed `GetVariantAsync` params from `(flagName, tenantId)` to `(name, variantKey)`. Fixed `WatchAsync` return from `IAsyncEnumerable` to `IObservable`. Fixed `GetAsync` `environment` param default. Fixed `ConfigurationEntry` record fields. Fixed `SetAsync` return type.
+  - `tutorials/44-disaster-recovery.md` — Replaced non-existent `DisasterRecoveryService` with actual `IFailoverManager` interface. Replaced `DrDrillService` with `IDrDrillRunner` interface and correct method signatures.
+  - `tutorials/45-performance-profiling.md` — Fixed `ProfilingSnapshot` → `ProfileSnapshot` with nested structure (Cpu, Memory, Gc). Fixed `GetSnapshots(int count)` → `GetSnapshots(DateTimeOffset from, DateTimeOffset to)`. Fixed `GetHistory(int count)` → `GetHistory()`. Fixed `GetRecommendations()` return from `IReadOnlyList<string>` to `IReadOnlyList<GcTuningRecommendation>`.
+  - `tutorials/46-complete-integration.md` — Fixed `HttpChannelAdapter : IChannelAdapter` → `HttpConnectorAdapter : IConnector` with correct `SendAsync` signature.
+- **Test counts**: No source changes — documentation only.
+
+## Chunk 079 – Fix Tutorials 48, 49 + Test Counts
+
+- **Date**: 2026-04-05
+- **Status**: done
+- **Goal**: Fix test example code in Tutorial 49 to match actual API. Verify test counts.
+- **Files modified**:
+  - `tutorials/49-testing-integrations.md` — Fixed `MapAck(envelope)` → `MapAck(messageId, correlationId)` and `MapNack(envelope, "timeout")` → `MapNack(messageId, correlationId, "timeout")`. Test counts already correct at 1,472 unit tests (updated in Phase 13).
+- **Notes**: Tutorial 48 `NotificationDecisionService` references are conceptual (showing how notification logic works) and already use correct `MapAck(messageId, correlationId)` signatures. Tutorial 50 test count (1,472) is correct.
+- **Test counts**: No source changes — documentation only.
+
 ## Chunk 074 – Phase 14 Completion
 
 - **Date**: 2026-04-04

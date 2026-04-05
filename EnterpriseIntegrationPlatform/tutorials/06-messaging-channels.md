@@ -84,9 +84,11 @@ public interface IPublishSubscribeChannel
 {
     Task PublishAsync<T>(
         IntegrationEnvelope<T> envelope,
+        string channel,
         CancellationToken cancellationToken = default);
 
     Task SubscribeAsync<T>(
+        string channel,
         string subscriberId,
         Func<IntegrationEnvelope<T>, Task> handler,
         CancellationToken cancellationToken = default);
@@ -156,7 +158,7 @@ public interface IInvalidMessageChannel
 {
     Task RouteInvalidAsync<T>(
         IntegrationEnvelope<T> envelope,
-        string validationError,
+        string reason,
         CancellationToken cancellationToken = default);
 }
 ```

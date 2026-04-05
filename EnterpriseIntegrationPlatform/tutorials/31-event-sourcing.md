@@ -106,7 +106,7 @@ public static class TemporalQuery
         string streamId,
         DateTimeOffset pointInTime,
         TState initialState,
-        int batchSize = 100,
+        int maxEventsPerRead = 1000,
         CancellationToken ct = default) where TState : notnull;
 }
 ```
@@ -128,11 +128,11 @@ public interface ISnapshotStore<TState>
 // src/EventSourcing/IEventProjection.cs
 public interface IEventProjection<TState>
 {
-    TState Apply(TState state, EventEnvelope @event);
+    Task<TState> ProjectAsync(TState state, EventEnvelope envelope, CancellationToken cancellationToken = default);
 }
 ```
 
-`IEventProjection<TState>` is a pure function: given a current state and an event, it returns the new state. The `EventProjectionEngine` reads new events from the store, applies each to the appropriate `IEventProjection<TState>` implementation, and tracks the last processed version per projection. `InMemoryEventStore` implements `IEventStore` using a `ConcurrentDictionary` with full optimistic concurrency support.
+`IEventProjection<TState>` is an async function: given a current state and an event, it returns the new state. The `EventProjectionEngine` reads new events from the store, applies each to the appropriate `IEventProjection<TState>` implementation, and tracks the last processed version per projection. `InMemoryEventStore` implements `IEventStore` using a `ConcurrentDictionary` with full optimistic concurrency support.
 
 ---
 
