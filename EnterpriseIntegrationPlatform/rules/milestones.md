@@ -28,7 +28,7 @@
 
 ## Next Chunk
 
-➡️ Phase 15 — Tutorial Fixes Round 2 (chunk 076)
+➡️ Phase 15 — Tutorial Fixes Round 2 (chunk 077)
 
 ---
 
@@ -38,35 +38,9 @@ Re-audit of all 50 tutorials (2026-04-05) found **17 tutorials still have errors
 
 | Chunk | Goal | Tutorials | Status |
 |-------|------|-----------|--------|
-| 076 | Fix tutorials 13, 14, 29 (routing & rate-limiting errors) | 13, 14, 29 | `not-started` |
 | 077 | Fix tutorials 31, 32, 37, 38 (advanced pattern & connector errors) | 31, 32, 37, 38 | `not-started` |
 | 078 | Fix tutorials 42, 44, 45, 46 (config, DR, profiling, end-to-end errors) | 42, 44, 45, 46 | `not-started` |
 | 079 | Fix tutorials 48, 49 and update test counts | 48, 49 | `not-started` |
-
----
-
-#### Chunk 076 — Fix Tutorials 13, 14, 29
-
-**Tutorial 13 — Routing Slip:**
-
-| Issue | Severity |
-|-------|----------|
-| Class name shown as `RoutingStep` but actual class is `RoutingSlipStep` (file: `src/Contracts/RoutingSlipStep.cs`). | 🔴 ERROR |
-| File path shown as `src/Contracts/RoutingStep.cs` but actual is `src/Contracts/RoutingSlipStep.cs`. | 🔴 ERROR |
-| `CurrentStep` shown returning non-nullable with `throw`, but actual returns `RoutingSlipStep?` (nullable). | 🟡 WARNING |
-
-**Tutorial 14 — Process Manager:**
-
-| Issue | Severity |
-|-------|----------|
-| Shows `_logging.RecordStage(correlationId, "CompensationStarted:...")` but actual method is `await _logging.LogAsync(correlationId, stepName, "CompensationStarted:...")` — wrong method name, wrong parameter count (2 vs 3), missing await. | 🔴 ERROR |
-
-**Tutorial 29 — Throttle & Rate Limiting:**
-
-| Issue | Severity |
-|-------|----------|
-| `AvailableTokens` property shown as `double` but actual type is `int` in `IMessageThrottle`. | 🔴 ERROR |
-| `IThrottleRegistry.RemovePolicy` shown returning `void` but actual returns `bool`. | 🔴 ERROR |
 
 ---
 

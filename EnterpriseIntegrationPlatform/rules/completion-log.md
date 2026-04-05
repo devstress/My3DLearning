@@ -15,6 +15,17 @@ See `milestones.md` for current phase status and next chunk.
   - `tutorials/07-temporal-workflows.md` — Replaced non-existent `IntegrationPipelineResult.Succeeded()` and `.Failed()` factory methods with record constructor `new IntegrationPipelineResult(messageId, isSuccess, failureReason)`.
 - **Test counts**: No source changes — documentation only.
 
+## Chunk 076 – Fix Tutorials 13, 14, 29
+
+- **Date**: 2026-04-05
+- **Status**: done
+- **Goal**: Fix routing slip class name, saga logging method, and throttle type mismatches.
+- **Files modified**:
+  - `tutorials/13-routing-slip.md` — Renamed `RoutingStep` → `RoutingSlipStep`, fixed file path to `src/Contracts/RoutingSlipStep.cs`, fixed `MetadataKey` from `static readonly string` to `const string`, fixed `IsComplete` from `!Steps.Any()` to `Steps.Count == 0`, fixed `CurrentStep` to nullable `RoutingSlipStep?`, fixed `Advance()` return to include `.AsReadOnly()`.
+  - `tutorials/14-process-manager.md` — Fixed `_logging.RecordStage(correlationId, msg)` to `await _logging.LogAsync(correlationId, stepName, msg)` (correct method name, 3 params, async).
+  - `tutorials/29-throttle-rate-limiting.md` — Fixed `AvailableTokens` type from `double` to `int`. Fixed `IThrottleRegistry.RemovePolicy` return from `void` to `bool`. Fixed `Resolve` return from `ThrottlePolicy` to `IMessageThrottle`. Fixed `GetAllPolicies`/`GetPolicy` return types to `ThrottlePolicyStatus`.
+- **Test counts**: No source changes — documentation only.
+
 ## Chunk 074 – Phase 14 Completion
 
 - **Date**: 2026-04-04
