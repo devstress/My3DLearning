@@ -22,29 +22,34 @@
 
 ## Completed Phases
 
-✅ Phases 1–17 complete — see `rules/completion-log.md` for full history.
+✅ Phases 1–18 complete — see `rules/completion-log.md` for full history.
 
 **Current stats:** 1,472 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,605 total tests**. 48 src projects.
 
 ---
 
-### Phase 18 — Tutorial Audit & Fixes (Round 5)
+### Phase 19 — Tutorial Audit as New Developer (Round 6)
 
-✅ Phase 18 complete.
+✅ Phase 19 complete.
 
-**Scope:** Fresh re-audit of all 50 tutorials by a new agent with no prior context — systematic verification of every code snippet, interface signature, property type, enum value, and file path against the actual source.
+**Scope:** Approached the repo as a brand-new developer with no prior context. Read each tutorial, found every code snippet, and verified signatures, `required` keywords, default values, interface inheritance, and method completeness against actual source.
 
-**Findings:** 3 tutorials had remaining issues; 47 passed clean.
+**Findings:** 8 tutorials had issues; 42 passed clean.
 
 | Tutorial | Issue | Fix Applied |
 |----------|-------|-------------|
-| 26 — Message Replay | `IMessageReplayer.ReplayAsync` showed `CancellationToken cancellationToken = default` — actual param is `CancellationToken ct` with no default | Fixed param name and removed default |
-| 42 — Configuration | `ConfigurationChange` record had 5 params with `string? Value` — actual has 6 params: `Key, Environment, ChangeType, OldValue, NewValue, Timestamp` | Rewrote record to match actual 6-param positional signature |
-| 47 — Saga Compensation | Entire tutorial showed pseudocode (`ExecuteTracked`, `CompletedStep`, `PipelineResult`, `CompensateAsync`) that doesn't exist in codebase | Rewrote all code blocks to match actual `AtomicPipelineWorkflow` with `List<string>` tracking, `HandleNackWithRollbackAsync`, `CompensateStepAsync`, and `AtomicPipelineResult` |
+| 03 — First Message | `IntegrationEnvelope<T>` missing `required` keyword on 6 properties (`MessageId`, `CorrelationId`, `Timestamp`, `Source`, `MessageType`, `Payload`); `Priority` and `Metadata` missing default values; property order didn't match source | Rewrote record with `required` keywords, defaults, and correct property order |
+| 05 — Message Brokers | `IMessageBrokerConsumer` missing `: IAsyncDisposable` inheritance | Added `: IAsyncDisposable` |
+| 06 — Messaging Channels | `IInvalidMessageChannel` missing `RouteRawInvalidAsync` method for handling unparseable raw data | Added method + explanatory note |
+| 08 — Activities & Pipeline | `PipelineOrchestrator.ProcessAsync` shown as generic `<T>` but actual source uses `IntegrationEnvelope<JsonElement>` — class also not `sealed` | Fixed to `JsonElement`, added `sealed`, corrected param name |
+| 32 — Multi-Tenancy | `ITenantOnboardingService` missing `GetStatusAsync` method | Added `GetStatusAsync` with nullable return |
+| 42 — Configuration | `ConfigurationChangeNotifier` missing `: IDisposable` inheritance | Added `: IDisposable` |
+| 48 — Notification Use Cases | `NotificationFeatureFlags.Enabled` constant doesn't exist — actual is `NotificationsEnabled`; `NotificationDecisionService` class presented as real code but doesn't exist in source | Fixed constant name; added pseudocode disclaimer comment |
+| 49 — Testing Integrations | Test example used non-existent `NotificationDecisionService` class | Replaced with actual `XmlNotificationMapperTests` from source; updated exercise |
 
 ## Next Chunk
 
-All phases complete (1–18). See `rules/completion-log.md` for full history.
+All phases complete (1–19). See `rules/completion-log.md` for full history.
 
 ---
 

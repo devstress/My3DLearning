@@ -99,7 +99,7 @@ public sealed record FeatureFlag(
 
 ```csharp
 // src/Configuration/ConfigurationChangeNotifier.cs
-public sealed class ConfigurationChangeNotifier : IObservable<ConfigurationChange>
+public sealed class ConfigurationChangeNotifier : IObservable<ConfigurationChange>, IDisposable
 {
     public void Publish(ConfigurationChange change);
     public IDisposable Subscribe(IObserver<ConfigurationChange> observer);

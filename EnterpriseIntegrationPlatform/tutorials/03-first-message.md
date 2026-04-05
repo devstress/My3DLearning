@@ -18,21 +18,21 @@ Every message in the platform is wrapped in an `IntegrationEnvelope<T>`. This is
 
 public record IntegrationEnvelope<T>
 {
-    public Guid MessageId { get; init; }
-    public Guid CorrelationId { get; init; }
+    public required Guid MessageId { get; init; }
+    public required Guid CorrelationId { get; init; }
     public Guid? CausationId { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
-    public string Source { get; init; }
-    public string MessageType { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+    public required string Source { get; init; }
+    public required string MessageType { get; init; }
     public string SchemaVersion { get; init; } = "1.0";
-    public T Payload { get; init; }
-    public MessagePriority Priority { get; init; }
+    public MessagePriority Priority { get; init; } = MessagePriority.Normal;
+    public required T Payload { get; init; }
+    public Dictionary<string, string> Metadata { get; init; } = new();
     public string? ReplyTo { get; init; }
     public DateTimeOffset? ExpiresAt { get; init; }
     public int? SequenceNumber { get; init; }
     public int? TotalCount { get; init; }
     public MessageIntent? Intent { get; init; }
-    public Dictionary<string, string> Metadata { get; init; }
 }
 ```
 

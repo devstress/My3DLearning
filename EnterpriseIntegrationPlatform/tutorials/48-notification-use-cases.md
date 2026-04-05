@@ -16,7 +16,7 @@
 │                  Notification Stack                        │
 │                                                           │
 │  IntegrationPipelineInput.NotificationsEnabled  (per-msg) │
-│  NotificationFeatureFlags.Enabled               (global)  │
+│  NotificationFeatureFlags.NotificationsEnabled   (global)  │
 │  IFeatureFlagService                            (toggle)  │
 │  INotificationMapper / XmlNotificationMapper    (format)  │
 │  NatsNotificationActivityService                (publish) │
@@ -183,6 +183,9 @@ maintenance windows without changing individual integration configurations.
 ```
 
 ```csharp
+// Conceptual pseudocode — the actual notification logic lives inside
+// IntegrationPipelineWorkflow and AtomicPipelineWorkflow (see Tutorials 46–47).
+// This example illustrates the decision flow for reference:
 public class NotificationDecisionService
 {
     public async Task HandleDeliveryResultAsync(
@@ -190,7 +193,7 @@ public class NotificationDecisionService
     {
         if (!input.NotificationsEnabled) return;              // UC1
         if (!await _featureFlags.IsEnabledAsync(
-            NotificationFeatureFlags.Enabled)) return;        // UC4/UC5
+            NotificationFeatureFlags.NotificationsEnabled)) return; // UC4/UC5
 
         if (result.Success)
             await _notificationService.PublishAckAsync(       // UC2

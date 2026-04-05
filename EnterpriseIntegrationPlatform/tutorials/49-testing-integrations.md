@@ -78,24 +78,33 @@ public class XmlNotificationMapperTests
 - **NSubstitute** for mocking interfaces:
 
 ```csharp
-[SetUp]
-public void SetUp()
+// Example from tests/UnitTests/XmlNotificationMapperTests.cs
+[TestFixture]
+public class XmlNotificationMapperTests
 {
-    _featureFlags = Substitute.For<IFeatureFlagService>();
-    _notificationService = Substitute.For<INatsNotificationActivityService>();
-    _sut = new NotificationDecisionService(_featureFlags, _notificationService);
-}
+    private XmlNotificationMapper _sut = null!;
 
-[Test]
-public async Task WhenFeatureFlagDisabled_SkipsNotification()
-{
-    _featureFlags.IsEnabledAsync(Arg.Any<string>())
-        .Returns(Task.FromResult(false));
+    [SetUp]
+    public void SetUp()
+    {
+        _sut = new XmlNotificationMapper();
+    }
 
-    await _sut.HandleDeliveryResultAsync(successResult, inputWithNotifications);
+    [Test]
+    public void MapAck_ReturnsXmlAckOk()
+    {
+        var result = _sut.MapAck(Guid.NewGuid(), Guid.NewGuid());
 
-    await _notificationService.DidNotReceive()
-        .PublishAckAsync(Arg.Any<string>());
+        Assert.That(result, Is.EqualTo("<Ack>ok</Ack>"));
+    }
+
+    [Test]
+    public void MapNack_ReturnsXmlNackWithErrorMessage()
+    {
+        var result = _sut.MapNack(Guid.NewGuid(), Guid.NewGuid(), "Connection timed out");
+
+        Assert.That(result, Is.EqualTo("<Nack>not ok because of Connection timed out</Nack>"));
+    }
 }
 ```
 
@@ -249,8 +258,10 @@ integration tests confirm that DLQ routing works with real brokers.
 
 ## Exercises
 
-1. Write a unit test for the `NotificationDecisionService` that covers all 5
-   use cases (UC1–UC5). Use NSubstitute to mock `IFeatureFlagService`.
+1. Write a unit test for `XmlNotificationMapper` that verifies XML special
+   characters (e.g., `<`, `&`, `"`) are properly escaped in error messages.
+   Use the existing `MapNack_EscapesXmlSpecialCharactersInErrorMessage` test
+   in `tests/UnitTests/XmlNotificationMapperTests.cs` as a reference.
 
 2. Create a Testcontainers integration test that verifies dead-letter queue
    routing when a consumer fails to process a message.

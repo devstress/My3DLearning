@@ -106,6 +106,10 @@ public interface ITenantOnboardingService
     Task<TenantOnboardingResult> DeprovisionAsync(
         string tenantId,
         CancellationToken cancellationToken = default);
+
+    Task<TenantOnboardingResult?> GetStatusAsync(
+        string tenantId,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record TenantOnboardingRequest(
