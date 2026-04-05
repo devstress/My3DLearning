@@ -92,13 +92,62 @@ This ensures either all recipients get the message or the source is redelivered.
 
 ---
 
-## Exercises
+## Lab
 
-1. A message matches two rules contributing destinations `["audit", "billing", "audit"]`. What does `RecipientListResult` report for `ResolvedCount` and `DuplicatesRemoved`?
+**Objective:** Analyze how the Recipient List pattern enables **scalable fan-out** to multiple destinations, design duplicate-safe publishing, and measure the performance impact of parallel vs. sequential delivery.
 
-2. Design a metadata-based recipient list where the sender specifies destinations in `Metadata["recipients"] = "topic-a,topic-b"`. What are the trade-offs vs. rule-based resolution?
+### Step 1: Trace a Recipient List Resolution
 
-3. With 10 recipients and one slow destination (3 s latency), how does parallel publishing help compared to sequential publishing?
+A message matches two routing rules that produce destinations `["audit", "billing", "audit"]`. Open `src/Processing.Routing/RecipientListRouter.cs` and trace:
+
+1. How are duplicate destinations handled? What does `RecipientListResult.DuplicatesRemoved` report?
+2. What is the final `ResolvedCount`?
+3. How does the router publish to each destination — sequentially or in parallel?
+
+### Step 2: Design a Metadata-Driven Recipient List
+
+Some integration scenarios require the **sender** to specify recipients dynamically via envelope metadata:
+
+```csharp
+envelope.Metadata["recipients"] = "audit,billing,compliance";
+```
+
+Design this approach and compare trade-offs:
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| Rule-based (server-side) | Centralized control, auditable | ? |
+| Metadata-based (sender-specified) | ? | Sender must know all destinations |
+
+Which approach provides better **atomicity** guarantees? (hint: what if the sender specifies a non-existent topic?)
+
+### Step 3: Analyze Fan-Out Scalability
+
+With 10 recipients and one slow destination (3-second latency):
+
+- How does parallel publishing (platform's default) compare to sequential publishing?
+- What is the total latency for parallel vs. sequential? (hint: parallel ≈ max latency, sequential ≈ sum)
+- If the slow destination fails, should the message be Ack'd or Nack'd for the other 9 successful deliveries? Design your atomicity strategy.
+
+## Exam
+
+1. A Recipient List resolves 5 destinations. Publishing to destination 3 fails. What should the platform do to maintain **atomicity**?
+   - A) Silently skip destination 3 and Ack the remaining 4
+   - B) Log the failure and track partial delivery — the message enters a compensable state where the failed destination can be retried independently without re-publishing to the successful 4
+   - C) Retry all 5 destinations from the beginning
+   - D) Route the entire message to the Dead Letter Queue
+
+2. Why does the Recipient List remove duplicate destinations before publishing?
+   - A) Duplicates are not supported by the NATS protocol
+   - B) Publishing the same message to the same topic multiple times creates duplicate processing downstream — de-duplication ensures **idempotent fan-out** at the routing layer
+   - C) Duplicate topics cause build errors
+   - D) The broker ignores duplicate publishes automatically
+
+3. How does parallel publishing to multiple recipients improve **throughput scalability**?
+   - A) It reduces the total message size
+   - B) Total fan-out latency equals the slowest recipient (not the sum of all) — this is critical when scaling to dozens of recipients, as sequential publishing would create unacceptable pipeline latency
+   - C) Parallel publishing uses less memory than sequential
+   - D) The broker handles parallelism internally regardless of how the producer publishes
 
 ---
 

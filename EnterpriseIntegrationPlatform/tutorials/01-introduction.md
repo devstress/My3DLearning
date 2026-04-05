@@ -152,13 +152,49 @@ By the end of this course, you'll understand how to:
 
 ---
 
-## Exercises
+## Lab
 
-1. **Explore the EIP website**: Visit [enterpriseintegrationpatterns.com](https://www.enterpriseintegrationpatterns.com/patterns/messaging/toc.html) and browse the pattern catalog. Pick three patterns and think about where you've seen them (or could use them) in your own work.
+**Objective:** Map EIP pattern categories to concrete platform components and trace how the Pipes and Filters architecture enables scalable message processing.
 
-2. **Review the architecture**: Read [`docs/architecture-overview.md`](../docs/architecture-overview.md) and identify how the platform's data flow maps to the Pipes and Filters pattern.
+### Step 1: Map Patterns to Projects
 
-3. **Count the patterns**: Look at [`docs/eip-mapping.md`](../docs/eip-mapping.md) and count how many of the 65 EIP patterns are implemented in the platform.
+Open [`docs/eip-mapping.md`](../docs/eip-mapping.md). For each of the following EIP categories, identify the `src/` project that implements it and the primary interface it exposes:
+
+| Category | Project | Interface |
+|----------|---------|-----------|
+| Message Construction | `src/Contracts/` | ? |
+| Content-Based Router | `src/Processing.Routing/` | ? |
+| Message Translator | `src/Processing.Translator/` | ? |
+| Splitter | `src/Processing.Splitter/` | ? |
+| Dead Letter Channel | `src/Processing.DeadLetter/` | ? |
+
+### Step 2: Trace the Pipes and Filters Chain
+
+Open [`docs/architecture-overview.md`](../docs/architecture-overview.md) and trace how a single message flows through the platform: Ingress → Broker → Workflow → Activities → Connectors. For each stage, write down which EIP pattern it implements and how the platform guarantees **atomicity** (hint: look at Temporal workflows and Ack/Nack).
+
+### Step 3: Evaluate Scalability Points
+
+Identify three places in the architecture where **horizontal scaling** is possible without code changes. Consider: broker partitions, Competing Consumers (`src/Processing.CompetingConsumers/`), and workflow workers. For each, explain what happens to in-flight messages when a new instance is added.
+
+## Exam
+
+1. Which integration style does the EIP book recommend for loosely coupled, asynchronous communication between systems?
+   - A) File Transfer
+   - B) Shared Database
+   - C) Messaging
+   - D) Remote Procedure Invocation
+
+2. In the Pipes and Filters pattern, what property must each filter maintain to allow independent scaling?
+   - A) Global mutable state shared across filters
+   - B) Stateless processing with all context carried in the message envelope
+   - C) Direct method calls to the next filter in the chain
+   - D) A persistent database connection for every filter
+
+3. How does the platform guarantee **zero message loss** when a processing step fails mid-pipeline?
+   - A) Messages are stored in memory and retried indefinitely
+   - B) Temporal workflows provide durable execution with saga compensation — either all steps complete or compensating actions roll back committed work
+   - C) The broker automatically resends messages every 5 seconds
+   - D) Failed messages are silently discarded to avoid blocking the pipeline
 
 ---
 

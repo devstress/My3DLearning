@@ -95,13 +95,66 @@ Normalization happens **before** any downstream processing. If normalization fai
 
 ---
 
-## Exercises
+## Lab
 
-1. A partner sends CSV with `|` as delimiter and no header row. Write the `NormalizerOptions` configuration for this case.
+**Objective:** Configure the Normalizer for multi-format input handling, analyze how the Canonical Data Model pattern enables **scalable** integration with diverse source systems, and design normalization strategies for edge cases.
 
-2. A payload arrives with `contentType = "application/json"` but contains invalid JSON. What happens when `StrictContentType = true`? What about `false`?
+### Step 1: Configure a CSV Normalizer
 
-3. Why does the platform choose JSON as the canonical format rather than XML or a binary format like Protocol Buffers?
+A partner sends CSV files with `|` as delimiter and no header row. Open `src/Processing.Normalizer/` and configure `NormalizerOptions`:
+
+```csharp
+var options = new NormalizerOptions
+{
+    CsvDelimiter = '|',
+    CsvHasHeader = false,
+    CsvColumnNames = ["orderId", "customerId", "amount", "currency"],
+    StrictContentType = true
+};
+```
+
+Trace what happens when: (a) a valid CSV arrives, (b) JSON arrives with `contentType = "text/csv"` but `StrictContentType = true`.
+
+### Step 2: Map the Canonical Data Model
+
+The platform normalizes all inputs to JSON. Draw a diagram showing 4 source systems and how they funnel through the Normalizer:
+
+```
+Partner A (XML) ─────┐
+Partner B (CSV) ─────┤
+Partner C (JSON) ────┼──→ Normalizer ──→ Canonical JSON ──→ Router ──→ N consumers
+Internal API (JSON) ─┘
+```
+
+How many translators are needed for 4 sources and 6 consumers? With a canonical model: **4** (one per source). Without: **24** (4×6). This is the **scalability** argument for normalization.
+
+### Step 3: Handle Format Detection Failures
+
+A payload arrives with `contentType = "application/json"` but contains invalid JSON. Analyze:
+
+- What happens when `StrictContentType = true`? (exception → DLQ)
+- What happens when `StrictContentType = false`? (format sniffing attempt)
+- Why is strict mode recommended for production **atomicity** — what risks does lenient mode introduce?
+
+## Exam
+
+1. Why does the platform normalize all messages to a **Canonical Data Model** (JSON)?
+   - A) JSON is faster to parse than all other formats
+   - B) A single canonical format means adding a new source system requires only one new translator — not one for every downstream consumer — making the integration platform scale linearly with the number of systems
+   - C) JSON is required by the NATS protocol
+   - D) The .NET runtime only supports JSON serialization
+
+2. What is the risk of setting `StrictContentType = false` in a production environment?
+   - A) No risk — lenient mode is always preferred
+   - B) A message could be misinterpreted — e.g., XML interpreted as JSON due to format sniffing — leading to corrupt data flowing through the pipeline undetected, violating **data atomicity**
+   - C) Lenient mode disables all content validation
+   - D) Strict mode is slower than lenient mode
+
+3. How does the Normalizer pattern reduce **integration complexity** when scaling from 5 to 50 connected systems?
+   - A) It doesn't — complexity grows equally regardless
+   - B) Without normalization, N sources × M consumers = N×M translators; with normalization, only N + M translators are needed — this is the difference between O(N²) and O(N) scaling
+   - C) The Normalizer caches all messages, reducing duplicate processing
+   - D) The Normalizer compresses messages to reduce broker storage
 
 ---
 

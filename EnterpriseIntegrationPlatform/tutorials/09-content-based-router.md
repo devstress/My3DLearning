@@ -97,13 +97,58 @@ The router publishes to the selected topic via the broker producer **before** ac
 
 ---
 
-## Exercises
+## Lab
 
-1. You have three routing rules with priorities 10, 5, and 1. A message matches rules at priorities 5 and 1. Which topic does the message go to and why?
+**Objective:** Configure routing rules with priorities, trace how the Content-Based Router dispatches messages, and analyze routing **scalability** under high-throughput conditions.
 
-2. A new requirement says messages with `Payload.customer.tier = "platinum"` must go to `priority-processing`. Write the `RoutingRule` record for this requirement.
+### Step 1: Configure a Multi-Rule Routing Table
 
-3. Why is pre-compiling regex patterns important for a high-throughput router? What happens if you skip compilation?
+Open `src/Processing.Routing/ContentBasedRouter.cs`. Create a routing configuration for an e-commerce platform:
+
+| Priority | Field | Operator | Value | Output Topic |
+|----------|-------|----------|-------|-------------|
+| 1 | `Payload.customer.tier` | Equals | `"platinum"` | `priority-processing` |
+| 5 | `MessageType` | Equals | `"OrderCreated"` | `orders.standard` |
+| 10 | `MessageType` | Matches | `"Return.*"` | `returns.processing` |
+| 100 | (default) | — | — | `general.inbox` |
+
+A message arrives with `MessageType = "OrderCreated"` and `Payload.customer.tier = "platinum"`. Which topic does it route to? Explain how priority ordering ensures deterministic routing.
+
+### Step 2: Trace the Routing Decision Path
+
+Using the `RoutingDecision` record, trace the router's decision path for a message that matches rules at priorities 1 and 5. Open the router implementation and identify:
+
+- How does the router evaluate rules? (sequential scan vs. sorted by priority?)
+- Does evaluation stop at the first match, or are all rules evaluated?
+- What `RoutingDecision` is returned — does it include the matched rule for auditing?
+
+### Step 3: Design for Routing Scalability
+
+Consider a Content-Based Router processing 50,000 messages/second with 200 routing rules:
+
+- What is the computational cost per message? (hint: O(n) for n rules)
+- How does pre-compiling regex patterns (`RoutingOperator.Matches`) improve throughput?
+- If you need to route to different brokers (Kafka for audit, NATS for real-time), how would the router's output topic abstraction enable this without code changes?
+
+## Exam
+
+1. You have routing rules with priorities 10, 5, and 1. A message matches rules at priorities 5 and 1. Which topic receives the message?
+   - A) Both topics receive the message (fan-out)
+   - B) Priority 1 — the router selects the lowest priority number (highest precedence) among matches
+   - C) Priority 10 — the router always uses the first rule defined
+   - D) Priority 5 — the router stops at the first match in definition order
+
+2. How does the Content-Based Router pattern support **atomic message routing**?
+   - A) It copies the message to all matching topics simultaneously
+   - B) Each message is routed to exactly one output topic — the routing decision is deterministic and idempotent, so replaying the same message always produces the same routing outcome
+   - C) It wraps the routing decision in a database transaction
+   - D) The router buffers messages until a batch is complete
+
+3. Why is pre-compiling regex patterns critical for **routing scalability** at high throughput?
+   - A) Pre-compilation reduces memory allocation per evaluation — without it, each message creates and discards regex objects, causing GC pressure that degrades throughput under load
+   - B) Pre-compilation is required by the .NET regex API
+   - C) Pre-compilation allows patterns to match across multiple lines
+   - D) Pre-compilation enables case-insensitive matching
 
 ---
 

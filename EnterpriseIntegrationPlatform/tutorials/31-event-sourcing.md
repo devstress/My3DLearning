@@ -148,13 +148,63 @@ Optimistic concurrency ensures **consistency without locks**. The `expectedVersi
 
 ---
 
-## Exercises
+## Lab
 
-1. An aggregate has 10,000 events. Without snapshots, what is the cost of reconstructing current state? With a snapshot at version 9,900?
+**Objective:** Analyze event sourcing's append-only model for **audit-complete atomicity**, trace optimistic concurrency conflict resolution, and design snapshot strategies for **scalable** aggregate reconstruction.
 
-2. Two commands arrive simultaneously for the same stream at version 5. Both expect version 5. Trace the optimistic concurrency flow.
+### Step 1: Calculate Aggregate Reconstruction Cost
 
-3. Use `TemporalQuery.ReplayToPointInTimeAsync` to reconstruct an order aggregate's state as of yesterday at noon. What parameters do you need to supply?
+An aggregate has 10,000 events. Compare reconstruction approaches:
+
+| Approach | Events Replayed | Cost | Time (est.) |
+|----------|----------------|------|-------------|
+| Full replay (no snapshots) | 10,000 | High CPU + memory | ~100ms |
+| Snapshot at version 9,900 | 100 | Low | ~1ms |
+| Snapshot at version 9,999 | 1 | Minimal | ~0.1ms |
+
+Open `src/EventSourcing/` and trace: How does the event store load a snapshot, then replay only subsequent events? What is the **scalability** trade-off between snapshot frequency and storage cost?
+
+### Step 2: Trace Optimistic Concurrency Conflict
+
+Two commands arrive simultaneously for the same stream at version 5. Both expect version 5:
+
+```
+Command A: Append event at version 5 → succeeds (stream now at version 6)
+Command B: Append event at version 5 → CONFLICT (expected 5, actual 6)
+```
+
+Trace the conflict resolution:
+1. What exception is thrown?
+2. Does Command B retry? With what strategy?
+3. How does optimistic concurrency ensure **atomic** state transitions without distributed locks?
+
+### Step 3: Design a Temporal Query for Audit
+
+Use `TemporalQuery.ReplayToPointInTimeAsync` to reconstruct an order aggregate's state as of yesterday at noon:
+
+- What parameters do you supply? (stream ID, point-in-time)
+- How does this differ from loading current state?
+- Why is this capability essential for **regulatory compliance** and audit trails?
+
+## Exam
+
+1. Why does event sourcing use an append-only log rather than mutable state updates?
+   - A) Append-only is faster for write operations
+   - B) Every state change is permanently recorded as an immutable event — this provides a complete audit trail, enables temporal queries (reconstructing past state), and guarantees **atomic** state transitions through optimistic concurrency
+   - C) Databases don't support mutable updates
+   - D) Append-only reduces storage costs
+
+2. How does optimistic concurrency prevent **atomicity** violations in concurrent event sourcing?
+   - A) It uses distributed locks to prevent concurrent access
+   - B) Each append specifies the expected version — if another command modified the stream first, the version mismatch is detected and the second command fails cleanly, ensuring only one writer succeeds per state transition
+   - C) Events are automatically merged when conflicts occur
+   - D) The event store queues concurrent commands
+
+3. How do snapshots improve **aggregate reconstruction scalability**?
+   - A) Snapshots reduce the number of events stored
+   - B) A snapshot captures aggregate state at a point in time — reconstruction replays only events after the snapshot instead of the entire history, reducing reconstruction time from O(N) to O(recent events)
+   - C) Snapshots are required by the event store
+   - D) Snapshots improve write performance
 
 ---
 

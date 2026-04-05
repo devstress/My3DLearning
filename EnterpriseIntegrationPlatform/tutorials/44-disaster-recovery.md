@@ -134,15 +134,67 @@ Synchronous replication (`min.insync.replicas=2`) ensures that every acknowledge
 message exists on at least two brokers before the producer receives confirmation.
 This guarantees no acknowledged message is lost during failover.
 
-## Exercises
+## Lab
 
-1. Calculate the RPO if Kafka is configured with `min.insync.replicas=1` and
-   asynchronous replication. What messages could be lost?
+**Objective:** Calculate RPO/RTO for different replication configurations, design a DR drill for Cassandra failover, and analyze broker replication trade-offs for **atomic** message durability.
 
-2. Design a DR drill that tests Cassandra failover. What queries would you run
-   to verify data consistency after the secondary becomes primary?
+### Step 1: Calculate RPO Under Different Configurations
 
-3. How does NATS JetStream's `num_replicas` setting affect both durability and
-   write latency? What trade-off would you choose for notification delivery?
+| Configuration | RPO | Risk |
+|--------------|-----|------|
+| Kafka: `min.insync.replicas=1`, async replication | ? | Messages not yet replicated are lost |
+| Kafka: `min.insync.replicas=2`, sync replication | 0 (zero data loss) | Higher write latency |
+| NATS JetStream: `num_replicas=3` | ? | Depends on quorum writes |
+
+Calculate: With `min.insync.replicas=1` and async replication, if the primary broker fails with 500ms of unreplicated data at 10,000 msg/s, how many messages could be lost?
+
+### Step 2: Design a DR Drill for Cassandra
+
+Design a complete DR drill that tests Cassandra failover:
+
+```
+1. Record current data state: SELECT count(*) FROM message_state WHERE status='delivered'
+2. Trigger failover: Promote secondary Cassandra to primary
+3. Verify data consistency:
+   - Re-run count query on new primary
+   - Compare with pre-failover count
+   - Check for data divergence in recent writes
+4. Test write path: Insert a test record and verify replication
+5. Verify application reconnection: Check application logs for successful reconnect
+```
+
+What **atomicity** guarantees does Cassandra's eventual consistency model provide during failover? What data could be lost?
+
+### Step 3: Analyze Broker Replication Trade-Offs
+
+NATS JetStream's `num_replicas` setting affects both durability and write latency:
+
+| num_replicas | Durability | Write Latency | Network Cost |
+|-------------|-----------|---------------|-------------|
+| 1 | Low (single point of failure) | ~1ms | Minimal |
+| 3 | High (survives 1 node failure) | ~5ms | 3x network |
+| 5 | Very high (survives 2 failures) | ~10ms | 5x network |
+
+For notification delivery (Tutorial 48), which trade-off would you choose? Why?
+
+## Exam
+
+1. What is the relationship between `min.insync.replicas` and **message atomicity**?
+   - A) It controls how fast messages are delivered
+   - B) `min.insync.replicas` determines how many broker replicas must acknowledge a write before the producer considers it committed — with `=1`, a broker failure can lose unsynced messages; with `=2`, the message survives single-node failures
+   - C) It limits the number of consumers per partition
+   - D) It controls message compression level
+
+2. Why must a DR drill verify data consistency **after** failover?
+   - A) Data is always consistent during failover
+   - B) Replication lag during failover can cause the secondary to be behind the primary — verifying consistency ensures no messages were lost during the transition, maintaining the platform's **zero message loss** guarantee
+   - C) Consistency checks are only needed quarterly
+   - D) The broker handles consistency automatically
+
+3. How does increasing `num_replicas` improve **durability** at the cost of **scalability**?
+   - A) More replicas improve read performance
+   - B) Each write must be acknowledged by more nodes (quorum) — this increases write latency and network cost, but guarantees the message survives node failures; the trade-off between durability and throughput must be tuned per workload
+   - C) Replicas reduce storage costs
+   - D) num_replicas only affects read performance
 
 **Previous: [← Tutorial 43](43-kubernetes-deployment.md)** | **Next: [Tutorial 45 →](45-performance-profiling.md)**

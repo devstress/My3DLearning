@@ -229,15 +229,66 @@ workflow retries or (with `AtomicPipelineWorkflow`) triggers saga compensation.
 Ack/Nack notifications close the feedback loop, ensuring the sender knows the
 outcome.
 
-## Exercises
+## Lab
 
-1. Trace a message through all 8 steps using the Admin.Api dashboard. What
-   metadata does each step add to the `IntegrationEnvelope`?
+**Objective:** Trace a complete message through all 8 processing stages, analyze how each stage contributes to **end-to-end atomicity**, and design a pipeline extension.
 
-2. What happens if the Channel Adapter returns HTTP 503? How does Temporal's
-   retry policy interact with the Nack notification (UC3)?
+### Step 1: Trace a Message Through All 8 Stages
 
-3. Modify the workflow to add a sixth step: audit logging. Where in the
-   pipeline would you insert it, and why?
+Follow a single message from ingestion to delivery:
+
+| Stage | EIP Pattern | Platform Component | Adds to Envelope |
+|-------|------------|-------------------|------------------|
+| 1. Receive | Messaging Gateway | Gateway.Api | `MessageId`, `Timestamp` |
+| 2. Validate | ? | IntegrationActivities | ? |
+| 3. Sanitize | ? | InputSanitizer | ? |
+| 4. Transform | Message Translator | MessageTranslator | `CausationId` |
+| 5. Route | Content-Based Router | ContentBasedRouter | Routing decision |
+| 6. Deliver | Channel Adapter | HttpConnector/SftpConnector | Delivery status |
+| 7. Persist | Message Store | CassandraMessageStore | ? |
+| 8. Notify | Ack/Nack | NotificationPublisher | Notification payload |
+
+Fill in the `?` cells by tracing through the actual source code.
+
+### Step 2: Analyze Failure at Each Stage
+
+For each stage, identify: What happens if it fails? Where does the message go? Is the failure retryable?
+
+| Stage Failure | Retryable? | Recovery Action | Atomicity Impact |
+|--------------|-----------|-----------------|-----------------|
+| Stage 4 (Transform) fails | Yes (transient) / No (schema) | Retry or DLQ | Stages 1-3 results preserved |
+| Stage 6 (Deliver) fails after Stage 7 (Persist) succeeds | ? | ? | ? |
+
+What is the worst-case scenario for **atomicity** — which combination of stage success/failure creates the hardest recovery?
+
+### Step 3: Design a Pipeline Extension
+
+Add a sixth step: "Audit Logging" that writes every message to a compliance store. Where in the pipeline would you insert it?
+
+- Before routing (Stage 4.5)? — captures the canonical message before routing decisions
+- After delivery (Stage 6.5)? — captures the delivery outcome
+- As a parallel branch from Stage 2? — captures even messages that fail validation
+
+Justify your choice based on **atomicity** and **compliance** requirements.
+
+## Exam
+
+1. The HTTP connector (Stage 6) returns HTTP 503. How does the platform maintain **end-to-end atomicity**?
+   - A) The message is lost
+   - B) Temporal's retry policy retries the delivery activity; if all retries fail, the message is Nack'd (UC3), routed to the DLQ with full context, and the originating system is notified of the failure — every stage's work is either committed or compensated
+   - C) The workflow restarts from Stage 1
+   - D) The connector silently drops the message
+
+2. Why are the 8 stages separated into distinct activities rather than one monolithic handler?
+   - A) .NET requires separate classes
+   - B) Each stage is an independent filter with its own retry policy, scaling characteristics, and failure handling — this Pipes and Filters architecture enables independent optimization and ensures a failure in one stage doesn't require re-executing all stages
+   - C) Monolithic handlers are not supported by Temporal
+   - D) Eight stages are required by the EIP book
+
+3. What is the most challenging **atomicity** scenario in the complete pipeline?
+   - A) All stages succeed
+   - B) Stage 6 (Deliver) succeeds but Stage 7 (Persist) fails — the external system received the message but the platform has no record; compensation requires checking the external system's state and reconciling, which cannot be fully automated
+   - C) Stage 1 (Receive) fails
+   - D) Stage 8 (Notify) fails
 
 **Previous: [← Tutorial 45](45-performance-profiling.md)** | **Next: [Tutorial 47 →](47-saga-compensation.md)**

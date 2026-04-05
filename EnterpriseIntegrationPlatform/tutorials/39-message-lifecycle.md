@@ -135,13 +135,65 @@ Lifecycle recording is a **best-effort side effect** — it must not block or fa
 
 ---
 
-## Exercises
+## Lab
 
-1. A message was received 30 minutes ago but never reached "Delivered" status. Use `ITraceAnalyzer.WhereIsMessageAsync` to identify which stage it is stuck in.
+**Objective:** Use the message lifecycle tracking system to diagnose stuck messages, design retention policies for **scalable** storage, and compare lifecycle tracking with OpenTelemetry tracing.
 
-2. Design a retention policy for the message state store that keeps 7 days of detailed events and 90 days of summary events.
+### Step 1: Diagnose a Stuck Message
 
-3. Why does the platform record lifecycle events separately from OpenTelemetry traces? What does each system provide that the other does not?
+A message was received 30 minutes ago but never reached "Delivered" status. Use `ITraceAnalyzer.WhereIsMessageAsync` to investigate:
+
+```csharp
+var location = await traceAnalyzer.WhereIsMessageAsync(messageId);
+// Returns: { Stage: "Transform", Status: "InProgress", SinceUtc: "30 min ago" }
+```
+
+Open `src/Observability/TraceAnalyzer.cs` and trace: How does the analyzer query the message state store? What lifecycle states are tracked (Received, Routing, Transforming, Delivering, Delivered, Failed)?
+
+Design an alerting rule: any message in "InProgress" for > 5 minutes should trigger an alert. How does this support **operational scalability**?
+
+### Step 2: Design a Retention Policy
+
+Design a retention strategy for the message state store handling 10 million messages/day:
+
+| Retention Tier | Data | Duration | Storage |
+|---------------|------|----------|---------|
+| Hot (detailed) | All lifecycle events, full envelope | 7 days | ~140GB |
+| Warm (summary) | Stage transitions, message ID, status | 90 days | ~27GB |
+| Cold (archive) | Message ID, final status, timestamp | 1 year | ~3.6GB |
+
+How does tiered retention balance **operational visibility** with **storage scalability**?
+
+### Step 3: Compare Lifecycle Tracking vs. OpenTelemetry
+
+| Aspect | Message Lifecycle | OpenTelemetry Tracing |
+|--------|------------------|----------------------|
+| Purpose | Business-level message tracking | Technical span timing |
+| Query model | "Where is message X?" | "Show me the trace for request Y" |
+| Retention | Days to months | Hours to days |
+| Audience | Operations team | Developers |
+
+Why does the platform maintain both systems? What does each provide that the other cannot?
+
+## Exam
+
+1. A message is stuck in "Transforming" state for 15 minutes. What does this indicate?
+   - A) The message was successfully delivered
+   - B) The transformation activity is either blocked (deadlock, external dependency), has failed without updating state, or the worker processing it has crashed — the lifecycle tracking enables targeted investigation of the exact stuck stage
+   - C) The message was routed to the DLQ
+   - D) The lifecycle store has a bug
+
+2. Why does the platform record lifecycle events separately from OpenTelemetry traces?
+   - A) They serve the same purpose
+   - B) Lifecycle tracking provides business-level "where is my message?" visibility with longer retention; OpenTelemetry provides technical performance metrics with shorter retention — together they serve both operators and developers
+   - C) OpenTelemetry cannot track message state
+   - D) Lifecycle events are faster to query
+
+3. How does tiered retention support **storage scalability** for lifecycle data?
+   - A) All data is kept forever at full detail
+   - B) Recent data is kept at full detail for debugging; older data is summarized to reduce storage — this balances operational needs (recent incidents require full detail) with cost (years of data at full detail would be prohibitively expensive)
+   - C) Retention policies are only needed for compliance
+   - D) The message broker handles retention automatically
 
 ---
 

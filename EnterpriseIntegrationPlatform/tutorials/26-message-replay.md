@@ -107,13 +107,68 @@ Replay re-publishes messages to the **same ingress topic** they originally enter
 
 ---
 
-## Exercises
+## Lab
 
-1. An operator discovers a bug in the content enricher that corrupted messages between 09:00 and 09:30 UTC. Write the `ReplayFilter` to target only those messages using `FromTimestamp` and `ToTimestamp`.
+**Objective:** Design a message replay operation for a production incident, analyze how the `ReplayId` header prevents duplicate processing, and evaluate replay store **scalability** requirements.
 
-2. Why does the platform inject a `ReplayId` header instead of simply re-publishing the original message unchanged? What problems could occur without it?
+### Step 1: Design a Time-Window Replay
 
-3. Describe what a production `IMessageReplayStore` implementation would need to handle 10 million messages per day efficiently.
+An operator discovers a bug in the content enricher that corrupted messages between 09:00 and 09:30 UTC on January 15th. Write the `ReplayFilter`:
+
+```csharp
+var filter = new ReplayFilter
+{
+    FromTimestamp = DateTimeOffset.Parse("2024-01-15T09:00:00Z"),
+    ToTimestamp = DateTimeOffset.Parse("2024-01-15T09:30:00Z"),
+    Topic = "eip.orders.enriched"
+};
+```
+
+Open `src/Processing.Replay/MessageReplayer.cs` and trace: How does the replayer iterate over stored messages? What happens to messages that don't match the filter?
+
+### Step 2: Analyze the ReplayId Header for Atomicity
+
+The platform injects a `ReplayId` header into replayed messages. Explain why:
+
+1. Without `ReplayId` — downstream consumers process the message as if it's new → **duplicate side effects** (e.g., double billing)
+2. With `ReplayId` — consumers can detect replays and apply **idempotent** processing
+3. How does `ReplayId` interact with `MessageId`? (the original `MessageId` is preserved for correlation)
+
+Design a consumer that checks for `ReplayId` and skips already-processed messages using a deduplication store.
+
+### Step 3: Evaluate Replay Store Scalability
+
+A production system processes 10 million messages/day. Design the replay store requirements:
+
+| Requirement | Value | Justification |
+|------------|-------|---------------|
+| Storage per message | ~2KB (envelope) | Full envelope for accurate replay |
+| Daily storage | ~20GB | 10M × 2KB |
+| Retention period | 30 days | Regulatory and operational needs |
+| Total storage | ~600GB | 30 × 20GB |
+| Query performance | < 100ms for time-range | Fast incident response |
+
+What storage technology would you recommend? (hint: time-series databases, object storage with indexing)
+
+## Exam
+
+1. Why does the platform inject a `ReplayId` header instead of re-publishing the original message unchanged?
+   - A) `ReplayId` improves serialization performance
+   - B) Without `ReplayId`, downstream consumers cannot distinguish replayed messages from new ones — leading to duplicate side effects like double billing; the header enables idempotent replay processing
+   - C) The broker requires unique headers for each publish
+   - D) `ReplayId` replaces the original `MessageId`
+
+2. What **atomicity** guarantee must a replay operation provide?
+   - A) All replayed messages must succeed or the entire replay is rolled back
+   - B) Each replayed message is independently atomic — if message 500 of 1000 fails, the first 499 are committed and 500+ can be retried; the `ReplayId` prevents duplicates from the successful ones
+   - C) Replay operations are fire-and-forget with no guarantees
+   - D) The entire replay must complete within a single database transaction
+
+3. How does time-range filtering in replay operations support **operational scalability**?
+   - A) Time filtering is faster than content filtering
+   - B) Operators can target a precise incident window instead of replaying all messages — this minimizes unnecessary reprocessing and downstream load during recovery
+   - C) Time ranges are required by the message broker
+   - D) Filtering has no impact on replay performance
 
 ---
 

@@ -127,13 +127,67 @@ The source message is **Acked only after a successful `ConnectorResult`**. If th
 
 ---
 
-## Exercises
+## Lab
 
-1. An external API requires a token obtained from `https://auth.example.com/token`. Write a `SendWithTokenAsync` call with appropriate parameters.
+**Objective:** Trace the HTTP connector's token-based authentication, analyze retry behavior for **atomic** delivery to external APIs, and evaluate token caching for **scalable** high-volume integration.
 
-2. The external API returns HTTP 503. Trace the flow through the retry framework (`MaxRetryAttempts` / `RetryDelayMs`) and the DLQ.
+### Step 1: Configure Token-Based Authentication
 
-3. Why does the connector cache tokens with `CacheTokenExpirySeconds` rather than fetching a new token for every request?
+An external API requires a token from `https://auth.example.com/token`. Write the connector configuration:
+
+```csharp
+await connector.SendWithTokenAsync(
+    envelope,
+    endpoint: "https://api.partner.com/orders",
+    tokenUrl: "https://auth.example.com/token",
+    clientId: "eip-platform",
+    clientSecret: await secretProvider.GetSecretAsync("partner-api-secret"),
+    cancellationToken: ct);
+```
+
+Open `src/Connectors.Http/HttpConnector.cs` and trace: How does the connector obtain, cache, and refresh tokens?
+
+### Step 2: Trace Retry and DLQ for External API Failures
+
+The external API returns HTTP 503 (Service Unavailable). Trace the flow:
+
+1. First attempt → 503 → retry with exponential backoff
+2. Retry 1 → 503 → retry again
+3. After `MaxRetryAttempts` exhausted → where does the message go?
+4. What `DeadLetterReason` is set?
+
+Now: what if the API returns HTTP 400 (Bad Request)? Is this retryable? How does the connector distinguish transient vs. permanent failures for **atomic** delivery guarantees?
+
+### Step 3: Evaluate Token Caching for Scalability
+
+At 5,000 messages/second, each requiring authentication:
+
+| Strategy | Token Requests/sec | Latency Impact |
+|----------|-------------------|----------------|
+| Token per request | 5,000 | +200ms per message (auth round-trip) |
+| Cached with `CacheTokenExpirySeconds = 300` | ~0.003 (1 per 5 min) | ~0ms (memory read) |
+
+Why is token caching essential for **throughput scalability**? What risk does stale token caching introduce? How does `CacheTokenExpirySeconds` balance performance and security?
+
+## Exam
+
+1. An external API returns HTTP 503. What should the HTTP connector do for **atomic** delivery?
+   - A) Immediately route to DLQ
+   - B) Retry with exponential backoff — HTTP 503 is a transient error indicating the service is temporarily overloaded; retries allow the service to recover before failing permanently to DLQ
+   - C) Retry indefinitely until the service recovers
+   - D) Return success to the pipeline
+
+2. Why does the connector cache authentication tokens?
+   - A) Tokens expire too quickly to use
+   - B) At high throughput, requesting a new token for every message would overwhelm the auth server and add unacceptable latency — caching amortizes the auth cost over thousands of messages
+   - C) Token caching is required by OAuth 2.0
+   - D) The auth server doesn't support concurrent requests
+
+3. How does the connector distinguish retryable from non-retryable HTTP errors?
+   - A) All HTTP errors are retryable
+   - B) HTTP 5xx (server errors) and 429 (rate limited) are retryable — the server may recover; HTTP 4xx (client errors like 400, 401, 403) are permanent — retrying won't fix the request, so fast-failing to DLQ preserves pipeline throughput
+   - C) Only HTTP 500 is retryable
+   - D) The broker determines retryability
 
 ---
 

@@ -146,14 +146,84 @@ Configuration updates are **versioned** — each `SetAsync` is atomic and create
 
 ---
 
-## Exercises
+## Lab
 
-1. Design a feature flag that enables a new routing algorithm for 10% of traffic, always enables it for `"tenant-beta"`, and offers variants `"v1"` and `"v2"`.
+**Objective:** Design feature flags with percentage rollouts, trace configuration change propagation, and analyze how environment overrides support **scalable** multi-environment deployments.
 
-2. A configuration change is made to update the retry count from 3 to 5. Trace the flow through `IConfigurationStore`, `ConfigurationChangeNotifier`, and the retry framework.
+### Step 1: Design a Feature Flag with Gradual Rollout
 
-3. Why does the platform use `EnvironmentOverrideProvider` in addition to the configuration store? When would an environment override be preferable?
+Design a feature flag for a new routing algorithm:
+
+```csharp
+var flag = new FeatureFlag
+{
+    Name = "new-routing-algorithm",
+    DefaultVariant = "v1",
+    Variants = ["v1", "v2"],
+    Rules = [
+        new FeatureFlagRule
+        {
+            TenantId = "tenant-beta",    // Always enabled for beta testers
+            Variant = "v2",
+            Percentage = 100
+        },
+        new FeatureFlagRule
+        {
+            Variant = "v2",
+            Percentage = 10              // 10% of all other traffic
+        }
+    ]
+};
+```
+
+Open `src/Configuration/` and trace: How does the platform evaluate which variant to apply? How does percentage-based rollout work — is it random per message or deterministic per tenant?
+
+### Step 2: Trace Configuration Change Propagation
+
+A configuration change updates the retry count from 3 to 5. Trace the flow:
+
+```
+1. Operator updates config → IConfigurationStore.SetAsync("retry.maxAttempts", "5")
+2. ConfigurationChangeNotifier detects the change
+3. All subscribed components receive the notification
+4. ExponentialBackoffRetryPolicy reloads the new value
+5. Next message uses MaxAttempts = 5
+```
+
+What is the propagation delay? What happens to messages already being retried with the old value? Is this an **atomicity** concern?
+
+### Step 3: Analyze Environment Override Scalability
+
+Why does the platform use `EnvironmentOverrideProvider` with the `EIP__` prefix convention?
+
+| Environment | Override Example | Use Case |
+|------------|-----------------|----------|
+| Development | `EIP__Broker__Type=InMemory` | Use in-memory broker for local dev |
+| Staging | `EIP__Retry__MaxAttempts=10` | More aggressive retry for testing |
+| Production | `EIP__Throttle__Rate=1000` | Production rate limits |
+
+How does this enable **scalable** multi-environment deployments without changing code or configuration files?
+
+## Exam
+
+1. Why does the platform use configuration change notification rather than reading config on every message?
+   - A) Reading configuration is too slow
+   - B) Reading config on every message would create a hot path to the configuration store — potentially millions of reads/second; change notification pushes updates only when values change, reducing load by orders of magnitude
+   - C) The configuration store doesn't support reads
+   - D) Notifications are required by .NET
+
+2. How do feature flags with percentage rollouts support **safe scalability** of new features?
+   - A) They make features faster
+   - B) Gradual rollout (10% → 50% → 100%) limits the blast radius of bugs — if the new algorithm causes failures, only a percentage of traffic is affected, enabling rapid rollback without impacting all tenants
+   - C) Percentage rollouts are required for production
+   - D) Feature flags reduce memory usage
+
+3. Why does the `EIP__` environment variable prefix convention support **multi-environment scalability**?
+   - A) The prefix is shorter than other options
+   - B) Environment variables override configuration store values per deployment — the same code artifact deploys to dev, staging, and production with different behavior controlled by environment, eliminating configuration file management across environments
+   - C) The .NET runtime requires specific prefixes
+   - D) The prefix prevents name collisions with system variables
 
 ---
 
-**Previous: [← Tutorial 41 — OpenClaw Web UI](41-openclaw-web.md)**
+**Previous: [← Tutorial 41 — OpenClaw Web UI](41-openclaw-web.md)** | **Next: [Tutorial 43 — Kubernetes Deployment →](43-kubernetes-deployment.md)**

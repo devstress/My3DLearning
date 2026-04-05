@@ -246,17 +246,61 @@ Here's how a typical message flow uses multiple channel types:
 
 ---
 
-## Exercises
+## Lab
 
-1. **Channel selection**: For each scenario, choose the channel type:
-   - Processing incoming purchase orders (one processor per order)
-   - Notifying 5 different systems when a shipment is dispatched
-   - Handling messages that arrive as XML or JSON from different partners
-   - Quarantining messages with missing required fields
+**Objective:** Classify messaging scenarios by channel type and design a channel topology that ensures **atomic delivery** and **scalable fan-out**.
 
-2. **Bridge design**: Your company uses Kafka for everything but wants to add NATS for new microservices. Design a Messaging Bridge that keeps both systems in sync.
+### Step 1: Map Scenarios to Channel Types
 
-3. **Dead Letter Channel**: How does the Invalid Message Channel relate to the Dead Letter Channel? When would you use each?
+For each scenario, identify the correct EIP channel pattern and the platform class that implements it:
+
+| Scenario | Channel Pattern | Platform Class |
+|----------|----------------|----------------|
+| Processing purchase orders (one processor per order) | ? | `PointToPointChannel` or `PublishSubscribeChannel`? |
+| Notifying 5 systems when a shipment is dispatched | ? | ? |
+| Handling messages in XML or JSON from different partners | ? | ? |
+| Quarantining messages with missing required fields | ? | ? |
+
+Open `src/Processing.Channels/` and verify your answers against the actual implementations.
+
+### Step 2: Design a Messaging Bridge for Broker Migration
+
+Your company uses Kafka for all integrations but wants to add NATS for new microservices. Using the `MessagingBridge` class in `src/Processing.Channels/`, design a bridge configuration that:
+
+- Reads from Kafka topic `legacy.orders.created`
+- Publishes to NATS subject `eip.orders.created`
+- Preserves the `CorrelationId` and all `Metadata` across the bridge
+
+Draw the message flow and identify where **atomicity** could be lost (hint: what if the bridge crashes after reading from Kafka but before publishing to NATS?). How does the platform's Ack/Nack pattern mitigate this?
+
+### Step 3: Evaluate Scalability of Channel Patterns
+
+Compare Point-to-Point and Publish-Subscribe channels under high load:
+
+- Point-to-Point with 3 competing consumers processing 10,000 messages/second
+- Pub-Sub with 5 subscriber groups, each with 2 consumers
+
+For each, explain: How does adding more consumers affect throughput? What happens to in-flight messages? Where is the bottleneck?
+
+## Exam
+
+1. In the EIP Messaging Bridge pattern, what is the bridge's primary responsibility?
+   - A) Transform message payloads between XML and JSON
+   - B) Connect two separate messaging systems while preserving message identity and metadata, enabling gradual broker migration without changing producers or consumers
+   - C) Compress messages to reduce broker storage requirements
+   - D) Route messages based on their content type header
+
+2. How does the Invalid Message Channel pattern contribute to **zero message loss**?
+   - A) Invalid messages are silently discarded to avoid poisoning downstream consumers
+   - B) Messages that cannot be parsed or violate schema rules are routed to a dedicated channel for inspection and reprocessing, ensuring they are never lost
+   - C) Invalid messages are automatically reformatted and retried
+   - D) The broker rejects invalid messages at the protocol level
+
+3. What is the key **scalability** difference between a Point-to-Point channel and a Publish-Subscribe channel?
+   - A) Point-to-Point channels cannot have multiple consumers
+   - B) In Point-to-Point, adding consumers distributes load (Competing Consumers); in Pub-Sub, adding subscriber groups creates independent copies of every message for parallel processing
+   - C) Publish-Subscribe channels are always faster than Point-to-Point
+   - D) Point-to-Point channels require Kafka while Pub-Sub requires NATS
 
 ---
 

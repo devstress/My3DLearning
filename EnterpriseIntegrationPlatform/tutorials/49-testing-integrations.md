@@ -9,7 +9,7 @@
 - Integration tests using Testcontainers
 - End-to-end browser tests with Playwright
 - Load and performance benchmarks via the LoadTests project
-- Testing conventions: `[SetUp]`, `Assert.That`, 1,472 unit tests
+- Testing conventions: `[SetUp]`, `Assert.That`
 
 ## The Test Pyramid
 
@@ -27,35 +27,35 @@
                 │   ContractTests    │  API contracts
                ┌┴───────────────────┴┐
                │     UnitTests        │  NUnit 4.4 + NSubstitute
-               │   1,472 tests       │  (fastest, most numerous)
+               │  (fastest, most)     │  (fastest, most numerous)
                └──────────────────────┘
 ```
 
 ## Unit Tests (NUnit 4.4 + NSubstitute)
 
-The foundation with 1,472 tests covering all core logic:
+The foundation of the test pyramid, covering all core logic:
 
 ```csharp
 [TestFixture]
 public class XmlNotificationMapperTests
 {
-    private XmlNotificationMapper _mapper;
+    private XmlNotificationMapper _sut = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _mapper = new XmlNotificationMapper();
+        _sut = new XmlNotificationMapper();
     }
 
     [Test]
-    public void MapAck_ReturnsExpectedXml()
+    public void MapAck_ReturnsXmlAckOk()
     {
         var messageId = Guid.NewGuid();
         var correlationId = Guid.NewGuid();
 
-        var result = _mapper.MapAck(messageId, correlationId);
+        var result = _sut.MapAck(messageId, correlationId);
 
-        Assert.That(result, Does.Contain("Ack"));
+        Assert.That(result, Is.EqualTo("<Ack>ok</Ack>"));
     }
 
     [Test]
@@ -64,7 +64,7 @@ public class XmlNotificationMapperTests
         var messageId = Guid.NewGuid();
         var correlationId = Guid.NewGuid();
 
-        var result = _mapper.MapNack(messageId, correlationId, "timeout");
+        var result = _sut.MapNack(messageId, correlationId, "timeout");
 
         Assert.That(result, Does.Contain("timeout"));
     }
@@ -245,7 +245,7 @@ Results:
 
 ```
 tests/
-├── UnitTests/              # 1,472 fast, isolated tests
+├── UnitTests/              # Fast, isolated tests (most numerous)
 ├── ContractTests/          # API serialization contracts
 ├── WorkflowTests/          # Temporal workflow tests
 ├── IntegrationTests/       # Testcontainers-based tests
@@ -265,17 +265,71 @@ Tests verify atomicity guarantees: unit tests check that Ack/Nack is published
 correctly, workflow tests validate saga compensation reverses all steps, and
 integration tests confirm that DLQ routing works with real brokers.
 
-## Exercises
+## Lab
 
-1. Write a unit test for `XmlNotificationMapper` that verifies XML special
-   characters (e.g., `<`, `&`, `"`) are properly escaped in error messages.
-   Use the existing `MapNack_EscapesXmlSpecialCharactersInErrorMessage` test
-   in `tests/UnitTests/XmlNotificationMapperTests.cs` as a reference.
+**Objective:** Design a testing strategy for integration platforms, analyze the testing pyramid for **scalable** quality assurance, and evaluate infrastructure testing with Testcontainers.
 
-2. Create a Testcontainers integration test that verifies dead-letter queue
-   routing when a consumer fails to process a message.
+### Step 1: Design the Testing Pyramid
 
-3. Design a load test scenario that measures the impact of enabling
-   `NotificationsEnabled` on pipeline throughput. What overhead do you expect?
+Map the platform's testing strategy:
+
+| Layer | Tool | Speed | Purpose | Examples |
+|-------|------|-------|---------|----------|
+| Unit | NUnit + NSubstitute | Fast (<1s each) | Verify individual components in isolation | Router rule evaluation, envelope immutability |
+| Contract | NUnit | Medium (~5s each) | Verify interface contracts are met | `IMessageBrokerProducer` implementations |
+| Integration | Testcontainers | Slow (~30s each) | Verify components work with real infrastructure | DLQ routing with real NATS, Cassandra persistence |
+| Workflow | Temporal test server | Medium | Verify end-to-end workflow orchestration | Saga compensation, activity retries |
+| Load | NBomber | Slow | Verify performance under sustained load | Throughput at 10K msg/s, P99 latency |
+
+Why is this pyramid structure critical for **development scalability**? What happens if you skip the unit layer and rely only on integration?
+
+### Step 2: Design a Testcontainers Integration Scenario
+
+Design a DLQ routing integration scenario:
+
+```
+1. Start NATS JetStream container
+2. Start Cassandra container
+3. Publish a message with invalid schema
+4. Verify: message appears in DLQ topic within 5 seconds
+5. Verify: DLQ entry contains original envelope + error reason
+6. Trigger replay via Admin API
+7. Verify: message re-enters the pipeline
+```
+
+What makes this scenario un-testable with unit mocks alone? (hint: it verifies the real broker's message delivery guarantee)
+
+### Step 3: Design a Load Profiling Scenario
+
+Design a load scenario to measure the impact of enabling `NotificationsEnabled`:
+
+| Metric | Without Notifications | With Notifications | Overhead |
+|--------|---------------------|-------------------|----------|
+| Throughput (msg/s) | ? | ? | ? |
+| P50 latency | ? | ? | ? |
+| P99 latency | ? | ? | ? |
+| CPU usage | ? | ? | ? |
+
+How would you use NBomber to measure this? What overhead percentage is acceptable for a notification feature?
+
+## Exam
+
+1. Why are unit-level verifications preferred over integration-level for most component validation?
+   - A) Integration scenarios are more accurate
+   - B) Unit-level verifications run in milliseconds without infrastructure dependencies — enabling developers to validate hundreds of scenarios in seconds; this **scales** development velocity because the fast feedback loop catches errors before expensive integration runs
+   - C) Unit-level verifications catch all bugs
+   - D) Integration scenarios are not reliable
+
+2. When should you use Testcontainers for integration verification instead of mocks?
+   - A) Always — mocks are unreliable
+   - B) When the verification depends on real infrastructure behavior — e.g., broker delivery guarantees, database consistency, connection pooling — that cannot be accurately simulated with mocks
+   - C) Never — integration verification is too slow
+   - D) Only for performance measurement
+
+3. Why is load profiling essential for **scalability** validation of an integration platform?
+   - A) Load profiling improves code quality
+   - B) Integration platforms must sustain high throughput under production conditions — load profiling reveals bottlenecks (GC pressure, lock contention, broker capacity) that only appear under sustained load and would cause production failures
+   - C) Load profiling is only needed before launch
+   - D) The broker handles load automatically
 
 **Previous: [← Tutorial 48](48-notification-use-cases.md)** | **Next: [Tutorial 50 →](50-best-practices.md)**

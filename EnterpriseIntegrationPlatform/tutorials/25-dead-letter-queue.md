@@ -108,7 +108,8 @@ public sealed class MessageExpirationChecker<T> : IMessageExpirationChecker<T>
 
         await _deadLetterPublisher.PublishAsync(
             envelope, DeadLetterReason.MessageExpired,
-            $"Message expired at {envelope.ExpiresAt.Value:O}.", 0, cancellationToken);
+            $"Message expired at {envelope.ExpiresAt.Value:O}. Current time: {now:O}.",
+            0, cancellationToken);
         return true;
     }
 }
@@ -130,13 +131,64 @@ Dead-lettering is the **last resort** — it runs only after all retries are exh
 
 ---
 
-## Exercises
+## Lab
 
-1. A message fails validation (`DeadLetterReason.ValidationFailed`). An operator fixes the schema and wants to reprocess it. Describe the replay flow through the Admin API.
+**Objective:** Trace the Dead Letter Queue lifecycle from failure to replay, analyze how the DLQ preserves **zero message loss atomicity**, and design an operational replay workflow.
 
-2. A message has `ExpiresAt = 2024-01-15T10:00:00Z` and the current time is `2024-01-15T10:00:01Z`. Trace the path through `MessageExpirationChecker` and `IDeadLetterPublisher`.
+### Step 1: Trace an Expired Message to the DLQ
 
-3. Why does the platform preserve the **complete original envelope** in `DeadLetterEnvelope` rather than just the error details? What operational benefit does this provide?
+A message has `ExpiresAt = 2024-01-15T10:00:00Z` and the current time is `2024-01-15T10:00:01Z`. Open `src/Processing.DeadLetter/MessageExpirationChecker.cs` and trace:
+
+1. `CheckAndRouteIfExpiredAsync` detects expiration — what `DeadLetterReason` is used?
+2. What information is logged? (hint: expiry time and current time)
+3. Where does the complete original envelope end up?
+
+Verify that the **entire original envelope** is preserved in `DeadLetterEnvelope` — not just error details.
+
+### Step 2: Design an Operational Replay Workflow
+
+A message fails validation (`DeadLetterReason.ValidationFailed`). An operator fixes the downstream schema. Design the replay flow:
+
+```
+1. Operator queries DLQ via Admin API: GET /api/deadletter?reason=ValidationFailed
+2. Operator reviews the original envelope and error details
+3. Operator triggers replay: POST /api/deadletter/{id}/replay
+4. Platform re-publishes the original envelope to its original topic
+5. Message re-enters the pipeline from the beginning
+```
+
+What **atomicity** guarantees must the replay provide? (hint: replay must either fully re-publish or fail cleanly — no partial replays)
+
+### Step 3: Categorize DLQ Reasons and Operational Response
+
+| DLQ Reason | Cause | Operational Response | Can Auto-Replay? |
+|-----------|-------|---------------------|-------------------|
+| `MessageExpired` | TTL exceeded | Review TTL settings | No — stale data |
+| `ValidationFailed` | Schema mismatch | Fix schema → replay | Yes |
+| `MaxRetriesExceeded` | Transient failures | Investigate root cause → replay | Maybe |
+| `PermanentFailure` | Non-retryable error | Manual intervention | No |
+
+Why is preserving the complete original envelope critical for DLQ operations? What would an operator lose if only the error message was stored?
+
+## Exam
+
+1. Why does the platform preserve the **complete original envelope** in the Dead Letter Queue?
+   - A) It's a storage requirement of the broker
+   - B) The original envelope enables accurate replay — operators can inspect the exact payload, metadata, and headers that caused the failure, and re-publish it unchanged for reprocessing after fixing the root cause
+   - C) The envelope is needed for deduplication
+   - D) Only the error details are stored
+
+2. How does the DLQ pattern ensure **zero message loss** in the integration platform?
+   - A) The DLQ stores messages in memory for fast retrieval
+   - B) Every message that cannot be processed successfully — whether due to expiration, validation failure, or exhausted retries — is routed to the DLQ rather than being silently dropped, ensuring nothing is ever lost
+   - C) The broker prevents message deletion
+   - D) Messages are automatically retried from the DLQ every minute
+
+3. What **atomicity** guarantee must a DLQ replay operation provide?
+   - A) The replay can be partial — some fields are replayed while others are skipped
+   - B) The replay must either fully re-publish the original message to its target topic or fail cleanly — partial replays could cause duplicate processing or data corruption
+   - C) The DLQ entry must be deleted before replay
+   - D) Replay is only possible within 24 hours of the original failure
 
 ---
 

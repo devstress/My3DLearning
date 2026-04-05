@@ -232,16 +232,59 @@ Is this task delivery (process and acknowledge)?
 
 ---
 
-## Exercises
+## Lab
 
-1. **HOL blocking scenario**: You have 1,000 recipients. Recipient 500 has a message that takes 60 seconds to process. With Kafka (10 partitions), how many other recipients are potentially blocked? With NATS queue groups?
+**Objective:** Design a broker topic hierarchy for a multi-tenant system and analyze how different broker architectures affect **scalability** and **message ordering guarantees**.
 
-2. **Topic design**: Design the topic hierarchy for a system that processes invoices, payments, and refunds across 3 regions (US, EU, APAC). Use NATS subject hierarchy.
+### Step 1: Design a Multi-Region Topic Hierarchy
 
-3. **Broker selection**: For each scenario, choose the best broker:
-   - Real-time analytics dashboard consuming all order events
-   - Processing customer onboarding requests (each takes 5-30 seconds)
-   - Audit trail that must be retained for 7 years
+Design a NATS subject hierarchy for a multi-region e-commerce system with: orders, payments, and refunds across three regions (US, EU, APAC). Use NATS conventions (`.` for levels, `*` for single-level wildcard, `>` for multi-level wildcard):
+
+```
+eip.{region}.{domain}.{event}
+Example: eip.us.orders.created
+```
+
+Write subscriber patterns for: (a) all events in EU: `eip.eu.>`, (b) all order events globally: `eip.*.orders.*`, (c) only payment completions in APAC: `eip.apac.payments.completed`.
+
+Explain how this hierarchy enables **horizontal scalability** — new regions can be added without changing existing subscribers.
+
+### Step 2: Compare Broker Scalability Characteristics
+
+Create a comparison table for Kafka, NATS JetStream, and Pulsar:
+
+| Characteristic | Kafka | NATS JetStream | Pulsar |
+|---------------|-------|----------------|--------|
+| Ordering guarantee | Per-partition | Per-subject | Per-key (Key_Shared) |
+| HOL blocking risk | ? | ? | ? |
+| Multi-tenant isolation | ? | ? | ? |
+| Scale-out mechanism | ? | ? | ? |
+
+For each cell, explain the implication for a platform processing 10,000 messages/second from 50 tenants.
+
+### Step 3: Design for Atomicity Across Broker Switches
+
+The platform uses `IMessageBrokerProducer` / `IMessageBrokerConsumer` to abstract the broker. Describe a scenario where switching from NATS to Kafka for a specific message type would change the **atomicity** guarantees (hint: Kafka's transactional producer vs. NATS at-least-once). What compensating design would the platform need?
+
+## Exam
+
+1. What is head-of-line (HOL) blocking and why is it a **scalability** problem?
+   - A) HOL blocking occurs when a slow message in a partition delays all subsequent messages; NATS queue groups avoid it because any available consumer can pick up any message
+   - B) HOL blocking is a network-layer issue that all brokers handle identically
+   - C) HOL blocking only affects messages with `MessagePriority.Low`
+   - D) HOL blocking means messages are delivered out of order
+
+2. Why does the platform define `IMessageBrokerProducer` and `IMessageBrokerConsumer` as abstractions rather than coding directly against a specific broker SDK?
+   - A) The broker SDKs do not support .NET 10
+   - B) It allows the broker implementation to be swapped at deployment time without changing application code — enabling different scalability and atomicity trade-offs per workload
+   - C) Abstractions are required by the C# compiler for async methods
+   - D) Each broker uses a different serialization format
+
+3. When would you choose Apache Pulsar's Key_Shared subscription over Kafka's partition-based consumption for **multi-tenant scalability**?
+   - A) When you need strict global order across all keys
+   - B) When you want per-key ordering without cross-key head-of-line blocking — one tenant's slow processing should not affect others
+   - C) When your messages do not have any key
+   - D) When you require messages to be stored for less than 24 hours
 
 ---
 

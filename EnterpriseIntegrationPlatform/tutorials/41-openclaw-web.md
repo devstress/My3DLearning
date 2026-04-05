@@ -123,13 +123,72 @@ The web UI provides **eventual consistency** — it shows the latest state from 
 
 ---
 
-## Exercises
+## Lab
 
-1. An operator searches for "failed orders from PartnerX last week." Trace the query through the `/api/inspect/ask` endpoint, `MessageStateInspector`, and the observability event log.
+**Objective:** Trace the operational query flow through OpenClaw's inspection APIs, design a "Where is my message?" workflow, and analyze why the UI delegates to Aspire for **scalable** observability.
 
-2. Design the UI flow for the "Where is my message?" feature: what inputs does the operator provide, and what data is displayed?
+### Step 1: Trace an Operational Query
 
-3. Why does OpenClaw.Web embed links to the Aspire dashboard rather than reimplementing trace and metric visualization?
+An operator searches for "failed orders from PartnerX last week." Trace the query flow:
+
+```
+1. Operator enters query in OpenClaw chat → POST /api/inspect/ask
+2. MessageStateInspector parses: source="PartnerX", status="Failed", timeRange=7d
+3. Query observability event log for matching messages
+4. Return: list of failed messages with failure reasons, stages, and timestamps
+```
+
+Open `src/Admin.Web/` and trace: How does the `/api/inspect/ask` endpoint delegate to `MessageStateInspector`? What data sources does it query?
+
+### Step 2: Design the "Where Is My Message?" Feature
+
+Design the complete UI flow:
+
+| Input | Source | Purpose |
+|-------|--------|---------|
+| Message ID or Correlation ID | Operator | Identify the message |
+| (optional) Time range | Operator | Narrow the search |
+
+| Output Display | Data Source |
+|---------------|-------------|
+| Current lifecycle stage | Message state store |
+| Processing timeline | Lifecycle events |
+| Error details (if failed) | DLQ entry |
+| Distributed trace link | OpenTelemetry trace ID |
+
+Why does the platform show a **link** to the Aspire dashboard trace rather than embedding trace visualization directly? (hint: Aspire already provides rich trace visualization — reimplementing it would be a maintenance burden)
+
+### Step 3: Analyze UI Architecture for Operational Scalability
+
+The OpenClaw Web UI proxies all data through Admin.Api endpoints. Design the resilience strategy:
+
+| Scenario | Behavior |
+|----------|----------|
+| Admin.Api healthy | Full functionality |
+| Admin.Api unreachable | Graceful fallback with cached data and "service unavailable" indicators |
+| Loki (observability) down | In-memory event log fallback |
+
+How does this resilience architecture support **operational scalability** — the UI must remain useful even during partial infrastructure failures?
+
+## Exam
+
+1. Why does OpenClaw embed links to the Aspire dashboard rather than reimplementing trace visualization?
+   - A) Aspire's visualization is faster
+   - B) Aspire already provides rich distributed trace, metrics, and log visualization — reimplementing this in OpenClaw would duplicate functionality, increase maintenance burden, and diverge from the platform's standard observability stack
+   - C) The Aspire dashboard is required by .NET
+   - D) OpenClaw cannot display visual data
+
+2. How does the proxy resilience pattern in OpenClaw support **operational scalability**?
+   - A) It makes the UI faster
+   - B) When backend services are degraded, the UI shows graceful fallbacks rather than crashing — operators can still access cached data and partial functionality, maintaining operational capability during infrastructure incidents
+   - C) Proxy resilience reduces network traffic
+   - D) The broker provides resilience automatically
+
+3. Why does the "Where is my message?" feature query multiple data sources?
+   - A) One data source is always sufficient
+   - B) No single system contains the complete picture — the lifecycle store tracks stage transitions, the DLQ contains failure details, and OpenTelemetry provides timing; combining them gives operators a complete and **actionable** view of any message's journey
+   - C) Multiple queries improve response time
+   - D) Each data source requires a separate API call
 
 ---
 

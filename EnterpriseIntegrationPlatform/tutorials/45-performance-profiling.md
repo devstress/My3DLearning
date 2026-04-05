@@ -189,15 +189,78 @@ GC pauses can cause broker acknowledgment timeouts, leading to duplicate message
 delivery. Server GC with concurrent mode reduces pause duration, keeping the
 Ack/Nack cycle within configured timeout windows.
 
-## Exercises
+## Lab
 
-1. Use `dotnet-counters` to monitor Gen 0/1/2 collection rates during a load
-   test. What ratio of Gen 0 to Gen 2 collections indicates healthy GC behavior?
+**Objective:** Use profiling tools to identify performance bottlenecks, analyze GC behavior under load, and design optimization strategies for **scalable** high-throughput message processing.
 
-2. Capture a CPU profile of the pipeline worker under load. Identify the top 3
-   methods by inclusive CPU time. Are any of them candidates for optimization?
+### Step 1: Monitor GC Behavior Under Load
 
-3. What is the impact of enabling LOH compaction on P99 latency? Design a test
-   that measures latency before and after compaction.
+Use `dotnet-counters` to monitor Gen 0/1/2 collection rates:
+
+```bash
+dotnet-counters monitor --process-id <pid> --counters System.Runtime
+```
+
+Observe the Gen 0 to Gen 2 ratio during a load test:
+
+| Metric | Healthy | Unhealthy |
+|--------|---------|-----------|
+| Gen 0 collections | 100/min | 100/min |
+| Gen 1 collections | 10/min | 50/min |
+| Gen 2 collections | 1/min | 20/min |
+| Gen 0:Gen 2 ratio | 100:1 | 5:1 |
+
+A low Gen 0:Gen 2 ratio indicates objects surviving to older generations — a sign of memory pressure. Open `src/Performance.Profiling/GcMonitor.cs` and trace: How does the platform track these metrics?
+
+### Step 2: Identify CPU Hotspots
+
+Capture a CPU profile of the pipeline worker under load:
+
+```bash
+dotnet-trace collect --process-id <pid> --duration 00:00:30
+```
+
+Open the trace in a flame graph viewer. Identify likely hotspots:
+
+| Method | CPU % (expected) | Optimization |
+|--------|-----------------|-------------|
+| JSON serialization | 30-40% | Pool JsonSerializerOptions |
+| Regex evaluation (routing) | 15-20% | Pre-compile patterns (already done) |
+| HTTP connector I/O wait | 20-30% | Connection pooling |
+| GC pauses | 5-10% | Reduce allocations |
+
+Open `src/Performance.Profiling/AllocationHotspotDetector.cs` and trace how the platform detects allocation-heavy code paths.
+
+### Step 3: Analyze LOH Compaction Impact on Latency
+
+Large Object Heap (LOH) compaction trades latency for memory efficiency:
+
+| Metric | Without Compaction | With Compaction |
+|--------|-------------------|----------------|
+| P50 latency | 5ms | 5ms |
+| P99 latency | 15ms | 50ms (GC pause spikes) |
+| Memory usage | Growing (fragmentation) | Stable |
+
+Design a profiling experiment to measure this trade-off. When is LOH compaction worth the latency cost?
+
+## Exam
+
+1. A Gen 0:Gen 2 collection ratio of 5:1 indicates what **performance scalability** problem?
+   - A) The application is running normally
+   - B) Objects are surviving to older generations — indicating either long-lived allocations or GC pressure; frequent Gen 2 collections cause stop-the-world pauses that degrade throughput and P99 latency under high message load
+   - C) The application needs more CPU cores
+   - D) Gen 2 collections are always harmful
+
+2. Why is pre-compiling regex patterns critical for **routing scalability**?
+   - A) Pre-compilation improves code readability
+   - B) Without pre-compilation, each message evaluation creates a new Regex object — causing allocation churn, GC pressure, and increased P99 latency; pre-compiled patterns are allocated once and reused across millions of evaluations
+   - C) The .NET regex engine requires pre-compilation
+   - D) Pre-compilation enables case-insensitive matching
+
+3. When profiling an integration platform, why is P99 latency more important than average latency?
+   - A) P99 is easier to calculate
+   - B) Integration platforms process millions of messages — the average hides tail-latency spikes from GC pauses, lock contention, or external service timeouts; P99 reveals the worst experience for 1% of messages, which at scale affects thousands of messages per hour
+   - C) Average latency is always lower than P99
+   - D) P99 is a marketing metric
 
 **Previous: [← Tutorial 44](44-disaster-recovery.md)** | **Next: [Tutorial 46 →](46-complete-integration.md)**

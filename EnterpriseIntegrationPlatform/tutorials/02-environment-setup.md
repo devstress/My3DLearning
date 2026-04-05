@@ -76,7 +76,7 @@ This downloads all NuGet packages defined in `Directory.Packages.props` (central
 dotnet build EnterpriseIntegrationPlatform.sln
 ```
 
-A clean build should complete with **0 errors**. The solution contains 44+ projects — this takes 30–60 seconds on first build.
+A clean build should complete with **0 errors**. The solution contains many projects — this takes 30–60 seconds on first build.
 
 ### Step 4: Run the Tests
 
@@ -86,14 +86,14 @@ dotnet test EnterpriseIntegrationPlatform.sln
 
 The test suite includes:
 
-| Test Project | Count | Description |
-|-------------|-------|-------------|
-| UnitTests | 1,100+ | Fast, isolated tests for every component |
-| ContractTests | 58 | Contract verification between services |
-| WorkflowTests | 29 | Temporal workflow behavior tests |
-| IntegrationTests | 17 | Testcontainers-based tests with real infrastructure |
-| PlaywrightTests | 13 | End-to-end browser tests for OpenClaw UI |
-| LoadTests | 10 | Performance and throughput benchmarks |
+| Test Project | Description |
+|-------------|-------------|
+| UnitTests | Fast, isolated tests for every component (most numerous) |
+| ContractTests | Contract verification between services |
+| WorkflowTests | Temporal workflow behavior tests |
+| IntegrationTests | Testcontainers-based tests with real infrastructure |
+| PlaywrightTests | End-to-end browser tests for OpenClaw UI |
+| LoadTests | Performance and throughput benchmarks |
 
 > **Note:** IntegrationTests and PlaywrightTests require Docker to be running.
 
@@ -144,7 +144,7 @@ The dashboard at `https://localhost:15888` (or the URL shown in console output) 
 
 ```
 EnterpriseIntegrationPlatform/
-├── src/                          # Source code (44+ projects)
+├── src/                          # Source code
 │   ├── AppHost/                  # .NET Aspire orchestrator
 │   ├── ServiceDefaults/          # Shared OpenTelemetry & health checks
 │   ├── Contracts/                # IntegrationEnvelope & shared interfaces
@@ -246,13 +246,63 @@ You need `Microsoft.NETCore.App 10.x.x` and `Microsoft.AspNetCore.App 10.x.x`.
 
 ---
 
-## Exercises
+## Lab
 
-1. **Explore the solution**: Open the `.sln` file in your IDE and browse the project list. Count how many `Processing.*` projects exist.
+**Objective:** Build the solution, launch the Aspire orchestrator, and explore how the platform's service topology implements the EIP Messaging Gateway and Control Bus patterns.
 
-2. **Read the tests**: Open `tests/UnitTests/` and browse the test namespaces. Each namespace corresponds to a `src/` project.
+### Step 1: Build and Launch
 
-3. **Explore Aspire**: Launch the AppHost and click through the Aspire dashboard. Find the health check endpoints for each service.
+Open a terminal in the repository root and execute:
+
+```bash
+dotnet restore EnterpriseIntegrationPlatform.sln
+dotnet build EnterpriseIntegrationPlatform.sln
+```
+
+Confirm the build succeeds with zero errors and zero warnings.
+
+### Step 2: Explore the Aspire Service Topology
+
+Start the orchestrator:
+
+```bash
+cd src/AppHost
+dotnet run
+```
+
+Open the Aspire dashboard URL printed in the console. Identify each service and classify it by EIP role:
+
+| Service | EIP Role |
+|---------|----------|
+| Gateway.Api | Messaging Gateway — single entry point for external systems |
+| Admin.Api | Control Bus — runtime administration and monitoring |
+| OpenClaw.Web | ? (identify its role) |
+
+Click each resource's health endpoint. Explain why health checks are essential for **scalability** — what happens when a load balancer cannot determine service health?
+
+### Step 3: Trace a Message Path Through Services
+
+Using the Aspire dashboard's **Traces** tab, identify the OpenTelemetry spans created when a message enters the Gateway. Draw the message flow: Gateway → Broker → Workflow → Activities → Connector. For each hop, note which EIP pattern is being applied (e.g., Gateway = Messaging Gateway, Broker = Message Channel, Workflow = Process Manager).
+
+## Exam
+
+1. In the EIP Messaging Gateway pattern, what is the gateway's primary responsibility?
+   - A) Transform message payloads between formats
+   - B) Provide a single entry point that encapsulates messaging-specific logic and shields external systems from internal broker details
+   - C) Store messages permanently in a database
+   - D) Route messages based on content inspection
+
+2. Why does the platform use .NET Aspire to orchestrate services rather than starting each service manually?
+   - A) Aspire encrypts all inter-service communication automatically
+   - B) Aspire ensures services start in dependency order with shared configuration, health checks, and observability — critical for a distributed integration platform's operational reliability
+   - C) Manual startup is not supported by .NET 10
+   - D) Aspire compiles all services into a single executable
+
+3. How does the Control Bus pattern (implemented by Admin.Api) support **operational scalability**?
+   - A) It routes business messages to faster consumers
+   - B) It provides centralized runtime management — feature flags, DLQ resubmission, and health monitoring — without modifying or redeploying processing pipelines
+   - C) It increases the number of broker partitions automatically
+   - D) It caches all messages in memory for faster retrieval
 
 ---
 

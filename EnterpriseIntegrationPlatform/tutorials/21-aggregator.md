@@ -113,13 +113,56 @@ Each `AggregateAsync` call atomically adds the item to the store and checks comp
 
 ---
 
-## Exercises
+## Lab
 
-1. A Splitter produces 5 items with `TotalCount = 5`. After receiving items 0, 1, 2, 3, what does `AggregateResult.ReceivedCount` return? What is `IsComplete`?
+**Objective:** Trace the Aggregator's completion logic, design timeout strategies, and analyze how **idempotent** aggregation ensures **atomic** reassembly of split messages.
 
-2. Design a `TimeoutCompletionStrategy` that completes a group if 30 seconds pass since the first item arrived. What challenges does this introduce?
+### Step 1: Trace Aggregation Completion
 
-3. Why must the `IMessageAggregateStore` be idempotent on `MessageId`? What happens without idempotency if a message is redelivered?
+A Splitter produces 5 items with `TotalCount = 5`. Items arrive out of order: 3, 0, 4, 1, 2. Open `src/Processing.Aggregator/MessageAggregator.cs` and trace:
+
+1. After receiving items 0, 1, 2, 3 — what does `AggregateResult.ReceivedCount` return? What is `IsComplete`?
+2. When item 4 arrives, how does the Aggregator know the group is complete?
+3. What `CorrelationId` links all 5 items to the same aggregate group?
+
+### Step 2: Design a Timeout Completion Strategy
+
+Not all split items may arrive (e.g., item 2 fails permanently). Design a timeout strategy:
+
+- After 30 seconds from the first item, complete the aggregate with whatever has arrived
+- Mark the result as `IsPartial = true`
+- Route the partial aggregate to a `review.incomplete-batches` topic
+
+What **atomicity** decision must you make: should a partial aggregate be considered "successful" or should it trigger compensation for already-delivered items?
+
+### Step 3: Analyze Idempotent Aggregation
+
+A message with `SequenceNumber = 2` is delivered twice (broker redelivery). Without idempotency:
+
+- The aggregate would count 6 items instead of 5
+- `IsComplete` would never be true (6 > 5) or would fire prematurely
+
+Open `src/Processing.Aggregator/` and verify: How does `IMessageAggregateStore` handle duplicate `MessageId`s? Why is idempotency critical for **scalable** at-least-once delivery systems?
+
+## Exam
+
+1. A Splitter produces 5 items. The Aggregator receives items 0, 1, 3, 4 but item 2 never arrives. What should happen after the timeout?
+   - A) Wait indefinitely — the aggregate must be complete
+   - B) Complete with 4 items, mark as partial, and route for manual review — a timeout prevents indefinite resource consumption while preserving the received work for inspection
+   - C) Discard all 4 received items
+   - D) Re-request item 2 from the Splitter
+
+2. Why must the Aggregator's store be **idempotent** on `MessageId`?
+   - A) Idempotency is required by the NUnit testing framework
+   - B) In at-least-once delivery systems, duplicate messages are expected — without idempotency, the aggregate count would be corrupted, potentially triggering premature completion or preventing completion entirely
+   - C) Idempotency improves serialization performance
+   - D) The broker guarantees exactly-once delivery, so idempotency is unnecessary
+
+3. How does the Splitter-Aggregator pair maintain **end-to-end atomicity** for a batch message?
+   - A) The Splitter and Aggregator share a database transaction
+   - B) The `CorrelationId` links all split items; `SequenceNumber` and `TotalCount` enable the Aggregator to verify completeness — only when all items succeed (or timeout triggers) is the aggregate result committed or compensated
+   - C) The broker ensures all items are delivered simultaneously
+   - D) Each split item is independently atomic — there is no end-to-end guarantee
 
 ---
 

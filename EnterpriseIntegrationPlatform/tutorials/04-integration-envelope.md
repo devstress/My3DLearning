@@ -215,13 +215,45 @@ All five envelopes share the same `CorrelationId`. This lets you:
 
 ---
 
-## Exercises
+## Lab
 
-1. **Design an envelope**: You receive an XML invoice from a partner via SFTP. Design the `IntegrationEnvelope` fields — what would `Source`, `MessageType`, `Intent`, and key metadata entries be?
+**Objective:** Build causation chains and sequenced message sets that demonstrate how the Envelope Wrapper pattern preserves **atomicity** and **traceability** across a multi-step integration pipeline.
 
-2. **Trace the chain**: A message arrives, gets validated, split into 3 parts, each part is transformed, and all 3 are aggregated. How many envelopes are created total? Draw the `CausationId` chain.
+### Step 1: Build a Causation Chain (Message Lineage)
 
-3. **Expiration scenario**: A message has `ExpiresAt = now + 5 minutes`. Processing takes 6 minutes. What happens? Which component handles this?
+Write code that simulates a three-step processing pipeline. Create an original envelope with `IntegrationEnvelope<string>.Create()`. Then create a second envelope (transformation result) using a `with` expression — set its `CausationId` to the first envelope's `MessageId` and keep the same `CorrelationId`. Create a third envelope whose `CausationId` is the second. Verify all three share the same `CorrelationId` but have distinct `MessageId` values.
+
+This lineage is essential for **atomicity**: if step 3 fails, the saga compensation engine uses the `CausationId` chain to identify and roll back exactly the right upstream steps.
+
+### Step 2: Model a Splitter Output with Sequencing
+
+Create three envelopes representing a Splitter's output. Use `with` expressions to set `SequenceNumber` (0, 1, 2) and `TotalCount` (3). Also set `ExpiresAt` on one envelope to 5 minutes from now, and on another to a time in the past. Verify `IsExpired` returns the correct value.
+
+Explain why the **Message Expiration** pattern is critical for scalability: in a high-throughput system, stale messages must be routed to the Dead Letter Queue rather than consuming resources processing outdated data.
+
+### Step 3: Design an Atomicity Scenario
+
+Imagine an order message is split into 3 line-item messages. Line-item 2 fails delivery. Using the envelope fields (`CorrelationId`, `CausationId`, `SequenceNumber`, `TotalCount`), describe how the platform can: (a) identify all 3 messages as belonging to the same operation, (b) determine which specific message failed, and (c) trigger compensation for line-items 1 and 3 that already succeeded.
+
+## Exam
+
+1. Why is `IntegrationEnvelope<T>` defined as a C# `record` rather than a `class`?
+   - A) Records are faster to serialize than classes
+   - B) Records provide immutability via `with` expressions, ensuring envelopes are never accidentally mutated during concurrent processing — critical for thread-safe scalability
+   - C) The .NET runtime requires records for generic types
+   - D) Records automatically encrypt their properties
+
+2. In a causation chain where message A is split into messages B₁, B₂, and B₃, what value should the `CausationId` of each split message contain?
+   - A) Its own `MessageId`
+   - B) The `CorrelationId` of message A
+   - C) The `MessageId` of message A — the parent that caused the split
+   - D) A new randomly generated `Guid`
+
+3. How does the `IsExpired` check contribute to the platform's **zero message loss** guarantee?
+   - A) Expired messages are silently dropped to save resources
+   - B) Expired messages are routed to the Dead Letter Queue with reason "expired", ensuring they are never silently lost but also don't consume processing capacity for stale data
+   - C) The broker automatically deletes expired messages
+   - D) `IsExpired` prevents messages from being published in the first place
 
 ---
 

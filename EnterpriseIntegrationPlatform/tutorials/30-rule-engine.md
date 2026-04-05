@@ -141,13 +141,70 @@ Rule evaluation happens **within the pipeline transaction**. If the selected act
 
 ---
 
-## Exercises
+## Lab
 
-1. Write a `BusinessRule` that routes all messages from source `"PartnerX"` with `MessageType` containing `"order"` to topic `"orders-priority"`.
+**Objective:** Write business rules with conditions and logic operators, trace priority-based evaluation, and analyze rule caching for **scalable** high-throughput routing decisions.
 
-2. A rule has `LogicOperator = RuleLogicOperator.Or` with two conditions. Explain how evaluation differs from `And`.
+### Step 1: Write a Priority-Based Business Rule
 
-3. Why does the platform evaluate rules in priority order and stop at the first match rather than evaluating all rules?
+Write a `BusinessRule` that routes all messages from source `"PartnerX"` with `MessageType` containing `"order"` to topic `"orders-priority"`:
+
+```csharp
+var rule = new BusinessRule
+{
+    Name = "PartnerX-Orders",
+    Priority = 1,
+    LogicOperator = RuleLogicOperator.And,
+    Conditions = [
+        new RuleCondition { FieldName = "Source", Operator = RuleConditionOperator.Equals, Value = "PartnerX" },
+        new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Contains, Value = "order" }
+    ],
+    OutputTopic = "orders-priority"
+};
+```
+
+Open `src/RuleEngine/BusinessRuleEngine.cs` and trace: How does `And` vs. `Or` logic change the evaluation?
+
+### Step 2: Trace Priority-Based Evaluation
+
+Rules are evaluated in priority order (lowest number = highest priority):
+
+| Priority | Rule | Conditions |
+|----------|------|-----------|
+| 1 | Premium orders | Source = "PartnerX" AND Type contains "order" |
+| 5 | All orders | Type contains "order" |
+| 10 | Default | Always matches |
+
+A message from `PartnerX` with type `"order.created"` matches rules at priorities 1 and 5. Which rule wins? Why does the engine stop at the first match? (hint: deterministic routing for **atomicity**)
+
+### Step 3: Design Rule Caching for Scalability
+
+At 50,000 messages/second with 100 rules, each message evaluates up to 100 conditions. Design a caching strategy:
+
+- Rules change infrequently (hourly) but messages arrive constantly
+- How does the platform cache compiled rules? (Open `src/RuleEngine/` to check)
+- What is the cache invalidation strategy when rules are updated?
+- What is the performance difference between cached vs. uncached rule evaluation?
+
+## Exam
+
+1. A rule engine has 3 rules with priorities 1, 5, 10. A message matches rules at priorities 5 and 10. Which rule is applied?
+   - A) Both rules are applied (fan-out)
+   - B) Priority 5 — the engine evaluates in priority order and stops at the first match, ensuring deterministic and **atomic** routing to exactly one destination
+   - C) Priority 10 — the last match wins
+   - D) The engine randomly selects one
+
+2. Why does the rule engine use `And`/`Or` logic operators for conditions?
+   - A) They're required by the .NET compiler
+   - B) `And` requires all conditions to match (strict targeting); `Or` requires any condition to match (broad targeting) — this enables both precise and flexible routing rules for different business scenarios
+   - C) Logic operators improve serialization performance
+   - D) They're equivalent — both produce the same result
+
+3. How does rule caching improve **throughput scalability**?
+   - A) Caching stores message results, not rules
+   - B) Compiled rules are cached in memory — avoiding repeated parsing and compilation of rule definitions for every message; since rules change infrequently but messages arrive at high volume, caching amortizes the compilation cost over millions of evaluations
+   - C) Caching is only useful during testing
+   - D) Rules are too small to benefit from caching
 
 ---
 

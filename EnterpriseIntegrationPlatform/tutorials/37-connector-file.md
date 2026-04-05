@@ -95,13 +95,66 @@ File I/O is bound by disk throughput and network filesystem latency (for NFS/SMB
 
 ---
 
-## Exercises
+## Lab
 
-1. Design a `FileConnectorOptions` for a batch process that writes UTF-16 encoded XML files to an NFS share, with `OverwriteExisting = true`.
+**Objective:** Configure file-based delivery for batch processing, analyze concurrent write safety, and trace how `{MessageId}` filenames prevent conflicts in **scaled** consumer deployments.
 
-2. Two consumer replicas write to the same `RootDirectory`. How does the `FilenamePattern` with `{MessageId}` prevent conflicts?
+### Step 1: Configure a File Connector
 
-3. Why does the connector use `Func<T, byte[]>` for serialization rather than accepting raw strings?
+Design a `FileConnectorOptions` for a batch process that writes UTF-16 encoded XML files:
+
+```csharp
+var options = new FileConnectorOptions
+{
+    RootDirectory = "/mnt/nfs/outbound/orders",
+    FilenamePattern = "order-{MessageId}.xml",
+    Encoding = "utf-16",
+    OverwriteExisting = true,
+    CreateDirectoryIfMissing = true
+};
+```
+
+Open `src/Connectors.File/FileConnector.cs` and trace: How does the connector resolve `{MessageId}` in the filename? What other placeholders are available?
+
+### Step 2: Analyze Concurrent Write Safety
+
+Two consumer replicas write to the same `RootDirectory`. With `{MessageId}` in the pattern:
+
+| Replica | Message | Filename |
+|---------|---------|----------|
+| A | `msg-abc-123` | `order-abc-123.xml` |
+| B | `msg-def-456` | `order-def-456.xml` |
+| A | `msg-abc-123` (redelivery) | `order-abc-123.xml` (overwrite) |
+
+How does `{MessageId}` prevent filename collisions between different messages? How does `OverwriteExisting` handle idempotent redelivery of the same message?
+
+### Step 3: Evaluate File Connector Atomicity
+
+The file connector uses `Func<T, byte[]>` for serialization rather than accepting raw strings. Explain:
+
+- Why `byte[]` instead of `string`? (hint: binary formats like Avro, Protocol Buffers)
+- How does the connector ensure **atomic** file creation? (hint: write to temp file, then rename)
+- What happens if the process crashes after writing but before renaming?
+
+## Exam
+
+1. Why does the file connector use `{MessageId}` in the filename pattern?
+   - A) Message IDs are shorter than timestamps
+   - B) `MessageId` is globally unique — using it in filenames prevents collision when multiple consumer replicas write to the same directory, and makes redeliveries idempotent (same file is overwritten, not duplicated)
+   - C) The filesystem requires GUIDs as filenames
+   - D) MessageId is the only available placeholder
+
+2. Why does the connector use `Func<T, byte[]>` for serialization?
+   - A) Bytes are smaller than strings
+   - B) `byte[]` supports any output format — JSON, XML, binary (Avro, Protobuf) — while `string` would limit the connector to text-only formats; this makes the connector **format-agnostic** and scalable across integration needs
+   - C) The filesystem only stores bytes
+   - D) String serialization is not supported in .NET
+
+3. How does write-then-rename ensure **atomic** file visibility?
+   - A) Renaming is faster than writing
+   - B) The receiver's file scanner only sees the final filename — the temp file is invisible to scanners looking for the expected pattern; rename is atomic at the OS level, so the file transitions from invisible to complete in one step
+   - C) The filesystem guarantees transactional writes
+   - D) Temp files are automatically deleted
 
 ---
 

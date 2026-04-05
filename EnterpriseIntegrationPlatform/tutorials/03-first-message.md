@@ -266,16 +266,62 @@ public class IntegrationEnvelopeTests
 
 ---
 
-## Exercises
+## Lab
 
-1. **Trace a CorrelationId**: Imagine you publish a message, it gets split into 5 parts, each part gets transformed, and then they're aggregated back together. Which field ensures they all stay linked? What would `CausationId` be set to on each split message?
+**Objective:** Create an `IntegrationEnvelope<T>`, publish it to a Message Channel, and trace the Correlation Identifier through a publish-subscribe round-trip.
 
-2. **Choose the Intent**: For each scenario, pick the correct `MessageIntent`:
-   - "Process this payment" → ?
-   - "Here is the quarterly report" → ?
-   - "A new customer registered" → ?
+### Step 1: Create and Inspect an Integration Envelope
 
-3. **Broker independence**: Why does the platform use `IMessageBrokerProducer` instead of calling Kafka/NATS directly? What happens when you switch from NATS to Pulsar?
+Using the static factory method, create an envelope and inspect the EIP Message pattern fields it populates automatically:
+
+```csharp
+var envelope = IntegrationEnvelope<string>.Create(
+    payload: "{\"orderId\": 42, \"amount\": 99.95}",
+    source: "OrderService",
+    messageType: "order.created");
+```
+
+Verify: `MessageId` is a non-empty `Guid` (Message Identity), `CorrelationId` is generated (Correlation Identifier pattern), `Timestamp` is UTC (for ordering and expiration), and `Priority` defaults to `Normal`.
+
+### Step 2: Trace the Message Lifecycle
+
+Draw the 8-step message lifecycle from the tutorial on paper or whiteboard:
+
+```
+CREATE → PUBLISH → PERSIST → CONSUME → WORKFLOW → ACTIVITIES → ACK/NACK → OBSERVE
+```
+
+For each step, identify: (a) which EIP pattern applies, (b) where **atomicity** is enforced (hint: PERSIST ensures durability, WORKFLOW ensures all-or-nothing), and (c) which step enables **scalability** through parallel processing (hint: CONSUME with consumer groups).
+
+### Step 3: Design a Multi-Consumer Topology
+
+Imagine you need both an **analytics service** and a **billing service** to receive `order.created` messages. Design the consumer group configuration:
+
+- Analytics: consumer group = `"analytics-processors"` (receives every message)
+- Billing: consumer group = `"billing-processors"` (receives every message)
+- Within billing, 3 instances share the load
+
+Explain which EIP patterns are at play: **Publish-Subscribe Channel** (different groups) vs. **Competing Consumers** (same group, multiple instances). Why does this design scale without code changes?
+
+## Exam
+
+1. What is the purpose of the `CorrelationId` field on `IntegrationEnvelope<T>`?
+   - A) It uniquely identifies a single message in the broker's storage
+   - B) It links all messages that belong to the same logical business transaction, even across splits, transformations, and aggregations
+   - C) It stores the consumer group name for load balancing
+   - D) It provides the encryption key for message payloads
+
+2. Which `MessageIntent` value should be assigned to a message that instructs a downstream service to perform an action (e.g., "process this payment")?
+   - A) `MessageIntent.Event`
+   - B) `MessageIntent.Document`
+   - C) `MessageIntent.Command`
+   - D) There is no distinction — all messages are treated identically
+
+3. How does the broker abstraction (`IMessageBrokerProducer` / `IMessageBrokerConsumer`) support **atomic processing** in the message lifecycle?
+   - A) It encrypts every message before publishing
+   - B) It ensures the message is durably persisted in the broker before returning from `PublishAsync`, so the message survives producer crashes
+   - C) It compresses the payload to reduce latency
+   - D) It creates a database transaction around the publish call
 
 ---
 

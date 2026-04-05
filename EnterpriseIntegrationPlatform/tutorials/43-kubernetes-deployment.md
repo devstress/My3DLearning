@@ -196,16 +196,87 @@ Rolling deployments ensure **zero-downtime releases**. Kubernetes maintains the
 old pods until new ones pass readiness probes, preserving message processing
 continuity. Liveness probes automatically restart unhealthy pods.
 
-## Exercises
+## Lab
 
-1. Modify the HPA to scale on both CPU and memory utilization. What
-   `averageUtilization` thresholds would you choose for a memory-intensive
-   pipeline worker?
+**Objective:** Configure Kubernetes HPA for auto-scaling integration workers, analyze graceful shutdown for **atomic** in-flight message handling, and design Kustomize overlays for multi-environment deployment.
 
-2. Create a Kustomize patch that overrides the image tag for the staging
-   overlay. How does this differ from changing `values.yaml` in Helm?
+### Step 1: Configure HPA with Multi-Metric Scaling
 
-3. What happens to in-flight messages if a pod is terminated during a rolling
-   update? How do graceful shutdown and broker acknowledgment interact?
+Modify the HPA to scale on both CPU and memory utilization:
+
+```yaml
+spec:
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+```
+
+Why set memory threshold higher than CPU? (hint: pipeline workers are more likely CPU-bound from JSON processing; memory scaling catches enrichment cache growth)
+
+### Step 2: Analyze Graceful Shutdown Atomicity
+
+During a rolling update, a pod is terminated while processing a message. Trace the shutdown sequence:
+
+```
+1. Kubernetes sends SIGTERM → pod enters termination grace period
+2. Worker stops accepting new messages (unsubscribes from broker)
+3. In-flight messages complete processing (up to terminationGracePeriodSeconds)
+4. Worker sends Ack for completed messages, Nack for incomplete ones
+5. Pod terminates → broker redelivers Nack'd messages to other consumers
+```
+
+What happens if `terminationGracePeriodSeconds` is too short? How does this affect **message atomicity**?
+
+### Step 3: Design Kustomize Overlays
+
+Create a Kustomize patch that overrides the image tag for staging:
+
+```yaml
+# overlays/staging/kustomization.yaml
+resources:
+  - ../../base
+patches:
+  - target:
+      kind: Deployment
+      name: pipeline-worker
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: registry.example.com/eip/worker:staging-latest
+```
+
+How does Kustomize differ from Helm for multi-environment deployment? Which is more **scalable** for a platform with 10+ microservices across 3 environments?
+
+## Exam
+
+1. What happens to in-flight messages when a pod is terminated during a rolling update?
+   - A) Messages are lost
+   - B) The pod completes processing in-flight messages during the termination grace period, Acks completed work, and Nacks incomplete messages — the broker redelivers Nack'd messages to healthy pods, ensuring **zero message loss**
+   - C) All messages are automatically retried from the beginning
+   - D) The broker waits for the pod to restart
+
+2. Why should the memory HPA threshold be set higher than CPU for integration workers?
+   - A) Memory is always less constrained than CPU
+   - B) Pipeline workers are typically CPU-bound from JSON parsing and regex evaluation; memory growth is gradual (from caching and enrichment) — setting memory threshold higher prevents premature scaling while still catching memory-intensive workload changes
+   - C) Kubernetes requires different thresholds
+   - D) Memory scaling is faster than CPU scaling
+
+3. How does Kubernetes auto-scaling support **integration platform scalability**?
+   - A) HPA only works with web servers
+   - B) HPA automatically adjusts the number of pipeline worker pods based on actual load — during peak hours, more workers process messages in parallel; during off-peak, resources are released, optimizing cost while maintaining throughput SLAs
+   - C) Auto-scaling requires manual approval
+   - D) The broker handles scaling internally
 
 **Previous: [← Tutorial 42](42-configuration.md)** | **Next: [Tutorial 44 →](44-disaster-recovery.md)**
