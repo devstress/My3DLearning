@@ -48,4 +48,11 @@ public static class MessageHeaders
 
     /// <summary>JSON-serialised array of <see cref="MessageHistoryEntry"/> tracking each processing step.</summary>
     public const string MessageHistory = "message-history";
+
+    /// <summary>
+    /// GUID identifying the replay operation that produced a replayed message.
+    /// Present only on replayed messages; used for audit-trail separation and
+    /// idempotent consumer deduplication.
+    /// </summary>
+    public const string ReplayId = "replay-id";
 }

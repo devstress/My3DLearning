@@ -192,4 +192,78 @@ public class MessageReplayerTests
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
     }
+
+    [Test]
+    public async Task ReplayAsync_InjectsReplayIdHeader_IntoReplayedMessages()
+    {
+        var replayer = BuildReplayer();
+        var envelope = BuildObjectEnvelope();
+        _store.GetMessagesForReplayAsync(Arg.Any<string>(), Arg.Any<ReplayFilter>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(ToAsyncEnumerable([envelope]));
+
+        IntegrationEnvelope<object>? captured = null;
+        _producer.PublishAsync(Arg.Any<IntegrationEnvelope<object>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask)
+            .AndDoes(ci => captured = (IntegrationEnvelope<object>)ci[0]);
+
+        var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
+
+        Assert.That(captured, Is.Not.Null);
+        Assert.That(captured!.Metadata.ContainsKey(MessageHeaders.ReplayId), Is.True);
+        Assert.That(Guid.TryParse(captured.Metadata[MessageHeaders.ReplayId], out _), Is.True);
+        Assert.That(result.ReplayedCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ReplayAsync_AllMessagesShareSameReplayId()
+    {
+        var replayer = BuildReplayer();
+        var e1 = BuildObjectEnvelope();
+        var e2 = BuildObjectEnvelope();
+        _store.GetMessagesForReplayAsync(Arg.Any<string>(), Arg.Any<ReplayFilter>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(ToAsyncEnumerable([e1, e2]));
+
+        var capturedIds = new List<string>();
+        _producer.PublishAsync(Arg.Any<IntegrationEnvelope<object>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask)
+            .AndDoes(ci =>
+            {
+                var env = (IntegrationEnvelope<object>)ci[0];
+                capturedIds.Add(env.Metadata[MessageHeaders.ReplayId]);
+            });
+
+        await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
+
+        Assert.That(capturedIds, Has.Count.EqualTo(2));
+        Assert.That(capturedIds[0], Is.EqualTo(capturedIds[1]));
+    }
+
+    [Test]
+    public async Task ReplayAsync_SkipAlreadyReplayed_SkipsMessagesWithReplayId()
+    {
+        var replayer = BuildReplayer(new ReplayOptions
+        {
+            SourceTopic = "source.topic",
+            TargetTopic = "target.topic",
+            MaxMessages = 100,
+            SkipAlreadyReplayed = true,
+        });
+
+        var alreadyReplayed = BuildObjectEnvelope();
+        alreadyReplayed.Metadata[MessageHeaders.ReplayId] = Guid.NewGuid().ToString();
+        var fresh = BuildObjectEnvelope();
+
+        _store.GetMessagesForReplayAsync(Arg.Any<string>(), Arg.Any<ReplayFilter>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(ToAsyncEnumerable([alreadyReplayed, fresh]));
+
+        var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
+
+        Assert.That(result.ReplayedCount, Is.EqualTo(1));
+        Assert.That(result.SkippedCount, Is.EqualTo(1));
+
+        await _producer.Received(1).PublishAsync(
+            Arg.Any<IntegrationEnvelope<object>>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
 }

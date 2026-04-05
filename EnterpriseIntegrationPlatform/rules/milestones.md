@@ -24,7 +24,7 @@
 
 ✅ Phases 1–21 complete — see `rules/completion-log.md` for full history.
 
-**Current stats:** 1,495 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,628 total tests**. 48 src projects.
+**Current stats:** 1,498 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,631 total tests**. 48 src projects.
 
 ---
 
@@ -45,17 +45,6 @@
 ### Phase 22 — Implement Unfulfilled Tutorial Promises
 
 **Scope:** Audit of all 50 tutorials against source code found 13 features that tutorials promise but are not implemented. These chunks implement the missing features so that every tutorial claim is backed by working code.
-
-#### Chunk 086 — ReplayId Header Injection in MessageReplayer
-
-| Field | Value |
-|-------|-------|
-| Status | `not-started` |
-| Tutorial | 26 — Message Replay (lines 9, 31, 34, 94, 106, 114) |
-| Claim | "Every replayed message receives a `ReplayId` header (a GUID) linking it back to the replay operation" for audit-trail separation and idempotent consumer deduplication. |
-| Current State | `MessageReplayer.ReplayAsync()` copies envelope metadata but never injects a `ReplayId` header. `SkippedCount` is always 0. |
-| Implementation | Generate a single `ReplayId` (GUID) per `ReplayAsync` invocation. Add `MessageHeaders.ReplayId` constant to `src/Contracts/MessageHeaders.cs`. Inject `replayedEnvelope.Metadata[MessageHeaders.ReplayId] = replayId.ToString()` for each message. Track skipped messages (e.g. if a message was already replayed based on presence of existing `ReplayId` and dedup option in `ReplayOptions`). Add unit tests. |
-| Files | `src/Contracts/MessageHeaders.cs`, `src/Processing.Replay/MessageReplayer.cs`, `src/Processing.Replay/ReplayOptions.cs`, `tests/UnitTests/MessageReplayerTests.cs` |
 
 #### Chunk 088 — Rule Engine In-Memory Caching with Periodic Refresh
 
@@ -114,7 +103,7 @@
 
 ## Next Chunk
 
-**Chunk 086** — ReplayId Header Injection in MessageReplayer
+**Chunk 088** — Rule Engine In-Memory Caching with Periodic Refresh
 
 ---
 

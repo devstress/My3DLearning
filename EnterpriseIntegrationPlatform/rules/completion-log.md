@@ -99,6 +99,19 @@ See `milestones.md` for current phase status and next chunk.
   - `tests/UnitTests/CompetingConsumersTests/CompetingConsumerOrchestratorTests.cs` — Added 1 new test: scale-down skipped during backpressure.
 - **Test counts**: 1,495 UnitTests (+1). 1,628 total tests.
 
+## Chunk 086 – ReplayId Header Injection in MessageReplayer
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Inject `ReplayId` header into replayed messages as promised by tutorial 26.
+- **Files modified**:
+  - `src/Contracts/MessageHeaders.cs` — Added `ReplayId` constant.
+  - `src/Processing.Replay/MessageReplayer.cs` — Generates ReplayId per invocation, injects into metadata, tracks skipped count.
+  - `src/Processing.Replay/ReplayOptions.cs` — Added `SkipAlreadyReplayed` boolean.
+  - `tests/UnitTests/MessageReplayerTests.cs` — Added 3 new tests.
+- **Test counts**: 1,498 UnitTests (+3). 1,631 total tests.
+
 ## Chunk 075 – Fix Tutorials 05, 06, 07
 
 - **Date**: 2026-04-05
