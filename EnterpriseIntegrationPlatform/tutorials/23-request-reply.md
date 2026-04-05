@@ -95,13 +95,57 @@ The request is published to the request topic and the correlator subscribes to t
 
 ---
 
-## Exercises
+## Lab
 
-1. A request is sent with `TimeoutMs = 5000`. The responder takes 7 seconds. What does `RequestReplyResult` look like?
+**Objective:** Trace the Request-Reply correlation mechanism, analyze timeout behavior, and design for **scalable** request-reply across distributed services.
 
-2. Two requesters send requests with different `CorrelationId` values to the same request topic. How does each requester get the correct reply?
+### Step 1: Trace Request-Reply Correlation
 
-3. Why does the correlator subscribe to the reply topic **before** publishing the request? What race condition does this prevent?
+A request is sent with `TimeoutMs = 5000`. The responder takes 7 seconds. Open `src/Processing.RequestReply/RequestReplyCorrelator.cs` and trace:
+
+1. What does `RequestReplyResult` look like? (`TimedOut = true`, no response)
+2. If the responder takes 3 seconds, what does the result contain?
+3. How does the `CorrelationId` in the request envelope match to the response?
+
+Now: Two requesters send requests with different `CorrelationId` values to the same request topic. How does each requester receive its own correct reply?
+
+### Step 2: Prevent the Subscribe-Before-Publish Race Condition
+
+The correlator subscribes to the reply topic **before** publishing the request. Explain:
+
+1. What race condition occurs if you publish first, then subscribe?
+2. How does pre-subscribing ensure the reply is never lost?
+3. Draw the timeline: Subscribe → Publish → Responder processes → Reply arrives → Correlator matches
+
+This is an **atomicity** concern: without pre-subscription, fast responders could publish replies before the requester is listening, causing permanent message loss.
+
+### Step 3: Design for Request-Reply Scalability
+
+At high throughput, many concurrent request-reply operations share the same reply topic:
+
+- How does the correlator isolate concurrent requests? (hint: `CorrelationId` matching)
+- What happens if 1,000 requests are in flight simultaneously? Memory implications?
+- How does the `TimeoutMs` prevent resource leaks from requests that never receive replies?
+
+## Exam
+
+1. Why does the Request-Reply correlator subscribe to the reply topic **before** publishing the request?
+   - A) Subscribing is faster than publishing
+   - B) A fast responder could publish the reply before the requester is listening — pre-subscribing eliminates this race condition, ensuring the reply is never lost even with sub-millisecond response times
+   - C) The broker requires subscriptions before publishes
+   - D) Pre-subscribing reduces network latency
+
+2. How does the `CorrelationId` enable **scalable** request-reply with many concurrent requests on the same topic?
+   - A) The broker routes replies based on `CorrelationId` automatically
+   - B) Each requester filters incoming replies by `CorrelationId` — only the matching reply is accepted, allowing thousands of concurrent request-reply operations to share a single reply topic without interference
+   - C) `CorrelationId` is used for message encryption
+   - D) Each request must use a unique reply topic
+
+3. What resource **scalability** concern does the timeout address in request-reply?
+   - A) Timeouts improve message throughput
+   - B) Without timeouts, requests that never receive replies would hold resources (memory, channel subscriptions) indefinitely — the timeout ensures cleanup even when responders fail, preventing memory leaks under sustained load
+   - C) Timeouts are only needed for testing
+   - D) The broker automatically cleans up timed-out requests
 
 ---
 

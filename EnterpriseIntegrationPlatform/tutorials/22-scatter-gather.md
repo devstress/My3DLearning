@@ -95,13 +95,67 @@ Scatter-Gather has **best-effort semantics** within the timeout window. If a rec
 
 ---
 
-## Exercises
+## Lab
 
-1. You scatter a pricing request to 3 suppliers with a 5-second timeout. Supplier A responds in 1 s, Supplier B in 3 s, Supplier C never responds. What does `ScatterGatherResult` look like?
+**Objective:** Trace the Scatter-Gather pattern's parallel request-response flow, analyze timeout behavior for **partial results**, and design a "best-of-N" selection strategy.
 
-2. How would you implement a "best of N" strategy where you take the lowest price from all responses received within the timeout?
+### Step 1: Trace a Scatter-Gather with Timeout
 
-3. Compare Scatter-Gather to calling each service sequentially. What is the latency difference with 3 services averaging 2 seconds each?
+You scatter a pricing request to 3 suppliers with `TimeoutMs = 5000`:
+
+| Supplier | Response Time | Price |
+|----------|--------------|-------|
+| A | 1 second | $120 |
+| B | 3 seconds | $95 |
+| C | Never responds | — |
+
+Open `src/Processing.ScatterGather/ScatterGatherer.cs` and trace:
+
+1. How does `ScatterGatherResult.Responses` look? (2 responses)
+2. Is `TimedOut = true`? (yes — only 2 of 3 responded)
+3. What is `Duration`? (≈5 seconds — the timeout)
+
+### Step 2: Design a "Best-of-N" Selection Strategy
+
+Using the partial results above, implement a selection strategy that picks the lowest price:
+
+```
+1. Scatter to all suppliers (parallel)
+2. Gather responses until timeout
+3. From gathered responses, select the one with lowest price
+4. If no responses arrived, route to DLQ with reason "no-supplier-response"
+```
+
+What is the **atomicity** guarantee? The selected best price must be committed as a single decision — if the commit fails, no supplier should be charged.
+
+### Step 3: Compare Scatter-Gather Latency vs. Sequential Calls
+
+| Approach | 3 services × 2s avg | 10 services × 2s avg |
+|----------|---------------------|----------------------|
+| Sequential | 6 seconds total | 20 seconds total |
+| Scatter-Gather | ~2 seconds (parallel) | ~2 seconds (parallel) |
+
+How does the Scatter-Gather pattern enable **scalable** multi-supplier/multi-service integration? What happens to latency as you add more recipients?
+
+## Exam
+
+1. A Scatter-Gather operation sends to 5 recipients with a 3-second timeout. Only 3 respond in time. What does the result indicate?
+   - A) Failure — all recipients must respond
+   - B) `TimedOut = true` with 3 responses — the caller receives partial results and can decide how to proceed based on business logic (e.g., select best from available)
+   - C) The operation retries the 2 missing recipients
+   - D) The 3 responses are discarded and the operation fails
+
+2. How does the Scatter-Gather pattern improve **integration scalability** compared to sequential service calls?
+   - A) It uses less memory per request
+   - B) Latency equals the slowest responder (or timeout), not the sum of all — adding more recipients doesn't increase total latency, enabling efficient multi-source integration at scale
+   - C) It reduces the number of network connections
+   - D) Sequential calls are always faster for small numbers of recipients
+
+3. What **atomicity** consideration arises when the Scatter-Gather selects one response from many?
+   - A) All responses must be stored permanently
+   - B) The selected response must be committed atomically — if the downstream commit fails, no side effects from the selection (e.g., supplier charges) should be applied, requiring compensation for any tentative reservations
+   - C) Non-selected responses are automatically compensated
+   - D) The broker handles selection atomicity
 
 ---
 

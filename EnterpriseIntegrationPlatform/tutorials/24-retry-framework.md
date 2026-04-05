@@ -122,13 +122,71 @@ When all retry attempts are exhausted (`IsSucceeded = false`), the message shoul
 
 ---
 
-## Exercises
+## Lab
 
-1. With `MaxAttempts = 4`, `InitialDelayMs = 500`, `BackoffMultiplier = 2.0`, and `UseJitter = false`, calculate the delay before each retry attempt.
+**Objective:** Calculate exponential backoff delays, analyze why jitter is critical for **scalable** retry under thundering-herd conditions, and design a retry classification strategy.
 
-2. Why is jitter important? Describe a scenario where 100 consumers without jitter cause problems for a recovering database.
+### Step 1: Calculate Backoff Delays
 
-3. A `JsonException` during deserialization is not retryable. How would you detect this and short-circuit to the DLQ?
+With `MaxAttempts = 4`, `InitialDelayMs = 500`, `BackoffMultiplier = 2.0`, and `UseJitter = false`, calculate the delay before each retry:
+
+| Attempt | Delay Formula | Delay |
+|---------|--------------|-------|
+| 1 (first retry) | 500 × 2⁰ | 500ms |
+| 2 | 500 × 2¹ | ? |
+| 3 | 500 × 2² | ? |
+| 4 | 500 × 2³ | ? |
+
+What is the total maximum wait time across all retries? Open `src/Processing.Retry/ExponentialBackoffRetryPolicy.cs` to verify the formula.
+
+### Step 2: Analyze the Thundering Herd Problem
+
+100 consumers lose connection to a database. All retry at the same exponential intervals (no jitter). Draw what happens:
+
+```
+t=0s:   [100 consumers all fail]
+t=500ms: [100 consumers all retry simultaneously] → database overwhelmed again
+t=1000ms: [100 consumers all retry simultaneously] → database overwhelmed again
+```
+
+Now add jitter: each consumer randomizes its delay within ±50%. Explain:
+- How does jitter spread the retry load over time?
+- Why is this critical for **system-level scalability** during recovery?
+- What is the relationship between jitter and the database's recovery time?
+
+### Step 3: Design Retry Classification
+
+Not all errors are retryable. Design a classification strategy:
+
+| Error Type | Retryable? | Action |
+|-----------|-----------|--------|
+| HTTP 503 (Service Unavailable) | Yes | Exponential backoff |
+| HTTP 400 (Bad Request) | No | Immediate DLQ |
+| `JsonException` (deserialization) | No | Immediate DLQ |
+| `TimeoutException` (network) | Yes | ? |
+| Schema validation failure | No | ? |
+
+Why is fast-failing non-retryable errors critical for **pipeline throughput**? What happens if you retry a `JsonException` 4 times before giving up?
+
+## Exam
+
+1. With `InitialDelayMs = 1000` and `BackoffMultiplier = 2.0`, what is the delay before the 4th retry attempt?
+   - A) 4000ms
+   - B) 8000ms — the delay doubles each attempt: 1000, 2000, 4000, 8000
+   - C) 3000ms
+   - D) 16000ms
+
+2. Why is jitter critical for **scalable** retry strategies in distributed systems?
+   - A) Jitter makes retries faster
+   - B) Without jitter, all consumers retry at identical intervals — creating synchronized spikes that can overwhelm the recovering service; jitter spreads retries over time, enabling gradual recovery
+   - C) Jitter is only needed for testing
+   - D) The broker requires jitter in retry delays
+
+3. Why should non-retryable errors (e.g., `JsonException`) be routed to the DLQ immediately instead of retried?
+   - A) Non-retryable errors are rare and don't matter
+   - B) Retrying a permanent error wastes processing capacity and delays handling of valid messages — fast-failing to DLQ preserves pipeline **throughput** and enables rapid human intervention
+   - C) The DLQ can fix the error automatically
+   - D) Non-retryable errors eventually succeed after enough retries
 
 ---
 
