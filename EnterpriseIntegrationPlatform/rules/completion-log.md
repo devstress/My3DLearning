@@ -50,6 +50,16 @@ See `milestones.md` for current phase status and next chunk.
   - `tutorials/46-complete-integration.md` — Fixed `HttpChannelAdapter : IChannelAdapter` → `HttpConnectorAdapter : IConnector` with correct `SendAsync` signature.
 - **Test counts**: No source changes — documentation only.
 
+## Chunk 079 – Fix Tutorials 48, 49 + Test Counts
+
+- **Date**: 2026-04-05
+- **Status**: done
+- **Goal**: Fix test example code in Tutorial 49 to match actual API. Verify test counts.
+- **Files modified**:
+  - `tutorials/49-testing-integrations.md` — Fixed `MapAck(envelope)` → `MapAck(messageId, correlationId)` and `MapNack(envelope, "timeout")` → `MapNack(messageId, correlationId, "timeout")`. Test counts already correct at 1,472 unit tests (updated in Phase 13).
+- **Notes**: Tutorial 48 `NotificationDecisionService` references are conceptual (showing how notification logic works) and already use correct `MapAck(messageId, correlationId)` signatures. Tutorial 50 test count (1,472) is correct.
+- **Test counts**: No source changes — documentation only.
+
 ## Chunk 074 – Phase 14 Completion
 
 - **Date**: 2026-04-04
