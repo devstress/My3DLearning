@@ -91,13 +91,59 @@ Messages are **Acked only after successful release** to the downstream topic. If
 
 ---
 
-## Exercises
+## Lab
 
-1. Three messages arrive for `CorrelationId = "order-42"` in this order: #3, #1, #2. Trace the calls to `Accept` and describe the return value for each call.
+**Objective:** Trace the Resequencer's buffering and release logic, analyze ordering guarantees for **atomic** batch processing, and design for partition-aware scaling.
 
-2. A sequence has messages #1, #2, #4 buffered and `ReleaseTimeout` fires. Describe what `ReleaseOnTimeout` returns and what happens to the gap at #3.
+### Step 1: Trace Out-of-Order Arrival
 
-3. Why must all messages for a `CorrelationId` be routed to the same resequencer instance? What broker feature enables this?
+Three messages arrive for `CorrelationId = "order-42"` in this order: #3, #1, #2. Open `src/Processing.Resequencer/` and trace each `Accept` call:
+
+| Arrival | SequenceNumber | Buffered? | Released? | Why? |
+|---------|---------------|-----------|-----------|------|
+| 1st | 3 | Yes | No | Waiting for #1 |
+| 2nd | 1 | — | Released: #1 | Next expected |
+| 3rd | 2 | — | Released: #2, then #3 | Completes the sequence |
+
+Verify your trace against the actual implementation.
+
+### Step 2: Handle Gaps with Timeout
+
+A sequence has messages #1, #2, #4 buffered, but #3 never arrives. After `ReleaseTimeout` fires:
+
+1. What does `ReleaseOnTimeout` return? (hint: #1 and #2 are released, #4 is released with a gap marker)
+2. Is the gap reported for downstream awareness?
+3. How does this design prevent indefinite buffering — critical for **system scalability** under high message volumes?
+
+Design an alerting strategy for gap detection: when should the operations team be notified?
+
+### Step 3: Partition-Aware Resequencing
+
+All messages for a `CorrelationId` must be routed to the same resequencer instance. Explain:
+
+- What broker feature enables this? (hint: Kafka partition keys, NATS subject-based routing)
+- What happens if messages for the same `CorrelationId` land on different resequencer instances?
+- How does partition-key routing enable **horizontal scaling** — each instance handles a subset of `CorrelationId`s independently?
+
+## Exam
+
+1. Why must all messages for a `CorrelationId` be routed to the **same** resequencer instance?
+   - A) Any instance can resequence any `CorrelationId`
+   - B) The resequencer maintains an ordered buffer per `CorrelationId` — if messages are split across instances, no single instance has the complete picture to determine correct ordering
+   - C) The broker automatically routes messages to the correct instance
+   - D) Resequencing doesn't require instance affinity
+
+2. How does the `ReleaseTimeout` prevent unbounded resource consumption?
+   - A) It deletes messages older than the timeout
+   - B) Without a timeout, a missing sequence number would cause all subsequent messages to buffer indefinitely — the timeout releases buffered messages with gap markers, preventing memory growth proportional to undelivered messages
+   - C) Timeouts are only needed in development
+   - D) The timeout reduces message processing latency
+
+3. How does partition-key routing enable **scalable** resequencing?
+   - A) All messages go to a single instance for global ordering
+   - B) Each resequencer instance handles a subset of `CorrelationId`s — adding instances distributes the load linearly, with no cross-instance coordination needed for ordering within each group
+   - C) Partition keys are only used for Kafka
+   - D) Routing is handled by the resequencer itself
 
 ---
 

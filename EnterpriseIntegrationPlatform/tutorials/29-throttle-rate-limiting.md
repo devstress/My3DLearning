@@ -150,13 +150,65 @@ When `AcquireAsync` delays a message, the message remains **uncommitted** — no
 
 ---
 
-## Exercises
+## Lab
 
-1. Design a `ThrottlePolicy` that allows a partner system to send 50 messages/second with bursts up to 200. Which `ThrottlePartitionKey` fields would you set?
+**Objective:** Design throttle policies for multi-tenant rate limiting, trace the token bucket algorithm, and analyze why per-tenant throttling is essential for **fair scalability**.
 
-2. The `TokenBucketThrottle` has 0 available tokens and a `MaxWait` of 5 seconds. A message arrives. Describe the sequence of events.
+### Step 1: Design a Multi-Tenant Throttle Policy
 
-3. Explain why the platform uses per-`TenantId` throttling by default for multi-tenant deployments rather than a single global throttle.
+Design a `ThrottlePolicy` for a partner system:
+
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| Rate | 50 messages/second | Sustained throughput |
+| Burst | 200 messages | Peak absorption |
+| `PartitionKey.TenantId` | `"partner-x"` | Per-tenant isolation |
+| `MaxWait` | 5 seconds | Max time to wait for a token |
+
+Open `src/Processing.Throttle/` and verify: How does the `TokenBucketThrottle` implement this? What happens when all 200 burst tokens are consumed?
+
+### Step 2: Trace Token Exhaustion
+
+The `TokenBucketThrottle` has 0 available tokens and `MaxWait = 5s`. A message arrives:
+
+1. The throttle checks: 0 tokens available
+2. Waits for token replenishment (50 tokens/second = 1 token every 20ms)
+3. After ~20ms, 1 token becomes available → message proceeds
+4. If no token is available after 5 seconds → what happens?
+
+What is the maximum queuing depth during a sustained burst? How does `MaxWait` prevent unbounded queue growth?
+
+### Step 3: Analyze Per-Tenant vs. Global Throttling
+
+Why does the platform use per-`TenantId` throttling by default?
+
+| Scenario | Global Throttle | Per-Tenant Throttle |
+|----------|----------------|-------------------|
+| Tenant A sends 10,000 msg/s | Blocks Tenant B too | Only Tenant A is throttled |
+| Tenant B sends 10 msg/s | May be blocked by A | Always gets through |
+| Fair resource allocation | No guarantee | Each tenant gets its quota |
+
+How does per-tenant throttling prevent the **noisy neighbor** problem? Why is this critical for **multi-tenant scalability**?
+
+## Exam
+
+1. A token bucket with rate=100/s and burst=500 receives 600 messages in 1 second. What happens?
+   - A) All 600 messages are processed immediately
+   - B) The first 500 are processed from the burst allowance; the remaining 100 wait for token replenishment at 100/s — after 1 second, all 600 have been processed; messages beyond capacity wait up to `MaxWait` before being rejected
+   - C) All 600 messages are rejected
+   - D) The burst limit is increased automatically
+
+2. Why is per-tenant throttling essential for **multi-tenant scalability**?
+   - A) Per-tenant throttling uses less memory
+   - B) Without per-tenant isolation, one tenant's traffic spike would exhaust the global rate limit and block all other tenants — the noisy neighbor problem; per-tenant throttling ensures fair resource allocation
+   - C) The broker requires per-tenant configuration
+   - D) Global throttling is always preferable for simplicity
+
+3. What happens when a message exceeds the `MaxWait` timeout in the throttle?
+   - A) The message is processed anyway
+   - B) The message is rejected with an appropriate error — this prevents unbounded queue growth and provides backpressure to the upstream sender, maintaining system stability under sustained overload
+   - C) The throttle increases its rate automatically
+   - D) The message is routed to a different topic
 
 ---
 

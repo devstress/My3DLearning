@@ -193,13 +193,65 @@ Each consumer processes messages independently and Acks them individually. If a 
 
 ---
 
-## Exercises
+## Lab
 
-1. A topic has 8 partitions and `MaxConsumers = 12`. What happens when the orchestrator tries to scale beyond 8 consumers? Why is `MaxConsumers` still useful?
+**Objective:** Trace the auto-scaling orchestrator with backpressure signaling, analyze cooldown to prevent scaling flap, and design a production backpressure integration.
 
-2. Consumer lag oscillates between 900 and 1100 with `ScaleUpThreshold = 1000`. Without `CooldownMs`, what behavior would you observe? How does cooldown fix it?
+### Step 1: Trace the Scaling Decision Path
 
-3. Design an `IBackpressureSignal` integration that returns HTTP 429 from the Gateway API when backpressure is active.
+A topic has 8 partitions, `MaxConsumers = 12`, and current consumer lag is 5,000. Open `src/Processing.CompetingConsumers/CompetingConsumerOrchestrator.cs` and trace `EvaluateAndScaleAsync`:
+
+1. Lag exceeds `ScaleUpThreshold` → what happens if current consumers = 8?
+2. Lag exceeds threshold but `currentCount >= MaxConsumers` → what signal is emitted?
+3. After scaling up, what prevents another scale-up in the next cycle? (hint: cooldown)
+
+Now: with `MaxConsumers = 12` and 8 Kafka partitions, what happens when the orchestrator scales to 9 consumers? (hint: one consumer will be idle — Kafka can't assign more consumers than partitions)
+
+### Step 2: Analyze Cooldown for Scaling Stability
+
+Consumer lag oscillates between 900 and 1100 with `ScaleUpThreshold = 1000`. Without cooldown:
+
+```
+Cycle 1: lag=1100 → scale up (3→4)
+Cycle 2: lag=900 → scale down (4→3)
+Cycle 3: lag=1100 → scale up (3→4)
+... flapping forever
+```
+
+How does `CooldownMs` break this cycle? What is the relationship between cooldown duration and scaling stability? What value would you set for a production system?
+
+### Step 3: Design a Backpressure Integration
+
+When the consumer pool is at maximum capacity and lag keeps growing, the orchestrator signals backpressure. Design a system-wide response:
+
+| Component | Backpressure Action |
+|-----------|-------------------|
+| Gateway API | Return HTTP 429 to upstream senders |
+| Ingestion producers | Pause or slow message publishing |
+| Dashboard (OpenClaw) | Show backpressure warning to operators |
+| Monitoring (OpenTelemetry) | Emit backpressure metrics and alerts |
+
+How does backpressure prevent **cascade failures** in a scalable system? What happens without it?
+
+## Exam
+
+1. A topic has 8 partitions and the orchestrator scales to 12 consumers. What happens?
+   - A) All 12 consumers share the 8 partitions equally
+   - B) 8 consumers each get 1 partition; 4 consumers are idle — Kafka cannot assign more consumers than partitions in a consumer group; `MaxConsumers` should be set to match partition count
+   - C) The broker creates 4 additional partitions automatically
+   - D) The extra consumers process from a different topic
+
+2. Why is cooldown critical for **scalable** auto-scaling?
+   - A) Cooldown reduces memory usage
+   - B) Without cooldown, oscillating lag near the threshold causes rapid scale-up/scale-down flapping — cooldown ensures each scaling decision has time to take effect before the next evaluation, preventing resource waste and instability
+   - C) Cooldown is only needed during maintenance windows
+   - D) The broker enforces cooldown automatically
+
+3. How does backpressure signaling maintain **system-level atomicity** under overload?
+   - A) Backpressure drops excess messages to protect the system
+   - B) Backpressure slows or pauses upstream producers — this prevents message accumulation that would exceed processing capacity, ensuring every accepted message can be processed atomically rather than overwhelming the pipeline
+   - C) Backpressure increases consumer count beyond the maximum
+   - D) Backpressure is only relevant for batch processing
 
 ---
 
