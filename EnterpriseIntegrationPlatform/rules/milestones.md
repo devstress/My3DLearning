@@ -24,7 +24,7 @@
 
 ✅ Phases 1–21 complete — see `rules/completion-log.md` for full history.
 
-**Current stats:** 1,514 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,647 total tests**. 48 src projects.
+**Current stats:** 1,518 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,651 total tests**. 48 src projects.
 
 ---
 
@@ -81,7 +81,7 @@
 
 ## Next Chunk
 
-**Chunk 090** — EnvironmentOverrideProvider: EIP__ Environment Variable Convention
+**Chunk 091** — DR Status Endpoint and Profiling API Endpoints
 
 ---
 

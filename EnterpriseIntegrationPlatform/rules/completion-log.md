@@ -135,6 +135,17 @@ See `milestones.md` for current phase status and next chunk.
   - `tests/UnitTests/InputSanitizerTests.cs` — Added 13 new tests covering XSS, SQL injection, HTML entities, Unicode overrides, and clean pass-through.
 - **Test counts**: 1,514 UnitTests (+13). 1,647 total tests.
 
+## Chunk 090 – EnvironmentOverrideProvider: EIP__ Environment Variable Convention
+
+- **Date**: 2026-04-05
+- **Phase**: 22
+- **Status**: done
+- **Goal**: Implement EIP__ environment variable convention as promised by tutorial 42 (line 121).
+- **Files modified**:
+  - `src/Configuration/EnvironmentOverrideProvider.cs` — Added `EnvPrefix`, `ResolveFromEnvironmentVariable()` method, and EIP__ env var as highest-priority cascade level in `ResolveAsync`.
+  - `tests/UnitTests/EnvironmentOverrideProviderTests.cs` — Added 4 new tests: env var overrides store, env var not set falls to store, colon-to-underscore mapping, missing var returns null.
+- **Test counts**: 1,518 UnitTests (+4). 1,651 total tests.
+
 ## Chunk 075 – Fix Tutorials 05, 06, 07
 
 - **Date**: 2026-04-05
