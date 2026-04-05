@@ -248,16 +248,71 @@ transaction, it guarantees that either all steps complete successfully or all
 completed steps are compensated. This is the strongest consistency guarantee
 available in a distributed system without two-phase commit.
 
-## Exercises
+## Lab
 
-1. What happens if `CompensateStepAsync` fails with a network timeout?
-   Design a retry policy that balances urgency (customer refund) with safety
-   (no double refund). See `CompensationActivityOptions` in the source.
+**Objective:** Design saga compensation for multi-step workflows, analyze compensation failure strategies, and compare workflow types for **throughput vs. consistency** trade-offs.
 
-2. Add a fourth step "SendConfirmation" to the saga. What does its
-   compensation look like? Is email compensation even possible?
+### Step 1: Design Compensation for Non-Reversible Actions
 
-3. Compare the `IntegrationPipelineWorkflow` and `AtomicPipelineWorkflow`.
-   When would you choose one over the other? Consider throughput vs. consistency.
+Add a fourth step "SendConfirmation" (email) to the saga:
+
+| Step | Action | Compensation | Reversible? |
+|------|--------|-------------|-------------|
+| 1. ValidateOrder | Schema validation | No-op (read-only) | N/A |
+| 2. ChargePayment | Debit customer account | Refund credit | Yes |
+| 3. ReserveInventory | Decrement stock | Increment stock | Yes |
+| 4. SendConfirmation | Email customer | ??? | **No** |
+
+Email is non-reversible. Design a compensating action:
+- Send a "cancellation notice" email? (creates customer confusion)
+- Log the non-reversible action for manual review? (operationally safer)
+- Accept that some actions cannot be compensated? (pragmatic)
+
+How does this challenge the **theoretical atomicity** of saga compensation?
+
+### Step 2: Handle Compensation Failures
+
+`CompensateStepAsync` for Step 2 (Refund) fails with a network timeout. Design a retry policy:
+
+| Concern | Policy |
+|---------|--------|
+| Urgency | Customer expects refund quickly |
+| Safety | Must not issue double refund |
+| Idempotency | Refund API must be idempotent (check by `CorrelationId`) |
+| Retry limit | 5 attempts with exponential backoff |
+| Escalation | After 5 failures → alert operations team for manual refund |
+
+Open `src/Workflow.Temporal/Activities/SagaCompensationActivities.cs` and check: How does the platform handle compensation activity failures?
+
+### Step 3: Compare Workflow Types
+
+| Aspect | IntegrationPipelineWorkflow | AtomicPipelineWorkflow |
+|--------|---------------------------|----------------------|
+| Compensation | None (fire-and-forget) | Full saga compensation |
+| Throughput | Higher (no compensation overhead) | Lower (tracks compensation state) |
+| Consistency guarantee | Best-effort delivery | All-or-nothing |
+| Best for | Non-critical notifications | Financial transactions, order processing |
+
+When would you choose `IntegrationPipelineWorkflow` over `AtomicPipelineWorkflow`?
+
+## Exam
+
+1. What should happen when a compensation activity itself fails?
+   - A) Silently mark the saga as compensated
+   - B) Retry with idempotent compensation (using `CorrelationId` to prevent duplicates); if retries are exhausted, escalate to the operations team — some compensations require human intervention when automated rollback fails
+   - C) Restart the entire original workflow
+   - D) Skip the failed compensation and continue
+
+2. Why is email delivery the hardest action to compensate in a saga?
+   - A) Email is too slow for saga patterns
+   - B) Email is non-reversible — once sent, it cannot be recalled; any "compensation" (like a cancellation email) creates additional customer communication rather than truly undoing the action, making it a practical limit of saga **atomicity**
+   - C) SMTP doesn't support compensation
+   - D) Email compensation is straightforward
+
+3. When would you choose higher throughput (`IntegrationPipelineWorkflow`) over consistency (`AtomicPipelineWorkflow`)?
+   - A) Always choose consistency
+   - B) When the cost of occasional message loss or duplicate processing is acceptable — e.g., analytics events, metric updates, or log forwarding where throughput matters more than per-message **atomicity**
+   - C) Throughput is always preferable
+   - D) The two workflows are identical in behavior
 
 **Previous: [← Tutorial 46](46-complete-integration.md)** | **Next: [Tutorial 48 →](48-notification-use-cases.md)**

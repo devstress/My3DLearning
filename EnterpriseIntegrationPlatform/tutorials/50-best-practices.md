@@ -190,15 +190,75 @@ Ack/Nack for delivery confirmation, DLQ for failure isolation, saga compensation
 for distributed rollback, and feature flags for operational control. Together,
 they provide the reliability guarantees that enterprise integrations demand.
 
-## Exercises
+## Lab
 
-1. Design a new integration that uses at least 5 EIP patterns from the
-   selection guide. Draw the message flow and justify each pattern choice.
+**Objective:** Design a complete integration using multiple EIP patterns, apply the production checklist, and analyze anti-patterns that undermine **scalability** and **atomicity**.
 
-2. Create a production checklist specific to your organization. What items
-   would you add beyond the list above?
+### Step 1: Design a Multi-Pattern Integration
 
-3. Review the anti-patterns list. Have you encountered any of these in your
-   own projects? How would you refactor using the patterns from this course?
+Design a new integration for processing insurance claims using at least 5 EIP patterns:
+
+```
+1. Messaging Gateway — Receive claims via REST API
+2. Content-Based Router — Route by claim type (auto, home, life)
+3. Content Enricher — Add policy details from CRM
+4. Splitter — Split multi-item claims into individual line items
+5. Aggregator — Reassemble after per-item validation
+6. Process Manager (Saga) — Orchestrate: validate → assess → approve/deny → notify
+7. Dead Letter Queue — Capture failed claims for manual review
+```
+
+Draw the complete message flow diagram. For each pattern, explain its **scalability** and **atomicity** contribution.
+
+### Step 2: Apply the Production Checklist
+
+Review your design against the production checklist:
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| Every message has `CorrelationId` tracking | ? | |
+| DLQ configured for all processing stages | ? | |
+| Per-tenant throttling configured | ? | |
+| Retry policies with jitter for all external calls | ? | |
+| Saga compensation for all non-idempotent steps | ? | |
+| Graceful shutdown handling in all consumers | ? | |
+| OpenTelemetry traces across all stages | ? | |
+| Health checks for all dependencies | ? | |
+
+What items would you add for your specific organization's compliance requirements?
+
+### Step 3: Identify and Refactor Anti-Patterns
+
+Review these anti-patterns and explain why each undermines **scalability** or **atomicity**:
+
+| Anti-Pattern | Problem | Refactoring |
+|-------------|---------|-------------|
+| Silent message drop | Messages disappear without trace | Always route to DLQ or discard topic |
+| Shared mutable state between filters | Race conditions under load | Use immutable envelopes and `with` expressions |
+| Synchronous blocking calls in pipeline | Throughput bottleneck | Use async/await throughout |
+| Global throttle for all tenants | Noisy neighbor problem | Per-tenant throttling |
+| No compensation in saga | Partial failures leave inconsistent state | Implement saga compensation for all non-idempotent steps |
+
+Have you encountered any of these in your own projects?
+
+## Exam
+
+1. Why is the EIP pattern catalog organized around **message-centric** architecture?
+   - A) Messages are the fastest way to communicate
+   - B) By making the message the unit of work — carrying its own identity, context, and routing information — each processing component can be independently developed, scaled, and recovered without coupling to others
+   - C) The EIP book was written before microservices
+   - D) Messages are the only communication mechanism in .NET
+
+2. What is the most dangerous anti-pattern for **production atomicity**?
+   - A) Using too many patterns
+   - B) Silent message drops — when a message fails and is neither routed to the DLQ nor explicitly discarded, it disappears from the system without trace; this violates the zero-message-loss guarantee and makes debugging impossible
+   - C) Having too many processing stages
+   - D) Using JSON instead of XML
+
+3. How does the production checklist approach support **team scalability**?
+   - A) Checklists are faster than documentation
+   - B) A shared checklist ensures every team member and every integration applies the same quality standards — new integrations don't miss critical concerns like DLQ routing, throttling, or compensation, regardless of who builds them
+   - C) Checklists replace code review
+   - D) Each team member creates their own checklist
 
 **Previous: [← Tutorial 49](49-testing-integrations.md)** | **[Back to Course Overview →](README.md)**
