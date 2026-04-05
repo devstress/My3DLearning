@@ -22,6 +22,8 @@ public sealed class PulsarConsumer : IMessageBrokerConsumer
     /// <summary>Initialises a new <see cref="PulsarConsumer"/>.</summary>
     public PulsarConsumer(IPulsarClient client, ILogger<PulsarConsumer> logger)
     {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(logger);
         _client = client;
         _logger = logger;
     }
