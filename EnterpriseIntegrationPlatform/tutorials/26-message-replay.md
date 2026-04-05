@@ -43,9 +43,7 @@ Messages are stored as they flow through the pipeline. When a replay is requeste
 // src/Processing.Replay/IMessageReplayer.cs
 public interface IMessageReplayer
 {
-    Task<ReplayResult> ReplayAsync(
-        ReplayFilter filter,
-        CancellationToken cancellationToken = default);
+    Task<ReplayResult> ReplayAsync(ReplayFilter filter, CancellationToken ct);
 }
 ```
 

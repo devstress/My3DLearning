@@ -22,30 +22,29 @@
 
 ## Completed Phases
 
-✅ Phases 1–16 complete — see `rules/completion-log.md` for full history.
+✅ Phases 1–17 complete — see `rules/completion-log.md` for full history.
 
 **Current stats:** 1,472 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,605 total tests**. 48 src projects.
 
 ---
 
-### Phase 17 — Tutorial Audit & Fixes (Round 4)
+### Phase 18 — Tutorial Audit & Fixes (Round 5)
 
-✅ Phase 17 complete.
+✅ Phase 18 complete.
 
-**Scope:** Fresh re-audit of all 50 tutorials by a new agent with no prior context — follow each tutorial as a reader would, verifying every code snippet, interface signature, property type, enum value, and file path against the actual source.
+**Scope:** Fresh re-audit of all 50 tutorials by a new agent with no prior context — systematic verification of every code snippet, interface signature, property type, enum value, and file path against the actual source.
 
-**Findings:** 4 tutorials had remaining issues; 46 passed clean.
+**Findings:** 3 tutorials had remaining issues; 47 passed clean.
 
 | Tutorial | Issue | Fix Applied |
 |----------|-------|-------------|
-| 07 — Temporal Workflows | Workflow code block still used wrong activity classes (`IntegrationActivities` for persist/ack/nack instead of `PipelineActivities`), wrong method names (`UpdateStatusAsync` vs `UpdateDeliveryStatusAsync`), wrong params (`validationResult.Errors` vs `validation.Reason`), saga block used `CompensateAsync` vs `CompensateStepAsync`, returned `IntegrationPipelineResult` instead of `AtomicPipelineResult` | Rewrote both workflow code blocks to match actual `IntegrationPipelineWorkflow.cs` and `AtomicPipelineWorkflow.cs` with correct activity class routing, parameter signatures, and return types |
-| 31 — Event Sourcing | `ISnapshotStore.LoadAsync` return type shown as nullable tuple `Task<(TState?, long)?>` — actual is non-nullable `Task<(TState?, long)>` | Removed trailing `?` from tuple return type |
-| 42 — Configuration | `FeatureFlag.TargetTenants` type shown as `IReadOnlyList<string>` → actual is `List<string>?`; `NotificationsEnabled` value lowercase `"notifications.enabled"` → actual PascalCase `"Notifications.Enabled"`; file path `src/Configuration/` → actual `src/Activities/` | Updated record definition to positional record matching source; fixed constant casing and file path |
-| 46 — Complete Integration | Return type `PipelineResult` → actual `IntegrationPipelineResult`; non-existent factory methods `PipelineResult.Failed()`/`Succeeded()` → actual uses constructor; `validation.ErrorMessage` → actual `validation.Reason`; `input.SourceTopic` → actual `input.NackSubject`/`input.AckSubject` | Rewrote workflow code block with correct types, constructors, property names, and notification guard |
+| 26 — Message Replay | `IMessageReplayer.ReplayAsync` showed `CancellationToken cancellationToken = default` — actual param is `CancellationToken ct` with no default | Fixed param name and removed default |
+| 42 — Configuration | `ConfigurationChange` record had 5 params with `string? Value` — actual has 6 params: `Key, Environment, ChangeType, OldValue, NewValue, Timestamp` | Rewrote record to match actual 6-param positional signature |
+| 47 — Saga Compensation | Entire tutorial showed pseudocode (`ExecuteTracked`, `CompletedStep`, `PipelineResult`, `CompensateAsync`) that doesn't exist in codebase | Rewrote all code blocks to match actual `AtomicPipelineWorkflow` with `List<string>` tracking, `HandleNackWithRollbackAsync`, `CompensateStepAsync`, and `AtomicPipelineResult` |
 
 ## Next Chunk
 
-All phases complete (1–17). See `rules/completion-log.md` for full history.
+All phases complete (1–18). See `rules/completion-log.md` for full history.
 
 ---
 

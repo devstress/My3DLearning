@@ -106,8 +106,10 @@ public sealed class ConfigurationChangeNotifier : IObservable<ConfigurationChang
 }
 
 public sealed record ConfigurationChange(
-    string Key, string? Value, string Environment,
-    ConfigurationChangeType ChangeType, DateTimeOffset Timestamp);
+    string Key, string Environment,
+    ConfigurationChangeType ChangeType,
+    string? OldValue, string? NewValue,
+    DateTimeOffset Timestamp);
 
 public enum ConfigurationChangeType { Created, Updated, Deleted }
 ```
