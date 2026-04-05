@@ -145,7 +145,7 @@ await connector.SendWithTokenAsync(
     cancellationToken: ct);
 ```
 
-Open `src/Connectors.Http/HttpConnector.cs` and trace: How does the connector obtain, cache, and refresh tokens?
+Open `src/Connector.Http/HttpConnector.cs` and trace: How does the connector obtain, cache, and refresh tokens?
 
 ### Step 2: Trace Retry and DLQ for External API Failures
 

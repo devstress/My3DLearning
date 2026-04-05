@@ -166,7 +166,7 @@ What **atomicity** guarantees must the replay provide? (hint: replay must either
 | `MessageExpired` | TTL exceeded | Review TTL settings | No — stale data |
 | `ValidationFailed` | Schema mismatch | Fix schema → replay | Yes |
 | `MaxRetriesExceeded` | Transient failures | Investigate root cause → replay | Maybe |
-| `PermanentFailure` | Non-retryable error | Manual intervention | No |
+| `PoisonMessage` | Non-retryable error | Manual intervention | No |
 
 Why is preserving the complete original envelope critical for DLQ operations? What would an operator lose if only the error message was stored?
 

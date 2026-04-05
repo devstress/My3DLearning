@@ -128,7 +128,7 @@ Func<OrderPayload, string> bodyBuilder = order =>
     """;
 ```
 
-Open `src/Connectors.Email/EmailConnector.cs` and trace: How does the connector use this builder? Why does it use `Func<T, string>` rather than a template engine?
+Open `src/Connector.Email/EmailConnector.cs` and trace: How does the connector use this builder? Why does it use `Func<T, string>` rather than a template engine?
 
 ### Step 2: Integrate Throttling for SMTP Rate Limits
 

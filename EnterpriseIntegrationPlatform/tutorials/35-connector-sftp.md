@@ -99,7 +99,7 @@ An SFTP server has a 10-connection limit. You have 20 consumer replicas uploadin
 | 10 fail with connection refused | Consumers wait for available connection |
 | No retry coordination | Queue + semaphore manages access |
 
-Open `src/Connectors.Sftp/SftpConnector.cs` and check: How does the platform pool SFTP connections? What happens when all pool slots are busy?
+Open `src/Connector.Sftp/SftpConnector.cs` and check: How does the platform pool SFTP connections? What happens when all pool slots are busy?
 
 ### Step 2: Trace the Upload Lifecycle
 

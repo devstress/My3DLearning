@@ -101,14 +101,13 @@ Normalization happens **before** any downstream processing. If normalization fai
 
 ### Step 1: Configure a CSV Normalizer
 
-A partner sends CSV files with `|` as delimiter and no header row. Open `src/Processing.Normalizer/` and configure `NormalizerOptions`:
+A partner sends CSV files with `|` as delimiter and no header row. Open `src/Processing.Transform/` and configure `NormalizerOptions`:
 
 ```csharp
 var options = new NormalizerOptions
 {
     CsvDelimiter = '|',
-    CsvHasHeader = false,
-    CsvColumnNames = ["orderId", "customerId", "amount", "currency"],
+    CsvHasHeaders = false,
     StrictContentType = true
 };
 ```

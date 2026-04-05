@@ -166,7 +166,7 @@ A developer asks: "Why did order 12345 fail?" Design the complete RAG flow:
    Recommended action: check PartnerX's schema version."
 ```
 
-Open `src/Rag/` and trace: How does the platform embed and retrieve context? What data sources are indexed?
+Open `src/AI.RagFlow/`, `src/AI.Ollama/`, and `src/AI.RagKnowledge/` and trace: How does the platform embed and retrieve context? What data sources are indexed?
 
 ### Step 2: Design Graceful Degradation
 
