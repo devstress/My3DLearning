@@ -21,6 +21,18 @@ See `milestones.md` for current phase status and next chunk.
   - `tests/UnitTests/SftpConnectorTests.cs` — Updated 10 existing tests to use pool mock; added 7 new pool tests (acquire, reuse, max-capacity blocking, cancellation, disconnected-client eviction, idle-timeout eviction, dispose).
 - **Test counts**: 1,479 UnitTests (+7). 1,612 total tests.
 
+## Chunk 081 – Unified Broker Selection via AddIngestion
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Implement `AddIngestion(Action<BrokerOptions> configure)` as promised by tutorial 05 (line 124): a unified DI registration method that selects broker by `BrokerType`.
+- **Architecture**: Added `AddIngestion` to `IngestionServiceExtensions.cs`. Uses reflection-based assembly loading: maps `BrokerType` → known assembly/type/method name, loads the broker assembly via `Assembly.Load`, and invokes the appropriate extension method (`AddNatsJetStreamBroker`, `AddKafkaBroker`, or `AddPulsarBroker`). No circular project references needed. Clear error messages when broker assembly is missing.
+- **Files modified**:
+  - `src/Ingestion/IngestionServiceExtensions.cs` — Added static `BrokerRegistrations` dictionary, `AddIngestion(Action<BrokerOptions>)` method with assembly loading and reflection invocation.
+  - `tests/UnitTests/IngestionServiceExtensionsTests.cs` — Added 4 new tests: `AddIngestion_NatsJetStream_RegistersProducerAndConsumer`, `AddIngestion_Kafka_RegistersProducerAndConsumer`, `AddIngestion_Pulsar_RegistersProducerAndConsumer`, `AddIngestion_NullConfigure_ThrowsArgumentNullException`.
+- **Test counts**: 1,483 UnitTests (+4). 1,616 total tests.
+
 ## Chunk 075 – Fix Tutorials 05, 06, 07
 
 - **Date**: 2026-04-05

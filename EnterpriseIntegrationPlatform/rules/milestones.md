@@ -24,7 +24,7 @@
 
 ✅ Phases 1–21 complete — see `rules/completion-log.md` for full history.
 
-**Current stats:** 1,479 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,612 total tests**. 48 src projects.
+**Current stats:** 1,483 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,616 total tests**. 48 src projects.
 
 ---
 
@@ -45,17 +45,6 @@
 ### Phase 22 — Implement Unfulfilled Tutorial Promises
 
 **Scope:** Audit of all 50 tutorials against source code found 13 features that tutorials promise but are not implemented. These chunks implement the missing features so that every tutorial claim is backed by working code.
-
-#### Chunk 081 — Unified Broker Selection via AddIngestion
-
-| Field | Value |
-|-------|-------|
-| Status | `not-started` |
-| Tutorial | 05 — Message Brokers (line 124) |
-| Claim | `services.AddIngestion(options => { options.BrokerType = BrokerType.NatsJetStream; })` — a unified DI registration method that reads `BrokerType` and registers the correct producer/consumer. |
-| Current State | `BrokerType` enum exists and is used in `BrokerTransactionalClient`, but no `AddIngestion()` method exists that wires up producer/consumer based on `BrokerType`. Each broker must be registered separately. |
-| Implementation | Add `AddIngestion(Action<BrokerOptions> configure)` to `IngestionServiceExtensions.cs` that switches on `BrokerOptions.BrokerType` to call `AddNatsJetStreamBroker`, `AddKafkaBroker`, or `AddPulsarBroker`. Add unit tests. |
-| Files | `src/Ingestion/IngestionServiceExtensions.cs`, `tests/UnitTests/IngestionServiceExtensionsTests.cs` |
 
 #### Chunk 082 — MessageFilter No-Silent-Drop Enforcement
 
@@ -180,7 +169,7 @@
 
 ## Next Chunk
 
-**Chunk 081** — Unified Broker Selection via AddIngestion
+**Chunk 082** — MessageFilter No-Silent-Drop Enforcement
 
 ---
 
