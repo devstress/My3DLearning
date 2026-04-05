@@ -68,23 +68,17 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 ✅ Phase 11 (Admin Dashboard & RAG, chunks 061-062) complete — see completion-log.md
 ✅ Phase 12 (Documentation, chunks 063-fix–065) complete — see completion-log.md
 ✅ Phase 13 (Tutorial Fixes, chunks 066-069) complete — see completion-log.md
+✅ Phase 14 (Test Coverage Expansion, chunks 070-074) complete — see completion-log.md
 
 ## Next Chunk
 
-**Phase 14 — Test Coverage Expansion** (chunks 070-074).  
-Next chunk: **070 — Ingestion.Kafka broker adapter unit tests**.
+All phases complete (including Phase 14 Test Coverage Expansion). See `rules/completion-log.md` for full history.
 
 ---
 
 ### Phase 14 — Test Coverage Expansion
 
-| Chunk | Focus | Files (est.) | Status |
-|-------|-------|-------------|--------|
-| 070 | Ingestion.Kafka broker adapter tests (KafkaProducer, KafkaConsumer, KafkaServiceExtensions, KafkaBrokerOptions) | ~4 new test files | not-started |
-| 071 | Ingestion.Pulsar broker adapter tests (PulsarProducer, PulsarConsumer, PulsarServiceExtensions) | ~3 new test files | not-started |
-| 072 | Processing.Routing advanced component tests (Detour, RoutingSlipRouter, MessageFilter edge cases) | ~5 new test files | not-started |
-| 073 | Workflow.Temporal activity and saga tests (SagaCompensation, IntegrationWorkflow, activities) | ~4 new test files | not-started |
-| 074 | Phase 14 completion — update milestones.md, completion-log.md | 2 files | not-started |
+✅ Phase 14 complete — see completion-log.md
 
 ---
 

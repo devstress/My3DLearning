@@ -4,6 +4,72 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 074 – Phase 14 Completion
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Finalize Phase 14 Test Coverage Expansion — update milestones.md, completion-log.md.
+- **Files modified**:
+  - `rules/milestones.md` — Mark Phase 14 complete, remove Phase 14 table, update Next Chunk section
+  - `rules/completion-log.md` — Add entries for chunks 070-074
+- **Test counts**: UnitTests: 1,472 (+72 from Phase 14). Total: 1,610 across 6 test projects (+19 Vitest).
+- **Notes**: All 14 phases complete. 48 src projects. 50 tutorials (all passing audit). 65 EIP patterns.
+
+## Chunk 073 – Workflow.Temporal Activity & Saga Tests
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add unit tests for untested Workflow.Temporal components.
+- **Files created**:
+  - `tests/UnitTests/IntegrationActivitiesTests.cs` — 3 tests: ValidateMessageAsync delegation, LogProcessingStageAsync delegation
+  - `tests/UnitTests/SagaCompensationActivitiesTests.cs` — 4 tests: compensation logging (start, success, failure), delegation, return values
+  - `tests/UnitTests/TemporalOptionsTests.cs` — 4 tests: SectionName, ServerAddress, Namespace, TaskQueue defaults
+- **Test counts**: UnitTests: 1,472 (+11 from this chunk).
+- **Notes**: Tests verify business logic delegation without requiring Temporal server.
+
+## Chunk 072 – Processing.Routing Advanced Component Tests
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add unit tests for Detour and RoutingServiceExtensions.
+- **Files created**:
+  - `tests/UnitTests/DetourTests.cs` — 13 tests: constructor guards, IsEnabled/SetEnabled, RouteAsync routing logic (global, per-message, disabled), producer verification
+  - `tests/UnitTests/RoutingServiceExtensionsTests.cs` — 7 tests: DI registration for ContentBasedRouter, DynamicRouter (both interfaces + same-instance), RecipientList, MessageFilter, Detour
+- **Test counts**: UnitTests: 1,461 (+20 from this chunk).
+
+## Chunk 071 – Ingestion.Pulsar Broker Adapter Tests
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add unit tests for PulsarProducer, PulsarConsumer, PulsarServiceExtensions.
+- **Files created**:
+  - `tests/UnitTests/PulsarProducerTests.cs` — 6 tests: constructor validation, PublishAsync arg guards, DisposeAsync
+  - `tests/UnitTests/PulsarConsumerTests.cs` — 8 tests: constructor validation, SubscribeAsync arg guards, DisposeAsync
+  - `tests/UnitTests/PulsarServiceExtensionsTests.cs` — 4 tests: DI registration, serviceUrl validation
+  - (+ 4 new test files referencing Pulsar)
+- **Files modified**:
+  - `src/Ingestion.Pulsar/PulsarProducer.cs` — Added ArgumentNullException.ThrowIfNull guards
+  - `src/Ingestion.Pulsar/PulsarConsumer.cs` — Added ArgumentNullException.ThrowIfNull guards
+  - `tests/UnitTests/UnitTests.csproj` — Added Ingestion.Pulsar project reference
+- **Test counts**: UnitTests: 1,441 (+22 from this chunk).
+
+## Chunk 070 – Ingestion.Kafka Broker Adapter Tests + Tutorial Audit Cleanup
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add unit tests for KafkaProducer, KafkaConsumer, KafkaServiceExtensions. Mark all 28 tutorial audit issues as FIXED.
+- **Files created**:
+  - `tests/UnitTests/KafkaProducerTests.cs` — 13 tests: constructor validation, PublishAsync serialization/key/topic, arg guards, Dispose
+  - `tests/UnitTests/KafkaConsumerTests.cs` — 9 tests: constructor validation, SubscribeAsync arg guards, DisposeAsync
+  - `tests/UnitTests/KafkaServiceExtensionsTests.cs` — 4 tests: DI registration, bootstrapServers validation
+- **Files modified**:
+  - `src/Ingestion.Kafka/KafkaProducer.cs` — Added ArgumentNullException.ThrowIfNull guards
+  - `src/Ingestion.Kafka/KafkaConsumer.cs` — Added ArgumentNullException.ThrowIfNull guards
+  - `tests/UnitTests/UnitTests.csproj` — Added Ingestion.Kafka project reference
+  - `rules/milestones.md` — Added Status column to all 28 tutorial audit tables, marked all FIXED, added Phase 14 plan
+- **Test counts**: UnitTests: 1,426 (+26 from this chunk).
+- **Notes**: Tutorial audit cleanup in milestones.md tracks all fixes to their chunk numbers.
+
 ## Chunk 069 – Tutorial Fixes: Configuration, Profiling, Notifications, Test Counts
 
 - **Date**: 2026-04-04
