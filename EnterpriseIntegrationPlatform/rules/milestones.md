@@ -24,7 +24,7 @@
 
 ✅ Phases 1–21 complete — see `rules/completion-log.md` for full history.
 
-**Current stats:** 1,501 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,634 total tests**. 48 src projects.
+**Current stats:** 1,514 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,647 total tests**. 48 src projects.
 
 ---
 
@@ -45,17 +45,6 @@
 ### Phase 22 — Implement Unfulfilled Tutorial Promises
 
 **Scope:** Audit of all 50 tutorials against source code found 13 features that tutorials promise but are not implemented. These chunks implement the missing features so that every tutorial claim is backed by working code.
-
-#### Chunk 089 — InputSanitizer: Script Tag, SQL Injection, HTML Entity, and Control Character Detection
-
-| Field | Value |
-|-------|-------|
-| Status | `not-started` |
-| Tutorial | 33 — Security (lines 50-54) |
-| Claim | Sanitizer detects and removes: script tags (`<script>`, `onclick`, `onerror`), SQL injection patterns (`'; DROP TABLE`, `OR 1=1`, `UNION SELECT`), HTML entities (`&#60;`, `&lt;`), and control characters (null bytes, Unicode direction overrides). |
-| Current State | `InputSanitizer` only removes CRLF + null bytes (3 chars in `DangerousChars`). No XSS, SQL injection, HTML entity, or Unicode override detection. |
-| Implementation | Extend `InputSanitizer.Sanitize()` to: (1) strip `<script>` blocks via regex, (2) remove inline event handler attributes (`on\w+=`), (3) decode and re-encode HTML entities to neutralize entity-based bypasses, (4) detect common SQL injection patterns and strip them (configurable via `SanitizationOptions`), (5) remove Unicode direction override chars (U+202A-U+202E, U+2066-U+2069). Extend `IsClean()` to detect these patterns. Add comprehensive unit tests. |
-| Files | `src/Security/InputSanitizer.cs`, new `src/Security/SanitizationOptions.cs`, `tests/UnitTests/InputSanitizerTests.cs` |
 
 #### Chunk 090 — EnvironmentOverrideProvider: EIP__ Environment Variable Convention
 
@@ -92,7 +81,7 @@
 
 ## Next Chunk
 
-**Chunk 089** — InputSanitizer: Script Tag, SQL Injection, HTML Entity, and Control Character Detection
+**Chunk 090** — EnvironmentOverrideProvider: EIP__ Environment Variable Convention
 
 ---
 

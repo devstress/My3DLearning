@@ -124,6 +124,17 @@ See `milestones.md` for current phase status and next chunk.
   - `tests/UnitTests/BusinessRuleEngineTests.cs` — Added 3 new tests.
 - **Test counts**: 1,501 UnitTests (+3). 1,634 total tests.
 
+## Chunk 089 – InputSanitizer: XSS, SQL Injection, HTML Entity, Unicode Override Detection
+
+- **Date**: 2026-04-05
+- **Phase**: 22
+- **Status**: done
+- **Goal**: Extend InputSanitizer as promised by tutorial 33 (lines 50-54): detect/remove script tags, SQL injection patterns, HTML entities, and Unicode direction overrides.
+- **Files modified**:
+  - `src/Security/InputSanitizer.cs` — Extended Sanitize() with 6 sanitization stages: HTML entity decode, script block removal, inline event handler removal, SQL injection pattern removal, CRLF/null byte handling, Unicode override removal. Extended IsClean() to detect all patterns. Used GeneratedRegex for thread-safe compiled patterns.
+  - `tests/UnitTests/InputSanitizerTests.cs` — Added 13 new tests covering XSS, SQL injection, HTML entities, Unicode overrides, and clean pass-through.
+- **Test counts**: 1,514 UnitTests (+13). 1,647 total tests.
+
 ## Chunk 075 – Fix Tutorials 05, 06, 07
 
 - **Date**: 2026-04-05
