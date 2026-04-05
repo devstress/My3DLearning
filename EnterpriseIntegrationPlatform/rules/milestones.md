@@ -22,34 +22,57 @@
 
 ## Completed Phases
 
-✅ Phases 1–18 complete — see `rules/completion-log.md` for full history.
+✅ Phases 1–21 complete — see `rules/completion-log.md` for full history.
 
-**Current stats:** 1,472 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,605 total tests**. 48 src projects.
+**Current stats:** 1,518 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,651 total tests**. 48 src projects.
+
+**Next chunk:** Phase 22 complete — all 13 chunks (080-092) done.
 
 ---
 
 ### Phase 19 — Tutorial Audit as New Developer (Round 6)
 
-✅ Phase 19 complete.
+✅ Phase 19 complete — see `rules/completion-log.md`.
 
-**Scope:** Approached the repo as a brand-new developer with no prior context. Read each tutorial, found every code snippet, and verified signatures, `required` keywords, default values, interface inheritance, and method completeness against actual source.
+### Phase 20 — Tutorial Audit as New Developer (Round 7)
 
-**Findings:** 8 tutorials had issues; 42 passed clean.
+✅ Phase 20 complete — fixed 7 tutorials (03, 17, 26, 28, 29, 45, 48) plus INormalizer.cs xmldoc.
 
-| Tutorial | Issue | Fix Applied |
-|----------|-------|-------------|
-| 03 — First Message | `IntegrationEnvelope<T>` missing `required` keyword on 6 properties (`MessageId`, `CorrelationId`, `Timestamp`, `Source`, `MessageType`, `Payload`); `Priority` and `Metadata` missing default values; property order didn't match source | Rewrote record with `required` keywords, defaults, and correct property order |
-| 05 — Message Brokers | `IMessageBrokerConsumer` missing `: IAsyncDisposable` inheritance | Added `: IAsyncDisposable` |
-| 06 — Messaging Channels | `IInvalidMessageChannel` missing `RouteRawInvalidAsync` method for handling unparseable raw data | Added method + explanatory note |
-| 08 — Activities & Pipeline | `PipelineOrchestrator.ProcessAsync` shown as generic `<T>` but actual source uses `IntegrationEnvelope<JsonElement>` — class also not `sealed` | Fixed to `JsonElement`, added `sealed`, corrected param name |
-| 32 — Multi-Tenancy | `ITenantOnboardingService` missing `GetStatusAsync` method | Added `GetStatusAsync` with nullable return |
-| 42 — Configuration | `ConfigurationChangeNotifier` missing `: IDisposable` inheritance | Added `: IDisposable` |
-| 48 — Notification Use Cases | `NotificationFeatureFlags.Enabled` constant doesn't exist — actual is `NotificationsEnabled`; `NotificationDecisionService` class presented as real code but doesn't exist in source | Fixed constant name; added pseudocode disclaimer comment |
-| 49 — Testing Integrations | Test example used non-existent `NotificationDecisionService` class | Replaced with actual `XmlNotificationMapperTests` from source; updated exercise |
+### Phase 21 — Tutorial Code Snippet Accuracy Audit
+
+✅ Phase 21 complete — fixed 4 tutorials (26, 31, 35, 38) with code snippets mismatched against actual source code.
+
+---
+
+### Phase 22 — Implement Unfulfilled Tutorial Promises
+
+**Scope:** Audit of all 50 tutorials against source code found 13 features that tutorials promise but are not implemented. These chunks implement the missing features so that every tutorial claim is backed by working code.
+
+#### Chunk 090 — EnvironmentOverrideProvider: EIP__ Environment Variable Convention
+
+| Field | Value |
+|-------|-------|
+| Status | `not-started` |
+| Tutorial | 42 — Configuration (line 121) |
+| Claim | "The `EnvironmentOverrideProvider` reads environment variables using the convention `EIP__Key__SubKey` (double underscore as separator). Environment variables take precedence over store values." |
+| Current State | `EnvironmentOverrideProvider` only does cascading resolution from the `IConfigurationStore`. It never reads `System.Environment.GetEnvironmentVariable()`. |
+| Implementation | In `ResolveAsync`, before falling back to the store, check `Environment.GetEnvironmentVariable($"EIP__{key.Replace(":", "__")}")`. If found, return a synthetic `ConfigurationEntry` with that value. Add `ResolveManyAsync` override similarly. Add unit tests using environment variable injection. |
+| Files | `src/Configuration/EnvironmentOverrideProvider.cs`, `tests/UnitTests/EnvironmentOverrideProviderTests.cs` |
+
+#### Chunk 092 — Kustomize Base Directory Structure
+
+| Field | Value |
+|-------|-------|
+| Status | `done` |
+| Tutorial | 43 — Kubernetes Deployment (lines 91-104) |
+| Claim | Tutorial shows flat `base/` with `deployment.yaml` and `service.yaml`. |
+| Current State | Actual structure has `base/admin-api/` and `base/openclaw-web/` subdirectories. |
+| Implementation | Updated tutorial 43 to match the actual directory structure (service-specific subdirectories, namespace.yaml, prod PDB files). |
+| Files | `tutorials/43-kubernetes-deployment.md` |
 
 ## Next Chunk
 
-All phases complete (1–19). See `rules/completion-log.md` for full history.
+Phase 22 complete — all 13 chunks (080-092) done.
 
 ---
 

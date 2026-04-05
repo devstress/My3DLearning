@@ -33,4 +33,18 @@ public sealed class RuleEngineOptions
     /// Defaults to 5 seconds.
     /// </summary>
     public TimeSpan RegexTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// When <see langword="true"/>, rules fetched from the store are cached in memory
+    /// and reused for subsequent evaluations until <see cref="CacheRefreshIntervalMs"/>
+    /// elapses. Defaults to <see langword="true"/>.
+    /// </summary>
+    public bool CacheEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Number of milliseconds between automatic cache refreshes.
+    /// Only used when <see cref="CacheEnabled"/> is <see langword="true"/>.
+    /// Defaults to 60 000 (1 minute).
+    /// </summary>
+    public int CacheRefreshIntervalMs { get; set; } = 60_000;
 }

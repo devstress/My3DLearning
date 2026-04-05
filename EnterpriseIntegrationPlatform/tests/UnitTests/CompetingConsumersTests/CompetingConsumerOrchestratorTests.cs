@@ -203,4 +203,18 @@ public class CompetingConsumerOrchestratorTests
         _backpressure.Received(1).Release();
         _backpressure.DidNotReceive().Signal();
     }
+
+    [Test]
+    public async Task EvaluateAndScaleAsync_LowLag_BackpressureActive_SkipsScaleDown()
+    {
+        _scaler.CurrentCount.Returns(3);
+        _backpressure.IsBackpressured.Returns(true);
+        _lagMonitor.GetLagAsync("orders", "group-1", Arg.Any<CancellationToken>())
+            .Returns(new ConsumerLagInfo("group-1", "orders", 10, DateTimeOffset.UtcNow));
+
+        await _sut.EvaluateAndScaleAsync(CancellationToken.None);
+
+        // Scale-down should be skipped because backpressure is active.
+        await _scaler.DidNotReceiveWithAnyArgs().ScaleAsync(default, default);
+    }
 }

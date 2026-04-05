@@ -188,7 +188,7 @@ public sealed class MessageNormalizer : INormalizer
             }
         }
 
-        var wrapper = new JsonObject { ["rows"] = array };
+        var wrapper = new JsonObject { [_options.XmlRootName] = array };
         var json = wrapper.ToJsonString(s_jsonOptions);
 
         return new NormalizationResult(json, originalContentType, "CSV", WasTransformed: true);

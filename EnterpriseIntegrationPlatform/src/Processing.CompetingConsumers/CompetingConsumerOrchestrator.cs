@@ -129,6 +129,16 @@ public sealed class CompetingConsumerOrchestrator : BackgroundService
                 return;
             }
 
+            // Pause scale-down when backpressure is active to avoid removing consumers
+            // while the system is under load.
+            if (_backpressure.IsBackpressured)
+            {
+                _logger.LogWarning(
+                    "Scale-down skipped — backpressure is active (lag: {Lag}, consumers: {Current})",
+                    lagInfo.CurrentLag, currentCount);
+                return;
+            }
+
             if (elapsed < cooldown)
             {
                 _logger.LogDebug(

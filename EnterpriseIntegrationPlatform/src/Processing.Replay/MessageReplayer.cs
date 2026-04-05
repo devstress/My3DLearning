@@ -32,14 +32,31 @@ public sealed class MessageReplayer : IMessageReplayer
             throw new InvalidOperationException("TargetTopic must not be null or whitespace.");
 
         var startedAt = DateTimeOffset.UtcNow;
+        var replayId = Guid.NewGuid();
         var replayed = 0;
+        var skipped = 0;
         var failed = 0;
 
         await foreach (var envelope in _store.GetMessagesForReplayAsync(
             _options.SourceTopic, filter, _options.MaxMessages, ct))
         {
+            // Skip already-replayed messages when dedup is enabled.
+            if (_options.SkipAlreadyReplayed &&
+                envelope.Metadata.ContainsKey(MessageHeaders.ReplayId))
+            {
+                skipped++;
+                _logger.LogDebug(
+                    "Skipped already-replayed message {MessageId}", envelope.MessageId);
+                continue;
+            }
+
             try
             {
+                var metadata = new Dictionary<string, string>(envelope.Metadata)
+                {
+                    [MessageHeaders.ReplayId] = replayId.ToString()
+                };
+
                 var replayedEnvelope = new IntegrationEnvelope<object>
                 {
                     MessageId = Guid.NewGuid(),
@@ -51,7 +68,7 @@ public sealed class MessageReplayer : IMessageReplayer
                     SchemaVersion = envelope.SchemaVersion,
                     Priority = envelope.Priority,
                     Payload = envelope.Payload,
-                    Metadata = envelope.Metadata
+                    Metadata = metadata
                 };
 
                 await _producer.PublishAsync(replayedEnvelope, _options.TargetTopic, ct);
@@ -67,7 +84,7 @@ public sealed class MessageReplayer : IMessageReplayer
         return new ReplayResult
         {
             ReplayedCount = replayed,
-            SkippedCount = 0,
+            SkippedCount = skipped,
             FailedCount = failed,
             StartedAt = startedAt,
             CompletedAt = DateTimeOffset.UtcNow

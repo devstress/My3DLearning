@@ -26,8 +26,10 @@ public sealed class NormalizerOptions
     public bool CsvHasHeaders { get; init; } = true;
 
     /// <summary>
-    /// XML root element name for the canonical representation when converting from
-    /// formats other than XML. Not used during XML→JSON normalization.
+    /// Root element name used as the canonical wrapper property when converting
+    /// non-JSON formats (XML, CSV) to JSON. During XML→JSON conversion this becomes
+    /// the top-level JSON property name wrapping the converted document. During
+    /// CSV→JSON conversion it names the array property.
     /// Defaults to <c>Root</c>.
     /// </summary>
     public string XmlRootName { get; init; } = "Root";

@@ -29,8 +29,16 @@ public sealed class InMemoryMessageAggregateStore<T> : IMessageAggregateStore<T>
         IReadOnlyList<IntegrationEnvelope<T>> snapshot;
         lock (group)
         {
-            group.Add(envelope);
-            snapshot = group.AsReadOnly();
+            // Idempotent on MessageId — skip duplicates from redelivered messages.
+            if (group.Any(e => e.MessageId == envelope.MessageId))
+            {
+                snapshot = group.AsReadOnly();
+            }
+            else
+            {
+                group.Add(envelope);
+                snapshot = group.AsReadOnly();
+            }
         }
 
         return Task.FromResult(snapshot);

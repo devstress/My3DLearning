@@ -84,7 +84,7 @@ public sealed class MessageNormalizerTests
         Assert.That(result.WasTransformed, Is.True);
 
         using var doc = JsonDocument.Parse(result.Payload);
-        var rows = doc.RootElement.GetProperty("rows");
+        var rows = doc.RootElement.GetProperty("Root");
         Assert.That(rows.GetArrayLength(), Is.EqualTo(2));
         Assert.That(rows[0].GetProperty("name").GetString(), Is.EqualTo("Alice"));
         Assert.That(rows[0].GetProperty("age").GetString(), Is.EqualTo("30"));
@@ -98,7 +98,7 @@ public sealed class MessageNormalizerTests
         var result = await _normalizer.NormalizeAsync(csv, "text/csv");
 
         using var doc = JsonDocument.Parse(result.Payload);
-        var rows = doc.RootElement.GetProperty("rows");
+        var rows = doc.RootElement.GetProperty("Root");
         Assert.That(rows[0].GetProperty("description").GetString(), Is.EqualTo("Has a, comma"));
     }
 
@@ -114,7 +114,7 @@ public sealed class MessageNormalizerTests
         var result = await _normalizer.NormalizeAsync(csv, "text/csv");
 
         using var doc = JsonDocument.Parse(result.Payload);
-        var rows = doc.RootElement.GetProperty("rows");
+        var rows = doc.RootElement.GetProperty("Root");
         Assert.That(rows.GetArrayLength(), Is.EqualTo(2));
         Assert.That(rows[0][0].GetString(), Is.EqualTo("Alice"));
     }
@@ -204,7 +204,7 @@ public sealed class MessageNormalizerTests
         var result = await _normalizer.NormalizeAsync(csv, "text/csv");
 
         using var doc = JsonDocument.Parse(result.Payload);
-        var rows = doc.RootElement.GetProperty("rows");
+        var rows = doc.RootElement.GetProperty("Root");
         Assert.That(rows[0].GetProperty("name").GetString(), Is.EqualTo("Alice"));
         Assert.That(rows[0].GetProperty("age").GetString(), Is.EqualTo("30"));
     }
@@ -216,5 +216,20 @@ public sealed class MessageNormalizerTests
         var result = await _normalizer.NormalizeAsync(payload, "application/json; charset=utf-8");
 
         Assert.That(result.DetectedFormat, Is.EqualTo("JSON"));
+    }
+
+    [Test]
+    public async Task NormalizeAsync_CsvWithCustomXmlRootName_UsesConfiguredName()
+    {
+        var normalizer = new MessageNormalizer(
+            Options.Create(new NormalizerOptions { XmlRootName = "records" }),
+            NullLogger<MessageNormalizer>.Instance);
+
+        var csv = "name,age\nAlice,30\n";
+        var result = await normalizer.NormalizeAsync(csv, "text/csv");
+
+        using var doc = JsonDocument.Parse(result.Payload);
+        Assert.That(doc.RootElement.TryGetProperty("records", out var records), Is.True);
+        Assert.That(records.GetArrayLength(), Is.EqualTo(1));
     }
 }

@@ -2,20 +2,21 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace EnterpriseIntegrationPlatform.Processing.Transform;
 
 /// <summary>
 /// Production implementation of <see cref="IContentEnricher"/>.
-/// Fetches supplementary data from an HTTP endpoint and merges it into the
-/// JSON payload at a configured target path.
+/// Fetches supplementary data from an enrichment source (HTTP, database, or cache)
+/// and merges it into the JSON payload at a configured target path.
 /// </summary>
 /// <remarks>
 /// <para>
 /// The enricher extracts a lookup key from the source payload using
-/// <see cref="ContentEnricherOptions.LookupKeyPath"/>, substitutes it into the
-/// endpoint URL template, and performs an HTTP GET. The response body is merged
+/// <see cref="ContentEnricherOptions.LookupKeyPath"/>, fetches enrichment data
+/// via the configured <see cref="IEnrichmentSource"/>, and merges the result
 /// at <see cref="ContentEnricherOptions.MergeTargetPath"/>.
 /// </para>
 /// <para>
@@ -24,7 +25,7 @@ namespace EnterpriseIntegrationPlatform.Processing.Transform;
 /// </remarks>
 public sealed class ContentEnricher : IContentEnricher
 {
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IEnrichmentSource _enrichmentSource;
     private readonly ContentEnricherOptions _options;
     private readonly ILogger<ContentEnricher> _logger;
 
@@ -34,19 +35,40 @@ public sealed class ContentEnricher : IContentEnricher
         PropertyNameCaseInsensitive = true,
     };
 
-    /// <summary>Initialises a new instance of <see cref="ContentEnricher"/>.</summary>
+    /// <summary>
+    /// Initialises a new instance of <see cref="ContentEnricher"/> with an explicit
+    /// <see cref="IEnrichmentSource"/>.
+    /// </summary>
+    public ContentEnricher(
+        IEnrichmentSource enrichmentSource,
+        IOptions<ContentEnricherOptions> options,
+        ILogger<ContentEnricher> logger)
+    {
+        ArgumentNullException.ThrowIfNull(enrichmentSource);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(logger);
+
+        _enrichmentSource = enrichmentSource;
+        _options = options.Value;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Initialises a new instance of <see cref="ContentEnricher"/> using an
+    /// <see cref="IHttpClientFactory"/> (backward-compatible HTTP-only constructor).
+    /// </summary>
     public ContentEnricher(
         IHttpClientFactory httpClientFactory,
         IOptions<ContentEnricherOptions> options,
         ILogger<ContentEnricher> logger)
+        : this(
+            new HttpEnrichmentSource(
+                httpClientFactory,
+                options.Value,
+                NullLogger<HttpEnrichmentSource>.Instance),
+            options,
+            logger)
     {
-        ArgumentNullException.ThrowIfNull(httpClientFactory);
-        ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(logger);
-
-        _httpClientFactory = httpClientFactory;
-        _options = options.Value;
-        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -75,28 +97,18 @@ public sealed class ContentEnricher : IContentEnricher
                 $"Lookup key path '{_options.LookupKeyPath}' not found in payload.");
         }
 
-        var url = _options.EndpointUrlTemplate.Replace("{key}", lookupKey, StringComparison.OrdinalIgnoreCase);
-
         try
         {
-            using var client = _httpClientFactory.CreateClient("ContentEnricher");
-            client.Timeout = _options.Timeout;
-
             _logger.LogDebug(
-                "Enriching payload for correlation {CorrelationId} via {Url}",
-                correlationId,
-                url);
+                "Enriching payload for correlation {CorrelationId} with key '{Key}'",
+                correlationId, lookupKey);
 
-            using var response = await client.GetAsync(url, cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            var enrichmentJson = await response.Content.ReadAsStringAsync(cancellationToken);
-            var enrichmentNode = JsonNode.Parse(enrichmentJson);
+            var enrichmentNode = await _enrichmentSource.FetchAsync(lookupKey, cancellationToken);
 
             if (enrichmentNode is null)
             {
                 _logger.LogWarning(
-                    "Enrichment response was null/empty for correlation {CorrelationId}",
+                    "Enrichment source returned null for correlation {CorrelationId}",
                     correlationId);
                 return MergeOrReturnOriginal(sourceNode, _options.FallbackValue);
             }

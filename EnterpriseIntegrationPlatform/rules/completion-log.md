@@ -4,6 +4,169 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 092 – Kustomize Base Directory Structure
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Fix tutorial 43 Kustomize directory tree to match actual `deploy/kustomize/` layout (service-specific subdirectories under `base/`, `namespace.yaml`, prod PDB files).
+- **Files modified**:
+  - `tutorials/43-kubernetes-deployment.md` — Updated directory tree to show `base/admin-api/`, `base/openclaw-web/`, `namespace.yaml`, and prod PDB files.
+- **Test counts**: 1,518 UnitTests. 1,651 total tests. (Documentation-only change, no new tests.)
+- **Notes**: Phase 22 now fully complete — all 13 chunks (080-092) done.
+
+## Chunk 080 – SFTP Connection Pooling
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Implement connection pooling for SFTP connector as promised by tutorial 35 (line 78): "The connector pools connections per host and reuses them across requests."
+- **Architecture**: Added `ISftpConnectionPool` / `SftpConnectionPool` using a bounded `Channel<byte>` as semaphore + `ConcurrentQueue<PooledConnection>` for idle connections. Pool evicts idle connections exceeding configurable timeout. `SftpConnector` now acquires/releases from pool instead of connect/disconnect per call.
+- **Files created**:
+  - `src/Connector.Sftp/ISftpConnectionPool.cs` — Pool interface with `AcquireAsync` / `Release`.
+  - `src/Connector.Sftp/SftpConnectionPool.cs` — Thread-safe pool implementation with bounded capacity, idle eviction, dispose support.
+- **Files modified**:
+  - `src/Connector.Sftp/SftpConnectorOptions.cs` — Added `MaxConnectionsPerHost` (default 5) and `ConnectionIdleTimeoutMs` (default 30000).
+  - `src/Connector.Sftp/SftpConnector.cs` — Refactored from direct `ISftpClient` connect/disconnect to pool-based acquire/release.
+  - `src/Connector.Sftp/SftpConnectorServiceExtensions.cs` — Registers `SftpConnectionPool` as singleton via factory.
+  - `tests/UnitTests/SftpConnectorTests.cs` — Updated 10 existing tests to use pool mock; added 7 new pool tests (acquire, reuse, max-capacity blocking, cancellation, disconnected-client eviction, idle-timeout eviction, dispose).
+- **Test counts**: 1,479 UnitTests (+7). 1,612 total tests.
+
+## Chunk 081 – Unified Broker Selection via AddIngestion
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Implement `AddIngestion(Action<BrokerOptions> configure)` as promised by tutorial 05 (line 124): a unified DI registration method that selects broker by `BrokerType`.
+- **Architecture**: Added `AddIngestion` to `IngestionServiceExtensions.cs`. Uses reflection-based assembly loading: maps `BrokerType` → known assembly/type/method name, loads the broker assembly via `Assembly.Load`, and invokes the appropriate extension method (`AddNatsJetStreamBroker`, `AddKafkaBroker`, or `AddPulsarBroker`). No circular project references needed. Clear error messages when broker assembly is missing.
+- **Files modified**:
+  - `src/Ingestion/IngestionServiceExtensions.cs` — Added static `BrokerRegistrations` dictionary, `AddIngestion(Action<BrokerOptions>)` method with assembly loading and reflection invocation.
+  - `tests/UnitTests/IngestionServiceExtensionsTests.cs` — Added 4 new tests: `AddIngestion_NatsJetStream_RegistersProducerAndConsumer`, `AddIngestion_Kafka_RegistersProducerAndConsumer`, `AddIngestion_Pulsar_RegistersProducerAndConsumer`, `AddIngestion_NullConfigure_ThrowsArgumentNullException`.
+- **Test counts**: 1,483 UnitTests (+4). 1,616 total tests.
+
+## Chunk 082 – MessageFilter No-Silent-Drop Enforcement
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Enforce no-silent-drop semantics as promised by tutorial 10 (line 94): "The platform enforces no silent drops in production deployments" and "If the DLQ publish fails, the source message is Nacked and redelivered."
+- **Architecture**: Added `RequireDiscardTopic` boolean (default false) to `MessageFilterOptions`. When true and no `DiscardTopic` is configured, the filter throws `InvalidOperationException` instead of silently dropping. DLQ publish failures propagate naturally (no catch) so the caller can Nack.
+- **Files modified**:
+  - `src/Processing.Routing/MessageFilterOptions.cs` — Added `RequireDiscardTopic` property with xmldoc.
+  - `src/Processing.Routing/MessageFilter.cs` — Added no-silent-drop enforcement when `RequireDiscardTopic` is true. Added comment clarifying DLQ publish failure propagation.
+  - `tests/UnitTests/MessageFilterTests.cs` — Added 3 new tests: `RequireDiscardTopic_NoDiscardTopic_ThrowsInvalidOperation`, `RequireDiscardTopic_WithDiscardTopic_RoutesNormally`, `DiscardPublishFails_ExceptionPropagatesForNack`.
+- **Test counts**: 1,486 UnitTests (+3). 1,619 total tests.
+
+## Chunk 083 – Content Enricher: Database and Cache Sources
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Implement database and cache enrichment sources as promised by tutorial 18 (line 7): "Enrichment sources: HTTP lookups, database queries, cache."
+- **Architecture**: Extracted `IEnrichmentSource` interface. Created `HttpEnrichmentSource` (HTTP GET), `DatabaseEnrichmentSource` (parameterised SQL via `DbConnection`), and `CachedEnrichmentSource` (decorator using `IMemoryCache` with configurable TTL). `ContentEnricher` now accepts `IEnrichmentSource` while maintaining backward-compatible `IHttpClientFactory` constructor.
+- **Files created**:
+  - `src/Processing.Transform/IEnrichmentSource.cs` — Interface with `FetchAsync(string lookupKey, CancellationToken)`.
+  - `src/Processing.Transform/HttpEnrichmentSource.cs` — HTTP GET implementation.
+  - `src/Processing.Transform/DatabaseEnrichmentSource.cs` — Parameterised SQL with `DbConnection`.
+  - `src/Processing.Transform/CachedEnrichmentSource.cs` — In-memory cache decorator with configurable TTL.
+  - `tests/UnitTests/EnrichmentSourceTests.cs` — 5 new tests: cache miss, cache hit, cache expiry, null caching, custom-source integration.
+- **Files modified**:
+  - `src/Processing.Transform/ContentEnricher.cs` — Refactored to use `IEnrichmentSource`, added backward-compatible `IHttpClientFactory` constructor.
+  - `src/Processing.Transform/Processing.Transform.csproj` — Added `Microsoft.Extensions.Caching.Memory`.
+  - `Directory.Packages.props` — Added `Microsoft.Extensions.Caching.Memory` 10.0.5.
+- **Test counts**: 1,491 UnitTests (+5). 1,624 total tests. All 12 existing enricher tests pass unchanged.
+
+## Chunk 084 – Normalizer: Use XmlRootName Option
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Wire `NormalizerOptions.XmlRootName` into `MessageNormalizer` so the option is actually used, as promised by tutorial 17 (line 82).
+- **Files modified**:
+  - `src/Processing.Transform/NormalizerOptions.cs` — Updated xmldoc to reflect actual usage.
+  - `src/Processing.Transform/MessageNormalizer.cs` — CSV wrapper now uses `_options.XmlRootName` instead of hardcoded `"rows"`.
+  - `tests/UnitTests/MessageNormalizerTests.cs` — Updated 4 CSV tests to use `"Root"` (default XmlRootName). Added 1 new test proving custom `XmlRootName` is respected.
+- **Test counts**: 1,492 UnitTests (+1). 1,625 total tests.
+
+## Chunk 085 – Aggregator Store Idempotency on MessageId
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Make `InMemoryMessageAggregateStore.AddAsync()` idempotent on `MessageId` as promised by tutorial 21 (line 112).
+- **Files modified**:
+  - `src/Processing.Aggregator/InMemoryMessageAggregateStore.cs` — Added duplicate `MessageId` check in `AddAsync` lock block.
+  - `tests/UnitTests/InMemoryMessageAggregateStoreTests.cs` — Added 2 new tests: duplicate-is-idempotent, different-MessageIds-both-added.
+- **Test counts**: 1,494 UnitTests (+2). 1,627 total tests.
+
+## Chunk 087 – Backpressure Pauses Scale-Down in Competing Consumers
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Make `CompetingConsumerOrchestrator` skip scale-down when `IsBackpressured` is true, as promised by tutorial 28 (line 113).
+- **Files modified**:
+  - `src/Processing.CompetingConsumers/CompetingConsumerOrchestrator.cs` — Added `_backpressure.IsBackpressured` check in scale-down branch with warning log.
+  - `tests/UnitTests/CompetingConsumersTests/CompetingConsumerOrchestratorTests.cs` — Added 1 new test: scale-down skipped during backpressure.
+- **Test counts**: 1,495 UnitTests (+1). 1,628 total tests.
+
+## Chunk 086 – ReplayId Header Injection in MessageReplayer
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Inject `ReplayId` header into replayed messages as promised by tutorial 26.
+- **Files modified**:
+  - `src/Contracts/MessageHeaders.cs` — Added `ReplayId` constant.
+  - `src/Processing.Replay/MessageReplayer.cs` — Generates ReplayId per invocation, injects into metadata, tracks skipped count.
+  - `src/Processing.Replay/ReplayOptions.cs` — Added `SkipAlreadyReplayed` boolean.
+  - `tests/UnitTests/MessageReplayerTests.cs` — Added 3 new tests.
+- **Test counts**: 1,498 UnitTests (+3). 1,631 total tests.
+
+## Chunk 088 – Rule Engine In-Memory Caching with Periodic Refresh
+
+- **Date**: 2026-04-05
+- **Phase**: 22
+- **Status**: done
+- **Goal**: Cache rules in memory with periodic refresh as promised by tutorial 30 (line 134).
+- **Files modified**:
+  - `src/RuleEngine/RuleEngineOptions.cs` — Added `CacheEnabled` and `CacheRefreshIntervalMs`.
+  - `src/RuleEngine/BusinessRuleEngine.cs` — Added rule caching with time-based refresh.
+  - `tests/UnitTests/BusinessRuleEngineTests.cs` — Added 3 new tests.
+- **Test counts**: 1,501 UnitTests (+3). 1,634 total tests.
+
+## Chunk 089 – InputSanitizer: XSS, SQL Injection, HTML Entity, Unicode Override Detection
+
+- **Date**: 2026-04-05
+- **Phase**: 22
+- **Status**: done
+- **Goal**: Extend InputSanitizer as promised by tutorial 33 (lines 50-54): detect/remove script tags, SQL injection patterns, HTML entities, and Unicode direction overrides.
+- **Files modified**:
+  - `src/Security/InputSanitizer.cs` — Extended Sanitize() with 6 sanitization stages: HTML entity decode, script block removal, inline event handler removal, SQL injection pattern removal, CRLF/null byte handling, Unicode override removal. Extended IsClean() to detect all patterns. Used GeneratedRegex for thread-safe compiled patterns.
+  - `tests/UnitTests/InputSanitizerTests.cs` — Added 13 new tests covering XSS, SQL injection, HTML entities, Unicode overrides, and clean pass-through.
+- **Test counts**: 1,514 UnitTests (+13). 1,647 total tests.
+
+## Chunk 090 – EnvironmentOverrideProvider: EIP__ Environment Variable Convention
+
+- **Date**: 2026-04-05
+- **Phase**: 22
+- **Status**: done
+- **Goal**: Implement EIP__ environment variable convention as promised by tutorial 42 (line 121).
+- **Files modified**:
+  - `src/Configuration/EnvironmentOverrideProvider.cs` — Added `EnvPrefix`, `ResolveFromEnvironmentVariable()` method, and EIP__ env var as highest-priority cascade level in `ResolveAsync`.
+  - `tests/UnitTests/EnvironmentOverrideProviderTests.cs` — Added 4 new tests: env var overrides store, env var not set falls to store, colon-to-underscore mapping, missing var returns null.
+- **Test counts**: 1,518 UnitTests (+4). 1,651 total tests.
+
+## Chunk 091 – DR Status Endpoint and Profiling API Endpoints
+
+- **Date**: 2026-04-05
+- **Phase**: 22
+- **Status**: done
+- **Goal**: Add missing DR status and profiling endpoints as promised by tutorials 44 and 45.
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added 6 new endpoints: `GET /api/admin/dr/status`, `GET /api/admin/profiling/status`, `POST /api/admin/profiling/cpu/start`, `POST /api/admin/profiling/cpu/stop`, `POST /api/admin/profiling/memory/snap`, `GET /api/admin/profiling/gc/stats`.
+- **Test counts**: 1,518 UnitTests. 1,651 total tests.
+
 ## Chunk 075 – Fix Tutorials 05, 06, 07
 
 - **Date**: 2026-04-05

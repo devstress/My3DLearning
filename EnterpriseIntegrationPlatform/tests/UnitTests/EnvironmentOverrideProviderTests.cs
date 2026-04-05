@@ -125,4 +125,65 @@ public sealed class EnvironmentOverrideProviderTests
             Assert.That(result!.Value, Is.EqualTo("default-val"));
         }
     }
+
+    // ───── EIP__ Environment Variable Convention ─────
+
+    [Test]
+    public async Task ResolveAsync_EipEnvVar_OverridesStoreValue()
+    {
+        var envVar = "EIP__Broker__ConnectionString";
+        try
+        {
+            Environment.SetEnvironmentVariable(envVar, "from-env");
+            await _store.SetAsync(new ConfigurationEntry("Broker:ConnectionString", "from-store", "prod"));
+
+            var result = await _provider.ResolveAsync("Broker:ConnectionString", "prod");
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result!.Value, Is.EqualTo("from-env"));
+            Assert.That(result.Environment, Is.EqualTo("environment-variable"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(envVar, null);
+        }
+    }
+
+    [Test]
+    public async Task ResolveAsync_EipEnvVar_NotSet_FallsToStore()
+    {
+        await _store.SetAsync(new ConfigurationEntry("Broker:ConnectionString", "from-store", "prod"));
+
+        var result = await _provider.ResolveAsync("Broker:ConnectionString", "prod");
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Value, Is.EqualTo("from-store"));
+    }
+
+    [Test]
+    public void ResolveFromEnvironmentVariable_MapsColonsToDoubleUnderscore()
+    {
+        var envVar = "EIP__Section__Nested__Key";
+        try
+        {
+            Environment.SetEnvironmentVariable(envVar, "deep-value");
+
+            var result = EnvironmentOverrideProvider.ResolveFromEnvironmentVariable("Section:Nested:Key");
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result!.Value, Is.EqualTo("deep-value"));
+            Assert.That(result.Key, Is.EqualTo("Section:Nested:Key"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(envVar, null);
+        }
+    }
+
+    [Test]
+    public void ResolveFromEnvironmentVariable_MissingVar_ReturnsNull()
+    {
+        var result = EnvironmentOverrideProvider.ResolveFromEnvironmentVariable("Missing:Key:Here");
+        Assert.That(result, Is.Null);
+    }
 }
