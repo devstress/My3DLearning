@@ -110,13 +110,12 @@ All instruments are created from `DiagnosticsConfig.Meter`. The static helper me
 
 ```csharp
 // src/Observability/DiagnosticsConfig.cs
-public sealed class DiagnosticsConfig
+public static class DiagnosticsConfig
 {
-    public required string ServiceName { get; init; }
-    public string? OtlpEndpoint { get; init; }
-    public double SamplingRate { get; init; } = 1.0;
-    public bool EnableConsoleExporter { get; init; } = false;
-    public IReadOnlyList<string>? AdditionalSources { get; init; }
+    public const string ServiceName = "EnterpriseIntegrationPlatform";
+    public const string ServiceVersion = "1.0.0";
+    public static readonly ActivitySource ActivitySource = new(ServiceName, ServiceVersion);
+    public static readonly Meter Meter = new(ServiceName, ServiceVersion);
 }
 ```
 

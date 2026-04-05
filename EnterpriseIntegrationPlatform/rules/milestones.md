@@ -28,7 +28,7 @@
 
 ## Next Chunk
 
-➡️ Phase 15 — Tutorial Fixes Round 2 (chunk 077)
+➡️ Phase 15 — Tutorial Fixes Round 2 (chunk 078)
 
 ---
 
@@ -38,42 +38,8 @@ Re-audit of all 50 tutorials (2026-04-05) found **17 tutorials still have errors
 
 | Chunk | Goal | Tutorials | Status |
 |-------|------|-----------|--------|
-| 077 | Fix tutorials 31, 32, 37, 38 (advanced pattern & connector errors) | 31, 32, 37, 38 | `not-started` |
 | 078 | Fix tutorials 42, 44, 45, 46 (config, DR, profiling, end-to-end errors) | 42, 44, 45, 46 | `not-started` |
 | 079 | Fix tutorials 48, 49 and update test counts | 48, 49 | `not-started` |
-
----
-
-#### Chunk 077 — Fix Tutorials 31, 32, 37, 38
-
-**Tutorial 31 — Event Sourcing:**
-
-| Issue | Severity |
-|-------|----------|
-| `IEventProjection<TState>` method shown as synchronous `TState Apply(TState state, EventEnvelope @event)` but actual is `Task<TState> ProjectAsync(TState state, EventEnvelope envelope, CancellationToken ct)`. Wrong name, wrong return type, missing cancellation token. | 🔴 ERROR |
-| `TemporalQuery` parameter shown as `int batchSize = 100` but actual is `int maxEventsPerRead = 1000`. Different name and default. | 🟡 WARNING |
-
-**Tutorial 32 — Multi-Tenancy:**
-
-| Issue | Severity |
-|-------|----------|
-| `ITenantOnboardingService.OnboardAsync` does not exist — actual method is `ProvisionAsync`. | 🔴 ERROR |
-| `ITenantOnboardingService.OffboardAsync` does not exist — actual method is `DeprovisionAsync`. | 🔴 ERROR |
-| `OnboardAsync` return type shown as `Task<TenantContext>` but actual is `Task<TenantOnboardingResult>`. | 🔴 ERROR |
-| `OffboardAsync` return type shown as `Task` but actual `DeprovisionAsync` returns `Task<TenantOnboardingResult>`. | 🔴 ERROR |
-| `TenantOnboardingRequest` missing required `TenantId` and `TenantPlan Plan` parameters. Property named `Properties` should be `Metadata` (type `IReadOnlyDictionary` not `IDictionary`). | 🔴 ERROR |
-
-**Tutorial 37 — File Connector:**
-
-| Issue | Severity |
-|-------|----------|
-| File path shown as `src/Connector.FileSystem/` but actual directory is `src/Connector.File/`. | 🟡 WARNING |
-
-**Tutorial 38 — OpenTelemetry:**
-
-| Issue | Severity |
-|-------|----------|
-| `DiagnosticsConfig` shown as instance class with `init` properties but actual is a `static` class with `const` and `static readonly` members. | 🔴 ERROR |
 
 ---
 

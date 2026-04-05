@@ -26,6 +26,18 @@ See `milestones.md` for current phase status and next chunk.
   - `tutorials/29-throttle-rate-limiting.md` — Fixed `AvailableTokens` type from `double` to `int`. Fixed `IThrottleRegistry.RemovePolicy` return from `void` to `bool`. Fixed `Resolve` return from `ThrottlePolicy` to `IMessageThrottle`. Fixed `GetAllPolicies`/`GetPolicy` return types to `ThrottlePolicyStatus`.
 - **Test counts**: No source changes — documentation only.
 
+## Chunk 077 – Fix Tutorials 31, 32, 37, 38
+
+- **Date**: 2026-04-05
+- **Status**: done
+- **Goal**: Fix event sourcing projection method, multi-tenancy onboarding API, file connector path, and DiagnosticsConfig class type.
+- **Files modified**:
+  - `tutorials/31-event-sourcing.md` — Fixed `IEventProjection<TState>.Apply()` → `ProjectAsync()` (async, correct name, adds CancellationToken). Fixed `TemporalQuery` param from `batchSize = 100` to `maxEventsPerRead = 1000`.
+  - `tutorials/32-multi-tenancy.md` — Fixed `ITenantOnboardingService.OnboardAsync` → `ProvisionAsync`, `OffboardAsync` → `DeprovisionAsync`, return types to `TenantOnboardingResult`. Fixed `TenantOnboardingRequest` to include `TenantId`, `TenantPlan Plan`, renamed `Properties` → `Metadata` with `IReadOnlyDictionary`.
+  - `tutorials/37-connector-file.md` — Fixed file paths from `src/Connector.FileSystem/` to `src/Connector.File/`.
+  - `tutorials/38-opentelemetry.md` — Fixed `DiagnosticsConfig` from instance class with `init` properties to `static` class with `const`/`static readonly` members.
+- **Test counts**: No source changes — documentation only.
+
 ## Chunk 074 – Phase 14 Completion
 
 - **Date**: 2026-04-04
