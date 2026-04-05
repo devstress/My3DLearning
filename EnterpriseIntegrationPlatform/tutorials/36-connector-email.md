@@ -110,13 +110,68 @@ The source message is **Acked only after SMTP confirmation**. If the SMTP server
 
 ---
 
-## Exercises
+## Lab
 
-1. Write a `Func<T, string>` body builder for an order confirmation email that includes the order ID and total from the payload.
+**Objective:** Design email delivery with throttling integration, trace the connector's notification pipeline, and analyze **atomic** delivery confirmation for email-based integrations.
 
-2. An SMTP server limits sending to 100 emails per minute. How would you integrate the throttle from Tutorial 29?
+### Step 1: Write a Body Builder for Order Confirmation
 
-3. Why does the connector use `Func<T, string>` body builders rather than a template engine?
+Write a `Func<OrderPayload, string>` body builder that creates an HTML email:
+
+```csharp
+Func<OrderPayload, string> bodyBuilder = order =>
+    $"""
+    <h1>Order Confirmation</h1>
+    <p>Order ID: {order.OrderId}</p>
+    <p>Total: ${order.Total:F2}</p>
+    <p>Thank you for your purchase!</p>
+    """;
+```
+
+Open `src/Connectors.Email/EmailConnector.cs` and trace: How does the connector use this builder? Why does it use `Func<T, string>` rather than a template engine?
+
+### Step 2: Integrate Throttling for SMTP Rate Limits
+
+An SMTP server limits sending to 100 emails per minute. Design the integration with the Throttle from Tutorial 29:
+
+```
+Message arrives → Throttle (100/min, per-tenant) → Email Connector → SMTP Send → Ack/Nack
+```
+
+What happens when the 101st email arrives within the minute? Does it queue, reject, or backpressure? How does this prevent the SMTP server from rejecting connections — a **scalability** concern for high-volume notification systems?
+
+### Step 3: Analyze Delivery Atomicity
+
+Email delivery is inherently non-atomic — you can't "uncommit" a sent email. Design a strategy:
+
+| Scenario | Connector Response | Pipeline Action |
+|----------|-------------------|----------------|
+| SMTP accepts message | Ack | Mark as delivered |
+| SMTP rejects (invalid address) | Nack | Route to DLQ |
+| SMTP timeout | Retry | Exponential backoff |
+| Email sent but recipient bounce | ? | How do you detect this? |
+
+Why is email the most challenging connector for **atomicity**? How does the platform handle "fire-and-forget" delivery?
+
+## Exam
+
+1. Why does the email connector use `Func<T, string>` body builders rather than a template engine?
+   - A) Template engines are not supported in .NET
+   - B) Lambdas are compiled code — they're type-safe, refactorable, and don't require a separate template syntax; for an integration platform where emails are programmatic notifications, code-based builders are simpler and more maintainable
+   - C) Templates are slower than string interpolation
+   - D) The SMTP protocol requires plain strings
+
+2. Why is throttle integration essential for email connector **scalability**?
+   - A) Throttling reduces email content size
+   - B) SMTP servers enforce rate limits — exceeding them causes connection rejection and delivery failure for all consumers; throttling ensures the platform respects server limits while queuing excess messages for later delivery
+   - C) Email delivery doesn't benefit from throttling
+   - D) Throttling is only needed for premium tenants
+
+3. What makes email delivery uniquely challenging for **processing atomicity**?
+   - A) Email is always delivered successfully
+   - B) Email delivery is one-way and non-reversible — once the SMTP server accepts the message, it cannot be recalled; the platform can only confirm SMTP acceptance, not final delivery to the recipient's inbox
+   - C) SMTP supports two-phase commit
+   - D) Email is synchronous and always returns a delivery receipt
 
 ---
 

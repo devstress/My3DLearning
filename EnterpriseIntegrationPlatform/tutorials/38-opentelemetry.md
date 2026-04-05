@@ -188,13 +188,64 @@ Telemetry is a **best-effort side channel** — if the collector is down, messag
 
 ---
 
-## Exercises
+## Lab
 
-1. A message flows through ingress → router → transformer → HTTP connector. Draw the expected span hierarchy in a trace viewer.
+**Objective:** Trace distributed spans across the integration pipeline, analyze how observability enables **scalable** operations, and design graceful degradation when telemetry infrastructure is unavailable.
 
-2. The OTLP collector is unreachable. What happens to message processing? What telemetry is lost?
+### Step 1: Draw a Trace Span Hierarchy
 
-3. Why does the platform propagate W3C `traceparent` through envelope metadata rather than relying on broker-level header propagation?
+A message flows through: ingress → router → transformer → HTTP connector. Draw the expected span hierarchy:
+
+```
+[Root Span: Gateway.Receive]
+  └─ [Span: ContentBasedRouter.RouteAsync]
+       └─ [Span: MessageTranslator.TranslateAsync]
+            └─ [Span: HttpConnector.SendAsync]
+                 └─ [Span: HTTP POST api.partner.com/orders]
+```
+
+Open `src/Observability/` and identify: How does the platform create parent-child span relationships? How is the W3C `traceparent` propagated through envelope metadata?
+
+### Step 2: Analyze Observability Resilience
+
+The OTLP collector is unreachable (network partition). Trace what happens:
+
+1. Does message processing stop? (No — observability must never block business logic)
+2. What telemetry is lost? (spans and metrics for the outage period)
+3. How does the platform implement this resilience? (hint: fire-and-forget telemetry export)
+
+Why is observability resilience critical for **integration platform scalability**? A telemetry outage must not cascade into a processing outage.
+
+### Step 3: Design Observability for Scalable Troubleshooting
+
+Explain why the platform propagates `traceparent` through envelope metadata rather than relying on broker-level header propagation:
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| Broker headers | Automatic, no code changes | Broker-specific, lost during bridge/transform |
+| Envelope metadata | Survives all processing stages | Requires explicit propagation |
+
+How does end-to-end tracing support **operational scalability** — what happens when an operator needs to debug a failure across 10 processing stages in a system handling 50,000 messages/second?
+
+## Exam
+
+1. Why does the platform propagate `traceparent` through envelope metadata rather than broker headers?
+   - A) Broker headers are not supported by NATS
+   - B) Envelope metadata survives all processing stages — including broker bridges, transformations, and splits — while broker headers may be lost or incompatible across different broker implementations
+   - C) Metadata is faster to read than headers
+   - D) W3C `traceparent` is too long for broker headers
+
+2. What should happen to message processing when the telemetry collector is unreachable?
+   - A) Processing stops until telemetry is restored
+   - B) Processing continues uninterrupted — telemetry is exported on a best-effort basis; observability must never block business message processing, as that would make the monitoring system a single point of failure
+   - C) Messages are queued until telemetry is available
+   - D) The platform switches to a backup collector
+
+3. How does distributed tracing support **scalable** operations for an integration platform?
+   - A) Tracing speeds up message processing
+   - B) End-to-end traces allow operators to pinpoint the exact stage and service where a message failed — without tracing, debugging failures across dozens of processing stages in a distributed system would be nearly impossible at scale
+   - C) Tracing reduces the number of processing stages
+   - D) The broker automatically generates traces
 
 ---
 

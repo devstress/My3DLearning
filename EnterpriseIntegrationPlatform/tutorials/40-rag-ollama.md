@@ -146,13 +146,70 @@ RAG is a **read-only, advisory feature** — it does not modify messages or pipe
 
 ---
 
-## Exercises
+## Lab
 
-1. A developer asks "Why did order 12345 fail?" Design the RAG flow: what gets embedded, what is retrieved, and what context is passed to the model.
+**Objective:** Design a RAG query flow for operational troubleshooting, analyze graceful degradation when AI infrastructure is unavailable, and evaluate self-hosted vs. cloud AI for **scalable** integration platform operations.
 
-2. The Ollama container runs out of GPU memory. What happens to the RAG API? How should the platform degrade gracefully?
+### Step 1: Design a RAG Troubleshooting Flow
 
-3. Why does the platform default to self-hosted Ollama rather than a cloud AI provider? What trade-offs are involved?
+A developer asks: "Why did order 12345 fail?" Design the complete RAG flow:
+
+```
+1. EMBED query → vector representation
+2. RETRIEVE relevant context:
+   - DLQ entry for order 12345 (error details, reason)
+   - Lifecycle events (which stage failed)
+   - Recent similar failures (pattern detection)
+3. GENERATE response using LLM with retrieved context
+4. RETURN: "Order 12345 failed at the Transform stage due to missing 'currency' field.
+   This is a recurring issue — 15 similar failures in the last hour from PartnerX.
+   Recommended action: check PartnerX's schema version."
+```
+
+Open `src/Rag/` and trace: How does the platform embed and retrieve context? What data sources are indexed?
+
+### Step 2: Design Graceful Degradation
+
+The Ollama container runs out of GPU memory. Design the degradation strategy:
+
+| Component | Normal Mode | Degraded Mode |
+|-----------|------------|---------------|
+| RAG API | Full LLM responses | Return raw retrieved context without AI summary |
+| Chat interface | AI-powered answers | "AI unavailable — showing raw data" |
+| Message processing | Unaffected | Unaffected (AI is never in the critical path) |
+
+Why must the RAG/AI system **never** be in the critical message processing path? How does this architectural decision support **pipeline atomicity**?
+
+### Step 3: Evaluate Self-Hosted vs. Cloud AI
+
+| Factor | Self-Hosted (Ollama) | Cloud (OpenAI/Azure) |
+|--------|---------------------|---------------------|
+| Data privacy | Payloads never leave your infrastructure | Data sent to external API |
+| Latency | Local network (~50ms) | Internet round-trip (~500ms) |
+| Cost at scale | Fixed (GPU hardware) | Variable (per-token pricing) |
+| Availability | You manage uptime | Provider manages uptime |
+
+Why does the platform default to self-hosted Ollama? Consider: enterprise integration platforms process sensitive business data from multiple tenants.
+
+## Exam
+
+1. Why must the RAG/AI system never be in the critical message processing path?
+   - A) AI responses are too slow for real-time processing
+   - B) AI infrastructure failures must not impact message processing — the integration platform's primary responsibility is atomic message delivery, and coupling it to AI availability would make GPU outages cascade into integration failures
+   - C) AI models cannot process binary data
+   - D) The broker doesn't support AI integration
+
+2. Why does the platform default to self-hosted Ollama rather than a cloud AI provider?
+   - A) Ollama is faster than cloud providers
+   - B) Enterprise integration platforms process sensitive business data from multiple tenants — self-hosting ensures payload data never leaves the organization's infrastructure, meeting data residency and privacy requirements
+   - C) Cloud AI providers don't support .NET
+   - D) Self-hosting is always cheaper
+
+3. How does RAG improve **operational scalability** for a large integration platform?
+   - A) RAG processes messages faster
+   - B) RAG enables natural-language troubleshooting across millions of messages — operators can ask "why did this fail?" instead of manually searching DLQ entries, lifecycle events, and logs, dramatically reducing mean-time-to-resolution
+   - C) RAG reduces the number of integration patterns needed
+   - D) RAG automatically fixes failed messages
 
 ---
 
