@@ -3,11 +3,10 @@
 ## What You'll Learn
 
 - The EIP Channel Adapter pattern for local and network file system integration
-- How `IFileConnector` provides WriteAsync, ReadAsync, and ListFilesAsync operations
-- Atomic write using temporary files and rename
+- How `IFileConnector` provides generic `WriteAsync<T>`, `ReadAsync`, and `ListFilesAsync` operations
 - Configurable encoding for multi-language payload support
 - Pattern matching for selective file discovery
-- Metadata sidecar files for traceability
+- Directory auto-creation and overwrite control
 
 ---
 
@@ -20,7 +19,7 @@
   Write path:
   ┌──────────────┐     ┌──────────────────┐     ┌──────────────┐
   │  Pipeline    │────▶│  File Connector   │────▶│  File System │
-  │  (envelope)  │     │  (atomic write)   │     │  (local/NFS) │
+  │  (envelope)  │     │  (write)          │     │  (local/NFS) │
   └──────────────┘     └──────────────────┘     └──────────────┘
 
   Read path:
@@ -39,110 +38,70 @@ File-based integration is common in batch processing, legacy system interop, and
 ### IFileConnector
 
 ```csharp
-// src/Connector.File/IFileConnector.cs
+// src/Connector.FileSystem/IFileConnector.cs
 public interface IFileConnector
 {
-    Task<ConnectorResult> WriteAsync(
-        IntegrationEnvelope<string> envelope,
-        FileConnectorOptions options,
-        CancellationToken cancellationToken = default);
+    Task<string> WriteAsync<T>(
+        IntegrationEnvelope<T> envelope,
+        Func<T, byte[]> serializer,
+        CancellationToken ct);
 
-    Task<IntegrationEnvelope<string>> ReadAsync(
-        string filePath,
-        FileConnectorOptions options,
-        CancellationToken cancellationToken = default);
+    Task<byte[]> ReadAsync(string filePath, CancellationToken ct);
 
-    Task<IReadOnlyList<LocalFileInfo>> ListFilesAsync(
-        string directory,
-        string? pattern,
-        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> ListFilesAsync(
+        string? subdirectory,
+        string searchPattern,
+        CancellationToken ct);
 }
 ```
+
+`WriteAsync<T>` accepts a generic envelope and a `Func<T, byte[]>` serializer, returning the full path of the written file. `ReadAsync` returns raw bytes. `ListFilesAsync` searches the `RootDirectory` (or an optional subdirectory) for files matching the given pattern.
 
 ### FileConnectorOptions
 
 ```csharp
-// src/Connector.File/FileConnectorOptions.cs
+// src/Connector.FileSystem/FileConnectorOptions.cs
 public sealed class FileConnectorOptions
 {
-    public required string Directory { get; init; }
-    public string FileNameTemplate { get; init; } = "{MessageId}_{Timestamp}.json";
-    public Encoding Encoding { get; init; } = Encoding.UTF8;
-    public bool UseAtomicWrite { get; init; } = true;
-    public bool WriteSidecarMetadata { get; init; } = true;
-    public string? FilePattern { get; init; }         // e.g. "*.json", "order_*.xml"
-    public bool DeleteAfterRead { get; init; } = false;
+    public string RootDirectory { get; set; } = string.Empty;
+    public string Encoding { get; set; } = "utf-8";
+    public bool CreateDirectoryIfNotExists { get; set; } = true;
+    public bool OverwriteExisting { get; set; } = false;
+    public string FilenamePattern { get; set; } = "{MessageId}-{MessageType}.json";
 }
 ```
 
 | Option | Purpose |
 |--------|---------|
-| `FileNameTemplate` | Template for generated filenames with `{MessageId}`, `{Timestamp}`, `{Source}` placeholders |
-| `Encoding` | Character encoding (UTF-8, UTF-16, ASCII, ISO-8859-1) for multi-language support |
-| `UseAtomicWrite` | Write to `.tmp` then rename — prevents partial reads |
-| `WriteSidecarMetadata` | Generate `.meta` JSON file alongside the data file |
-| `FilePattern` | Glob pattern for `ListFilesAsync` filtering |
-| `DeleteAfterRead` | Remove file after successful read and ingestion |
+| `RootDirectory` | Base directory for all file operations |
+| `Encoding` | Character encoding name for text files (default `utf-8`) |
+| `CreateDirectoryIfNotExists` | Automatically create the directory tree if it does not exist (default `true`) |
+| `OverwriteExisting` | When `false`, throws if a file with the same name exists (default `false`) |
+| `FilenamePattern` | Template for generated filenames with `{MessageId}`, `{MessageType}`, `{CorrelationId}`, `{Timestamp}` tokens |
 
-### Atomic Write
-
-When `UseAtomicWrite = true`, the write process:
-1. Generates the target filename from the template
-2. Writes content to `{filename}.tmp` with the configured encoding
-3. Writes the sidecar `.meta` file (if enabled)
-4. Renames `.tmp` → final filename
-
-This guarantees that any process polling the directory sees only complete files.
-
-### Metadata Sidecar
-
-```json
-{
-  "messageId": "msg-456",
-  "correlationId": "batch-789",
-  "source": "InventorySystem",
-  "writtenAt": "2024-01-15T14:00:00Z",
-  "encoding": "utf-8",
-  "originalContentType": "application/json",
-  "tenantId": "tenant-b"
-}
-```
-
-### LocalFileInfo
-
-```csharp
-// src/Connector.File/LocalFileInfo.cs
-public sealed record LocalFileInfo(
-    string FileName,
-    string FullPath,
-    long SizeBytes,
-    DateTimeOffset LastModified,
-    bool HasSidecar);
-```
-
-`ListFilesAsync` supports standard glob patterns (`*.json`, `order_*.xml`, `2024-01-*`) for selective file discovery.
+`ListFilesAsync` supports standard search patterns (`*.json`, `order_*.xml`, `2024-01-*`) for selective file discovery.
 
 ---
 
 ## Scalability Dimension
 
-File I/O is bound by disk throughput and network filesystem latency (for NFS/SMB mounts). The connector supports concurrent writes from multiple replicas because `{MessageId}` in the filename template ensures uniqueness. For read-side polling, use a single consumer with `DeleteAfterRead = true` to prevent duplicate ingestion, or implement a distributed lock if multiple readers are needed.
+File I/O is bound by disk throughput and network filesystem latency (for NFS/SMB mounts). The connector supports concurrent writes from multiple replicas because `{MessageId}` in the `FilenamePattern` ensures uniqueness. For read-side polling, use a single consumer to prevent duplicate ingestion, or implement a distributed lock if multiple readers are needed.
 
 ---
 
 ## Atomicity Dimension
 
-Atomic write ensures **all-or-nothing file delivery**. If the process crashes during the `.tmp` write phase, no final file exists and the source message is redelivered. The rename from `.tmp` to the final name is atomic on local filesystems and most NFS implementations. The source message is Acked only after the rename succeeds. When `DeleteAfterRead = true`, the file is deleted only after the message is successfully published to the pipeline.
+`WriteAsync` ensures **all-or-nothing file delivery**. If `OverwriteExisting` is `false` and the target file exists, an `InvalidOperationException` is thrown and the source message is redelivered. The source message is Acked only after the write succeeds and the full path is returned. `CreateDirectoryIfNotExists` prevents failures due to missing directory trees.
 
 ---
 
 ## Exercises
 
-1. Design a `FileConnectorOptions` for a batch process that writes UTF-16 encoded XML files with sidecar metadata to an NFS share.
+1. Design a `FileConnectorOptions` for a batch process that writes UTF-16 encoded XML files to an NFS share, with `OverwriteExisting = true`.
 
-2. Two consumer replicas poll the same directory with `DeleteAfterRead = true`. What race condition can occur? How would you prevent it?
+2. Two consumer replicas write to the same `RootDirectory`. How does the `FilenamePattern` with `{MessageId}` prevent conflicts?
 
-3. Why does the connector use a separate `.meta` sidecar file instead of embedding metadata in the data file itself?
+3. Why does the connector use `Func<T, byte[]>` for serialization rather than accepting raw strings?
 
 ---
 

@@ -26,17 +26,17 @@
 ```csharp
 public interface INotificationMapper
 {
-    string MapAck(IntegrationEnvelope envelope);
-    string MapNack(IntegrationEnvelope envelope, string errorMessage);
+    string MapAck(Guid messageId, Guid correlationId);
+    string MapNack(Guid messageId, Guid correlationId, string errorMessage);
 }
 
 public class XmlNotificationMapper : INotificationMapper
 {
-    public string MapAck(IntegrationEnvelope envelope)
+    public string MapAck(Guid messageId, Guid correlationId)
         => "<Ack>ok</Ack>";
 
-    public string MapNack(IntegrationEnvelope envelope, string errorMessage)
-        => $"<Nack>not ok because of {errorMessage}</Nack>";
+    public string MapNack(Guid messageId, Guid correlationId, string errorMessage)
+        => $"<Nack>not ok because of {SecurityElement.Escape(errorMessage)}</Nack>";
 }
 ```
 
@@ -80,7 +80,7 @@ operate without change. No Ack or Nack is produced.
   NatsNotificationActivityService.PublishAckAsync()
        │
        ▼
-  XmlNotificationMapper.MapAck(envelope)
+  XmlNotificationMapper.MapAck(messageId, correlationId)
        │
        ▼
   NATS ◀── "<Ack>ok</Ack>"
@@ -105,7 +105,7 @@ The sender receives confirmation that the message was delivered and processed.
   NatsNotificationActivityService.PublishNackAsync()
        │
        ▼
-  XmlNotificationMapper.MapNack(envelope, "Connection timed out")
+  XmlNotificationMapper.MapNack(messageId, correlationId, "Connection timed out")
        │
        ▼
   NATS ◀── "<Nack>not ok because of Connection timed out</Nack>"
@@ -194,10 +194,10 @@ public class NotificationDecisionService
 
         if (result.Success)
             await _notificationService.PublishAckAsync(       // UC2
-                _mapper.MapAck(input.Envelope));
+                _mapper.MapAck(input.MessageId, input.CorrelationId));
         else
             await _notificationService.PublishNackAsync(      // UC3
-                _mapper.MapNack(input.Envelope, result.ErrorMessage));
+                _mapper.MapNack(input.MessageId, input.CorrelationId, result.ErrorMessage));
     }
 }
 ```

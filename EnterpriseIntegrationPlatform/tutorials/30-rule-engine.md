@@ -5,7 +5,7 @@
 - How `IRuleEngine` evaluates business rules against integration messages
 - `BusinessRuleEngine` with priority-ordered evaluation
 - `IRuleStore` for persisting and querying rules at runtime
-- `BusinessRule` with conditions (AND/OR) and actions (Route, Transform, Enrich, Reject, Notify, Store)
+- `BusinessRule` with conditions (AND/OR) and actions (Route, Transform, Reject, DeadLetter)
 - `RuleConditionOperator` enum for flexible condition matching
 - `RuleEvaluationResult` and `InMemoryRuleStore`
 
@@ -20,9 +20,9 @@
   │  Incoming    │────▶│  Rule Engine   │
   │  Message     │     │               │
   └──────────────┘     │  Rule 1 (P=1) │──▶ Route to Topic A
-                       │  Rule 2 (P=2) │──▶ Transform + Enrich
+                       │  Rule 2 (P=2) │──▶ Transform
                        │  Rule 3 (P=3) │──▶ Reject
-                       │  Default      │──▶ Store
+                       │  Default      │──▶ DeadLetter
                        └───────────────┘
 ```
 
@@ -48,38 +48,34 @@ public interface IRuleEngine
 
 ```csharp
 // src/RuleEngine/BusinessRule.cs
-public sealed class BusinessRule
+public sealed record BusinessRule
 {
-    public required string Id { get; init; }
     public required string Name { get; init; }
     public required int Priority { get; init; }
-    public required ConditionGroup Conditions { get; init; }
-    public required RuleAction Action { get; init; }
-    public bool IsEnabled { get; init; } = true;
-}
-
-public sealed class ConditionGroup
-{
-    public LogicalOperator Operator { get; init; } = LogicalOperator.And;
+    public RuleLogicOperator LogicOperator { get; init; } = RuleLogicOperator.And;
     public required IReadOnlyList<RuleCondition> Conditions { get; init; }
+    public required RuleAction Action { get; init; }
+    public bool StopOnMatch { get; init; } = true;
+    public bool Enabled { get; init; } = true;
 }
 
-public enum LogicalOperator { And, Or }
+public enum RuleLogicOperator { And, Or }
 ```
 
 ### RuleCondition and RuleConditionOperator
 
 ```csharp
 // src/RuleEngine/RuleCondition.cs
-public sealed record RuleCondition(
-    string Field,
-    RuleConditionOperator Operator,
-    string Value);
+public sealed record RuleCondition
+{
+    public required string FieldName { get; init; }
+    public required RuleConditionOperator Operator { get; init; }
+    public required string Value { get; init; }
+}
 
 public enum RuleConditionOperator
 {
-    Equals, NotEquals, Contains, StartsWith,
-    EndsWith, GreaterThan, LessThan, Regex, Exists
+    Equals, Contains, Regex, In, GreaterThan
 }
 ```
 
@@ -87,16 +83,20 @@ public enum RuleConditionOperator
 
 ```csharp
 // src/RuleEngine/RuleAction.cs
-public sealed record RuleAction(RuleActionType Type, IDictionary<string, string>? Parameters = null);
+public sealed record RuleAction
+{
+    public required RuleActionType ActionType { get; init; }
+    public string? TargetTopic { get; init; }
+    public string? TransformName { get; init; }
+    public string? Reason { get; init; }
+}
 
 public enum RuleActionType
 {
     Route,
     Transform,
-    Enrich,
     Reject,
-    Notify,
-    Store
+    DeadLetter
 }
 ```
 
@@ -104,7 +104,11 @@ public enum RuleActionType
 
 ```csharp
 // src/RuleEngine/RuleEvaluationResult.cs
-public sealed record RuleEvaluationResult(bool Matched, BusinessRule? MatchedRule, RuleAction? SelectedAction, int RulesEvaluated);
+public sealed record RuleEvaluationResult(
+    IReadOnlyList<BusinessRule> MatchedRules,
+    IReadOnlyList<RuleAction> Actions,
+    bool HasMatch,
+    int RulesEvaluated);
 ```
 
 ### IRuleStore
@@ -113,9 +117,11 @@ public sealed record RuleEvaluationResult(bool Matched, BusinessRule? MatchedRul
 // src/RuleEngine/IRuleStore.cs
 public interface IRuleStore
 {
-    Task<IReadOnlyList<BusinessRule>> GetActiveRulesAsync(CancellationToken ct);
-    Task AddAsync(BusinessRule rule, CancellationToken ct);
-    Task RemoveAsync(string ruleId, CancellationToken ct);
+    Task<IReadOnlyList<BusinessRule>> GetAllAsync(CancellationToken ct = default);
+    Task<BusinessRule?> GetByNameAsync(string name, CancellationToken ct = default);
+    Task AddOrUpdateAsync(BusinessRule rule, CancellationToken ct = default);
+    Task<bool> RemoveAsync(string name, CancellationToken ct = default);
+    Task<int> CountAsync(CancellationToken ct = default);
 }
 ```
 
@@ -139,7 +145,7 @@ Rule evaluation happens **within the pipeline transaction**. If the selected act
 
 1. Write a `BusinessRule` that routes all messages from source `"PartnerX"` with `MessageType` containing `"order"` to topic `"orders-priority"`.
 
-2. A rule has `ConditionGroup.Operator = Or` with two conditions. Explain how evaluation differs from `And`.
+2. A rule has `LogicOperator = RuleLogicOperator.Or` with two conditions. Explain how evaluation differs from `And`.
 
 3. Why does the platform evaluate rules in priority order and stop at the first match rather than evaluating all rules?
 

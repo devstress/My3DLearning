@@ -39,18 +39,24 @@ Activities delegate to **service interfaces** defined in `src/Activities/`. This
 // src/Activities/IPersistenceActivityService.cs
 public interface IPersistenceActivityService
 {
-    Task SaveMessageAsync<T>(
-        IntegrationEnvelope<T> envelope,
-        DeliveryStatus status,
+    Task SaveMessageAsync(
+        IntegrationPipelineInput input,
         CancellationToken cancellationToken = default);
 
     Task UpdateDeliveryStatusAsync(
         Guid messageId,
-        DeliveryStatus status,
+        Guid correlationId,
+        DateTimeOffset recordedAt,
+        string status,
         CancellationToken cancellationToken = default);
 
     Task SaveFaultAsync(
-        FaultEnvelope fault,
+        Guid messageId,
+        Guid correlationId,
+        string messageType,
+        string faultedBy,
+        string reason,
+        int retryCount,
         CancellationToken cancellationToken = default);
 }
 ```
@@ -63,13 +69,19 @@ public interface IPersistenceActivityService
 // src/Activities/IMessageValidationService.cs
 public interface IMessageValidationService
 {
-    Task<ValidationResult> ValidateAsync<T>(
-        IntegrationEnvelope<T> envelope,
-        CancellationToken cancellationToken = default);
+    Task<MessageValidationResult> ValidateAsync(
+        string messageType,
+        string payloadJson);
+}
+
+public record MessageValidationResult(bool IsValid, string? Reason = null)
+{
+    public static MessageValidationResult Success { get; } = new(true);
+    public static MessageValidationResult Failure(string reason) => new(false, reason);
 }
 ```
 
-**Purpose:** Validate message content — schema validation, required fields, business rules. Returns errors if validation fails.
+**Purpose:** Validate message content — schema validation, required fields, business rules. Returns a `MessageValidationResult` indicating success or the reason for failure.
 
 ### INotificationActivityService
 
@@ -77,18 +89,22 @@ public interface IMessageValidationService
 // src/Activities/INotificationActivityService.cs
 public interface INotificationActivityService
 {
-    Task PublishAckAsync<T>(
-        IntegrationEnvelope<T> envelope,
+    Task PublishAckAsync(
+        Guid messageId,
+        Guid correlationId,
+        string topic,
         CancellationToken cancellationToken = default);
 
-    Task PublishNackAsync<T>(
-        IntegrationEnvelope<T> envelope,
-        IReadOnlyList<string> errors,
+    Task PublishNackAsync(
+        Guid messageId,
+        Guid correlationId,
+        string reason,
+        string topic,
         CancellationToken cancellationToken = default);
 }
 ```
 
-**Purpose:** Publish Ack/Nack notifications. On success, publish Ack so downstream systems know the message was processed. On failure, publish Nack so they can react.
+**Purpose:** Publish Ack/Nack notifications. On success, publish Ack so downstream systems know the message was processed. On failure, publish Nack with a reason so they can react.
 
 ### ICompensationActivityService
 
@@ -96,14 +112,13 @@ public interface INotificationActivityService
 // src/Activities/ICompensationActivityService.cs
 public interface ICompensationActivityService
 {
-    Task ExecuteCompensationAsync(
-        string stepName,
-        IntegrationPipelineInput input,
-        CancellationToken cancellationToken = default);
+    Task<bool> CompensateAsync(
+        Guid correlationId,
+        string stepName);
 }
 ```
 
-**Purpose:** Undo the effects of a completed step during saga compensation.
+**Purpose:** Undo the effects of a completed step during saga compensation. Returns `true` on success, `false` on failure.
 
 ---
 
@@ -264,12 +279,12 @@ public class PersistenceActivityTests
     [Test]
     public async Task SaveMessage_StoresWithPendingStatus()
     {
-        var envelope = CreateTestEnvelope();
+        var input = CreateTestPipelineInput();
 
-        await _persistence.SaveMessageAsync(envelope, DeliveryStatus.Pending);
+        await _persistence.SaveMessageAsync(input);
 
         await _persistence.Received(1).SaveMessageAsync(
-            envelope, DeliveryStatus.Pending, Arg.Any<CancellationToken>());
+            input, Arg.Any<CancellationToken>());
     }
 }
 ```

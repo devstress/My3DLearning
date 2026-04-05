@@ -24,13 +24,14 @@ public record IntegrationEnvelope<T>
     public DateTimeOffset Timestamp { get; init; }
     public string Source { get; init; }
     public string MessageType { get; init; }
+    public string SchemaVersion { get; init; } = "1.0";
     public T Payload { get; init; }
     public MessagePriority Priority { get; init; }
     public string? ReplyTo { get; init; }
     public DateTimeOffset? ExpiresAt { get; init; }
     public int? SequenceNumber { get; init; }
     public int? TotalCount { get; init; }
-    public MessageIntent Intent { get; init; }
+    public MessageIntent? Intent { get; init; }
     public Dictionary<string, string> Metadata { get; init; }
 }
 ```
@@ -46,7 +47,8 @@ public record IntegrationEnvelope<T>
 | `MessageType` | Describes the payload type (e.g., "OrderCreated") |
 | `Payload` | The actual message content (generic type `T`) |
 | `Priority` | Low, Normal, High, or Critical |
-| `Intent` | Command, Document, or Event (EIP message construction patterns) |
+| `SchemaVersion` | Schema version of the message contract (default: `"1.0"`) |
+| `Intent` | Command, Document, or Event — nullable (EIP message construction patterns) |
 | `Metadata` | Key-value pairs for headers (TraceId, ContentType, etc.) |
 
 ---
@@ -104,8 +106,8 @@ The platform abstracts the broker behind `IMessageBrokerProducer`:
 public interface IMessageBrokerProducer
 {
     Task PublishAsync<T>(
-        string topic,
         IntegrationEnvelope<T> envelope,
+        string topic,
         CancellationToken cancellationToken = default);
 }
 ```
@@ -134,7 +136,7 @@ public class OrderService(IMessageBrokerProducer producer)
             }
         };
 
-        await producer.PublishAsync("orders.created", envelope);
+        await producer.PublishAsync(envelope, "orders.created");
     }
 }
 ```

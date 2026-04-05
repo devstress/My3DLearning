@@ -49,9 +49,12 @@ public interface IPointToPointChannel
 {
     Task SendAsync<T>(
         IntegrationEnvelope<T> envelope,
+        string channel,
         CancellationToken cancellationToken = default);
 
     Task ReceiveAsync<T>(
+        string channel,
+        string consumerGroup,
         Func<IntegrationEnvelope<T>, Task> handler,
         CancellationToken cancellationToken = default);
 }
@@ -115,34 +118,31 @@ Each message goes to EVERY subscriber (fan-out)
 
 ## Datatype Channel
 
-The **Datatype Channel** routes messages by their content type. Different formats (JSON, XML, CSV) go to different handlers.
+The **Datatype Channel** routes messages to a dedicated channel derived from their `MessageType`. Each distinct message type flows on its own channel, ensuring type-safe consumption. Use `ResolveChannel` to look up the channel name for a given message type.
 
 ```csharp
 // src/Ingestion/Channels/IDatatypeChannel.cs
 public interface IDatatypeChannel
 {
-    Task RouteAsync<T>(
+    Task PublishAsync<T>(
         IntegrationEnvelope<T> envelope,
         CancellationToken cancellationToken = default);
 
-    Task RegisterHandlerAsync(
-        string contentType,
-        Func<object, Task> handler,
-        CancellationToken cancellationToken = default);
+    string ResolveChannel(string messageType);
 }
 ```
 
 ### How It Works
 
 ```
-                  ┌─→ [JSON Handler]    (content-type: application/json)
-Message ─→ Route ─┤
-                  ├─→ [XML Handler]     (content-type: application/xml)
+                  ┌─→ [OrderCreated channel]   (messageType: "OrderCreated")
+Message ─→ Publish┤
+                  ├─→ [InvoiceReceived channel](messageType: "InvoiceReceived")
                   │
-                  └─→ [CSV Handler]     (content-type: text/csv)
+                  └─→ [ShipmentDispatched channel](messageType: "ShipmentDispatched")
 ```
 
-**Use when:** You receive messages in multiple formats and each format needs different processing logic.
+**Use when:** You have distinct message types and each type should flow on its own dedicated channel.
 
 ---
 
@@ -185,10 +185,15 @@ The **Messaging Bridge** connects two different messaging systems. It consumes f
 
 ```csharp
 // src/Ingestion/Channels/IMessagingBridge.cs
-public interface IMessagingBridge
+public interface IMessagingBridge : IAsyncDisposable
 {
-    Task StartAsync(CancellationToken cancellationToken = default);
-    Task StopAsync(CancellationToken cancellationToken = default);
+    Task StartAsync<T>(
+        string sourceChannel,
+        string targetChannel,
+        CancellationToken cancellationToken = default);
+
+    long ForwardedCount { get; }
+    long DuplicateCount { get; }
 }
 ```
 

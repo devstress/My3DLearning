@@ -43,103 +43,89 @@ OpenClaw.Web is a Blazor Server application that aggregates data from the messag
 
 ## Platform Implementation
 
-### Natural Language Search
+### DemoDataSeeder
+
+OpenClaw.Web uses a `DemoDataSeeder` (a `BackgroundService`) to populate the `IObservabilityEventLog` with sample message lifecycle events so operators can test "where is my message?" queries before the Kafka ingestion pipeline is running. It seeds three scenarios:
+
+- **order-02** — Successfully delivered (`Pending → InFlight → Delivered`)
+- **shipment-123** — Currently in-flight (`Pending → InFlight`)
+- **invoice-001** — Failed with retry (`Pending → InFlight → Failed → Retrying`)
+
+The `/api/health/seeder` endpoint exposes `DemoDataSeeder.IsSeeded` so Playwright tests can poll for readiness.
+
+### Service Registration (Program.cs)
+
+The web app registers services directly through DI — there are no `IMessageSearchService`, `IMessageInspector`, or `IRagChatService` abstractions. Instead, `Program.cs` wires up the concrete services:
 
 ```csharp
-// src/OpenClaw.Web/Services/IMessageSearchService.cs
-public interface IMessageSearchService
-{
-    Task<SearchResults> SearchAsync(
-        string query,
-        SearchOptions? options = null,
-        CancellationToken cancellationToken = default);
-}
+// Register Ollama AI service
+builder.Services.AddOllamaService(ollamaBaseAddress, ollamaModel);
 
-public sealed record SearchResults(
-    IReadOnlyList<MessageSearchHit> Hits,
-    int TotalCount,
-    TimeSpan SearchDuration);
+// Register platform observability (Loki-backed IObservabilityEventLog)
+builder.Services.AddPlatformObservability(lokiBaseAddress);
 
-public sealed record MessageSearchHit(
-    string MessageId,
-    string CorrelationId,
-    string CurrentState,
-    string Summary,
-    float Relevance);
+// Register RagFlow RAG service
+builder.Services.AddRagFlowService(builder.Configuration);
+
+// Seed demo data
+builder.Services.AddHostedService<DemoDataSeeder>();
 ```
 
-The search service supports both structured queries (`messageId:abc-123`) and natural language (`"order from PartnerX that failed yesterday"`). Natural language queries are processed by the RAG API to find relevant messages.
+### API Endpoints
 
-### Message State Inspection
+The `/api/inspect` group provides message search and inspection via `MessageStateInspector`, which queries the `IObservabilityEventLog` and calls `IOllamaService` for AI-powered trace analysis:
 
 ```csharp
-// src/OpenClaw.Web/Services/IMessageInspector.cs
-public interface IMessageInspector
-{
-    Task<MessageDetail?> GetDetailAsync(
-        string messageId,
-        CancellationToken cancellationToken = default);
-}
+// Query by business key (e.g. "order-02")
+GET /api/inspect/business/{businessKey}
 
-public sealed record MessageDetail(
-    string MessageId,
-    string CorrelationId,
-    string Source,
-    string MessageType,
-    string CurrentState,
-    IReadOnlyList<MessageEvent> Lifecycle,
-    TraceAnalysis? Trace,
-    string? DeadLetterReason);
+// Query by correlation ID
+GET /api/inspect/correlation/{correlationId:guid}
+
+// Free-form natural language query
+POST /api/inspect/ask  { "query": "..." }
 ```
 
-The detail view displays the complete message lifecycle (Tutorial 39), trace analysis, and dead letter reason if applicable. Operators can see exactly which pipeline stage processed the message and how long each stage took.
-
-### RAG Knowledge Chat
+The `/api/generate` group provides RAG-powered context retrieval via `IRagFlowService`:
 
 ```csharp
-// src/OpenClaw.Web/Services/IRagChatService.cs
-public interface IRagChatService
-{
-    Task<ChatResponse> AskAsync(
-        string question,
-        string? messageContext = null,
-        CancellationToken cancellationToken = default);
-}
+// Retrieve context for integration generation
+POST /api/generate/integration
 
-public sealed record ChatResponse(
-    string Answer,
-    IReadOnlyList<string> SourceDocuments,
-    float Confidence);
+// Chat completion (retrieval + generation)
+POST /api/generate/chat
+
+// List available RagFlow datasets
+GET  /api/generate/datasets
 ```
 
-The chat panel lets operators ask questions like:
-- *"Why did this message fail?"*
-- *"What does error code EIP-4012 mean?"*
-- *"How do I replay messages from the last hour?"*
+Health endpoints check `IOllamaService.IsHealthyAsync()` and `IRagFlowService.IsHealthyAsync()`.
 
-The RAG API grounds answers in platform documentation, message history, and dead letter details.
+### Embedded Web UI
 
-### Aspire Dashboard Integration
-
-OpenClaw.Web links to the Aspire dashboard for deeper diagnostics: **Traces** (click a message to view its distributed trace from Tutorial 38), **Metrics** (pipeline throughput and error rates), and **Logs** (structured logs from Tutorial 39). The `AspireDashboardOptions` class configures the dashboard URL and URL templates for traces and metrics.
+OpenClaw.Web serves a single-page Blazor Server UI at `/` with:
+- A search box for business key or natural-language queries
+- A timeline visualization of message lifecycle events with status badges (`Pending`, `InFlight`, `Delivered`, `Failed`, `Retrying`, `DeadLettered`)
+- Ollama health status indicator
+- Links to the Aspire dashboard for deeper diagnostics
 
 ---
 
 ## Scalability Dimension
 
-OpenClaw.Web is a **read-only UI** — it queries existing stores and APIs without modifying pipeline state. Blazor Server maintains a SignalR connection per user, so the number of concurrent operators determines resource needs. For large teams, deploy multiple web instances behind a load balancer with sticky sessions. Search performance depends on the message state store's indexing (Tutorial 39).
+OpenClaw.Web is a **read-only UI** — it queries the `IObservabilityEventLog` and AI services without modifying pipeline state. Blazor Server maintains a SignalR connection per user, so the number of concurrent operators determines resource needs. For large teams, deploy multiple web instances behind a load balancer with sticky sessions. Search performance depends on the observability event log's indexing (Tutorial 39).
 
 ---
 
 ## Atomicity Dimension
 
-The web UI provides **eventual consistency** — it shows the latest state from the store, which may be a few seconds behind real-time processing. The lifecycle view uses `GetByMessageIdAsync` for a consistent snapshot of a single message's history. The RAG chat is advisory — its answers are generated, not authoritative. Operators should verify critical decisions against the raw lifecycle data.
+The web UI provides **eventual consistency** — it shows the latest state from the observability event log, which may be a few seconds behind real-time processing. The lifecycle view uses `IObservabilityEventLog.GetByBusinessKeyAsync` for a consistent snapshot of a single message's history. The AI-powered trace analysis is advisory — its answers are generated by `IOllamaService`, not authoritative. Operators should verify critical decisions against the raw lifecycle data.
 
 ---
 
 ## Exercises
 
-1. An operator searches for "failed orders from PartnerX last week." Trace the query through `IMessageSearchService` and the RAG API.
+1. An operator searches for "failed orders from PartnerX last week." Trace the query through the `/api/inspect/ask` endpoint, `MessageStateInspector`, and the observability event log.
 
 2. Design the UI flow for the "Where is my message?" feature: what inputs does the operator provide, and what data is displayed?
 

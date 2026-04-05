@@ -26,6 +26,7 @@ The `IntegrationEnvelope<T>` is the single most important type in the platform. 
 │  ┌─── Source & Type ─────────────────────────────┐  │
 │  │ Source         : string ("order-system")      │  │
 │  │ MessageType    : string ("OrderCreated")      │  │
+│  │ SchemaVersion  : string (default "1.0")       │  │
 │  │ Timestamp      : DateTimeOffset               │  │
 │  └───────────────────────────────────────────────┘  │
 │                                                     │
@@ -45,7 +46,7 @@ The `IntegrationEnvelope<T>` is the single most important type in the platform. 
 │  └───────────────────────────────────────────────┘  │
 │                                                     │
 │  ┌─── Classification ───────────────────────────┐  │
-│  │ Intent         : Command | Document | Event   │  │
+│  │ Intent         : Command | Document | Event?  │  │
 │  └───────────────────────────────────────────────┘  │
 │                                                     │
 │  ┌─── Metadata ──────────────────────────────────┐  │
@@ -82,6 +83,8 @@ Original Order (MessageId: A, CausationId: null)
 
 **MessageType** — A string discriminator for the payload type. Routing rules often match on this field.
 
+**SchemaVersion** — Version of the message contract schema (default: `"1.0"`). Allows consumers to handle schema evolution.
+
 **Timestamp** — When the message was created (UTC). Used for ordering, expiration checks, and audit.
 
 ### Quality of Service
@@ -116,7 +119,7 @@ The **Aggregator** uses `TotalCount` to know when all parts have arrived.
 
 ### Message Intent
 
-**Intent** — Implements three EIP **Message Construction** patterns:
+**Intent** (`MessageIntent?`, nullable) — Implements three EIP **Message Construction** patterns:
 
 | Intent | EIP Pattern | Meaning | Example |
 |--------|------------|---------|---------|

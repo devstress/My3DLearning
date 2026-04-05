@@ -4,6 +4,127 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 074 – Phase 14 Completion
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Finalize Phase 14 Test Coverage Expansion — update milestones.md, completion-log.md.
+- **Files modified**:
+  - `rules/milestones.md` — Mark Phase 14 complete, remove Phase 14 table, update Next Chunk section
+  - `rules/completion-log.md` — Add entries for chunks 070-074
+- **Test counts**: UnitTests: 1,472 (+72 from Phase 14). Total: 1,610 across 6 test projects (+19 Vitest).
+- **Notes**: All 14 phases complete. 48 src projects. 50 tutorials (all passing audit). 65 EIP patterns.
+
+## Chunk 073 – Workflow.Temporal Activity & Saga Tests
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add unit tests for untested Workflow.Temporal components.
+- **Files created**:
+  - `tests/UnitTests/IntegrationActivitiesTests.cs` — 3 tests: ValidateMessageAsync delegation, LogProcessingStageAsync delegation
+  - `tests/UnitTests/SagaCompensationActivitiesTests.cs` — 4 tests: compensation logging (start, success, failure), delegation, return values
+  - `tests/UnitTests/TemporalOptionsTests.cs` — 4 tests: SectionName, ServerAddress, Namespace, TaskQueue defaults
+- **Test counts**: UnitTests: 1,472 (+11 from this chunk).
+- **Notes**: Tests verify business logic delegation without requiring Temporal server.
+
+## Chunk 072 – Processing.Routing Advanced Component Tests
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add unit tests for Detour and RoutingServiceExtensions.
+- **Files created**:
+  - `tests/UnitTests/DetourTests.cs` — 13 tests: constructor guards, IsEnabled/SetEnabled, RouteAsync routing logic (global, per-message, disabled), producer verification
+  - `tests/UnitTests/RoutingServiceExtensionsTests.cs` — 7 tests: DI registration for ContentBasedRouter, DynamicRouter (both interfaces + same-instance), RecipientList, MessageFilter, Detour
+- **Test counts**: UnitTests: 1,461 (+20 from this chunk).
+
+## Chunk 071 – Ingestion.Pulsar Broker Adapter Tests
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add unit tests for PulsarProducer, PulsarConsumer, PulsarServiceExtensions.
+- **Files created**:
+  - `tests/UnitTests/PulsarProducerTests.cs` — 6 tests: constructor validation, PublishAsync arg guards, DisposeAsync
+  - `tests/UnitTests/PulsarConsumerTests.cs` — 8 tests: constructor validation, SubscribeAsync arg guards, DisposeAsync
+  - `tests/UnitTests/PulsarServiceExtensionsTests.cs` — 4 tests: DI registration, serviceUrl validation
+  - (+ 4 new test files referencing Pulsar)
+- **Files modified**:
+  - `src/Ingestion.Pulsar/PulsarProducer.cs` — Added ArgumentNullException.ThrowIfNull guards
+  - `src/Ingestion.Pulsar/PulsarConsumer.cs` — Added ArgumentNullException.ThrowIfNull guards
+  - `tests/UnitTests/UnitTests.csproj` — Added Ingestion.Pulsar project reference
+- **Test counts**: UnitTests: 1,441 (+22 from this chunk).
+
+## Chunk 070 – Ingestion.Kafka Broker Adapter Tests + Tutorial Audit Cleanup
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Add unit tests for KafkaProducer, KafkaConsumer, KafkaServiceExtensions. Mark all 28 tutorial audit issues as FIXED.
+- **Files created**:
+  - `tests/UnitTests/KafkaProducerTests.cs` — 13 tests: constructor validation, PublishAsync serialization/key/topic, arg guards, Dispose
+  - `tests/UnitTests/KafkaConsumerTests.cs` — 9 tests: constructor validation, SubscribeAsync arg guards, DisposeAsync
+  - `tests/UnitTests/KafkaServiceExtensionsTests.cs` — 4 tests: DI registration, bootstrapServers validation
+- **Files modified**:
+  - `src/Ingestion.Kafka/KafkaProducer.cs` — Added ArgumentNullException.ThrowIfNull guards
+  - `src/Ingestion.Kafka/KafkaConsumer.cs` — Added ArgumentNullException.ThrowIfNull guards
+  - `tests/UnitTests/UnitTests.csproj` — Added Ingestion.Kafka project reference
+  - `rules/milestones.md` — Added Status column to all 28 tutorial audit tables, marked all FIXED, added Phase 14 plan
+- **Test counts**: UnitTests: 1,426 (+26 from this chunk).
+- **Notes**: Tutorial audit cleanup in milestones.md tracks all fixes to their chunk numbers.
+
+## Chunk 069 – Tutorial Fixes: Configuration, Profiling, Notifications, Test Counts
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Fix remaining tutorial code snippets (42, 45, 48, 49, 50) to match actual API signatures.
+- **Files modified**:
+  - `tutorials/42-configuration.md` — Fixed IConfigurationStore, IFeatureFlagService, ConfigurationChangeNotifier, FeatureFlag, NotificationFeatureFlags signatures
+  - `tutorials/45-performance-profiling.md` — Replaced CpuProfiler→ContinuousProfiler, MemoryProfiler→GcMonitor with correct method signatures
+  - `tutorials/48-notification-use-cases.md` — Fixed INotificationMapper to use (Guid, Guid) params instead of IntegrationEnvelope
+  - `tutorials/49-testing-integrations.md` — Updated test count from 1,181 to 1,400
+  - `tutorials/50-best-practices.md` — Updated test count from 1,181 to 1,400
+- **Test counts**: UnitTests: 1,400 (unchanged — documentation only). Total: 1,538 across 6 test projects.
+- **Notes**: Completes Phase 13 Tutorial Fixes.
+
+## Chunk 068 – Tutorial Fixes: Beginner Path, Intermediate, Connectors, Advanced
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Fix tutorial code snippets for 19 tutorials to match actual API signatures.
+- **Files modified**:
+  - `tutorials/03-first-message.md` — Fixed PublishAsync parameter order (envelope, topic)
+  - `tutorials/04-integration-envelope.md` — Added SchemaVersion, fixed Intent nullability
+  - `tutorials/06-messaging-channels.md` — Fixed IPointToPointChannel, IDatatypeChannel, IMessagingBridge signatures
+  - `tutorials/08-activities-pipeline.md` — Fixed all 4 activity service interfaces
+  - `tutorials/13-routing-slip.md` — Fixed RoutingSlip.Advance() with InvalidOperationException guard
+  - `tutorials/14-process-manager.md` — Added post-compensation logging to SagaCompensationActivities
+  - `tutorials/26-message-replay.md` — Fixed ReplayFilter, IMessageReplayStore, ReplayResult signatures
+  - `tutorials/27-resequencer.md` — Fixed IResequencer (sync Accept), removed GapPolicy, fixed ResequencerOptions
+  - `tutorials/31-event-sourcing.md` — Fixed IEventStore, EventEnvelope, ISnapshotStore<T>, IEventProjection<T>, TemporalQuery
+  - `tutorials/32-multi-tenancy.md` — Fixed ITenantResolver (sync), TenantContext, ITenantIsolationGuard, TenantIsolationException
+  - `tutorials/33-security.md` — Fixed IInputSanitizer (sync), IPayloadSizeGuard, JwtOptions, ISecretProvider, VaultSecretProvider
+  - `tutorials/34-connector-http.md` — Fixed IHttpConnector, HttpConnectorOptions, ConnectorResult
+  - `tutorials/35-connector-sftp.md` — Fixed ISftpConnector, SftpConnectorOptions, removed RemoteFileInfo
+  - `tutorials/36-connector-email.md` — Fixed IEmailConnector, EmailConnectorOptions, removed EmailAttachment
+  - `tutorials/37-connector-file.md` — Fixed IFileConnector, FileConnectorOptions, namespace Connector.FileSystem
+  - `tutorials/38-opentelemetry.md` — Fixed PlatformActivitySource, PlatformMeters, CorrelationPropagator
+  - `tutorials/39-message-lifecycle.md` — Fixed MessageEvent, DeliveryStatus, IMessageStateStore, ITraceAnalyzer, IObservabilityEventLog
+  - `tutorials/40-rag-ollama.md` — Replaced IOllamaEmbeddingProvider→IOllamaService, IRagPipeline→IRagFlowService, etc.
+  - `tutorials/41-openclaw-web.md` — Removed nonexistent interfaces, described actual DemoDataSeeder architecture
+- **Test counts**: UnitTests: 1,400 (unchanged — documentation only). Total: 1,538 across 6 test projects.
+
+## Chunk 066-067 – Tutorial Fixes: Competing Consumers, Throttle, Rule Engine
+
+- **Date**: 2026-04-04
+- **Status**: done
+- **Goal**: Fix tutorial code snippets for tutorials 28, 29, 30 to match actual API signatures. Add comprehensive tutorial audit to milestones.md. Fix tutorials/README.md link for Tutorial 48.
+- **Files modified**:
+  - `tutorials/README.md` — Fixed Tutorial 48 link from 48-migrating-from-biztalk.md to 48-notification-use-cases.md
+  - `tutorials/28-competing-consumers.md` — Fixed IConsumerLagMonitor, IConsumerScaler, IBackpressureSignal, CompetingConsumerOptions
+  - `tutorials/29-throttle-rate-limiting.md` — Fixed IMessageThrottle, ThrottleResult, ThrottleMetrics, ThrottlePartitionKey, IThrottleRegistry
+  - `tutorials/30-rule-engine.md` — Fixed BusinessRule, RuleCondition, RuleAction, IRuleStore, RuleEvaluationResult, all enums
+  - `rules/milestones.md` — Added comprehensive tutorial audit section with all 28 tutorial issues catalogued
+- **Test counts**: UnitTests: 1,400 (unchanged — documentation only). Total: 1,538 across 6 test projects.
+- **Notes**: 48 src projects unchanged. Phase 13 started.
+
 ## Chunk 065 – API Reference
 
 - **Date**: 2026-04-04

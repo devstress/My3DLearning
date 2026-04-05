@@ -18,6 +18,8 @@ public sealed class KafkaConsumer : IMessageBrokerConsumer
     /// <summary>Initialises a new <see cref="KafkaConsumer"/>.</summary>
     public KafkaConsumer(ConsumerConfig config, ILogger<KafkaConsumer> logger)
     {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(logger);
         _config = config;
         _logger = logger;
     }

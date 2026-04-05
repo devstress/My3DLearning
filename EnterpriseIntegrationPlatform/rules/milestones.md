@@ -65,10 +65,20 @@ It implements Enterprise Integration Patterns in a cloud-native, horizontally sc
 ✅ Phase 8 (Missing EIP Patterns – Routing & Transformation, chunks 052-053) complete — see completion-log.md
 ✅ Phase 9 (Missing EIP Patterns – Endpoints & System Management, chunks 054-058) complete — see completion-log.md
 ✅ Phase 10 (Connectors & Test Coverage Hardening, chunks 059-060) complete — see completion-log.md
+✅ Phase 11 (Admin Dashboard & RAG, chunks 061-062) complete — see completion-log.md
+✅ Phase 12 (Documentation, chunks 063-fix–065) complete — see completion-log.md
+✅ Phase 13 (Tutorial Fixes, chunks 066-069) complete — see completion-log.md
+✅ Phase 14 (Test Coverage Expansion, chunks 070-074) complete — see completion-log.md
 
 ## Next Chunk
 
-All phases complete. See `rules/completion-log.md` for full history.
+All phases complete (including Phase 14 Test Coverage Expansion). See `rules/completion-log.md` for full history.
+
+---
+
+### Phase 14 — Test Coverage Expansion
+
+✅ Phase 14 complete — see completion-log.md
 
 ---
 
@@ -171,6 +181,309 @@ All phases complete. See `rules/completion-log.md` for full history.
 - ✅ Smart Proxy (SystemManagement.SmartProxy)
 - ✅ Test Message (SystemManagement.TestMessageGenerator)
 - ✅ Channel Purger (Ingestion.ChannelPurger)
+
+---
+
+## Tutorial Audit (2026-04-04)
+
+> Full audit of all 50 tutorials against the actual codebase.  
+> Build succeeds. All 1,538 .NET tests pass (1,400 Unit + 58 Contract + 29 Workflow + 24 Playwright + 17 Integration + 10 Load).  
+> ✅ **All 28 faulty tutorials fixed in Phase 13 (chunks 066-069).**
+
+### README Discrepancy
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| **tutorials/README.md** lists Tutorial 48 as "[Migrating from BizTalk](48-migrating-from-biztalk.md)" but the actual file is `48-notification-use-cases.md` (about notification use cases). `48-migrating-from-biztalk.md` does not exist. | 🔴 ERROR | ✅ FIXED (chunk 066) |
+
+### Tutorial 03 — Your First Message
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `PublishAsync` parameter order shown as `(topic, envelope)` but actual signature is `(envelope, topic)` in `IMessageBrokerProducer`. Code will not compile. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 04 — The Integration Envelope
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `SchemaVersion` field exists in `IntegrationEnvelope` but is not documented in the tutorial. | 🟡 WARNING | ✅ FIXED (chunk 068) |
+| `Intent` property shown as non-nullable but is actually `MessageIntent?` (nullable). | 🟡 WARNING | ✅ FIXED (chunk 068) |
+
+### Tutorial 06 — Messaging Channels
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IPointToPointChannel.ReceiveAsync` missing required `channel` and `consumerGroup` parameters. Code will not compile. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IDatatypeChannel` methods differ: tutorial shows `RouteAsync()`/`RegisterHandlerAsync()`, actual has `PublishAsync<T>()`/`ResolveChannel()`. | 🟡 WARNING | ✅ FIXED (chunk 068) |
+| `IMessagingBridge.StartAsync` missing `sourceChannel` and `targetChannel` parameters. | 🟡 WARNING | ✅ FIXED (chunk 068) |
+
+### Tutorial 08 — Activities and the Pipeline
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IPersistenceActivityService.SaveMessageAsync` — completely wrong signature. Actual takes `IntegrationPipelineInput`, not `IntegrationEnvelope<T>` + `DeliveryStatus`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IMessageValidationService.ValidateAsync` — completely wrong. Returns `MessageValidationResult` (not `ValidationResult`), takes `(string messageType, string payloadJson)` not `IntegrationEnvelope<T>`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `INotificationActivityService.PublishAckAsync` — takes `(Guid messageId, Guid correlationId, string topic)`, not `IntegrationEnvelope<T>`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `INotificationActivityService.PublishNackAsync` — takes `(Guid messageId, Guid correlationId, string reason, string topic)`, not `(IntegrationEnvelope<T>, IReadOnlyList<string>)`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `ICompensationActivityService` — method is `CompensateAsync(Guid, string)` returning `Task<bool>`, not `ExecuteCompensationAsync(string, IntegrationPipelineInput)`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 10 — Message Filter
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `RuleCondition` referenced at `src/Processing.Routing/RuleCondition.cs` but actually located at `src/RuleEngine/RuleCondition.cs`. | 🟡 WARNING | ✅ FIXED (chunk 068) |
+
+### Tutorial 13 — Routing Slip
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `RoutingSlip.Advance()` shown as one-liner lambda but actual code includes `InvalidOperationException` guard for completed slips. | 🟡 WARNING | ✅ FIXED (chunk 068) |
+
+### Tutorial 14 — Process Manager
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `SagaCompensationActivities` code snippet omits post-compensation success/failure logging that exists in actual code. | 🟡 WARNING | ✅ FIXED (chunk 068) |
+
+### Tutorial 26 — Message Replay
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `ReplayFilter` uses `From`/`To` properties but actual has `FromTimestamp`/`ToTimestamp`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `ReplayFilter.CorrelationId` shown as `string?` but actual is `Guid?`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IMessageReplayStore.QueryAsync` does not exist. Actual method is `GetMessagesForReplayAsync(topic, filter, maxMessages, ct)` returning `IAsyncEnumerable`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IMessageReplayStore.StoreAsync` signature wrong. Actual is `StoreForReplayAsync<T>(envelope, topic, ct)`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `ReplayResult` missing `SkippedCount` and `FailedCount` properties. | 🟡 WARNING | ✅ FIXED (chunk 068) |
+| `InMemoryMessageReplayStore` class mentioned but does not exist in codebase. | 🟡 WARNING | ✅ FIXED (chunk 068) |
+
+### Tutorial 27 — Resequencer
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IResequencer.SubmitAsync` does not exist. Actual method is `Accept<T>(envelope)` — synchronous, not async. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `GapPolicy` enum (`WaitForTimeout`, `ReleasePartial`, `DeadLetter`) does not exist. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `ResequencerOptions` properties wrong: `MaxBufferSize`→`MaxConcurrentSequences`, `SequenceTimeout`→`ReleaseTimeout`, no `GapPolicy`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| Default timeout shown as 5 minutes but actual is 30 seconds. Default buffer shown as 1,000 but actual is 10,000. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 28 — Competing Consumers
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IConsumerLagMonitor.GetCurrentLagAsync` — actual is `GetLagAsync(topic, consumerGroup, ct)` returning `ConsumerLagInfo`. | 🔴 ERROR | ✅ FIXED (chunk 066) |
+| `IConsumerLagMonitor.GetLagByPartitionAsync` does not exist. | 🔴 ERROR | ✅ FIXED (chunk 066) |
+| `IConsumerScaler` shows `ScaleUpAsync`/`ScaleDownAsync` but actual has single `ScaleAsync(desiredCount, ct)`. | 🔴 ERROR | ✅ FIXED (chunk 066) |
+| `IBackpressureSignal.IsActive` → actual is `IsBackpressured`. `Activate`/`Deactivate` → actual is `Signal`/`Release`. | 🔴 ERROR | ✅ FIXED (chunk 066) |
+| `CompetingConsumerOptions.EvaluationInterval` does not exist. `CooldownPeriod` is actually `CooldownMs` (int milliseconds, default 30s not 2min). | 🔴 ERROR | ✅ FIXED (chunk 066) |
+
+### Tutorial 29 — Throttle & Rate Limiting
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IMessageThrottle.AcquireAsync` takes `IntegrationEnvelope<T>` not `string partitionKey`. Returns `ThrottleResult` not `ThrottleDecision`. | 🔴 ERROR | ✅ FIXED (chunk 066) |
+| `ThrottleDecision` class does not exist — actual is `ThrottleResult`. | 🔴 ERROR | ✅ FIXED (chunk 066) |
+| `IMessageThrottle.GetMetrics` takes no parameters, not `string partitionKey`. | 🔴 ERROR | ✅ FIXED (chunk 066) |
+| `ThrottlePartitionStrategy` enum does not exist. Partitioning uses `ThrottlePartitionKey` record with `TenantId`, `Queue`, `Endpoint`. | 🔴 ERROR | ✅ FIXED (chunk 066) |
+| `IThrottleRegistry` methods differ significantly from tutorial. | 🔴 ERROR | ✅ FIXED (chunk 066) |
+| `ThrottleMetrics` properties differ: no `PartitionKey`, `TotalThrottled`, `AverageWaitTime`; actual has `TotalAcquired`, `TotalRejected`, `BurstCapacity`, `RefillRate`, `TotalWaitTime`. | 🔴 ERROR | ✅ FIXED (chunk 066) |
+
+### Tutorial 30 — Rule Engine
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `ConditionGroup` class does not exist. `BusinessRule` directly has `LogicOperator` and `Conditions`. | 🔴 ERROR | ✅ FIXED (chunk 067) |
+| Enum is `RuleLogicOperator`, not `LogicalOperator`. | 🔴 ERROR | ✅ FIXED (chunk 067) |
+| `BusinessRule` properties wrong: no `Id`, uses `Enabled` not `IsEnabled`, has `StopOnMatch`, uses `LogicOperator` not separate `ConditionGroup`. | 🔴 ERROR | ✅ FIXED (chunk 067) |
+| `RuleCondition` uses `FieldName` not `Field`. | 🟡 WARNING | ✅ FIXED (chunk 067) |
+| `RuleConditionOperator` enum missing values: no `NotEquals`, `StartsWith`, `EndsWith`, `LessThan`, `Exists`. Has `In` instead. | 🔴 ERROR | ✅ FIXED (chunk 067) |
+| `RuleAction` uses named properties (`ActionType`, `TargetTopic`, `TransformName`, `Reason`), not generic `Parameters` dict. | 🔴 ERROR | ✅ FIXED (chunk 067) |
+| `RuleActionType` enum: missing `Enrich`, `Notify`, `Store`; has `DeadLetter` instead. | 🔴 ERROR | ✅ FIXED (chunk 067) |
+| `IRuleStore` methods differ: no `GetActiveRulesAsync`, has `GetAllAsync`, `GetByNameAsync`, `AddOrUpdateAsync`, `CountAsync`. | 🔴 ERROR | ✅ FIXED (chunk 067) |
+| `RuleEvaluationResult` returns collections (`MatchedRules`, `Actions`) not singles (`MatchedRule`, `SelectedAction`). | 🔴 ERROR | ✅ FIXED (chunk 067) |
+
+### Tutorial 31 — Event Sourcing
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IEventStore.AppendAsync` returns `Task<long>`, not `Task`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IEventStore.ReadStreamAsync` missing `count` parameter. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IEventStore.QueryAsync(TemporalQuery)` does not exist. `TemporalQuery` is a static helper class, not a query object. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `EventEnvelope` property is `Data`, not `Payload`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `ISnapshotStore` is generic `ISnapshotStore<TState>`, saves typed state not string. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IEventProjection` is generic `IEventProjection<TState>`, takes and returns state. No `ProjectionName` property. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `TemporalQuery` is a static class with helper methods, not a record. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 32 — Multi-Tenancy
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `ITenantResolver` methods are synchronous `Resolve()`, not async. Takes `IReadOnlyDictionary<string, string>` or `string?`, not `IntegrationEnvelope`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `TenantContext.TenantName` is nullable, not required. Property is `IsResolved` not `IsAnonymous`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `ITenantIsolationGuard` has single `Enforce<T>(envelope, expectedTenantId)`, not `Validate`/`ValidateEnvelope`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `TenantIsolationException` properties are `MessageId`, `ActualTenantId`, `ExpectedTenantId` — not `SourceTenantId`, `TargetTenantId`, `Operation`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 33 — Security
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IInputSanitizer` methods are synchronous `Sanitize(string)`/`IsClean(string)`, not async `SanitizeAsync` returning `SanitizationResult`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IPayloadSizeGuard` method is `Enforce(string)`/`Enforce(byte[])`, not `Validate(IntegrationEnvelope)`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `JwtOptions` uses `set` accessors with empty string defaults, not `init`/`required`. Has `ClockSkew` instead of `TokenLifetime`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `ISecretProvider` returns `SecretEntry?` objects with version/metadata support, not raw strings. Additional `DeleteSecretAsync`/`ListSecretKeysAsync` methods. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `HashiCorpVaultSecretProvider` is actually named `VaultSecretProvider`. | 🟡 WARNING | ✅ FIXED (chunk 068) |
+
+### Tutorial 34 — HTTP Connector
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IHttpConnector` methods are generic `SendAsync<TPayload, TResponse>` with URL/method params, not `SendAsync(envelope, options)`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `HttpConnectorOptions` completely different: uses `BaseUrl` (string), `TimeoutSeconds` (int), retry/cache settings. No `AuthenticationMode` enum. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `ConnectorResult` has no `HttpStatusCode` or `Duration`. Has `ConnectorName`, `StatusMessage`, `CompletedAt` instead. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 35 — SFTP Connector
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `ISftpConnector` methods completely different: `UploadAsync` returns path string, `DownloadAsync` returns bytes, `ListFilesAsync` returns strings. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `RemoteFileInfo` record does not exist in codebase. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `SftpConnectorOptions` much simpler: no SSH key auth, no atomic rename option, no sidecar metadata, no file template. Uses `RootPath` not `RemoteDirectory`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 36 — Email Connector
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IEmailConnector.SendAsync` is generic, returns `Task` (not `ConnectorResult`), takes individual params not options object. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `EmailConnectorOptions` only has basic SMTP config. No To/Cc/Bcc, no body template, no HTML flag, no attachments. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `EmailAttachment` record does not exist. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| Liquid template rendering described but not implemented — uses `Func<T, string>` body builders instead. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 37 — File Connector
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IFileConnector` methods differ: `WriteAsync` returns path, `ReadAsync` returns bytes, `ListFilesAsync` returns strings. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `LocalFileInfo` record does not exist. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `FileConnectorOptions` uses string encoding, no atomic write flag, no sidecar metadata. Namespace is `Connector.FileSystem`, not `Connector.File`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 38 — OpenTelemetry
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `PlatformActivitySource` doesn't directly expose `ActivitySource`. It's in `DiagnosticsConfig`. Has generic overload for envelopes. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `PlatformMeters` missing `MessagesDeadLettered`, `MessagesRetried`, `MessagesInFlight` counters. Has `MessagesProcessed` not `MessagesDelivered`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `CorrelationPropagator` methods differ: `InjectTraceContext<T>` returns envelope, `ExtractAndStart<T>` returns Activity. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 39 — Message Lifecycle
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `MessageEvent` IDs are `Guid` not `string`. Uses `Stage`/`Status`/`Source` not `State`/`Component`. Has additional `EventId`, `TraceId`, `SpanId`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `DeliveryStatus` enum values are `Pending, InFlight, Delivered, Failed, Retrying, DeadLettered` — not `Received, Routed, Transformed, Acked, Nacked`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IMessageStateStore` methods take `Guid` not `string` for message/correlation IDs. Has additional `GetLatestByCorrelationIdAsync`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `ITraceAnalyzer` methods differ: returns AI-generated strings, not structured `TraceAnalysis` record. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IObservabilityEventLog` method is `RecordAsync` not `WriteAsync`. No generic `QueryAsync` with date range. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 40 — RAG with Ollama
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IOllamaEmbeddingProvider` does not exist. Actual is `IOllamaService` with `GenerateAsync`/`AnalyseAsync`/`IsHealthyAsync`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `OllamaOptions` → actual class is `OllamaSettings` with only a `Model` property. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IRagPipeline` does not exist. Actual is `IRagFlowService` with `RetrieveAsync`/`ChatAsync`/`ListDatasetsAsync`/`IsHealthyAsync`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `RagResponse` → actual is `RagFlowChatResponse(Answer, ConversationId, References)`. No `Confidence` field. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `RagOptions` → actual is `RagFlowOptions` for connection config (BaseAddress, ApiKey, AssistantId), not query options. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+| `IGenerationProvider` interface does not exist in codebase. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 41 — OpenClaw Web UI
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IMessageSearchService`, `IMessageInspector`, `IRagChatService` do not exist. OpenClaw.Web only has `DemoDataSeeder.cs` and `Program.cs`. | 🔴 ERROR | ✅ FIXED (chunk 068) |
+
+### Tutorial 42 — Configuration
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `IConfigurationStore` methods differ: `GetAsync` requires `environment`, `SetAsync` takes `ConfigurationEntry` not key+value, no `GetAllAsync`/`GetHistoryAsync`. Has `DeleteAsync`/`WatchAsync`. | 🔴 ERROR | ✅ FIXED (chunk 069) |
+| `IFeatureFlagService` methods differ: param names, `GetAllFlagsAsync` → `ListAsync`, missing `GetAsync`/`SetAsync`/`DeleteAsync`. | 🔴 ERROR | ✅ FIXED (chunk 069) |
+| `ConfigurationChangeNotifier` uses `IObservable<T>` pattern with `Publish()`, not events with `NotifyAsync()`. `ConfigurationChange` record has `Environment`, `ChangeType`, `Timestamp`. | 🔴 ERROR | ✅ FIXED (chunk 069) |
+| `FeatureFlag` is a record not class, `Variants` is `Dictionary<string,string>` not `IReadOnlyList<string>`, `RolloutPercentage` is `int` not `double`. | 🟡 WARNING | ✅ FIXED (chunk 069) |
+| `NotificationFeatureFlags` has only `NotificationsEnabled` constant, not separate `AckNotifications`/`NackNotifications`. | 🟡 WARNING | ✅ FIXED (chunk 069) |
+
+### Tutorial 45 — Performance Profiling
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `CpuProfiler` does not exist. Actual is `ContinuousProfiler` with synchronous `CaptureSnapshot()`. | 🔴 ERROR | ✅ FIXED (chunk 069) |
+| `MemoryProfiler` does not exist. Memory profiling is in `GcMonitor` returning `GcSnapshot`. | 🔴 ERROR | ✅ FIXED (chunk 069) |
+
+### Tutorial 48 — Notification Use Cases
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `INotificationMapper` takes `(Guid messageId, Guid correlationId)`, not `IntegrationEnvelope`. `MapNack` has 3 params. Uses `SecurityElement.Escape()`. | 🔴 ERROR | ✅ FIXED (chunk 069) |
+
+### Tutorial 49 — Testing Integrations
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| Claims "1,181+ unit tests" but actual count is **1,400** unit tests (1,538 total .NET tests). | 🟡 WARNING | ✅ FIXED (chunk 069) |
+
+### Tutorial 50 — Best Practices
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| Inherits incorrect "1,181+ unit tests" claim from Tutorial 49. | 🟡 WARNING | ✅ FIXED (chunk 069) |
+
+### Tutorials Passing Audit (No Issues Found)
+
+✅ Tutorial 01 — Introduction  
+✅ Tutorial 02 — Environment Setup  
+✅ Tutorial 05 — Message Brokers  
+✅ Tutorial 07 — Temporal Workflows (minor simplification)  
+✅ Tutorial 09 — Content-Based Router  
+✅ Tutorial 11 — Dynamic Router  
+✅ Tutorial 12 — Recipient List  
+✅ Tutorial 15 — Message Translator  
+✅ Tutorial 16 — Transform Pipeline  
+✅ Tutorial 17 — Normalizer  
+✅ Tutorial 18 — Content Enricher  
+✅ Tutorial 19 — Content Filter  
+✅ Tutorial 20 — Splitter  
+✅ Tutorial 21 — Aggregator  
+✅ Tutorial 22 — Scatter-Gather  
+✅ Tutorial 23 — Request-Reply  
+✅ Tutorial 24 — Retry Framework  
+✅ Tutorial 25 — Dead Letter Queue  
+✅ Tutorial 43 — Kubernetes Deployment  
+✅ Tutorial 44 — Disaster Recovery  
+✅ Tutorial 46 — Complete Integration  
+✅ Tutorial 47 — Saga Compensation  
+
+### Summary
+
+| Category | Count | Status |
+|----------|-------|--------|
+| 🔴 ERROR (code won't compile or API mismatch) | ~90 | ✅ ALL FIXED |
+| 🟡 WARNING (incomplete or misleading) | ~15 | ✅ ALL FIXED |
+| Tutorials with errors | 28 of 50 | ✅ ALL 28 FIXED |
+| Tutorials passing | 22 of 50 | ✅ (50 of 50 now) |
+
+**Most affected tutorials (by error count):**
+1. Tutorial 30 (Rule Engine) — 9 errors ✅ FIXED (chunk 067)
+2. Tutorial 31 (Event Sourcing) — 7 errors ✅ FIXED (chunk 068)
+3. Tutorial 40 (RAG with Ollama) — 6 errors ✅ FIXED (chunk 068)
+4. Tutorial 28 (Competing Consumers) — 5 errors ✅ FIXED (chunk 066)
+5. Tutorial 08 (Activities and the Pipeline) — 5 errors ✅ FIXED (chunk 068)
+6. Tutorial 29 (Throttle & Rate Limiting) — 6 errors ✅ FIXED (chunk 066)
+7. Tutorial 39 (Message Lifecycle) — 5 errors ✅ FIXED (chunk 068)
+
+**Root cause pattern:** Tutorials showed idealized/designed API signatures that differed from actual implementations. All have been corrected.
+
+**Completed next steps (Phase 13):**
+1. ✅ Fix tutorials/README.md — corrected Tutorial 48 link (chunk 066)
+2. ✅ Updated all tutorial code snippets to match actual API signatures (chunks 066-069)
+3. ✅ Corrected test count claims to reflect actual 1,400 unit tests / 1,538 total (chunk 069)
+4. ✅ Prioritized fixing Tutorials 03, 06, 08 (beginner path) (chunk 068)
 
 ---
 

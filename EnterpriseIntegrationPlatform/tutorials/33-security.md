@@ -7,7 +7,7 @@
 - Script tag removal, SQL injection pattern detection, and HTML entity sanitization
 - `PayloadTooLargeException` for oversized payloads
 - `JwtOptions` for configuring JWT authentication and validation
-- `Security.Secrets` for integrating with Azure Key Vault and HashiCorp Vault
+- `Security.Secrets` for integrating with Azure Key Vault and HashiCorp Vault via `ISecretProvider`
 
 ---
 
@@ -40,16 +40,12 @@ The sanitizer and size guard act as a security gateway. They run before any busi
 // src/Security/IInputSanitizer.cs
 public interface IInputSanitizer
 {
-    Task<SanitizationResult> SanitizeAsync(
-        string payload,
-        CancellationToken cancellationToken = default);
+    string Sanitize(string input);
+    bool IsClean(string input);
 }
-
-public sealed record SanitizationResult(
-    string SanitizedPayload,
-    bool WasModified,
-    IReadOnlyList<string> RemovedPatterns);
 ```
+
+`Sanitize` returns a cleaned copy of the input with dangerous content removed. `IsClean` returns `true` if the input contains no dangerous patterns (i.e., `Sanitize` would not modify it). Both methods are synchronous.
 
 The sanitizer detects and removes:
 - **Script tags**: `<script>...</script>`, inline event handlers (`onclick`, `onerror`)
@@ -57,15 +53,14 @@ The sanitizer detects and removes:
 - **HTML entities**: encoded characters used to bypass text-based filters (`&#60;`, `&lt;`)
 - **Control characters**: null bytes, Unicode direction overrides
 
-The `RemovedPatterns` list provides an audit trail of what was stripped, useful for forensic analysis.
-
 ### IPayloadSizeGuard
 
 ```csharp
 // src/Security/IPayloadSizeGuard.cs
 public interface IPayloadSizeGuard
 {
-    void Validate(IntegrationEnvelope<string> envelope);
+    void Enforce(string payload);
+    void Enforce(byte[] payloadBytes);
 }
 ```
 
@@ -88,15 +83,16 @@ When the payload exceeds the configured limit, the guard throws `PayloadTooLarge
 // src/Security/JwtOptions.cs
 public sealed class JwtOptions
 {
-    public required string Issuer { get; init; }
-    public required string Audience { get; init; }
-    public required string SigningKey { get; init; }
-    public TimeSpan TokenLifetime { get; init; } = TimeSpan.FromHours(1);
-    public bool ValidateLifetime { get; init; } = true;
+    public const string SectionName = "Jwt";
+    public string Issuer { get; set; } = string.Empty;
+    public string Audience { get; set; } = string.Empty;
+    public string SigningKey { get; set; } = string.Empty;
+    public bool ValidateLifetime { get; set; } = true;
+    public TimeSpan ClockSkew { get; set; } = TimeSpan.FromMinutes(5);
 }
 ```
 
-JWT authentication is used at the Gateway API layer. Tokens carry tenant identity (Tutorial 32) and scopes. The `JwtOptions` configure validation parameters.
+JWT authentication is used at the Gateway API layer. Tokens carry tenant identity (Tutorial 32) and scopes. The `JwtOptions` configure validation parameters and are bound from the `"Jwt"` configuration section via `SectionName`. The `ClockSkew` property controls how much clock drift is tolerated when validating token expiration.
 
 ### Security.Secrets
 
@@ -104,14 +100,25 @@ JWT authentication is used at the Gateway API layer. Tokens carry tenant identit
 // src/Security.Secrets/ISecretProvider.cs
 public interface ISecretProvider
 {
-    Task<string> GetSecretAsync(string secretName, CancellationToken ct);
-    Task SetSecretAsync(string secretName, string value, CancellationToken ct);
+    Task<SecretEntry?> GetSecretAsync(string key, CancellationToken ct = default);
+    Task SetSecretAsync(string key, string value, CancellationToken ct = default);
+    Task<bool> DeleteSecretAsync(string key, CancellationToken ct = default);
+    Task<IReadOnlyList<string>> ListSecretKeysAsync(CancellationToken ct = default);
 }
+
+public sealed record SecretEntry(
+    string Key,
+    string Value,
+    int Version,
+    DateTimeOffset CreatedAt,
+    Dictionary<string, string> Metadata);
 ```
+
+`GetSecretAsync` returns a `SecretEntry?` containing the value along with version, creation timestamp, and metadata — or `null` if the key does not exist. `DeleteSecretAsync` returns `true` if the key was deleted, `false` if it did not exist. `ListSecretKeysAsync` returns all known key names.
 
 Two implementations are provided:
 - `AzureKeyVaultSecretProvider` — integrates with Azure Key Vault using managed identity
-- `HashiCorpVaultSecretProvider` — integrates with HashiCorp Vault using AppRole or token auth
+- `VaultSecretProvider` — integrates with HashiCorp Vault using AppRole or token auth
 
 Secrets are never stored in configuration files or environment variables in production. The `ISecretProvider` abstraction allows swapping providers without code changes.
 
@@ -125,7 +132,7 @@ The sanitizer and size guard are **stateless and CPU-bound** — they inspect ea
 
 ## Atomicity Dimension
 
-Sanitization runs **before the message is Acked**. If the sanitizer modifies a payload, the `WasModified` flag ensures downstream components know the payload was altered. If the size guard rejects a message, it is Nacked and dead-lettered in a single atomic operation — the original message is never lost, just quarantined for inspection.
+Sanitization runs **before the message is Acked**. Callers can use `IsClean` to check whether the input would be modified, and `Sanitize` to obtain the cleaned payload. If the size guard rejects a message, it is Nacked and dead-lettered in a single atomic operation — the original message is never lost, just quarantined for inspection.
 
 ---
 
@@ -135,7 +142,7 @@ Sanitization runs **before the message is Acked**. If the sanitizer modifies a p
 
 2. Why does the platform use a separate `IPayloadSizeGuard` instead of checking size inside `IInputSanitizer`?
 
-3. Compare `AzureKeyVaultSecretProvider` and `HashiCorpVaultSecretProvider`. When would you choose one over the other?
+3. Compare `AzureKeyVaultSecretProvider` and `VaultSecretProvider`. When would you choose one over the other?
 
 ---
 

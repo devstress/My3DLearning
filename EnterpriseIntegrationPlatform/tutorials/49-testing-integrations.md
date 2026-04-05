@@ -9,7 +9,7 @@
 - Integration tests using Testcontainers
 - End-to-end browser tests with Playwright
 - Load and performance benchmarks via the LoadTests project
-- Testing conventions: `[SetUp]`, `Assert.That`, 1,181+ unit tests
+- Testing conventions: `[SetUp]`, `Assert.That`, 1,472 unit tests
 
 ## The Test Pyramid
 
@@ -27,13 +27,13 @@
                 │   ContractTests    │  API contracts
                ┌┴───────────────────┴┐
                │     UnitTests        │  NUnit 4.4 + NSubstitute
-               │   1,181+ tests       │  (fastest, most numerous)
+               │   1,472 tests       │  (fastest, most numerous)
                └──────────────────────┘
 ```
 
 ## Unit Tests (NUnit 4.4 + NSubstitute)
 
-The foundation with 1,181+ tests covering all core logic:
+The foundation with 1,472 tests covering all core logic:
 
 ```csharp
 [TestFixture]
@@ -225,7 +225,7 @@ Results:
 
 ```
 tests/
-├── UnitTests/              # 1,181+ fast, isolated tests
+├── UnitTests/              # 1,472 fast, isolated tests
 ├── ContractTests/          # API serialization contracts
 ├── WorkflowTests/          # Temporal workflow tests
 ├── IntegrationTests/       # Testcontainers-based tests

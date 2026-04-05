@@ -3,11 +3,11 @@
 ## What You'll Learn
 
 - How `IEventStore` provides an append-only log of domain events
-- `ISnapshotStore` for periodic snapshots to speed up replay
-- `IEventProjection` and `EventProjectionEngine` for building read-side views
+- `ISnapshotStore<TState>` for periodic snapshots to speed up replay
+- `IEventProjection<TState>` and `EventProjectionEngine` for building read-side views
 - `EventEnvelope` as the standard wrapper for stored events
 - Optimistic concurrency via `OptimisticConcurrencyException`
-- `TemporalQuery` for time-range queries and `InMemoryEventStore`
+- `TemporalQuery` for point-in-time replay and `InMemoryEventStore`
 
 ---
 
@@ -44,20 +44,23 @@ The event store is the source of truth. Projections build queryable read models.
 // src/EventSourcing/IEventStore.cs
 public interface IEventStore
 {
-    Task AppendAsync(
+    Task<long> AppendAsync(
         string streamId,
         IReadOnlyList<EventEnvelope> events,
         long expectedVersion,
-        CancellationToken ct);
+        CancellationToken ct = default);
 
     Task<IReadOnlyList<EventEnvelope>> ReadStreamAsync(
         string streamId,
         long fromVersion,
-        CancellationToken ct);
+        int count,
+        CancellationToken ct = default);
 
-    Task<IReadOnlyList<EventEnvelope>> QueryAsync(
-        TemporalQuery query,
-        CancellationToken ct);
+    Task<IReadOnlyList<EventEnvelope>> ReadStreamBackwardAsync(
+        string streamId,
+        long fromVersion,
+        int count,
+        CancellationToken ct = default);
 }
 ```
 
@@ -65,15 +68,14 @@ public interface IEventStore
 
 ```csharp
 // src/EventSourcing/EventEnvelope.cs
-public sealed record EventEnvelope
-{
-    public required string StreamId { get; init; }
-    public required long Version { get; init; }
-    public required string EventType { get; init; }
-    public required string Payload { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-    public IDictionary<string, string>? Metadata { get; init; }
-}
+public sealed record EventEnvelope(
+    Guid EventId,
+    string StreamId,
+    string EventType,
+    string Data,
+    long Version,
+    DateTimeOffset Timestamp,
+    Dictionary<string, string> Metadata);
 ```
 
 ### Optimistic Concurrency
@@ -88,23 +90,35 @@ public sealed class OptimisticConcurrencyException : Exception
 }
 ```
 
-When `AppendAsync` is called with an `expectedVersion` that does not match the stream's current version, the store throws `OptimisticConcurrencyException`. The caller must reload the stream, re-apply the command, and retry. This prevents lost updates without pessimistic locks.
+When `AppendAsync` is called with an `expectedVersion` that does not match the stream's current version, the store throws `OptimisticConcurrencyException`. On success, `AppendAsync` returns the new stream version as a `long`. The caller must reload the stream, re-apply the command, and retry on conflict. This prevents lost updates without pessimistic locks.
 
 ### TemporalQuery
 
+`TemporalQuery` is a static helper class that replays a stream's events up to a specific point in time, producing the projected state at that moment:
+
 ```csharp
 // src/EventSourcing/TemporalQuery.cs
-public sealed record TemporalQuery(DateTimeOffset From, DateTimeOffset To, string? StreamId = null, string? EventType = null);
+public static class TemporalQuery
+{
+    public static async Task<(TState State, long Version)> ReplayToPointInTimeAsync<TState>(
+        IEventStore store,
+        IEventProjection<TState> projection,
+        string streamId,
+        DateTimeOffset pointInTime,
+        TState initialState,
+        int batchSize = 100,
+        CancellationToken ct = default) where TState : notnull;
+}
 ```
 
 ### ISnapshotStore
 
 ```csharp
 // src/EventSourcing/ISnapshotStore.cs
-public interface ISnapshotStore
+public interface ISnapshotStore<TState>
 {
-    Task SaveAsync(string streamId, long version, string snapshot, CancellationToken ct);
-    Task<(string Snapshot, long Version)?> LoadAsync(string streamId, CancellationToken ct);
+    Task SaveAsync(string streamId, TState state, long version, CancellationToken ct = default);
+    Task<(TState? State, long Version)?> LoadAsync(string streamId, CancellationToken ct = default);
 }
 ```
 
@@ -112,14 +126,13 @@ public interface ISnapshotStore
 
 ```csharp
 // src/EventSourcing/IEventProjection.cs
-public interface IEventProjection
+public interface IEventProjection<TState>
 {
-    string ProjectionName { get; }
-    Task ProjectAsync(EventEnvelope envelope, CancellationToken ct);
+    TState Apply(TState state, EventEnvelope @event);
 }
 ```
 
-The `EventProjectionEngine` reads new events from the store, dispatches each to registered `IEventProjection` implementations, and tracks the last processed version per projection. `InMemoryEventStore` implements `IEventStore` using a `ConcurrentDictionary` with full optimistic concurrency support.
+`IEventProjection<TState>` is a pure function: given a current state and an event, it returns the new state. The `EventProjectionEngine` reads new events from the store, applies each to the appropriate `IEventProjection<TState>` implementation, and tracks the last processed version per projection. `InMemoryEventStore` implements `IEventStore` using a `ConcurrentDictionary` with full optimistic concurrency support.
 
 ---
 
@@ -141,7 +154,7 @@ Optimistic concurrency ensures **consistency without locks**. The `expectedVersi
 
 2. Two commands arrive simultaneously for the same stream at version 5. Both expect version 5. Trace the optimistic concurrency flow.
 
-3. Design a `TemporalQuery` that retrieves all `"OrderPlaced"` events from the last 24 hours across all streams.
+3. Use `TemporalQuery.ReplayToPointInTimeAsync` to reconstruct an order aggregate's state as of yesterday at noon. What parameters do you need to supply?
 
 ---
 

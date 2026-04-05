@@ -20,6 +20,8 @@ public sealed class PulsarProducer : IMessageBrokerProducer, IAsyncDisposable
     /// <summary>Initialises a new <see cref="PulsarProducer"/>.</summary>
     public PulsarProducer(IPulsarClient client, ILogger<PulsarProducer> logger)
     {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(logger);
         _client = client;
         _logger = logger;
     }
