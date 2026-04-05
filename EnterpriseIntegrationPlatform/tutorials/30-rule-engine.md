@@ -38,8 +38,8 @@ Rules are evaluated in priority order. The first match determines the action, de
 // src/RuleEngine/IRuleEngine.cs
 public interface IRuleEngine
 {
-    Task<RuleEvaluationResult> EvaluateAsync(
-        IntegrationEnvelope<string> envelope,
+    Task<RuleEvaluationResult> EvaluateAsync<T>(
+        IntegrationEnvelope<T> envelope,
         CancellationToken cancellationToken = default);
 }
 ```

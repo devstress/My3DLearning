@@ -184,11 +184,11 @@ The orchestrator wraps the message in pipeline input and dispatches to Temporal:
 
 ```csharp
 // Simplified from src/Demo.Pipeline/PipelineOrchestrator.cs
-public class PipelineOrchestrator : IPipelineOrchestrator
+public sealed class PipelineOrchestrator : IPipelineOrchestrator
 {
-    public async Task ProcessAsync<T>(
-        IntegrationEnvelope<T> envelope,
-        CancellationToken ct)
+    public async Task ProcessAsync(
+        IntegrationEnvelope<JsonElement> envelope,
+        CancellationToken cancellationToken = default)
     {
         var input = new IntegrationPipelineInput
         {
@@ -197,7 +197,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             // ... map from envelope to workflow input
         };
 
-        await _dispatcher.DispatchAsync(input, ct);
+        await _dispatcher.DispatchAsync(input, cancellationToken);
     }
 }
 ```

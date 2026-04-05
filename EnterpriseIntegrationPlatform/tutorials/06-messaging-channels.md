@@ -160,8 +160,16 @@ public interface IInvalidMessageChannel
         IntegrationEnvelope<T> envelope,
         string reason,
         CancellationToken cancellationToken = default);
+
+    Task RouteRawInvalidAsync(
+        string rawData,
+        string sourceTopic,
+        string reason,
+        CancellationToken cancellationToken = default);
 }
 ```
+
+> `RouteInvalidAsync` handles messages that were parsed into an envelope but failed validation. `RouteRawInvalidAsync` handles raw data that could not be deserialized into an envelope at all.
 
 ### How It Works
 

@@ -2,7 +2,7 @@ namespace EnterpriseIntegrationPlatform.Processing.Transform;
 
 /// <summary>
 /// Enterprise Integration Pattern — Normalizer.
-/// Detects the format of an incoming message (JSON, XML, CSV, flat-file) and converts
+/// Detects the format of an incoming message (JSON, XML, CSV) and converts
 /// it to the canonical JSON representation used throughout the platform.
 /// </summary>
 /// <remarks>

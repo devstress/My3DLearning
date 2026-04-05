@@ -52,7 +52,7 @@ Gateway.Api wraps this in an `IntegrationEnvelope` and publishes to the broker.
 
 ## Step 2: Broker Receives and Queues
 
-The message enters the configured broker (Kafka, RabbitMQ, or NATS):
+The message enters the configured broker (Kafka, NATS JetStream, or Pulsar):
 
 ```
 ┌─────────────────────────────────────────┐
@@ -74,20 +74,58 @@ The worker starts an `IntegrationPipelineWorkflow` (or `AtomicPipelineWorkflow`
 for saga compensation). Temporal manages retries and state.
 
 ```csharp
+// src/Workflow.Temporal/Workflows/IntegrationPipelineWorkflow.cs (simplified)
+[Workflow]
 public class IntegrationPipelineWorkflow
 {
-    public async Task<PipelineResult> RunAsync(IntegrationPipelineInput input)
+    [WorkflowRun]
+    public async Task<IntegrationPipelineResult> RunAsync(IntegrationPipelineInput input)
     {
-        var validated = await ExecuteActivity<ValidateActivity>(input);
-        var transformed = await ExecuteActivity<TransformActivity>(validated);
-        var routed = await ExecuteActivity<RouteActivity>(transformed);
-        var delivered = await ExecuteActivity<DeliverActivity>(routed);
+        // Step 1: Persist message to storage
+        await Workflow.ExecuteActivityAsync(
+            (PipelineActivities act) => act.PersistMessageAsync(input),
+            PipelineActivityOptions);
+
+        // Step 2: Validate message schema and content
+        var validation = await Workflow.ExecuteActivityAsync(
+            (IntegrationActivities act) =>
+                act.ValidateMessageAsync(input.MessageType, input.PayloadJson),
+            ValidationActivityOptions);
+
+        if (!validation.IsValid)
+        {
+            if (input.NotificationsEnabled)
+            {
+                await Workflow.ExecuteActivityAsync(
+                    (PipelineActivities act) =>
+                        act.PublishNackAsync(input.MessageId, input.CorrelationId,
+                            validation.Reason ?? "Validation failed", input.NackSubject),
+                    PipelineActivityOptions);
+            }
+            return new IntegrationPipelineResult(input.MessageId, false, validation.Reason);
+        }
+
+        // Steps 3-4: Transform and Route are handled externally via
+        // the Normalizer and Content-Based Router patterns — the workflow
+        // publishes to the appropriate channel and downstream consumers
+        // handle format conversion and routing decisions.
+
+        // Step 5: Publish success acknowledgment
         if (input.NotificationsEnabled)
-            await ExecuteActivity<NotifyActivity>(delivered);
-        return delivered.Result;
+        {
+            await Workflow.ExecuteActivityAsync(
+                (PipelineActivities act) =>
+                    act.PublishAckAsync(input.MessageId, input.CorrelationId,
+                        input.AckSubject),
+                PipelineActivityOptions);
+        }
+
+        return new IntegrationPipelineResult(input.MessageId, true);
     }
 }
 ```
+
+> **Note:** The workflow orchestrates three activity classes: `IntegrationActivities` (validation), `PipelineActivities` (persistence and notifications), and `SagaCompensationActivities` (rollback — see Tutorial 47). Transform and routing are handled by separate pipeline consumers, not by individual workflow activities.
 
 ## Step 4: Validate
 

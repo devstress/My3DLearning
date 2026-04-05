@@ -76,13 +76,15 @@ public interface IFeatureFlagService
 
 ```csharp
 // src/Configuration/FeatureFlag.cs
-public sealed record FeatureFlag
+public sealed record FeatureFlag(
+    string Name,
+    bool IsEnabled = false,
+    Dictionary<string, string>? Variants = null,
+    int RolloutPercentage = 100,
+    List<string>? TargetTenants = null)
 {
-    public required string Name { get; init; }
-    public bool IsEnabled { get; init; }
-    public Dictionary<string, string> Variants { get; init; } = new();
-    public int RolloutPercentage { get; init; } = 100;
-    public IReadOnlyList<string> TargetTenants { get; init; } = Array.Empty<string>();
+    public Dictionary<string, string> Variants { get; init; } = Variants ?? new();
+    public List<string> TargetTenants { get; init; } = TargetTenants ?? [];
 }
 ```
 
@@ -97,15 +99,17 @@ public sealed record FeatureFlag
 
 ```csharp
 // src/Configuration/ConfigurationChangeNotifier.cs
-public sealed class ConfigurationChangeNotifier : IObservable<ConfigurationChange>
+public sealed class ConfigurationChangeNotifier : IObservable<ConfigurationChange>, IDisposable
 {
     public void Publish(ConfigurationChange change);
     public IDisposable Subscribe(IObserver<ConfigurationChange> observer);
 }
 
 public sealed record ConfigurationChange(
-    string Key, string? Value, string Environment,
-    ConfigurationChangeType ChangeType, DateTimeOffset Timestamp);
+    string Key, string Environment,
+    ConfigurationChangeType ChangeType,
+    string? OldValue, string? NewValue,
+    DateTimeOffset Timestamp);
 
 public enum ConfigurationChangeType { Created, Updated, Deleted }
 ```
@@ -119,10 +123,10 @@ The `EnvironmentOverrideProvider` reads environment variables using the conventi
 ### NotificationFeatureFlags
 
 ```csharp
-// src/Configuration/NotificationFeatureFlags.cs
+// src/Activities/NotificationFeatureFlags.cs
 public static class NotificationFeatureFlags
 {
-    public const string NotificationsEnabled = "notifications.enabled";
+    public const string NotificationsEnabled = "Notifications.Enabled";
 }
 ```
 

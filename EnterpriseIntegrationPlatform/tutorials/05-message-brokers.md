@@ -105,7 +105,7 @@ public interface IMessageBrokerProducer
 }
 
 // src/Ingestion/IMessageBrokerConsumer.cs
-public interface IMessageBrokerConsumer
+public interface IMessageBrokerConsumer : IAsyncDisposable
 {
     Task SubscribeAsync<T>(
         string topic,

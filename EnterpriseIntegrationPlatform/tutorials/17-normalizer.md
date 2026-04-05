@@ -3,7 +3,7 @@
 ## What You'll Learn
 
 - The EIP Normalizer pattern for converting diverse formats to a canonical model
-- How `INormalizer` / `MessageNormalizer` auto-detects JSON, XML, CSV, and flat-file
+- How `INormalizer` / `MessageNormalizer` auto-detects JSON, XML, and CSV
 - The `NormalizationResult` with `DetectedFormat` and `WasTransformed`
 - `NormalizerOptions` for CSV delimiter, header mode, and strict content-type handling
 - Why a canonical model simplifies downstream processing
@@ -18,8 +18,7 @@
 ```
   JSON  ──────▶ ┌──────────────┐
   XML   ──────▶ │  Normalizer  │──▶ Canonical JSON
-  CSV   ──────▶ │              │
-  Flat  ──────▶ └──────────────┘
+  CSV   ──────▶ └──────────────┘
 ```
 
 External systems send data in many formats. The Normalizer detects the incoming format and converts it to the platform's canonical representation (JSON), so every downstream component only needs to understand one format.
@@ -45,7 +44,7 @@ public interface INormalizer
 
 The `MessageNormalizer` class implements `INormalizer`. It:
 1. Inspects the `contentType` parameter (or payload content if `StrictContentType = false`)
-2. Detects whether the payload is JSON, XML, CSV, or flat-file
+2. Detects whether the payload is JSON, XML, or CSV
 3. Applies the appropriate conversion to produce canonical JSON
 4. Returns the result with the detected format
 
@@ -56,7 +55,7 @@ The `MessageNormalizer` class implements `INormalizer`. It:
 public sealed record NormalizationResult(
     string Payload,
     string OriginalContentType,
-    string DetectedFormat,       // "JSON", "XML", "CSV", "FlatFile"
+    string DetectedFormat,       // "JSON", "XML", "CSV"
     bool WasTransformed);
 ```
 

@@ -118,7 +118,7 @@ public static class TemporalQuery
 public interface ISnapshotStore<TState>
 {
     Task SaveAsync(string streamId, TState state, long version, CancellationToken ct = default);
-    Task<(TState? State, long Version)?> LoadAsync(string streamId, CancellationToken ct = default);
+    Task<(TState? State, long Version)> LoadAsync(string streamId, CancellationToken ct = default);
 }
 ```
 

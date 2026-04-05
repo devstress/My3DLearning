@@ -51,10 +51,10 @@ public sealed class CompetingConsumerOrchestrator : BackgroundService
             var lagInfo = await _lagMonitor.GetLagAsync(
                 _options.TargetTopic, _options.ConsumerGroup, stoppingToken);
 
-            if (lagInfo.TotalLag > _options.ScaleUpThreshold)
+            if (lagInfo.CurrentLag >= _options.ScaleUpThreshold)
                 await _scaler.ScaleAsync(
                     Math.Min(_scaler.CurrentCount + 1, _options.MaxConsumers), stoppingToken);
-            else if (lagInfo.TotalLag < _options.ScaleDownThreshold
+            else if (lagInfo.CurrentLag <= _options.ScaleDownThreshold
                      && _scaler.CurrentCount > _options.MinConsumers)
                 await _scaler.ScaleAsync(_scaler.CurrentCount - 1, stoppingToken);
 
@@ -78,11 +78,14 @@ public interface IConsumerLagMonitor
         CancellationToken ct = default);
 }
 
-public sealed record ConsumerLagInfo(
-    long TotalLag,
-    int ActiveConsumers,
-    DateTimeOffset MeasuredAt);
+public record ConsumerLagInfo(
+    string ConsumerGroup,
+    string Topic,
+    long CurrentLag,
+    DateTimeOffset Timestamp);
 ```
+
+> **Note:** `ConsumerLagInfo` tracks lag per consumer group and topic. The active consumer count is available separately via `IConsumerScaler.CurrentCount`.
 
 ### IConsumerScaler
 

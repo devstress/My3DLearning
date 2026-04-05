@@ -40,7 +40,7 @@
 Capture CPU and runtime profiling snapshots to identify hot paths:
 
 ```csharp
-public sealed class ContinuousProfiler
+public sealed class ContinuousProfiler : IContinuousProfiler
 {
     public ContinuousProfiler(ILogger<ContinuousProfiler> logger, IOptions<ProfilingOptions> options) { /* ... */ }
 
@@ -68,18 +68,18 @@ public sealed class ContinuousProfiler
 Track GC activity and detect memory issues:
 
 ```csharp
-public sealed class GcMonitor
+public sealed class GcMonitor : IGcMonitor
 {
     public GcSnapshot CaptureSnapshot()
     {
         return new GcSnapshot
         {
-            Gen0 = GC.CollectionCount(0),
-            Gen1 = GC.CollectionCount(1),
-            Gen2 = GC.CollectionCount(2),
-            TotalMemoryMb = GC.GetTotalMemory(forceFullCollection: false) / (1024.0 * 1024.0),
+            Gen0Collections = GC.CollectionCount(0),
+            Gen1Collections = GC.CollectionCount(1),
+            Gen2Collections = GC.CollectionCount(2),
+            TotalCommittedBytes = GC.GetTotalMemory(forceFullCollection: false),
             IsServerGc = GCSettings.IsServerGC,
-            Timestamp = DateTimeOffset.UtcNow
+            // ... additional properties: heap sizes, fragmentation, pause times
         };
     }
 

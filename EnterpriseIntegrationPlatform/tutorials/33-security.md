@@ -70,8 +70,8 @@ public interface IPayloadSizeGuard
 // src/Security/PayloadTooLargeException.cs
 public sealed class PayloadTooLargeException : Exception
 {
-    public long ActualSize { get; }
-    public long MaxAllowedSize { get; }
+    public int ActualBytes { get; }
+    public int MaxBytes { get; }
 }
 ```
 
@@ -100,21 +100,30 @@ JWT authentication is used at the Gateway API layer. Tokens carry tenant identit
 // src/Security.Secrets/ISecretProvider.cs
 public interface ISecretProvider
 {
-    Task<SecretEntry?> GetSecretAsync(string key, CancellationToken ct = default);
-    Task SetSecretAsync(string key, string value, CancellationToken ct = default);
+    Task<SecretEntry?> GetSecretAsync(
+        string key, string? version = null, CancellationToken ct = default);
+    Task<SecretEntry> SetSecretAsync(
+        string key, string value,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken ct = default);
     Task<bool> DeleteSecretAsync(string key, CancellationToken ct = default);
-    Task<IReadOnlyList<string>> ListSecretKeysAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<string>> ListSecretKeysAsync(
+        string? prefix = null, CancellationToken ct = default);
 }
 
 public sealed record SecretEntry(
     string Key,
     string Value,
-    int Version,
+    string Version,
     DateTimeOffset CreatedAt,
-    Dictionary<string, string> Metadata);
+    DateTimeOffset? ExpiresAt = null,
+    IReadOnlyDictionary<string, string>? Metadata = null)
+{
+    public bool IsExpired => ExpiresAt.HasValue && ExpiresAt.Value <= DateTimeOffset.UtcNow;
+}
 ```
 
-`GetSecretAsync` returns a `SecretEntry?` containing the value along with version, creation timestamp, and metadata — or `null` if the key does not exist. `DeleteSecretAsync` returns `true` if the key was deleted, `false` if it did not exist. `ListSecretKeysAsync` returns all known key names.
+`GetSecretAsync` returns a `SecretEntry?` containing the value along with version, creation timestamp, and metadata — or `null` if the key does not exist. The optional `version` parameter allows retrieving a specific version of a secret. `SetSecretAsync` returns the newly created `SecretEntry` (with version and timestamp) and accepts optional metadata. `DeleteSecretAsync` returns `true` if the key was deleted, `false` if it did not exist. `ListSecretKeysAsync` returns all known key names, optionally filtered by prefix.
 
 Two implementations are provided:
 - `AzureKeyVaultSecretProvider` — integrates with Azure Key Vault using managed identity
