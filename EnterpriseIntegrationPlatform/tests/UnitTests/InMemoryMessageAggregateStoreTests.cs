@@ -142,4 +142,34 @@ public class InMemoryMessageAggregateStoreTests
         var group = await store.AddAsync(BuildEnvelope(correlationId, "last"));
         Assert.That(group, Has.Count.EqualTo(count + 1));
     }
+
+    [Test]
+    public async Task AddAsync_DuplicateMessageId_Idempotent_DoesNotDuplicate()
+    {
+        var store = new InMemoryMessageAggregateStore<string>();
+        var correlationId = Guid.NewGuid();
+        var envelope = BuildEnvelope(correlationId, "original");
+
+        var first = await store.AddAsync(envelope);
+        Assert.That(first, Has.Count.EqualTo(1));
+
+        // Add the same envelope again (same MessageId) — simulates redelivery
+        var second = await store.AddAsync(envelope);
+        Assert.That(second, Has.Count.EqualTo(1), "Duplicate MessageId should not be added");
+    }
+
+    [Test]
+    public async Task AddAsync_DifferentMessageIds_SameCorrelationId_BothAdded()
+    {
+        var store = new InMemoryMessageAggregateStore<string>();
+        var correlationId = Guid.NewGuid();
+
+        var env1 = BuildEnvelope(correlationId, "first");
+        var env2 = BuildEnvelope(correlationId, "second");
+
+        await store.AddAsync(env1);
+        var group = await store.AddAsync(env2);
+
+        Assert.That(group, Has.Count.EqualTo(2));
+    }
 }

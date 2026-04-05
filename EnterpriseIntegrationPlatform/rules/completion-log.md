@@ -65,6 +65,40 @@ See `milestones.md` for current phase status and next chunk.
   - `Directory.Packages.props` — Added `Microsoft.Extensions.Caching.Memory` 10.0.5.
 - **Test counts**: 1,491 UnitTests (+5). 1,624 total tests. All 12 existing enricher tests pass unchanged.
 
+## Chunk 084 – Normalizer: Use XmlRootName Option
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Wire `NormalizerOptions.XmlRootName` into `MessageNormalizer` so the option is actually used, as promised by tutorial 17 (line 82).
+- **Files modified**:
+  - `src/Processing.Transform/NormalizerOptions.cs` — Updated xmldoc to reflect actual usage.
+  - `src/Processing.Transform/MessageNormalizer.cs` — CSV wrapper now uses `_options.XmlRootName` instead of hardcoded `"rows"`.
+  - `tests/UnitTests/MessageNormalizerTests.cs` — Updated 4 CSV tests to use `"Root"` (default XmlRootName). Added 1 new test proving custom `XmlRootName` is respected.
+- **Test counts**: 1,492 UnitTests (+1). 1,625 total tests.
+
+## Chunk 085 – Aggregator Store Idempotency on MessageId
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Make `InMemoryMessageAggregateStore.AddAsync()` idempotent on `MessageId` as promised by tutorial 21 (line 112).
+- **Files modified**:
+  - `src/Processing.Aggregator/InMemoryMessageAggregateStore.cs` — Added duplicate `MessageId` check in `AddAsync` lock block.
+  - `tests/UnitTests/InMemoryMessageAggregateStoreTests.cs` — Added 2 new tests: duplicate-is-idempotent, different-MessageIds-both-added.
+- **Test counts**: 1,494 UnitTests (+2). 1,627 total tests.
+
+## Chunk 087 – Backpressure Pauses Scale-Down in Competing Consumers
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Make `CompetingConsumerOrchestrator` skip scale-down when `IsBackpressured` is true, as promised by tutorial 28 (line 113).
+- **Files modified**:
+  - `src/Processing.CompetingConsumers/CompetingConsumerOrchestrator.cs` — Added `_backpressure.IsBackpressured` check in scale-down branch with warning log.
+  - `tests/UnitTests/CompetingConsumersTests/CompetingConsumerOrchestratorTests.cs` — Added 1 new test: scale-down skipped during backpressure.
+- **Test counts**: 1,495 UnitTests (+1). 1,628 total tests.
+
 ## Chunk 075 – Fix Tutorials 05, 06, 07
 
 - **Date**: 2026-04-05

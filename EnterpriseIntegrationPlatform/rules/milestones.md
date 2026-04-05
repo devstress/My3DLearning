@@ -24,7 +24,7 @@
 
 ✅ Phases 1–21 complete — see `rules/completion-log.md` for full history.
 
-**Current stats:** 1,491 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,624 total tests**. 48 src projects.
+**Current stats:** 1,495 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,628 total tests**. 48 src projects.
 
 ---
 
@@ -46,28 +46,6 @@
 
 **Scope:** Audit of all 50 tutorials against source code found 13 features that tutorials promise but are not implemented. These chunks implement the missing features so that every tutorial claim is backed by working code.
 
-#### Chunk 084 — Normalizer: Use XmlRootName Option
-
-| Field | Value |
-|-------|-------|
-| Status | `not-started` |
-| Tutorial | 17 — Normalizer (line 82) |
-| Claim | "Root element name used when converting non-XML formats to XML" |
-| Current State | `NormalizerOptions.XmlRootName` property exists but is never read by `MessageNormalizer`. Dead code. |
-| Implementation | If the normalizer is asked to produce XML output (or if a future XML output mode is added), use `XmlRootName` as the root element. Alternatively, if only JSON output is supported, use `XmlRootName` when parsing XML→JSON to name the wrapper property. Document the actual usage in xmldoc. Add unit test proving the option is respected. |
-| Files | `src/Processing.Transform/MessageNormalizer.cs`, `src/Processing.Transform/NormalizerOptions.cs`, `tests/UnitTests/MessageNormalizerTests.cs` |
-
-#### Chunk 085 — Aggregator Store Idempotency on MessageId
-
-| Field | Value |
-|-------|-------|
-| Status | `not-started` |
-| Tutorial | 21 — Aggregator (line 112) |
-| Claim | "the store must be idempotent on MessageId" — redelivered messages should not be duplicated in the aggregation group. |
-| Current State | `InMemoryMessageAggregateStore.AddAsync()` blindly appends every envelope. Duplicate `MessageId` values are not detected. |
-| Implementation | In `AddAsync`, check if any existing envelope in the group has the same `MessageId`. If so, skip the add and return the existing snapshot. Add unit tests for duplicate detection. |
-| Files | `src/Processing.Aggregator/InMemoryMessageAggregateStore.cs`, `tests/UnitTests/InMemoryMessageAggregateStoreTests.cs` |
-
 #### Chunk 086 — ReplayId Header Injection in MessageReplayer
 
 | Field | Value |
@@ -78,17 +56,6 @@
 | Current State | `MessageReplayer.ReplayAsync()` copies envelope metadata but never injects a `ReplayId` header. `SkippedCount` is always 0. |
 | Implementation | Generate a single `ReplayId` (GUID) per `ReplayAsync` invocation. Add `MessageHeaders.ReplayId` constant to `src/Contracts/MessageHeaders.cs`. Inject `replayedEnvelope.Metadata[MessageHeaders.ReplayId] = replayId.ToString()` for each message. Track skipped messages (e.g. if a message was already replayed based on presence of existing `ReplayId` and dedup option in `ReplayOptions`). Add unit tests. |
 | Files | `src/Contracts/MessageHeaders.cs`, `src/Processing.Replay/MessageReplayer.cs`, `src/Processing.Replay/ReplayOptions.cs`, `tests/UnitTests/MessageReplayerTests.cs` |
-
-#### Chunk 087 — Backpressure Pauses Scale-Down in Competing Consumers
-
-| Field | Value |
-|-------|-------|
-| Status | `not-started` |
-| Tutorial | 28 — Competing Consumers (line 113) |
-| Claim | "When `IsBackpressured` is true, the orchestrator pauses scale-down and can signal upstream producers (via broker flow control or HTTP 429) to slow ingestion." |
-| Current State | `CompetingConsumerOrchestrator.EvaluateAndScaleAsync()` never reads `_backpressure.IsBackpressured`. Scale-down proceeds regardless of backpressure state. |
-| Implementation | In the scale-down branch of `EvaluateAndScaleAsync`, check `_backpressure.IsBackpressured` and skip scale-down if true (log a warning instead). Add unit test verifying scale-down is skipped during backpressure. |
-| Files | `src/Processing.CompetingConsumers/CompetingConsumerOrchestrator.cs`, `tests/UnitTests/CompetingConsumersTests/CompetingConsumerOrchestratorTests.cs` |
 
 #### Chunk 088 — Rule Engine In-Memory Caching with Periodic Refresh
 
@@ -147,7 +114,7 @@
 
 ## Next Chunk
 
-**Chunk 084** — Normalizer: Use XmlRootName Option
+**Chunk 086** — ReplayId Header Injection in MessageReplayer
 
 ---
 
