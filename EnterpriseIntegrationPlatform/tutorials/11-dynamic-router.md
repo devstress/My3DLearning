@@ -104,13 +104,59 @@ Routing decisions are deterministic for a given routing-table snapshot. If the p
 
 ---
 
-## Exercises
+## Lab
 
-1. Participant D registers `conditionKey = "invoices"` with destination `"invoice-processing"`. A message arrives with `MessageType = "invoices"`. Trace the routing path.
+**Objective:** Trace how the Dynamic Router updates its routing table at runtime, analyze the EIP pattern's role in **scalable** integration topologies, and design a consistent routing strategy for distributed deployments.
 
-2. What happens if Participant D unregisters and a new message with `conditionKey = "invoices"` arrives before any other participant registers for that key?
+### Step 1: Trace a Dynamic Registration Flow
 
-3. How would you make the routing table consistent across 5 router replicas? Describe a broker-based approach.
+Open `src/Processing.Routing/DynamicRouter.cs`. A new participant registers with `conditionKey = "invoices"` and destination `"invoice-processing"`. Then a message arrives with `MessageType = "invoices"`. Trace the code path:
+
+1. How does `RegisterAsync` store the mapping?
+2. How does `RouteAsync` look up the destination?
+3. What `RoutingDecision` is returned — does it include the matched condition for auditing?
+
+Now: Participant unregisters. A new message with the same key arrives. What happens? Where does the message go?
+
+### Step 2: Design for Multi-Replica Consistency
+
+You have 5 Dynamic Router replicas behind a load balancer. Participant D registers on Replica 1, but Replica 3 doesn't know about it. Design a solution using the platform's broker infrastructure:
+
+- Publish registration events to a `routing.registrations` topic
+- Each replica subscribes and updates its local table
+- How does this use the **Publish-Subscribe Channel** pattern to keep all replicas consistent?
+- What happens to messages during the propagation delay? Is this an **atomicity** concern?
+
+### Step 3: Compare Dynamic Router Scalability vs. Content-Based Router
+
+| Aspect | Content-Based Router | Dynamic Router |
+|--------|---------------------|---------------|
+| Rule source | Static configuration | Runtime registrations |
+| Adding new routes | ? | ? |
+| Scalability model | ? | ? |
+| Consistency across replicas | ? | ? |
+
+When would you choose a Dynamic Router over a Content-Based Router in a multi-tenant SaaS platform?
+
+## Exam
+
+1. What EIP pattern does the Dynamic Router implement that the Content-Based Router does not?
+   - A) Message Filter with discard
+   - B) A self-updating routing table where downstream participants register and unregister their interests at runtime, enabling topology changes without redeploying the router
+   - C) Priority-based message queuing
+   - D) Batch message processing
+
+2. In a horizontally scaled deployment with multiple router instances, what is the main **consistency** challenge?
+   - A) All routers must share a single-threaded execution context
+   - B) Registration changes on one instance must propagate to all others — during propagation, different instances may route the same message to different destinations
+   - C) Dynamic routers cannot be scaled horizontally
+   - D) Each router instance requires its own broker connection
+
+3. How does the Dynamic Router pattern support **scalable** integration topology changes?
+   - A) It requires a full system restart to add new routes
+   - B) New services register their routing interests at startup — the router begins directing matching messages to them immediately, with no configuration changes or redeployments needed
+   - C) It pre-allocates routes for all possible message types
+   - D) It uses a database trigger to detect new services
 
 ---
 

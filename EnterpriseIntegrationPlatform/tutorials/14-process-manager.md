@@ -125,13 +125,67 @@ The `AtomicPipelineWorkflow` implements full **saga compensation**. Completed st
 
 ---
 
-## Exercises
+## Lab
 
-1. A workflow has steps: Persist → Validate → Transform → Deliver. Transform succeeds but Deliver fails. List the compensation steps in execution order.
+**Objective:** Trace the Process Manager's orchestration of multi-step workflows with saga compensation, and analyze how centralized coordination enables **atomic** all-or-nothing processing.
 
-2. What is the key difference between a Process Manager and a Routing Slip? When would you choose one over the other?
+### Step 1: Trace a Compensation Sequence
 
-3. A compensation activity (`CompensateStepAsync`) itself fails. What does Temporal do? What does the platform log?
+A workflow has steps: Persist → Validate → Transform → Deliver. Transform succeeds but Deliver fails after all retries. Open `src/Workflow.Temporal/AtomicPipelineWorkflow.cs` and trace:
+
+1. Which steps need compensation? (only steps that committed work)
+2. In what order do compensation steps execute? (hint: reverse)
+3. What does `SagaCompensationActivities.CompensateStepAsync` do for each step?
+
+List the compensation sequence:
+
+| Order | Compensating | Original Step |
+|-------|-------------|---------------|
+| 1 | Undo Transform | Transform |
+| 2 | ? | ? |
+| 3 | ? | ? |
+
+### Step 2: Handle Compensation Failures
+
+The compensation for "Persist" itself fails. Open `src/Workflow.Temporal/Activities/SagaCompensationActivities.cs` and answer:
+
+- What does the `CompensateStepAsync` method return when compensation fails?
+- Does Temporal retry the compensation? With what policy?
+- What is logged? How does the operations team know that manual intervention is required?
+
+Design an alerting strategy for compensation failures — this is the **atomicity boundary** of the system.
+
+### Step 3: Compare Process Manager vs. Routing Slip
+
+| Aspect | Process Manager | Routing Slip |
+|--------|----------------|-------------|
+| Coordination | Centralized (Temporal) | Decentralized (in-message) |
+| Compensation | Full saga support | Limited / manual |
+| Visibility | Full execution history | ? |
+| Scalability bottleneck | Temporal server | ? |
+| Best for | Complex branching, compensation | ? |
+
+When would a Process Manager's centralized coordination be worth the **scalability** trade-off vs. a Routing Slip?
+
+## Exam
+
+1. In a Process Manager with saga compensation, why must compensation steps execute in **reverse order**?
+   - A) It's a convention with no technical reason
+   - B) Later steps may depend on earlier steps' committed state — reverse-order compensation ensures each rollback sees the state from the steps that preceded it, maintaining consistency
+   - C) Temporal only supports reverse execution
+   - D) Reverse order is faster for the scheduler
+
+2. A compensation step itself fails. What is the correct platform behavior for maintaining **atomicity**?
+   - A) Silently ignore the failure and mark the saga as complete
+   - B) Log the failure, mark the saga as partially compensated, and alert the operations team — some atomicity violations require human intervention when automatic compensation is impossible
+   - C) Restart the entire original workflow from Step 1
+   - D) Route the compensation failure to the Dead Letter Queue and retry indefinitely
+
+3. What is the key advantage of the Process Manager pattern over the Routing Slip for **enterprise-grade atomicity**?
+   - A) Process Managers are faster for simple linear pipelines
+   - B) The Process Manager maintains a durable execution history with full saga compensation — if any step fails, all committed work can be rolled back to restore consistency
+   - C) Process Managers don't require a message broker
+   - D) Routing Slips cannot carry parameters
 
 ---
 

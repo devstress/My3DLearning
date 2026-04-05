@@ -111,13 +111,72 @@ The routing slip is stored in the envelope's `Metadata` dictionary as serialised
 
 ---
 
-## Exercises
+## Lab
 
-1. Build a `RoutingSlip` with steps: Validate → Transform → Deliver. The Transform step needs a parameter `"targetFormat" = "XML"`. Write the C# construction code.
+**Objective:** Build a Routing Slip, trace failure recovery with partial completion, and compare the Routing Slip pattern's **scalability** against Process Manager workflows.
 
-2. A message has completed Validate and Transform but crashes during Deliver. What does the `RemainingSlip` look like when the message is redelivered?
+### Step 1: Build a Routing Slip with Parameters
 
-3. Compare a routing slip to a Temporal workflow pipeline. When would you choose a slip over a workflow?
+Write C# code to construct a `RoutingSlip` with three steps:
+
+```csharp
+var slip = new RoutingSlip([
+    new RoutingSlipStep("Validate", new Dictionary<string, string>()),
+    new RoutingSlipStep("Transform", new Dictionary<string, string>
+    {
+        ["targetFormat"] = "XML",
+        ["schemaVersion"] = "2.0"
+    }),
+    new RoutingSlipStep("Deliver", new Dictionary<string, string>
+    {
+        ["endpoint"] = "https://partner.example.com/api/orders"
+    })
+]);
+```
+
+Open `src/Processing.Routing/RoutingSlip.cs` and verify the record structure. How does each step carry its own parameters? Why is this important for **atomicity** — each step is self-contained with all the data it needs.
+
+### Step 2: Trace a Partial-Completion Recovery
+
+A message has completed Validate and Transform but the worker crashes during Deliver. The message is redelivered with the slip attached:
+
+1. What does `RemainingSlip` contain? (hint: only Deliver remains)
+2. How does the platform know which steps already completed?
+3. Are Validate and Transform re-executed? Why or why not?
+
+Draw the recovery timeline and explain how the Routing Slip pattern achieves **idempotent resume** — crashed messages resume from exactly where they left off.
+
+### Step 3: Compare Routing Slip vs. Temporal Workflow
+
+| Aspect | Routing Slip | Temporal Workflow (Process Manager) |
+|--------|-------------|-------------------------------------|
+| State persistence | In the message itself | In Temporal's event history |
+| Dynamic step addition | ? | ? |
+| Compensation support | ? | ? |
+| Scalability | ? | ? |
+| Best for | ? | ? |
+
+When would you choose a Routing Slip over a full Temporal workflow? Consider: simple linear pipelines vs. complex branching logic.
+
+## Exam
+
+1. A Routing Slip message has completed steps 1-3 of 5. The worker crashes. What happens on redelivery?
+   - A) All 5 steps execute from the beginning
+   - B) The slip indicates steps 1-3 are complete — only steps 4-5 are in `RemainingSlip`, so processing resumes from step 4 without re-executing completed work
+   - C) The message is routed to the Dead Letter Queue
+   - D) A new slip is created with all 5 steps
+
+2. Why does the Routing Slip pattern carry processing state **inside the message** rather than in an external store?
+   - A) External stores are too slow for message processing
+   - B) The message is self-contained — any processor can pick it up and resume, enabling **horizontal scaling** without shared state coordination between consumers
+   - C) The message broker requires all state in the payload
+   - D) External stores don't support key-value parameters
+
+3. What is the key **scalability** advantage of a Routing Slip over a centralized Process Manager?
+   - A) Routing slips are faster to serialize
+   - B) No central coordinator is needed — each step independently reads the slip and forwards to the next, so the pattern scales linearly with more processors and has no single-point-of-failure bottleneck
+   - C) Process Managers cannot run on multiple machines
+   - D) Routing slips support more data formats
 
 ---
 
