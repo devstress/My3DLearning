@@ -28,7 +28,7 @@
 
 ## Next Chunk
 
-➡️ Phase 15 — Tutorial Fixes Round 2 (chunk 075)
+➡️ Phase 15 — Tutorial Fixes Round 2 (chunk 076)
 
 ---
 
@@ -38,36 +38,10 @@ Re-audit of all 50 tutorials (2026-04-05) found **17 tutorials still have errors
 
 | Chunk | Goal | Tutorials | Status |
 |-------|------|-----------|--------|
-| 075 | Fix tutorials 05, 06, 07 (core concepts — compilation errors) | 05, 06, 07 | `not-started` |
 | 076 | Fix tutorials 13, 14, 29 (routing & rate-limiting errors) | 13, 14, 29 | `not-started` |
 | 077 | Fix tutorials 31, 32, 37, 38 (advanced pattern & connector errors) | 31, 32, 37, 38 | `not-started` |
 | 078 | Fix tutorials 42, 44, 45, 46 (config, DR, profiling, end-to-end errors) | 42, 44, 45, 46 | `not-started` |
 | 079 | Fix tutorials 48, 49 and update test counts | 48, 49 | `not-started` |
-
----
-
-#### Chunk 075 — Fix Tutorials 05, 06, 07
-
-**Tutorial 05 — Message Brokers:**
-
-| Issue | Severity |
-|-------|----------|
-| `PublishAsync` parameter order shown as `(string topic, IntegrationEnvelope<T> envelope, ...)` but actual signature in `IMessageBrokerProducer` is `(IntegrationEnvelope<T> envelope, string topic, ...)`. Parameters reversed — code will not compile. | 🔴 ERROR |
-| Example code `await producer.PublishAsync("orders.created", envelope)` uses wrong parameter order. | 🔴 ERROR |
-
-**Tutorial 06 — Messaging Channels:**
-
-| Issue | Severity |
-|-------|----------|
-| `IPublishSubscribeChannel.PublishAsync<T>` missing required `string channel` parameter. Actual: `PublishAsync<T>(IntegrationEnvelope<T> envelope, string channel, CancellationToken ct)`. Code will not compile. | 🔴 ERROR |
-| `IPublishSubscribeChannel.SubscribeAsync<T>` missing required `string channel` parameter (first param). Actual: `SubscribeAsync<T>(string channel, string subscriberId, Func<...> handler, CancellationToken ct)`. Code will not compile. | 🔴 ERROR |
-| `InvalidMessageChannel.RouteInvalidAsync` parameter named `validationError` but actual is `reason`. | 🟡 WARNING |
-
-**Tutorial 07 — Temporal Workflows:**
-
-| Issue | Severity |
-|-------|----------|
-| Shows `IntegrationPipelineResult.Failed(errors)` and `.Succeeded()` static factory methods but these do not exist. `IntegrationPipelineResult` is a record with constructor: `new IntegrationPipelineResult(Guid MessageId, bool IsSuccess, string? FailureReason)`. Code will not compile. | 🔴 ERROR |
 
 ---
 

@@ -72,7 +72,7 @@ public class IntegrationPipelineWorkflow
             await Workflow.ExecuteActivityAsync(
                 (IntegrationActivities a) => a.PublishNackAsync(input, validationResult),
                 ActivityOptions);
-            return IntegrationPipelineResult.Failed(validationResult.Errors);
+            return new IntegrationPipelineResult(input.MessageId, false, string.Join("; ", validationResult.Errors));
         }
 
         // Step 3: Update status to InFlight
@@ -85,7 +85,7 @@ public class IntegrationPipelineWorkflow
             (IntegrationActivities a) => a.PublishAckAsync(input),
             ActivityOptions);
 
-        return IntegrationPipelineResult.Succeeded();
+        return new IntegrationPipelineResult(input.MessageId, true);
     }
 }
 ```
@@ -145,7 +145,7 @@ public class AtomicPipelineWorkflow
             completedSteps.Push("deliver");
 
             await PublishAck(input);
-            return IntegrationPipelineResult.Succeeded();
+            return new IntegrationPipelineResult(input.MessageId, true);
         }
         catch (Exception ex)
         {
@@ -160,7 +160,7 @@ public class AtomicPipelineWorkflow
             }
 
             await PublishNack(input, ex);
-            return IntegrationPipelineResult.Failed(ex.Message);
+            return new IntegrationPipelineResult(input.MessageId, false, ex.Message);
         }
     }
 }

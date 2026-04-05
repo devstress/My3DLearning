@@ -4,6 +4,17 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 075 – Fix Tutorials 05, 06, 07
+
+- **Date**: 2026-04-05
+- **Status**: done
+- **Goal**: Fix compilation errors in core-concept tutorials (message broker parameter order, missing channel params, non-existent factory methods).
+- **Files modified**:
+  - `tutorials/05-message-brokers.md` — Fixed `PublishAsync` parameter order from `(topic, envelope)` to `(envelope, topic)` in interface definition and example code.
+  - `tutorials/06-messaging-channels.md` — Added missing `string channel` parameter to `IPublishSubscribeChannel.PublishAsync` and `SubscribeAsync`. Fixed `RouteInvalidAsync` parameter name from `validationError` to `reason`.
+  - `tutorials/07-temporal-workflows.md` — Replaced non-existent `IntegrationPipelineResult.Succeeded()` and `.Failed()` factory methods with record constructor `new IntegrationPipelineResult(messageId, isSuccess, failureReason)`.
+- **Test counts**: No source changes — documentation only.
+
 ## Chunk 074 – Phase 14 Completion
 
 - **Date**: 2026-04-04
