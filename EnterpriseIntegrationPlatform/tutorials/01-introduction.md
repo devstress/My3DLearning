@@ -152,41 +152,49 @@ By the end of this course, you'll understand how to:
 
 ---
 
-## Lab Exercise
+## Lab
 
-**Objective:** Explore the platform's project structure and identify how EIP patterns map to concrete source code components.
+**Objective:** Map EIP pattern categories to concrete platform components and trace how the Pipes and Filters architecture enables scalable message processing.
 
-### Step 1: Browse the EIP Pattern Mapping
+### Step 1: Map Patterns to Projects
 
-Open [`docs/eip-mapping.md`](../docs/eip-mapping.md) and [`docs/architecture-overview.md`](../docs/architecture-overview.md). For each of the following EIP pattern categories — Message Construction, Message Routing, and Message Transformation — find at least one `src/` project that implements it. Record the project name and the primary interface it exposes (e.g., `Processing.Routing` → `IContentBasedRouter`).
+Open [`docs/eip-mapping.md`](../docs/eip-mapping.md). For each of the following EIP categories, identify the `src/` project that implements it and the primary interface it exposes:
 
-### Step 2: Inspect a Processing Project
+| Category | Project | Interface |
+|----------|---------|-----------|
+| Message Construction | `src/Contracts/` | ? |
+| Content-Based Router | `src/Processing.Routing/` | ? |
+| Message Translator | `src/Processing.Translator/` | ? |
+| Splitter | `src/Processing.Splitter/` | ? |
+| Dead Letter Channel | `src/Processing.DeadLetter/` | ? |
 
-Open `src/Processing.Routing/` in your IDE. Locate the `IContentBasedRouter` interface and its `RouteAsync` method signature. Then open `src/Processing.Splitter/` and find `IMessageSplitter<T>`. Note how both interfaces accept an `IntegrationEnvelope<T>` — this is the platform's canonical message wrapper from `src/Contracts/`.
+### Step 2: Trace the Pipes and Filters Chain
 
-### Step 3: Write a Unit Test
+Open [`docs/architecture-overview.md`](../docs/architecture-overview.md) and trace how a single message flows through the platform: Ingress → Broker → Workflow → Activities → Connectors. For each stage, write down which EIP pattern it implements and how the platform guarantees **atomicity** (hint: look at Temporal workflows and Ack/Nack).
 
-Create a test class named `EipPatternDiscoveryTests` in the `tests/UnitTests/` project. Add a test method called `IntegrationEnvelope_ImplementsRecordSemantics_SupportsWithExpressions` that creates an `IntegrationEnvelope<string>` using the `IntegrationEnvelope<string>.Create()` factory method, then uses a `with` expression to change the `Source` property, and asserts that the original envelope is unchanged while the new envelope has the updated source.
+### Step 3: Evaluate Scalability Points
 
-## Knowledge Check
+Identify three places in the architecture where **horizontal scaling** is possible without code changes. Consider: broker partitions, Competing Consumers (`src/Processing.CompetingConsumers/`), and workflow workers. For each, explain what happens to in-flight messages when a new instance is added.
 
-1. Which integration style does the Enterprise Integration Patterns book recommend for loosely coupled, asynchronous communication between systems?
+## Exam
+
+1. Which integration style does the EIP book recommend for loosely coupled, asynchronous communication between systems?
    - A) File Transfer
    - B) Shared Database
    - C) Messaging
    - D) Remote Procedure Invocation
 
-2. In the platform's architecture, what is the role of `IntegrationEnvelope<T>`?
-   - A) It serializes messages to XML for transport over HTTP
-   - B) It serves as the canonical message wrapper carrying payload, identity, and metadata through every processing stage
-   - C) It stores messages in a relational database for auditing
-   - D) It encrypts message payloads before publishing to brokers
+2. In the Pipes and Filters pattern, what property must each filter maintain to allow independent scaling?
+   - A) Global mutable state shared across filters
+   - B) Stateless processing with all context carried in the message envelope
+   - C) Direct method calls to the next filter in the chain
+   - D) A persistent database connection for every filter
 
-3. Why does the platform define processing components behind interfaces such as `IContentBasedRouter` and `IMessageSplitter<T>` rather than concrete classes?
-   - A) Interfaces are required by the .NET runtime for serialization
-   - B) It allows each component to be tested, replaced, and composed independently — following the Pipes and Filters pattern
-   - C) Concrete classes cannot be used with dependency injection in .NET
-   - D) Interfaces automatically provide thread safety
+3. How does the platform guarantee **zero message loss** when a processing step fails mid-pipeline?
+   - A) Messages are stored in memory and retried indefinitely
+   - B) Temporal workflows provide durable execution with saga compensation — either all steps complete or compensating actions roll back committed work
+   - C) The broker automatically resends messages every 5 seconds
+   - D) Failed messages are silently discarded to avoid blocking the pipeline
 
 ---
 

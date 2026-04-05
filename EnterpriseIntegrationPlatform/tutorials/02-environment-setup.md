@@ -246,56 +246,63 @@ You need `Microsoft.NETCore.App 10.x.x` and `Microsoft.AspNetCore.App 10.x.x`.
 
 ---
 
-## Lab Exercise
+## Lab
 
-**Objective:** Build the solution, run the test suite, and launch the .NET Aspire dashboard to verify your development environment is fully operational.
+**Objective:** Build the solution, launch the Aspire orchestrator, and explore how the platform's service topology implements the EIP Messaging Gateway and Control Bus patterns.
 
-### Step 1: Build and Run the Test Suite
+### Step 1: Build and Launch
 
 Open a terminal in the repository root and execute:
 
 ```bash
-dotnet restore
-dotnet build --no-restore
-dotnet test --no-build --verbosity normal
+dotnet restore EnterpriseIntegrationPlatform.sln
+dotnet build EnterpriseIntegrationPlatform.sln
 ```
 
-Confirm that the build succeeds with zero errors and that all test projects (UnitTests, ContractTests, WorkflowTests) report their results.
+Confirm the build succeeds with zero errors and zero warnings.
 
-### Step 2: Launch the Aspire Dashboard
+### Step 2: Explore the Aspire Service Topology
 
-Start the orchestrator and open the dashboard:
+Start the orchestrator:
 
 ```bash
 cd src/AppHost
 dotnet run
 ```
 
-Open the Aspire dashboard URL printed in the console (typically `https://localhost:15888`). Locate the **Gateway.Api**, **Admin.Api**, and **OpenClaw.Web** resources. Click into each resource and verify its health check endpoint returns a healthy status.
+Open the Aspire dashboard URL printed in the console. Identify each service and classify it by EIP role:
 
-### Step 3: Write a Unit Test
+| Service | EIP Role |
+|---------|----------|
+| Gateway.Api | Messaging Gateway — single entry point for external systems |
+| Admin.Api | Control Bus — runtime administration and monitoring |
+| OpenClaw.Web | ? (identify its role) |
 
-In the `tests/UnitTests/` project, create a test class named `EnvironmentVerificationTests`. Add a test method called `AppHost_ServiceDefaultsAssembly_CanBeLoaded` that uses `typeof(EnterpriseIntegrationPlatform.Contracts.IntegrationEnvelope<string>).Assembly` to verify the Contracts assembly loads successfully. Assert that the assembly is not null and that its `GetTypes()` array contains the `IntegrationEnvelope<T>` type.
+Click each resource's health endpoint. Explain why health checks are essential for **scalability** — what happens when a load balancer cannot determine service health?
 
-## Knowledge Check
+### Step 3: Trace a Message Path Through Services
 
-1. Which command restores NuGet packages for every project in the solution before building?
-   - A) `dotnet build --restore`
-   - B) `dotnet restore`
-   - C) `dotnet nuget install`
-   - D) `dotnet pack`
+Using the Aspire dashboard's **Traces** tab, identify the OpenTelemetry spans created when a message enters the Gateway. Draw the message flow: Gateway → Broker → Workflow → Activities → Connector. For each hop, note which EIP pattern is being applied (e.g., Gateway = Messaging Gateway, Broker = Message Channel, Workflow = Process Manager).
 
-2. What is the purpose of the `src/AppHost` project in this platform?
-   - A) It hosts the production web application behind a reverse proxy
-   - B) It is the .NET Aspire orchestrator that starts all services and infrastructure containers in the correct order
-   - C) It compiles all projects into a single deployable binary
-   - D) It runs database migrations on startup
+## Exam
 
-3. Why does the platform organize tests into separate projects (UnitTests, ContractTests, IntegrationTests) rather than a single test project?
-   - A) .NET only allows one test framework per project
-   - B) It enables running fast unit tests independently from slow integration tests that require infrastructure like Docker containers
-   - C) Each test project must target a different .NET version
-   - D) NUnit requires separate assemblies for parallel execution
+1. In the EIP Messaging Gateway pattern, what is the gateway's primary responsibility?
+   - A) Transform message payloads between formats
+   - B) Provide a single entry point that encapsulates messaging-specific logic and shields external systems from internal broker details
+   - C) Store messages permanently in a database
+   - D) Route messages based on content inspection
+
+2. Why does the platform use .NET Aspire to orchestrate services rather than starting each service manually?
+   - A) Aspire encrypts all inter-service communication automatically
+   - B) Aspire ensures services start in dependency order with shared configuration, health checks, and observability — critical for a distributed integration platform's operational reliability
+   - C) Manual startup is not supported by .NET 10
+   - D) Aspire compiles all services into a single executable
+
+3. How does the Control Bus pattern (implemented by Admin.Api) support **operational scalability**?
+   - A) It routes business messages to faster consumers
+   - B) It provides centralized runtime management — feature flags, DLQ resubmission, and health monitoring — without modifying or redeploying processing pipelines
+   - C) It increases the number of broker partitions automatically
+   - D) It caches all messages in memory for faster retrieval
 
 ---
 
