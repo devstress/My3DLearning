@@ -46,6 +46,25 @@ See `milestones.md` for current phase status and next chunk.
   - `tests/UnitTests/MessageFilterTests.cs` — Added 3 new tests: `RequireDiscardTopic_NoDiscardTopic_ThrowsInvalidOperation`, `RequireDiscardTopic_WithDiscardTopic_RoutesNormally`, `DiscardPublishFails_ExceptionPropagatesForNack`.
 - **Test counts**: 1,486 UnitTests (+3). 1,619 total tests.
 
+## Chunk 083 – Content Enricher: Database and Cache Sources
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Implement database and cache enrichment sources as promised by tutorial 18 (line 7): "Enrichment sources: HTTP lookups, database queries, cache."
+- **Architecture**: Extracted `IEnrichmentSource` interface. Created `HttpEnrichmentSource` (HTTP GET), `DatabaseEnrichmentSource` (parameterised SQL via `DbConnection`), and `CachedEnrichmentSource` (decorator using `IMemoryCache` with configurable TTL). `ContentEnricher` now accepts `IEnrichmentSource` while maintaining backward-compatible `IHttpClientFactory` constructor.
+- **Files created**:
+  - `src/Processing.Transform/IEnrichmentSource.cs` — Interface with `FetchAsync(string lookupKey, CancellationToken)`.
+  - `src/Processing.Transform/HttpEnrichmentSource.cs` — HTTP GET implementation.
+  - `src/Processing.Transform/DatabaseEnrichmentSource.cs` — Parameterised SQL with `DbConnection`.
+  - `src/Processing.Transform/CachedEnrichmentSource.cs` — In-memory cache decorator with configurable TTL.
+  - `tests/UnitTests/EnrichmentSourceTests.cs` — 5 new tests: cache miss, cache hit, cache expiry, null caching, custom-source integration.
+- **Files modified**:
+  - `src/Processing.Transform/ContentEnricher.cs` — Refactored to use `IEnrichmentSource`, added backward-compatible `IHttpClientFactory` constructor.
+  - `src/Processing.Transform/Processing.Transform.csproj` — Added `Microsoft.Extensions.Caching.Memory`.
+  - `Directory.Packages.props` — Added `Microsoft.Extensions.Caching.Memory` 10.0.5.
+- **Test counts**: 1,491 UnitTests (+5). 1,624 total tests. All 12 existing enricher tests pass unchanged.
+
 ## Chunk 075 – Fix Tutorials 05, 06, 07
 
 - **Date**: 2026-04-05

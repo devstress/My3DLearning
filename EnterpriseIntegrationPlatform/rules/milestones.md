@@ -24,7 +24,7 @@
 
 ✅ Phases 1–21 complete — see `rules/completion-log.md` for full history.
 
-**Current stats:** 1,486 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,619 total tests**. 48 src projects.
+**Current stats:** 1,491 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,624 total tests**. 48 src projects.
 
 ---
 
@@ -45,17 +45,6 @@
 ### Phase 22 — Implement Unfulfilled Tutorial Promises
 
 **Scope:** Audit of all 50 tutorials against source code found 13 features that tutorials promise but are not implemented. These chunks implement the missing features so that every tutorial claim is backed by working code.
-
-#### Chunk 083 — Content Enricher: Database and Cache Sources
-
-| Field | Value |
-|-------|-------|
-| Status | `not-started` |
-| Tutorial | 18 — Content Enricher (line 7) |
-| Claim | "Enrichment sources: HTTP lookups, database queries, cache" |
-| Current State | `ContentEnricher` only supports HTTP GET. No database or cache enrichment. |
-| Implementation | Extract enrichment source as `IEnrichmentSource` interface with `FetchAsync(string lookupKey, CancellationToken ct)`. Implement `HttpEnrichmentSource` (extract current HTTP logic), `DatabaseEnrichmentSource` (uses `IDbConnection` with parameterized SQL from options), and `CachedEnrichmentSource` (decorator using `IMemoryCache` with configurable TTL). `ContentEnricher` takes `IEnrichmentSource` instead of `IHttpClientFactory`. Add `EnrichmentSourceType` enum to options. Add unit tests for each source and caching behavior. |
-| Files | New `src/Processing.Transform/IEnrichmentSource.cs`, `src/Processing.Transform/HttpEnrichmentSource.cs`, `src/Processing.Transform/DatabaseEnrichmentSource.cs`, `src/Processing.Transform/CachedEnrichmentSource.cs`, `src/Processing.Transform/ContentEnricherOptions.cs`, `src/Processing.Transform/ContentEnricher.cs`, `tests/UnitTests/ContentEnricherTests.cs` |
 
 #### Chunk 084 — Normalizer: Use XmlRootName Option
 
@@ -158,7 +147,7 @@
 
 ## Next Chunk
 
-**Chunk 083** — Content Enricher: Database and Cache Sources
+**Chunk 084** — Normalizer: Use XmlRootName Option
 
 ---
 
