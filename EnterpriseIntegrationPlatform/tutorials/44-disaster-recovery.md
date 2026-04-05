@@ -31,21 +31,18 @@
 
 ## DisasterRecovery Module
 
-The `src/DisasterRecovery/` project provides:
+The `src/DisasterRecovery/` project provides three core interfaces:
 
 ```csharp
-public class DisasterRecoveryService : IDisasterRecoveryService
+// src/DisasterRecovery/IFailoverManager.cs
+public interface IFailoverManager
 {
-    public async Task<FailoverResult> InitiateFailoverAsync(
-        FailoverRequest request, CancellationToken ct)
-    {
-        // 1. Verify secondary region health
-        // 2. Drain primary message queues
-        // 3. Switch DNS / load balancer target
-        // 4. Activate secondary consumers
-        // 5. Validate end-to-end message flow
-        return new FailoverResult { Success = true, ElapsedMs = elapsed };
-    }
+    Task RegisterRegionAsync(RegionInfo region, CancellationToken cancellationToken = default);
+    Task<RegionInfo?> GetPrimaryAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<RegionInfo>> GetAllRegionsAsync(CancellationToken cancellationToken = default);
+    Task<FailoverResult> FailoverAsync(string targetRegionId, CancellationToken cancellationToken = default);
+    Task<FailoverResult> FailbackAsync(string originalPrimaryRegionId, CancellationToken cancellationToken = default);
+    Task UpdateHealthCheckAsync(string regionId, CancellationToken cancellationToken = default);
 }
 ```
 
@@ -114,17 +111,14 @@ GET  /api/admin/dr/drill/history   # Past drill results and metrics
 Automated drills validate recovery without production impact:
 
 ```csharp
-public class DrDrillService
+// src/DisasterRecovery/IDrDrillRunner.cs
+public interface IDrDrillRunner
 {
-    public async Task<DrillResult> RunDrillAsync()
-    {
-        // 1. Publish test messages to primary
-        // 2. Simulate primary failure (stop consumers)
-        // 3. Verify secondary picks up within RTO
-        // 4. Validate no message loss (RPO check)
-        // 5. Restore primary and rebalance
-        return result;
-    }
+    Task<DrDrillResult> RunDrillAsync(
+        DrDrillScenario scenario, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DrDrillResult>> GetDrillHistoryAsync(
+        int limit = 50, CancellationToken cancellationToken = default);
+    Task<DrDrillResult?> GetLastDrillResultAsync(CancellationToken cancellationToken = default);
 }
 ```
 

@@ -42,25 +42,24 @@ Capture CPU and runtime profiling snapshots to identify hot paths:
 ```csharp
 public sealed class ContinuousProfiler
 {
-    public ContinuousProfiler(IOptions<ProfilingOptions> options) { /* ... */ }
+    public ContinuousProfiler(ILogger<ContinuousProfiler> logger, IOptions<ProfilingOptions> options) { /* ... */ }
 
-    public ProfilingSnapshot CaptureSnapshot()
+    public ProfileSnapshot CaptureSnapshot(string? label = null)
     {
-        // Captures a point-in-time snapshot of CPU and runtime metrics
-        return new ProfilingSnapshot
+        // Captures a point-in-time snapshot with nested Cpu, Memory, and Gc sub-objects
+        return new ProfileSnapshot
         {
-            CpuUsagePercent = GetCpuUsage(),
-            WorkingSetMb = GetWorkingSet(),
-            GcGen0Collections = GC.CollectionCount(0),
-            GcGen1Collections = GC.CollectionCount(1),
-            GcGen2Collections = GC.CollectionCount(2),
-            ThreadCount = GetThreadCount(),
-            Timestamp = DateTimeOffset.UtcNow
+            SnapshotId = Guid.NewGuid().ToString("N"),
+            CapturedAt = DateTimeOffset.UtcNow,
+            Cpu = new CpuSnapshot { /* CpuUsagePercent, ThreadCount, ... */ },
+            Memory = new MemorySnapshot { /* WorkingSetBytes, ManagedHeapSizeBytes, ... */ },
+            Gc = new GcSnapshot { /* Gen0Collections, Gen1Collections, Gen2Collections, ... */ },
+            Label = label
         };
     }
 
-    public IReadOnlyList<ProfilingSnapshot> GetSnapshots(int count = 10) { /* ... */ }
-    public ProfilingSnapshot? GetLatestSnapshot() { /* ... */ }
+    public IReadOnlyList<ProfileSnapshot> GetSnapshots(DateTimeOffset from, DateTimeOffset to) { /* ... */ }
+    public ProfileSnapshot? GetLatestSnapshot() { /* ... */ }
 }
 ```
 
@@ -84,8 +83,8 @@ public sealed class GcMonitor
         };
     }
 
-    public IReadOnlyList<string> GetRecommendations() { /* ... */ }
-    public IReadOnlyList<GcSnapshot> GetHistory(int count = 10) { /* ... */ }
+    public IReadOnlyList<GcTuningRecommendation> GetRecommendations() { /* ... */ }
+    public IReadOnlyList<GcSnapshot> GetHistory() { /* ... */ }
     public void ClearHistory() { /* ... */ }
 }
 ```

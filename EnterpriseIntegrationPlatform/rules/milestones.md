@@ -28,7 +28,7 @@
 
 ## Next Chunk
 
-➡️ Phase 15 — Tutorial Fixes Round 2 (chunk 078)
+➡️ Phase 15 — Tutorial Fixes Round 2 (chunk 079)
 
 ---
 
@@ -38,44 +38,7 @@ Re-audit of all 50 tutorials (2026-04-05) found **17 tutorials still have errors
 
 | Chunk | Goal | Tutorials | Status |
 |-------|------|-----------|--------|
-| 078 | Fix tutorials 42, 44, 45, 46 (config, DR, profiling, end-to-end errors) | 42, 44, 45, 46 | `not-started` |
 | 079 | Fix tutorials 48, 49 and update test counts | 48, 49 | `not-started` |
-
----
-
-#### Chunk 078 — Fix Tutorials 42, 44, 45, 46
-
-**Tutorial 42 — Configuration:**
-
-| Issue | Severity |
-|-------|----------|
-| `IFeatureFlagService.GetVariantAsync` shown as `(string flagName, string? tenantId, CancellationToken ct)` but actual is `(string name, string variantKey, CancellationToken ct)`. Completely different parameters. | 🔴 ERROR |
-| `IConfigurationStore.WatchAsync` return type shown as `IAsyncEnumerable<ConfigurationChange>` but actual is `IObservable<ConfigurationChange>`. Different consumption pattern. | 🔴 ERROR |
-| `IConfigurationStore.GetAsync` `environment` parameter shown as required but actual has default `"default"`. | 🟡 WARNING |
-
-**Tutorial 44 — Disaster Recovery:**
-
-| Issue | Severity |
-|-------|----------|
-| `DisasterRecoveryService` class shown but does not exist. Actual architecture uses `IFailoverManager`, `IReplicationManager`, `IDrDrillRunner`. | 🔴 ERROR |
-| `DrDrillService` class shown but actual is `DrDrillRunner`. | 🔴 ERROR |
-| `InitiateFailoverAsync(FailoverRequest)` does not exist. Actual is `IFailoverManager.FailoverAsync(string targetRegionId, CancellationToken)`. | 🔴 ERROR |
-
-**Tutorial 45 — Performance Profiling:**
-
-| Issue | Severity |
-|-------|----------|
-| `ContinuousProfiler.CaptureSnapshot()` return type shown as `ProfilingSnapshot` but actual is `ProfileSnapshot` with nested structure (Cpu, Memory, Gc sub-objects). | 🔴 ERROR |
-| `ContinuousProfiler.GetSnapshots(int count = 10)` — actual is `GetSnapshots(DateTimeOffset from, DateTimeOffset to)`. Completely different parameters. | 🔴 ERROR |
-| `GcMonitor.GetHistory(int count = 10)` — actual `GetHistory()` takes no parameters. | 🔴 ERROR |
-| `GcMonitor.GetRecommendations()` shown returning `IReadOnlyList<string>` but actual returns `IReadOnlyList<GcTuningRecommendation>`. | 🔴 ERROR |
-
-**Tutorial 46 — Complete End-to-End Integration:**
-
-| Issue | Severity |
-|-------|----------|
-| `HttpChannelAdapter : IChannelAdapter` class shown but does not exist. Actual is `HttpConnectorAdapter : IConnector` at `src/Connector.Http/HttpConnectorAdapter.cs`. | 🔴 ERROR |
-| Activity class names in workflow example differ from actual (`ValidateActivity` etc. vs `PipelineActivities`/`IntegrationActivities`). | 🟡 WARNING |
 
 ---
 

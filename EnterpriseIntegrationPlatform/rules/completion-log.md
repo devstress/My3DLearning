@@ -38,6 +38,18 @@ See `milestones.md` for current phase status and next chunk.
   - `tutorials/38-opentelemetry.md` — Fixed `DiagnosticsConfig` from instance class with `init` properties to `static` class with `const`/`static readonly` members.
 - **Test counts**: No source changes — documentation only.
 
+## Chunk 078 – Fix Tutorials 42, 44, 45, 46
+
+- **Date**: 2026-04-05
+- **Status**: done
+- **Goal**: Fix configuration API signatures, disaster recovery class names, performance profiling types, and end-to-end connector references.
+- **Files modified**:
+  - `tutorials/42-configuration.md` — Fixed `GetVariantAsync` params from `(flagName, tenantId)` to `(name, variantKey)`. Fixed `WatchAsync` return from `IAsyncEnumerable` to `IObservable`. Fixed `GetAsync` `environment` param default. Fixed `ConfigurationEntry` record fields. Fixed `SetAsync` return type.
+  - `tutorials/44-disaster-recovery.md` — Replaced non-existent `DisasterRecoveryService` with actual `IFailoverManager` interface. Replaced `DrDrillService` with `IDrDrillRunner` interface and correct method signatures.
+  - `tutorials/45-performance-profiling.md` — Fixed `ProfilingSnapshot` → `ProfileSnapshot` with nested structure (Cpu, Memory, Gc). Fixed `GetSnapshots(int count)` → `GetSnapshots(DateTimeOffset from, DateTimeOffset to)`. Fixed `GetHistory(int count)` → `GetHistory()`. Fixed `GetRecommendations()` return from `IReadOnlyList<string>` to `IReadOnlyList<GcTuningRecommendation>`.
+  - `tutorials/46-complete-integration.md` — Fixed `HttpChannelAdapter : IChannelAdapter` → `HttpConnectorAdapter : IConnector` with correct `SendAsync` signature.
+- **Test counts**: No source changes — documentation only.
+
 ## Chunk 074 – Phase 14 Completion
 
 - **Date**: 2026-04-04

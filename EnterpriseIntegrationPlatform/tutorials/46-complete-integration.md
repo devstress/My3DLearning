@@ -126,21 +126,19 @@ correct destination channel:
 
 ## Step 7: Deliver (Channel Adapter)
 
-The **Channel Adapter** delivers the message to the external system via HTTP:
+The **Channel Adapter** delivers the message to the external system via the connector:
 
 ```csharp
-public class HttpChannelAdapter : IChannelAdapter
+// src/Connector.Http/HttpConnectorAdapter.cs
+public sealed class HttpConnectorAdapter : IConnector
 {
-    public async Task<DeliveryResult> DeliverAsync(
-        IntegrationEnvelope envelope, CancellationToken ct)
+    public async Task<ConnectorResult> SendAsync<T>(
+        IntegrationEnvelope<T> envelope,
+        ConnectorSendOptions options,
+        CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.PostAsync(
-            envelope.DestinationEndpoint, envelope.ToHttpContent(), ct);
-        return new DeliveryResult
-        {
-            Success = response.IsSuccessStatusCode,
-            StatusCode = (int)response.StatusCode
-        };
+        // Sends the envelope payload via HTTP to the configured endpoint
+        // Returns ConnectorResult with success/failure status
     }
 }
 ```
