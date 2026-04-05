@@ -204,17 +204,21 @@ public class ScatterGathererTests
         var correlationId = Guid.NewGuid();
         var request = new ScatterRequest<string>(correlationId, "payload", ["topic-a", "topic-b"]);
 
-        // Submit only one response
+        // Submit only one response (on the first publish only)
+        var submitted = 0;
         _producer
             .When(p => p.PublishAsync(Arg.Any<IntegrationEnvelope<string>>(), Arg.Any<string>(), Arg.Any<CancellationToken>()))
             .Do(_ =>
             {
-                Task.Run(async () =>
+                if (Interlocked.Increment(ref submitted) == 1)
                 {
-                    await Task.Delay(50);
-                    await sut.SubmitResponseAsync(correlationId,
-                        new GatherResponse<string>("topic-a", "resp-a", DateTimeOffset.UtcNow, true, null));
-                });
+                    Task.Run(async () =>
+                    {
+                        await Task.Delay(50);
+                        await sut.SubmitResponseAsync(correlationId,
+                            new GatherResponse<string>("topic-a", "resp-a", DateTimeOffset.UtcNow, true, null));
+                    });
+                }
             });
 
         var result = await sut.ScatterGatherAsync(request);
