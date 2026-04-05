@@ -79,7 +79,7 @@ for saga compensation). Temporal manages retries and state.
 public class IntegrationPipelineWorkflow
 {
     [WorkflowRun]
-    public async Task<PipelineResult> RunAsync(IntegrationPipelineInput input)
+    public async Task<IntegrationPipelineResult> RunAsync(IntegrationPipelineInput input)
     {
         // Step 1: Persist message to storage
         await Workflow.ExecuteActivityAsync(
@@ -94,12 +94,15 @@ public class IntegrationPipelineWorkflow
 
         if (!validation.IsValid)
         {
-            await Workflow.ExecuteActivityAsync(
-                (PipelineActivities act) =>
-                    act.PublishNackAsync(input.MessageId, input.CorrelationId,
-                        validation.ErrorMessage, input.SourceTopic),
-                NackActivityOptions);
-            return PipelineResult.Failed(validation.ErrorMessage);
+            if (input.NotificationsEnabled)
+            {
+                await Workflow.ExecuteActivityAsync(
+                    (PipelineActivities act) =>
+                        act.PublishNackAsync(input.MessageId, input.CorrelationId,
+                            validation.Reason ?? "Validation failed", input.NackSubject),
+                    PipelineActivityOptions);
+            }
+            return new IntegrationPipelineResult(input.MessageId, false, validation.Reason);
         }
 
         // Steps 3-4: Transform and Route are handled externally via
@@ -108,13 +111,16 @@ public class IntegrationPipelineWorkflow
         // handle format conversion and routing decisions.
 
         // Step 5: Publish success acknowledgment
-        await Workflow.ExecuteActivityAsync(
-            (PipelineActivities act) =>
-                act.PublishAckAsync(input.MessageId, input.CorrelationId,
-                    input.SourceTopic),
-            AckActivityOptions);
+        if (input.NotificationsEnabled)
+        {
+            await Workflow.ExecuteActivityAsync(
+                (PipelineActivities act) =>
+                    act.PublishAckAsync(input.MessageId, input.CorrelationId,
+                        input.AckSubject),
+                PipelineActivityOptions);
+        }
 
-        return PipelineResult.Succeeded();
+        return new IntegrationPipelineResult(input.MessageId, true);
     }
 }
 ```

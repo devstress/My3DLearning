@@ -58,32 +58,60 @@ public class IntegrationPipelineWorkflow
     {
         // Step 1: Persist the message (status: Pending)
         await Workflow.ExecuteActivityAsync(
-            (IntegrationActivities a) => a.PersistMessageAsync(input),
-            ActivityOptions);
+            (PipelineActivities act) => act.PersistMessageAsync(input),
+            PipelineActivityOptions);
 
-        // Step 2: Validate the message
-        var validationResult = await Workflow.ExecuteActivityAsync(
-            (IntegrationActivities a) => a.ValidateMessageAsync(input),
-            ActivityOptions);
+        // Step 2: Log Received lifecycle event
+        await Workflow.ExecuteActivityAsync(
+            (PipelineActivities act) =>
+                act.LogStageAsync(input.MessageId, input.MessageType, "Received"),
+            PipelineActivityOptions);
 
-        if (!validationResult.IsValid)
+        // Step 3: Validate the message
+        var validation = await Workflow.ExecuteActivityAsync(
+            (IntegrationActivities act) =>
+                act.ValidateMessageAsync(input.MessageType, input.PayloadJson),
+            ValidationActivityOptions);
+
+        if (!validation.IsValid)
         {
-            // Publish Nack and route to DLQ
+            // Publish Nack and update status to Failed
             await Workflow.ExecuteActivityAsync(
-                (IntegrationActivities a) => a.PublishNackAsync(input, validationResult),
-                ActivityOptions);
-            return new IntegrationPipelineResult(input.MessageId, false, string.Join("; ", validationResult.Errors));
+                (PipelineActivities act) =>
+                    act.UpdateDeliveryStatusAsync(
+                        input.MessageId, input.CorrelationId,
+                        input.Timestamp, "Failed"),
+                PipelineActivityOptions);
+
+            if (input.NotificationsEnabled)
+            {
+                await Workflow.ExecuteActivityAsync(
+                    (PipelineActivities act) =>
+                        act.PublishNackAsync(
+                            input.MessageId, input.CorrelationId,
+                            validation.Reason ?? "Validation failed", input.NackSubject),
+                    PipelineActivityOptions);
+            }
+
+            return new IntegrationPipelineResult(input.MessageId, false, validation.Reason);
         }
 
-        // Step 3: Update status to InFlight
+        // Step 4: Update status to Delivered
         await Workflow.ExecuteActivityAsync(
-            (IntegrationActivities a) => a.UpdateStatusAsync(input, DeliveryStatus.InFlight),
-            ActivityOptions);
+            (PipelineActivities act) =>
+                act.UpdateDeliveryStatusAsync(
+                    input.MessageId, input.CorrelationId,
+                    input.Timestamp, "Delivered"),
+            PipelineActivityOptions);
 
-        // Step 4: Publish Ack
-        await Workflow.ExecuteActivityAsync(
-            (IntegrationActivities a) => a.PublishAckAsync(input),
-            ActivityOptions);
+        // Step 5: Publish Ack
+        if (input.NotificationsEnabled)
+        {
+            await Workflow.ExecuteActivityAsync(
+                (PipelineActivities act) =>
+                    act.PublishAckAsync(input.MessageId, input.CorrelationId, input.AckSubject),
+                PipelineActivityOptions);
+        }
 
         return new IntegrationPipelineResult(input.MessageId, true);
     }
@@ -119,49 +147,53 @@ Publish Nack with compensation details
 ```
 
 ```csharp
-// Simplified saga compensation flow
+// src/Workflow.Temporal/Workflows/AtomicPipelineWorkflow.cs (simplified)
 [Workflow]
 public class AtomicPipelineWorkflow
 {
     [WorkflowRun]
-    public async Task<IntegrationPipelineResult> RunAsync(
+    public async Task<AtomicPipelineResult> RunAsync(
         IntegrationPipelineInput input)
     {
-        var completedSteps = new Stack<string>();
+        var completedSteps = new List<string>();
 
-        try
+        // Step 1: Persist message as Pending
+        await Workflow.ExecuteActivityAsync(
+            (PipelineActivities act) => act.PersistMessageAsync(input),
+            PipelineActivityOptions);
+        completedSteps.Add("PersistMessage");
+
+        // Step 2: Validate message
+        var validation = await Workflow.ExecuteActivityAsync(
+            (IntegrationActivities act) =>
+                act.ValidateMessageAsync(input.MessageType, input.PayloadJson),
+            ValidationActivityOptions);
+
+        if (!validation.IsValid)
         {
-            // Execute steps, tracking each completed one
-            await ExecuteStep("persist", input);
-            completedSteps.Push("persist");
-
-            await ExecuteStep("validate", input);
-            completedSteps.Push("validate");
-
-            await ExecuteStep("transform", input);
-            completedSteps.Push("transform");
-
-            await ExecuteStep("deliver", input);
-            completedSteps.Push("deliver");
-
-            await PublishAck(input);
-            return new IntegrationPipelineResult(input.MessageId, true);
-        }
-        catch (Exception ex)
-        {
-            // Compensate in reverse order
-            while (completedSteps.Count > 0)
+            // Compensate all previously completed steps in reverse order
+            foreach (var step in Enumerable.Reverse(completedSteps))
             {
-                var step = completedSteps.Pop();
                 await Workflow.ExecuteActivityAsync(
-                    (SagaCompensationActivities a) =>
-                        a.CompensateAsync(step, input),
-                    CompensationOptions);
+                    (SagaCompensationActivities act) =>
+                        act.CompensateStepAsync(input.CorrelationId, step),
+                    CompensationActivityOptions);
             }
 
-            await PublishNack(input, ex);
-            return new IntegrationPipelineResult(input.MessageId, false, ex.Message);
+            // Save fault and publish Nack
+            return new AtomicPipelineResult(
+                input.MessageId, false, validation.Reason);
         }
+
+        // Step 3: Update status to Delivered and Publish Ack
+        await Workflow.ExecuteActivityAsync(
+            (PipelineActivities act) =>
+                act.UpdateDeliveryStatusAsync(
+                    input.MessageId, input.CorrelationId,
+                    input.Timestamp, "Delivered"),
+            PipelineActivityOptions);
+
+        return new AtomicPipelineResult(input.MessageId, true);
     }
 }
 ```

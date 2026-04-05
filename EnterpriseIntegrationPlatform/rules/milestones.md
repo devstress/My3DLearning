@@ -22,33 +22,30 @@
 
 ## Completed Phases
 
-✅ Phases 1–15 complete — see `rules/completion-log.md` for full history.
+✅ Phases 1–16 complete — see `rules/completion-log.md` for full history.
 
 **Current stats:** 1,472 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,605 total tests**. 48 src projects.
 
 ---
 
-### Phase 16 — Tutorial Audit & Fixes (Round 3)
+### Phase 17 — Tutorial Audit & Fixes (Round 4)
 
-✅ Phase 16 complete.
+✅ Phase 17 complete.
 
-**Scope:** Full re-audit of all 50 tutorials by following each one as a new reader would.
+**Scope:** Fresh re-audit of all 50 tutorials by a new agent with no prior context — follow each tutorial as a reader would, verifying every code snippet, interface signature, property type, enum value, and file path against the actual source.
 
-**Findings:** 7 tutorials had issues; 43 passed clean.
+**Findings:** 4 tutorials had remaining issues; 46 passed clean.
 
 | Tutorial | Issue | Fix Applied |
 |----------|-------|-------------|
-| 07 — Temporal Workflows | `[ActivityMethod]` → `[Activity]`, `ValidationResult` → `MessageValidationResult`, method signatures and class split incorrect | Rewrote activity code blocks to show actual `IntegrationActivities` + `PipelineActivities` split with correct signatures |
-| 28 — Competing Consumers | `ConsumerLagInfo` record wrong (`TotalLag`/`ActiveConsumers`/`MeasuredAt` → `ConsumerGroup`/`Topic`/`CurrentLag`/`Timestamp`) | Fixed record definition and code example to use `CurrentLag` |
-| 29 — Throttle & Rate Limiting | `ThrottleResult.RemainingTokens` and `ThrottleMetrics` fields typed as `double` → actual is `int`; positional record → property-init | Updated to match actual property-init syntax with `int` types |
-| 30 — Rule Engine | `EvaluateAsync(IntegrationEnvelope<string>)` → actual is generic `EvaluateAsync<T>(IntegrationEnvelope<T>)` | Fixed to generic signature |
-| 33 — Security | `ISecretProvider` missing `version`/`metadata` params, `SecretEntry.Version` type `int`→`string`, `PayloadTooLargeException` wrong property names/types | Updated all signatures, types, and property names to match source |
-| 45 — Performance Profiling | `GcSnapshot` properties `Gen0`/`Gen1`/`Gen2`/`TotalMemoryMb` → actual `Gen0Collections`/etc./`TotalCommittedBytes` | Updated property names to match actual implementation |
-| 46 — Complete Integration | Non-existent activity classes (`ValidateActivity`, `TransformActivity`, etc.); mentions "RabbitMQ" (not used) | Replaced pseudo-code with actual workflow pattern; fixed broker name |
+| 07 — Temporal Workflows | Workflow code block still used wrong activity classes (`IntegrationActivities` for persist/ack/nack instead of `PipelineActivities`), wrong method names (`UpdateStatusAsync` vs `UpdateDeliveryStatusAsync`), wrong params (`validationResult.Errors` vs `validation.Reason`), saga block used `CompensateAsync` vs `CompensateStepAsync`, returned `IntegrationPipelineResult` instead of `AtomicPipelineResult` | Rewrote both workflow code blocks to match actual `IntegrationPipelineWorkflow.cs` and `AtomicPipelineWorkflow.cs` with correct activity class routing, parameter signatures, and return types |
+| 31 — Event Sourcing | `ISnapshotStore.LoadAsync` return type shown as nullable tuple `Task<(TState?, long)?>` — actual is non-nullable `Task<(TState?, long)>` | Removed trailing `?` from tuple return type |
+| 42 — Configuration | `FeatureFlag.TargetTenants` type shown as `IReadOnlyList<string>` → actual is `List<string>?`; `NotificationsEnabled` value lowercase `"notifications.enabled"` → actual PascalCase `"Notifications.Enabled"`; file path `src/Configuration/` → actual `src/Activities/` | Updated record definition to positional record matching source; fixed constant casing and file path |
+| 46 — Complete Integration | Return type `PipelineResult` → actual `IntegrationPipelineResult`; non-existent factory methods `PipelineResult.Failed()`/`Succeeded()` → actual uses constructor; `validation.ErrorMessage` → actual `validation.Reason`; `input.SourceTopic` → actual `input.NackSubject`/`input.AckSubject` | Rewrote workflow code block with correct types, constructors, property names, and notification guard |
 
 ## Next Chunk
 
-All phases complete (1–16). See `rules/completion-log.md` for full history.
+All phases complete (1–17). See `rules/completion-log.md` for full history.
 
 ---
 

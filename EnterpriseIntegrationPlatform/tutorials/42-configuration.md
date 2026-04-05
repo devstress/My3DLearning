@@ -76,13 +76,15 @@ public interface IFeatureFlagService
 
 ```csharp
 // src/Configuration/FeatureFlag.cs
-public sealed record FeatureFlag
+public sealed record FeatureFlag(
+    string Name,
+    bool IsEnabled = false,
+    Dictionary<string, string>? Variants = null,
+    int RolloutPercentage = 100,
+    List<string>? TargetTenants = null)
 {
-    public required string Name { get; init; }
-    public bool IsEnabled { get; init; }
-    public Dictionary<string, string> Variants { get; init; } = new();
-    public int RolloutPercentage { get; init; } = 100;
-    public IReadOnlyList<string> TargetTenants { get; init; } = Array.Empty<string>();
+    public Dictionary<string, string> Variants { get; init; } = Variants ?? new();
+    public List<string> TargetTenants { get; init; } = TargetTenants ?? [];
 }
 ```
 
@@ -119,10 +121,10 @@ The `EnvironmentOverrideProvider` reads environment variables using the conventi
 ### NotificationFeatureFlags
 
 ```csharp
-// src/Configuration/NotificationFeatureFlags.cs
+// src/Activities/NotificationFeatureFlags.cs
 public static class NotificationFeatureFlags
 {
-    public const string NotificationsEnabled = "notifications.enabled";
+    public const string NotificationsEnabled = "Notifications.Enabled";
 }
 ```
 
