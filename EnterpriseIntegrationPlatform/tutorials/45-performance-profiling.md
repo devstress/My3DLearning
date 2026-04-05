@@ -40,7 +40,7 @@
 Capture CPU and runtime profiling snapshots to identify hot paths:
 
 ```csharp
-public sealed class ContinuousProfiler
+public sealed class ContinuousProfiler : IContinuousProfiler
 {
     public ContinuousProfiler(ILogger<ContinuousProfiler> logger, IOptions<ProfilingOptions> options) { /* ... */ }
 
@@ -68,7 +68,7 @@ public sealed class ContinuousProfiler
 Track GC activity and detect memory issues:
 
 ```csharp
-public sealed class GcMonitor
+public sealed class GcMonitor : IGcMonitor
 {
     public GcSnapshot CaptureSnapshot()
     {

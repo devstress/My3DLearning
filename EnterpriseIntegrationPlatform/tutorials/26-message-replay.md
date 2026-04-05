@@ -62,7 +62,7 @@ public interface IMessageReplayStore
 
 ```csharp
 // src/Processing.Replay/ReplayFilter.cs
-public sealed record ReplayFilter
+public record ReplayFilter
 {
     public Guid? CorrelationId { get; init; }
     public string? MessageType { get; init; }

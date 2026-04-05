@@ -152,7 +152,7 @@ The consumer side uses `IMessageBrokerConsumer`:
 ```csharp
 // Location: src/Ingestion/IMessageBrokerConsumer.cs
 
-public interface IMessageBrokerConsumer
+public interface IMessageBrokerConsumer : IAsyncDisposable
 {
     Task SubscribeAsync<T>(
         string topic,

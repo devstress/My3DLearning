@@ -30,7 +30,7 @@ public interface INotificationMapper
     string MapNack(Guid messageId, Guid correlationId, string errorMessage);
 }
 
-public class XmlNotificationMapper : INotificationMapper
+public sealed class XmlNotificationMapper : INotificationMapper
 {
     public string MapAck(Guid messageId, Guid correlationId)
         => "<Ack>ok</Ack>";

@@ -57,7 +57,7 @@ public interface IMessageThrottle
 
 ```csharp
 // src/Processing.Throttle/TokenBucketThrottle.cs
-public sealed class TokenBucketThrottle : IMessageThrottle
+public sealed class TokenBucketThrottle : IMessageThrottle, IDisposable
 {
     // Each partition key gets its own bucket
     // Tokens refill at policy.RefillRate per second
@@ -82,10 +82,12 @@ public sealed record ThrottleResult
 
 ```csharp
 // src/Processing.Throttle/ThrottlePartitionKey.cs
-public sealed record ThrottlePartitionKey(
-    string? TenantId = null,
-    string? Queue = null,
-    string? Endpoint = null);
+public sealed record ThrottlePartitionKey
+{
+    public string? TenantId { get; init; }
+    public string? Queue { get; init; }
+    public string? Endpoint { get; init; }
+}
 ```
 
 | Key Property | Use Case |

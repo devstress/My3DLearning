@@ -78,7 +78,7 @@ public interface IConsumerLagMonitor
         CancellationToken ct = default);
 }
 
-public sealed record ConsumerLagInfo(
+public record ConsumerLagInfo(
     string ConsumerGroup,
     string Topic,
     long CurrentLag,
