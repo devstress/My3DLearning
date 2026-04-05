@@ -48,19 +48,19 @@ public interface IEventStore
         string streamId,
         IReadOnlyList<EventEnvelope> events,
         long expectedVersion,
-        CancellationToken ct = default);
+        CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<EventEnvelope>> ReadStreamAsync(
         string streamId,
         long fromVersion,
         int count,
-        CancellationToken ct = default);
+        CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<EventEnvelope>> ReadStreamBackwardAsync(
         string streamId,
         long fromVersion,
         int count,
-        CancellationToken ct = default);
+        CancellationToken cancellationToken = default);
 }
 ```
 
@@ -107,7 +107,7 @@ public static class TemporalQuery
         DateTimeOffset pointInTime,
         TState initialState,
         int maxEventsPerRead = 1000,
-        CancellationToken ct = default) where TState : notnull;
+        CancellationToken cancellationToken = default) where TState : notnull;
 }
 ```
 
@@ -117,8 +117,8 @@ public static class TemporalQuery
 // src/EventSourcing/ISnapshotStore.cs
 public interface ISnapshotStore<TState>
 {
-    Task SaveAsync(string streamId, TState state, long version, CancellationToken ct = default);
-    Task<(TState? State, long Version)> LoadAsync(string streamId, CancellationToken ct = default);
+    Task SaveAsync(string streamId, TState state, long version, CancellationToken cancellationToken = default);
+    Task<(TState? State, long Version)> LoadAsync(string streamId, CancellationToken cancellationToken = default);
 }
 ```
 

@@ -5,7 +5,7 @@
 - How `IMessageThrottle` controls message flow rate inside the pipeline
 - The `TokenBucketThrottle` algorithm: steady refill rate with burst capacity
 - `IThrottleRegistry` for managing multiple throttle policies per partition key
-- `ThrottlePolicy` with partition strategies: by Source, Recipient, CorrelationId, or Global
+- `ThrottlePolicy` with partition strategies: by TenantId, Queue, Endpoint, or Global
 - `ThrottleMetrics` for monitoring throttle pressure and wait times
 - The difference between **rate limiting** (HTTP 429) and **throttling** (pipeline delays)
 - Per-tenant partitioning for fair resource sharing

@@ -165,8 +165,8 @@ public class IntegrationPipelineWorker : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        await _consumer.SubscribeAsync<object>(
-            topic: _options.InputTopic,
+        await _consumer.SubscribeAsync<JsonElement>(
+            topic: _options.InboundSubject,
             consumerGroup: _options.ConsumerGroup,
             handler: async envelope =>
             {
@@ -251,10 +251,15 @@ The pipeline is configured via `PipelineOptions`:
 ```csharp
 public class PipelineOptions
 {
-    public string InputTopic { get; set; }      // Where to listen
-    public string ConsumerGroup { get; set; }    // Consumer group name
-    public int WorkerConcurrency { get; set; }   // Parallel processing
-    public TimeSpan ProcessingTimeout { get; set; } // Per-message timeout
+    public string NatsUrl { get; set; }             // NATS server URL
+    public string InboundSubject { get; set; }      // Where to listen
+    public string AckSubject { get; set; }          // Ack notification subject
+    public string NackSubject { get; set; }         // Nack notification subject
+    public string ConsumerGroup { get; set; }       // Consumer group name
+    public string TemporalServerAddress { get; set; } // Temporal gRPC address
+    public string TemporalNamespace { get; set; }   // Temporal namespace
+    public string TemporalTaskQueue { get; set; }   // Temporal task queue
+    public TimeSpan WorkflowTimeout { get; set; }   // Workflow timeout
 }
 ```
 

@@ -37,11 +37,18 @@ deploy/helm/eip/
 ├── Chart.yaml          # Chart metadata and version
 ├── values.yaml         # Default configuration values
 └── templates/
-    ├── deployment.yaml
-    ├── service.yaml
-    ├── ingress.yaml
+    ├── _helpers.tpl
+    ├── admin-api.yaml
+    ├── configmap.yaml
+    ├── demo-pipeline.yaml
+    ├── grafana-dashboards-configmap.yaml
     ├── hpa.yaml
-    └── configmap.yaml
+    ├── ingestion-kafka.yaml
+    ├── namespace.yaml
+    ├── networkpolicy.yaml
+    ├── openclaw-web.yaml
+    ├── serviceaccount.yaml
+    └── workflow-temporal.yaml
 ```
 
 **Chart.yaml** declares the chart:
