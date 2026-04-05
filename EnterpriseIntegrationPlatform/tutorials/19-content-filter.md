@@ -79,13 +79,61 @@ Filtering is a **pure, deterministic function** — the same input and keep-path
 
 ---
 
-## Exercises
+## Lab
 
-1. A message has fields `order.id`, `order.items[]`, `customer.email`, `customer.phone`, `audit.createdBy`. You only need `order.id` and `customer.email`. Write the `keepPaths` list and describe the resulting JSON structure.
+**Objective:** Apply the Content Filter pattern to remove unnecessary data, analyze data minimization for **security** and **scalability**, and design a filter-then-route pipeline.
 
-2. A keep-path `customer.address.zipCode` is specified but the message doesn't have an `address` field. What happens?
+### Step 1: Configure a Content Filter
 
-3. Design a pipeline that first enriches a message (Tutorial 18) and then filters it. Why is this order important?
+A message has fields: `order.id`, `order.items[]`, `customer.email`, `customer.phone`, `customer.ssn`, `audit.createdBy`. You need only `order.id` and `customer.email` for the downstream billing system. Write the `keepPaths` configuration:
+
+```csharp
+var keepPaths = new[] { "order.id", "customer.email" };
+```
+
+Open `src/Processing.Transformer/JsonPathFilterStep.cs` and trace: What happens to `customer.ssn`? What happens if `keepPaths` references a field that doesn't exist in the message (e.g., `customer.address.zipCode`)?
+
+### Step 2: Design for Security and Data Minimization
+
+The Content Filter is a key tool for **data minimization** (GDPR, PCI-DSS). Design a pipeline:
+
+| Consumer | Allowed Fields | Filtered Fields |
+|----------|---------------|----------------|
+| Billing | `order.id`, `customer.email`, `order.total` | PII, items, audit |
+| Analytics | `order.id`, `order.items[]`, `order.total` | All customer PII |
+| Audit | All fields | None (full record) |
+
+How does the Content Filter ensure that the billing system **never** receives `customer.ssn`? Why is this an **atomicity** concern — what happens if the filter is accidentally misconfigured?
+
+### Step 3: Design an Enrich-Then-Filter Pipeline
+
+Explain why the order matters: first Enrich (Tutorial 18) then Filter. Draw a pipeline:
+
+```
+Raw message → Content Enricher (add customer data) → Content Filter (remove sensitive fields) → Route to consumer
+```
+
+If you reverse the order (filter first, then enrich), what goes wrong? How does the pipeline order preserve both data completeness and data minimization?
+
+## Exam
+
+1. A keep-path references a field that doesn't exist in the message. What should the Content Filter do?
+   - A) Throw an exception and route to DLQ
+   - B) Silently omit the missing field from the output — the filter operates on what's present, producing a valid subset without failing, which supports graceful handling of schema variations
+   - C) Add the field with a null value
+   - D) Block the message until the field is available
+
+2. Why is the Content Filter critical for **PCI-DSS and GDPR compliance** in enterprise integration?
+   - A) It encrypts sensitive fields automatically
+   - B) It ensures each downstream consumer receives only the data it needs — preventing over-exposure of PII and cardholder data by stripping unauthorized fields before routing
+   - C) It logs all sensitive data access for audit
+   - D) It replaces sensitive data with synthetic values
+
+3. In a high-throughput pipeline, how does content filtering improve **scalability**?
+   - A) Filtering doesn't affect performance
+   - B) Removing unnecessary fields reduces message size — smaller messages mean lower broker storage costs, faster serialization, and reduced network bandwidth across the entire downstream processing chain
+   - C) Filtering enables parallel processing
+   - D) Filtered messages skip the routing step
 
 ---
 

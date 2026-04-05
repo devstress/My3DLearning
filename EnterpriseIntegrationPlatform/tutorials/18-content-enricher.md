@@ -88,13 +88,60 @@ Enrichment is **not idempotent by default** if the external data changes between
 
 ---
 
-## Exercises
+## Lab
 
-1. An order message `{ "orderId": 42 }` needs enrichment with customer data from `GET /api/customers/{customerId}`. But the order message doesn't contain `customerId` — only `orderId`. How would you design a two-step enrichment?
+**Objective:** Design enrichment strategies using external data sources, analyze **atomicity** when enrichment depends on external service availability, and evaluate caching for **scalable** enrichment.
 
-2. The external HTTP service is down. What happens to messages waiting for enrichment? How does the retry policy interact with the enricher?
+### Step 1: Design a Two-Step Enrichment
 
-3. Compare the Content Enricher to the Content Filter (Tutorial 19). How are they complementary?
+An order message `{ "orderId": 42 }` needs customer data, but only contains `orderId` — not `customerId`. Design the enrichment flow:
+
+1. Step 1: Look up `customerId` from `GET /api/orders/42` → returns `{ "customerId": "CUST-7" }`
+2. Step 2: Enrich with customer data from `GET /api/customers/CUST-7` → returns `{ "name": "Alice", "tier": "gold" }`
+
+Open `src/Processing.Enricher/ContentEnricher.cs` and identify how the enricher merges external data into the envelope. Does it mutate the original or create a new enriched envelope?
+
+### Step 2: Analyze Enrichment Failure Atomicity
+
+The external HTTP service is down during enrichment. Trace what happens:
+
+1. Does the enricher retry? What retry policy applies?
+2. If all retries fail, where does the message go?
+3. Is the original message preserved untouched for retry later?
+
+Now consider: the enricher calls two services. Service A succeeds but Service B fails. Is the partial enrichment from Service A committed? How does this affect **atomicity**? Design a strategy: should partial enrichment be discarded or preserved?
+
+### Step 3: Design a Caching Strategy for Scalability
+
+At 10,000 messages/second, each enrichment requires an HTTP call to an external CRM. Without caching, that's 10,000 HTTP calls/second. Design a caching strategy:
+
+| Cache Level | TTL | Hit Rate | Scalability Impact |
+|-------------|-----|----------|-------------------|
+| In-memory (per-worker) | 60s | ~80% | Reduces to 2,000 calls/second |
+| Distributed (Redis) | 5min | ~95% | Reduces to 500 calls/second |
+| Database fallback | 1hr | ~99% | ? |
+
+Open `src/Processing.Enricher/` and check if the platform implements caching. How does cache invalidation interact with message **consistency**?
+
+## Exam
+
+1. The Content Enricher calls an external service that is temporarily unavailable. What is the correct **atomic** behavior?
+   - A) Skip enrichment and forward the message without the additional data
+   - B) Preserve the original message, retry according to policy, and if all retries fail route to the DLQ — the message is never forwarded with missing enrichment data
+   - C) Cache the last known good response and use it
+   - D) Block all messages until the external service recovers
+
+2. How does caching in the Content Enricher improve **scalability** without sacrificing data accuracy?
+   - A) Caching eliminates the need for external services entirely
+   - B) Frequently accessed enrichment data (e.g., customer records) is cached with a TTL — this reduces external API calls by 80-95% while ensuring data freshness through time-based expiration
+   - C) The cache stores messages, not enrichment data
+   - D) Caching is only useful for batch processing
+
+3. How are the Content Enricher and Content Filter (Tutorial 19) **complementary** in a pipeline?
+   - A) They do the same thing in reverse order
+   - B) The Enricher adds data from external sources, then the Filter removes fields not needed downstream — together they ensure each consumer receives exactly the data it needs, no more and no less
+   - C) The Filter must always run before the Enricher
+   - D) They cannot be used in the same pipeline
 
 ---
 
