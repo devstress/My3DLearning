@@ -25,4 +25,16 @@ public sealed class SftpConnectorOptions
 
     /// <summary>Connection timeout in milliseconds. Default is 10000.</summary>
     public int TimeoutMs { get; set; } = 10000;
+
+    /// <summary>
+    /// Maximum number of pooled SFTP connections per host. When the pool is exhausted,
+    /// callers wait until a connection is returned. Default is 5.
+    /// </summary>
+    public int MaxConnectionsPerHost { get; set; } = 5;
+
+    /// <summary>
+    /// Maximum time (in milliseconds) an idle connection may remain in the pool before
+    /// it is closed. Set to 0 to disable idle eviction. Default is 30 000 (30 s).
+    /// </summary>
+    public int ConnectionIdleTimeoutMs { get; set; } = 30_000;
 }

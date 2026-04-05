@@ -24,7 +24,7 @@
 
 ✅ Phases 1–21 complete — see `rules/completion-log.md` for full history.
 
-**Current stats:** 1,472 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,605 total tests**. 48 src projects.
+**Current stats:** 1,479 UnitTests + 58 Contract + 29 Workflow + 17 Integration + 10 Load + 19 Vitest = **1,612 total tests**. 48 src projects.
 
 ---
 
@@ -45,17 +45,6 @@
 ### Phase 22 — Implement Unfulfilled Tutorial Promises
 
 **Scope:** Audit of all 50 tutorials against source code found 13 features that tutorials promise but are not implemented. These chunks implement the missing features so that every tutorial claim is backed by working code.
-
-#### Chunk 080 — SFTP Connection Pooling
-
-| Field | Value |
-|-------|-------|
-| Status | `not-started` |
-| Tutorial | 35 — SFTP Connector (line 78) |
-| Claim | "The connector pools connections per host and reuses them across requests." |
-| Current State | `SftpConnectorOptions` has no pool config. No pooling code exists. |
-| Implementation | Add `MaxConnectionsPerHost` (default 5) and `ConnectionIdleTimeoutMs` (default 30000) to `SftpConnectorOptions`. Create `SftpConnectionPool` class in `src/Connector.Sftp/` that manages a `ConcurrentDictionary<string, Channel<SftpConnection>>` per host. `ISftpConnector` implementation should acquire/release from pool. Add unit tests. |
-| Files | `src/Connector.Sftp/SftpConnectorOptions.cs`, new `src/Connector.Sftp/SftpConnectionPool.cs`, `tests/UnitTests/SftpConnectorTests.cs` |
 
 #### Chunk 081 — Unified Broker Selection via AddIngestion
 
@@ -191,7 +180,7 @@
 
 ## Next Chunk
 
-**Chunk 080** — SFTP Connection Pooling
+**Chunk 081** — Unified Broker Selection via AddIngestion
 
 ---
 

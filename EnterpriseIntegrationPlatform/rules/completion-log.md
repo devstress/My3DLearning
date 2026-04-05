@@ -4,6 +4,23 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 080 – SFTP Connection Pooling
+
+- **Date**: 2026-04-05
+- **Phase**: 22 — Implement Unfulfilled Tutorial Promises
+- **Status**: done
+- **Goal**: Implement connection pooling for SFTP connector as promised by tutorial 35 (line 78): "The connector pools connections per host and reuses them across requests."
+- **Architecture**: Added `ISftpConnectionPool` / `SftpConnectionPool` using a bounded `Channel<byte>` as semaphore + `ConcurrentQueue<PooledConnection>` for idle connections. Pool evicts idle connections exceeding configurable timeout. `SftpConnector` now acquires/releases from pool instead of connect/disconnect per call.
+- **Files created**:
+  - `src/Connector.Sftp/ISftpConnectionPool.cs` — Pool interface with `AcquireAsync` / `Release`.
+  - `src/Connector.Sftp/SftpConnectionPool.cs` — Thread-safe pool implementation with bounded capacity, idle eviction, dispose support.
+- **Files modified**:
+  - `src/Connector.Sftp/SftpConnectorOptions.cs` — Added `MaxConnectionsPerHost` (default 5) and `ConnectionIdleTimeoutMs` (default 30000).
+  - `src/Connector.Sftp/SftpConnector.cs` — Refactored from direct `ISftpClient` connect/disconnect to pool-based acquire/release.
+  - `src/Connector.Sftp/SftpConnectorServiceExtensions.cs` — Registers `SftpConnectionPool` as singleton via factory.
+  - `tests/UnitTests/SftpConnectorTests.cs` — Updated 10 existing tests to use pool mock; added 7 new pool tests (acquire, reuse, max-capacity blocking, cancellation, disconnected-client eviction, idle-timeout eviction, dispose).
+- **Test counts**: 1,479 UnitTests (+7). 1,612 total tests.
+
 ## Chunk 075 – Fix Tutorials 05, 06, 07
 
 - **Date**: 2026-04-05
