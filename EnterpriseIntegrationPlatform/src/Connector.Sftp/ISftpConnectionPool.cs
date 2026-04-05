@@ -13,7 +13,7 @@ public interface ISftpConnectionPool : IAsyncDisposable
     /// is returned.
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>A connected SFTP client that must be returned via <see cref="ReleaseAsync"/>.</returns>
+    /// <returns>A connected SFTP client that must be returned via <see cref="Release"/>.</returns>
     Task<ISftpClient> AcquireAsync(CancellationToken ct = default);
 
     /// <summary>
