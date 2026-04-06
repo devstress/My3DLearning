@@ -155,24 +155,17 @@ Configuration updates are **versioned** — each `SetAsync` is atomic and create
 Design a feature flag for a new routing algorithm:
 
 ```csharp
-var flag = new FeatureFlag
+var flag = new FeatureFlag(
+    Name: "new-routing-algorithm",
+    IsEnabled: true,
+    RolloutPercentage: 10)
 {
-    Name = "new-routing-algorithm",
-    DefaultVariant = "v1",
-    Variants = ["v1", "v2"],
-    Rules = [
-        new FeatureFlagRule
-        {
-            TenantId = "tenant-beta",    // Always enabled for beta testers
-            Variant = "v2",
-            Percentage = 100
-        },
-        new FeatureFlagRule
-        {
-            Variant = "v2",
-            Percentage = 10              // 10% of all other traffic
-        }
-    ]
+    Variants = new Dictionary<string, string>
+    {
+        ["control"] = "v1",
+        ["treatment"] = "v2"
+    },
+    TargetTenants = ["tenant-beta"]   // Always enabled for beta testers
 };
 ```
 

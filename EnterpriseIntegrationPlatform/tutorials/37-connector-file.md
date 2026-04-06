@@ -110,11 +110,11 @@ var options = new FileConnectorOptions
     FilenamePattern = "order-{MessageId}.xml",
     Encoding = "utf-16",
     OverwriteExisting = true,
-    CreateDirectoryIfMissing = true
+    CreateDirectoryIfNotExists = true
 };
 ```
 
-Open `src/Connectors.File/FileConnector.cs` and trace: How does the connector resolve `{MessageId}` in the filename? What other placeholders are available?
+Open `src/Connector.File/FileConnector.cs` and trace: How does the connector resolve `{MessageId}` in the filename? What other placeholders are available?
 
 ### Step 2: Analyze Concurrent Write Safety
 

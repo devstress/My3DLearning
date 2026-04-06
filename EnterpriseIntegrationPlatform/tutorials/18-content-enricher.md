@@ -99,7 +99,7 @@ An order message `{ "orderId": 42 }` needs customer data, but only contains `ord
 1. Step 1: Look up `customerId` from `GET /api/orders/42` → returns `{ "customerId": "CUST-7" }`
 2. Step 2: Enrich with customer data from `GET /api/customers/CUST-7` → returns `{ "name": "Alice", "tier": "gold" }`
 
-Open `src/Processing.Enricher/ContentEnricher.cs` and identify how the enricher merges external data into the envelope. Does it mutate the original or create a new enriched envelope?
+Open `src/Processing.Transform/ContentEnricher.cs` and identify how the enricher merges external data into the envelope. Does it mutate the original or create a new enriched envelope?
 
 ### Step 2: Analyze Enrichment Failure Atomicity
 
@@ -121,7 +121,7 @@ At 10,000 messages/second, each enrichment requires an HTTP call to an external 
 | Distributed (Redis) | 5min | ~95% | Reduces to 500 calls/second |
 | Database fallback | 1hr | ~99% | ? |
 
-Open `src/Processing.Enricher/` and check if the platform implements caching. How does cache invalidation interact with message **consistency**?
+Open `src/Processing.Transform/` and check if the platform implements caching. How does cache invalidation interact with message **consistency**?
 
 ## Exam
 

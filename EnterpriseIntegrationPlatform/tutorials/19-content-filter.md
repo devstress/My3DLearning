@@ -91,7 +91,7 @@ A message has fields: `order.id`, `order.items[]`, `customer.email`, `customer.p
 var keepPaths = new[] { "order.id", "customer.email" };
 ```
 
-Open `src/Processing.Transformer/JsonPathFilterStep.cs` and trace: What happens to `customer.ssn`? What happens if `keepPaths` references a field that doesn't exist in the message (e.g., `customer.address.zipCode`)?
+Open `src/Processing.Transform/JsonPathFilterStep.cs` and trace: What happens to `customer.ssn`? What happens if `keepPaths` references a field that doesn't exist in the message (e.g., `customer.address.zipCode`)?
 
 ### Step 2: Design for Security and Data Minimization
 

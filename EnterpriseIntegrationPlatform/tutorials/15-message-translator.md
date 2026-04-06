@@ -115,7 +115,7 @@ Into this output:
 { "fullName": "Alice Smith", "contactEmail": "alice@example.com", "source": "CRM" }
 ```
 
-Identify: which mapping uses `SourceField`, which uses `StaticValue`, and how would you combine `first_name` + `last_name` into `fullName`? Open `src/Processing.Translator/JsonFieldMappingTransform.cs` to verify the mapping mechanics.
+Identify: which mapping uses `SourcePath`, which uses `StaticValue`, and how would you combine `first_name` + `last_name` into `fullName`? Open `src/Processing.Translator/JsonFieldMappingTransform.cs` to verify the mapping mechanics.
 
 ### Step 2: Trace Immutability Through Translation
 

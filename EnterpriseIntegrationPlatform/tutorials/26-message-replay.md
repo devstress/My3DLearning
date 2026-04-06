@@ -119,9 +119,10 @@ An operator discovers a bug in the content enricher that corrupted messages betw
 var filter = new ReplayFilter
 {
     FromTimestamp = DateTimeOffset.Parse("2024-01-15T09:00:00Z"),
-    ToTimestamp = DateTimeOffset.Parse("2024-01-15T09:30:00Z"),
-    Topic = "eip.orders.enriched"
+    ToTimestamp = DateTimeOffset.Parse("2024-01-15T09:30:00Z")
 };
+// Topic is passed as a separate parameter to the replay store:
+// await replayStore.GetMessagesForReplayAsync("eip.orders.enriched", filter, ...);
 ```
 
 Open `src/Processing.Replay/MessageReplayer.cs` and trace: How does the replayer iterate over stored messages? What happens to messages that don't match the filter?

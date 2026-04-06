@@ -122,7 +122,7 @@ Design a 3-step pipeline for PCI-compliant order processing:
 | 2 | Redact PII | `RegexReplaceStep` | Mask email addresses with `***@***` |
 | 3 | Filter fields | `JsonPathFilterStep` | Keep only `$.order.id` and `$.order.total` |
 
-Open `src/Processing.Transformer/` and verify each step class exists. Write the `TransformOptions` configuration for this pipeline.
+Open `src/Processing.Transform/` and verify each step class exists. Write the `TransformOptions` configuration for this pipeline.
 
 ### Step 2: Trace Failure Recovery with StepsApplied
 

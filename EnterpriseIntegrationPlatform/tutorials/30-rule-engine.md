@@ -159,7 +159,7 @@ var rule = new BusinessRule
         new RuleCondition { FieldName = "Source", Operator = RuleConditionOperator.Equals, Value = "PartnerX" },
         new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Contains, Value = "order" }
     ],
-    OutputTopic = "orders-priority"
+    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "orders-priority" }
 };
 ```
 
