@@ -1,101 +1,69 @@
 // ============================================================================
 // Tutorial 26 – Message Replay (Exam)
 // ============================================================================
-// Coding challenges: verify replay-id metadata injection, filter by
-// CorrelationId, and confirm ReplayOptions default values.
+// E2E challenges: filtered replay, max-messages cap, correlation-based replay.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Replay;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial26;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Replayed Envelope Carries replay-id Metadata ────────────
-
     [Test]
-    public async Task Challenge1_ReplayedEnvelope_ContainsReplayIdHeader()
+    public async Task Challenge1_FilterByCorrelationId_OnlyMatchingReplayed()
     {
-        IntegrationEnvelope<object>? captured = null;
+        await using var output = new MockEndpoint("replay-corr");
         var store = new InMemoryMessageReplayStore();
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        producer
-            .PublishAsync(
-                Arg.Do<IntegrationEnvelope<object>>(e => captured = e),
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
-
-        var options = Options.Create(new ReplayOptions
-        {
-            SourceTopic = "src",
-            TargetTopic = "tgt",
-            MaxMessages = 10,
-        });
-
-        var replayer = new MessageReplayer(
-            store, producer, options, NullLogger<MessageReplayer>.Instance);
-
-        var env = IntegrationEnvelope<string>.Create("data", "Svc", "type");
-        await store.StoreForReplayAsync(env, "src", CancellationToken.None);
-
-        await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
-
-        Assert.That(captured, Is.Not.Null);
-        Assert.That(captured!.Metadata.ContainsKey(MessageHeaders.ReplayId), Is.True);
-        Assert.That(Guid.TryParse(captured.Metadata[MessageHeaders.ReplayId], out _), Is.True);
-    }
-
-    // ── Challenge 2: Filter By CorrelationId ────────────────────────────────
-
-    [Test]
-    public async Task Challenge2_FilterByCorrelationId_ReturnsOnlyMatchingMessages()
-    {
-        var store = new InMemoryMessageReplayStore();
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var options = Options.Create(new ReplayOptions
-        {
-            SourceTopic = "src",
-            TargetTopic = "tgt",
-            MaxMessages = 100,
-        });
-
-        var replayer = new MessageReplayer(
-            store, producer, options, NullLogger<MessageReplayer>.Instance);
-
         var targetCorrelation = Guid.NewGuid();
-        var match = IntegrationEnvelope<string>.Create(
-            "match", "Svc", "type", correlationId: targetCorrelation);
-        var noMatch = IntegrationEnvelope<string>.Create("no", "Svc", "type");
 
-        await store.StoreForReplayAsync(match, "src", CancellationToken.None);
-        await store.StoreForReplayAsync(noMatch, "src", CancellationToken.None);
+        var env1 = IntegrationEnvelope<string>.Create("a", "Svc", "evt") with { CorrelationId = targetCorrelation };
+        var env2 = IntegrationEnvelope<string>.Create("b", "Svc", "evt");
+        var env3 = IntegrationEnvelope<string>.Create("c", "Svc", "evt") with { CorrelationId = targetCorrelation };
+        await store.StoreForReplayAsync(env1, "src", CancellationToken.None);
+        await store.StoreForReplayAsync(env2, "src", CancellationToken.None);
+        await store.StoreForReplayAsync(env3, "src", CancellationToken.None);
 
-        var filter = new ReplayFilter { CorrelationId = targetCorrelation };
-        var result = await replayer.ReplayAsync(filter, CancellationToken.None);
+        var opts = Options.Create(new ReplayOptions { SourceTopic = "src", TargetTopic = "tgt", MaxMessages = 100 });
+        var replayer = new MessageReplayer(store, output, opts, NullLogger<MessageReplayer>.Instance);
+        var result = await replayer.ReplayAsync(new ReplayFilter { CorrelationId = targetCorrelation }, CancellationToken.None);
 
-        Assert.That(result.ReplayedCount, Is.EqualTo(1));
+        Assert.That(result.ReplayedCount, Is.EqualTo(2));
+        output.AssertReceivedOnTopic("tgt", 2);
     }
 
-    // ── Challenge 3: ReplayOptions Default Values ───────────────────────────
+    [Test]
+    public async Task Challenge2_MaxMessages_CapsReplayCount()
+    {
+        await using var output = new MockEndpoint("replay-max");
+        var store = new InMemoryMessageReplayStore();
+        for (var i = 0; i < 10; i++)
+            await store.StoreForReplayAsync(
+                IntegrationEnvelope<string>.Create($"d{i}", "Svc", "evt"), "src", CancellationToken.None);
+
+        var opts = Options.Create(new ReplayOptions { SourceTopic = "src", TargetTopic = "tgt", MaxMessages = 3 });
+        var replayer = new MessageReplayer(store, output, opts, NullLogger<MessageReplayer>.Instance);
+        var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
+
+        Assert.That(result.ReplayedCount, Is.EqualTo(3));
+        output.AssertReceivedCount(3);
+    }
 
     [Test]
-    public void Challenge3_ReplayOptions_DefaultValues()
+    public async Task Challenge3_MissingSourceTopic_ThrowsInvalidOperation()
     {
-        var opts = new ReplayOptions();
+        await using var output = new MockEndpoint("replay-err");
+        var store = new InMemoryMessageReplayStore();
+        var opts = Options.Create(new ReplayOptions { SourceTopic = "", TargetTopic = "tgt" });
+        var replayer = new MessageReplayer(store, output, opts, NullLogger<MessageReplayer>.Instance);
 
-        Assert.That(opts.SourceTopic, Is.EqualTo(string.Empty));
-        Assert.That(opts.TargetTopic, Is.EqualTo(string.Empty));
-        Assert.That(opts.MaxMessages, Is.EqualTo(1000));
-        Assert.That(opts.BatchSize, Is.EqualTo(100));
-        Assert.That(opts.SkipAlreadyReplayed, Is.False);
+        Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None));
     }
 }

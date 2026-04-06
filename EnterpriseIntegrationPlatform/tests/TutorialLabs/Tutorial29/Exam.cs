@@ -1,8 +1,8 @@
 // ============================================================================
 // Tutorial 29 – Throttle and Rate Limiting (Exam)
 // ============================================================================
-// Coding challenges: burst capacity exhaustion, partition key isolation,
-// and metrics tracking under load.
+// E2E challenges: burst exhaustion, metric accumulation, backpressure reject
+// across multiple messages.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -10,85 +10,93 @@ using EnterpriseIntegrationPlatform.Processing.Throttle;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial29;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Exhaust Burst Capacity ─────────────────────────────────
-
     [Test]
-    public async Task Challenge1_ExhaustBurstCapacity_SubsequentAcquiresBlocked()
+    public async Task Challenge1_BurstExhaustion_PermittedThenRejected()
     {
-        // Configure a small burst capacity and consume all tokens.
-        // Verify that the next acquire is rejected when RejectOnBackpressure = true.
-        var options = Options.Create(new ThrottleOptions
+        await using var output = new MockEndpoint("throttle-burst");
+        using var throttle = CreateThrottle(burstCapacity: 3, rejectOnBackpressure: true);
+
+        var permitted = 0;
+        var rejected = 0;
+        for (var i = 0; i < 5; i++)
         {
-            MaxMessagesPerSecond = 1,
-            BurstCapacity = 3,
-            RejectOnBackpressure = true,
-        });
-
-        using var throttle = new TokenBucketThrottle(options, NullLogger<TokenBucketThrottle>.Instance);
-
-        var envelope = IntegrationEnvelope<string>.Create("data", "TestService", "test.event");
-
-        // Consume all 3 burst tokens.
-        for (var i = 0; i < 3; i++)
-        {
-            var ok = await throttle.AcquireAsync(envelope);
-            Assert.That(ok.Permitted, Is.True, $"Token {i} should be permitted");
+            var env = IntegrationEnvelope<string>.Create($"msg-{i}", "Svc", "evt");
+            var result = await throttle.AcquireAsync(env);
+            if (result.Permitted)
+            {
+                permitted++;
+                await output.PublishAsync(env, "ok");
+            }
+            else
+            {
+                rejected++;
+            }
         }
 
-        // 4th acquire should be rejected.
-        var rejected = await throttle.AcquireAsync(envelope);
-        Assert.That(rejected.Permitted, Is.False);
-        Assert.That(rejected.RejectionReason, Is.Not.Null);
+        Assert.That(permitted, Is.EqualTo(3));
+        Assert.That(rejected, Is.EqualTo(2));
+        output.AssertReceivedOnTopic("ok", 3);
     }
 
-    // ── Challenge 2: Global Partition Key ───────────────────────────────────
-
     [Test]
-    public void Challenge2_GlobalPartitionKey_HasWildcards()
+    public async Task Challenge2_MetricAccumulation_TracksAllOperations()
     {
-        // The Global partition key should use wildcards for all dimensions.
-        var global = ThrottlePartitionKey.Global;
+        await using var output = new MockEndpoint("throttle-metrics");
+        using var throttle = CreateThrottle(burstCapacity: 2, rejectOnBackpressure: true);
 
-        Assert.That(global.TenantId, Is.Null);
-        Assert.That(global.Queue, Is.Null);
-        Assert.That(global.Endpoint, Is.Null);
-
-        var key = global.ToKey();
-        Assert.That(key, Does.Contain("tenant:*"));
-        Assert.That(key, Does.Contain("queue:*"));
-        Assert.That(key, Does.Contain("endpoint:*"));
-    }
-
-    // ── Challenge 3: Metrics Track Rejections ───────────────────────────────
-
-    [Test]
-    public async Task Challenge3_MetricsTrackRejections_AfterExhaustion()
-    {
-        var options = Options.Create(new ThrottleOptions
+        for (var i = 0; i < 4; i++)
         {
-            MaxMessagesPerSecond = 1,
-            BurstCapacity = 1,
-            RejectOnBackpressure = true,
-        });
-
-        using var throttle = new TokenBucketThrottle(options, NullLogger<TokenBucketThrottle>.Instance);
-
-        var envelope = IntegrationEnvelope<string>.Create("data", "TestService", "test.event");
-
-        // Consume the single token.
-        await throttle.AcquireAsync(envelope);
-        // This one should be rejected.
-        await throttle.AcquireAsync(envelope);
+            var env = IntegrationEnvelope<string>.Create($"m{i}", "Svc", "evt");
+            var result = await throttle.AcquireAsync(env);
+            if (result.Permitted)
+                await output.PublishAsync(env, "processed");
+        }
 
         var metrics = throttle.GetMetrics();
+        Assert.That(metrics.TotalAcquired, Is.EqualTo(2));
+        Assert.That(metrics.TotalRejected, Is.EqualTo(2));
+        Assert.That(metrics.TotalWaitTime, Is.GreaterThanOrEqualTo(TimeSpan.Zero));
 
-        Assert.That(metrics.TotalAcquired, Is.EqualTo(1));
-        Assert.That(metrics.TotalRejected, Is.EqualTo(1));
+        output.AssertReceivedOnTopic("processed", 2);
+    }
+
+    [Test]
+    public async Task Challenge3_SingleToken_AlternatePermitReject()
+    {
+        await using var output = new MockEndpoint("throttle-single");
+        using var throttle = CreateThrottle(burstCapacity: 1, rejectOnBackpressure: true);
+
+        var env1 = IntegrationEnvelope<string>.Create("first", "Svc", "evt");
+        var r1 = await throttle.AcquireAsync(env1);
+        Assert.That(r1.Permitted, Is.True);
+        await output.PublishAsync(env1, "ok");
+
+        var env2 = IntegrationEnvelope<string>.Create("second", "Svc", "evt");
+        var r2 = await throttle.AcquireAsync(env2);
+        Assert.That(r2.Permitted, Is.False);
+        Assert.That(r2.RemainingTokens, Is.EqualTo(0));
+
+        output.AssertReceivedCount(1);
+        output.AssertReceivedOnTopic("ok", 1);
+    }
+
+    private static TokenBucketThrottle CreateThrottle(
+        int burstCapacity = 10, bool rejectOnBackpressure = false)
+    {
+        var opts = Options.Create(new ThrottleOptions
+        {
+            BurstCapacity = burstCapacity,
+            MaxMessagesPerSecond = 0,
+            RejectOnBackpressure = rejectOnBackpressure,
+            MaxWaitTime = TimeSpan.FromMilliseconds(50),
+        });
+        return new TokenBucketThrottle(opts, NullLogger<TokenBucketThrottle>.Instance);
     }
 }
