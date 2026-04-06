@@ -33,71 +33,84 @@ public interface IMessageBrokerConsumer : IAsyncDisposable
 {
     Task SubscribeAsync<T>(string topic, Func<IntegrationEnvelope<T>, Task> handler, CancellationToken ct = default);
 }
+
+// Real channels that wrap the broker interfaces
+// src/Ingestion/Channels/PointToPointChannel.cs — queue semantics, one consumer per message
+// src/Ingestion/Channels/PublishSubscribeChannel.cs — fan-out, every subscriber gets every message
 ```
 
 ## Exercises
 
-### 1. Create an envelope and verify auto-generated fields
+### 1. Send a command through a real PointToPointChannel
 
 ```csharp
-var envelope = IntegrationEnvelope<string>.Create(
-    payload: "Hello, EIP!",
-    source: "Tutorial01",
-    messageType: "greeting.created");
+var broker = new MockEndpoint("broker");
+var channel = new PointToPointChannel(broker, broker, NullLogger<PointToPointChannel>.Instance);
 
-Assert.That(envelope.MessageId, Is.Not.EqualTo(Guid.Empty));
-Assert.That(envelope.CorrelationId, Is.Not.EqualTo(Guid.Empty));
-Assert.That(envelope.Timestamp, Is.Not.EqualTo(default(DateTimeOffset)));
-Assert.That(envelope.Source, Is.EqualTo("Tutorial01"));
-Assert.That(envelope.Payload, Is.EqualTo("Hello, EIP!"));
-```
-
-### 2. Check default values on a new envelope
-
-```csharp
-var envelope = IntegrationEnvelope<string>.Create("payload", "source", "type");
-
-Assert.That(envelope.SchemaVersion, Is.EqualTo("1.0"));
-Assert.That(envelope.Priority, Is.EqualTo(MessagePriority.Normal));
-Assert.That(envelope.CausationId, Is.Null);
-Assert.That(envelope.ReplyTo, Is.Null);
-Assert.That(envelope.Metadata, Is.Empty);
-```
-
-### 3. Set message intent using `with` expression
-
-```csharp
-var command = IntegrationEnvelope<string>.Create(
-    "PlaceOrder", "OrderService", "order.place") with
+var order = IntegrationEnvelope<string>.Create(
+    "PlaceOrder:ORD-001", "WebApp", "order.place") with
 {
     Intent = MessageIntent.Command,
 };
+await channel.SendAsync(order, "orders-queue", CancellationToken.None);
 
-Assert.That(command.Intent, Is.EqualTo(MessageIntent.Command));
+// The channel published to the broker — message arrived
+broker.AssertReceivedOnTopic("orders-queue", 1);
 ```
 
-### 4. Verify platform types exist (EIP pattern mapping)
+### 2. Subscribe and receive through a real channel
 
 ```csharp
-// EIP: Message Channel → IMessageBrokerProducer
-var producerType = typeof(IMessageBrokerProducer);
-Assert.That(producerType.IsInterface, Is.True);
-Assert.That(producerType.GetMethod("PublishAsync"), Is.Not.Null);
+IntegrationEnvelope<string>? received = null;
+await channel.ReceiveAsync<string>("orders-queue", "processor",
+    msg => { received = msg; return Task.CompletedTask; }, CancellationToken.None);
 
-// EIP: Message Endpoint → IMessageBrokerConsumer
-var consumerType = typeof(IMessageBrokerConsumer);
-Assert.That(consumerType.IsInterface, Is.True);
-Assert.That(consumerType.GetMethod("SubscribeAsync"), Is.Not.Null);
+await broker.SendAsync(order);
+// Handler was invoked — received is now populated
 ```
 
-### 5. Verify IntegrationEnvelope is a C# record with value equality
+### 3. Fan-out with PublishSubscribeChannel
 
 ```csharp
-var envelopeType = typeof(IntegrationEnvelope<string>);
-Assert.That(envelopeType.IsClass, Is.True);
+var channel = new PublishSubscribeChannel(broker, broker, NullLogger<PublishSubscribeChannel>.Instance);
 
-var equatable = typeof(IEquatable<IntegrationEnvelope<string>>);
-Assert.That(equatable.IsAssignableFrom(envelopeType), Is.True);
+await channel.SubscribeAsync<string>("events-topic", "audit-service",
+    msg => { /* audit */ return Task.CompletedTask; }, CancellationToken.None);
+await channel.SubscribeAsync<string>("events-topic", "notification-service",
+    msg => { /* notify */ return Task.CompletedTask; }, CancellationToken.None);
+
+await channel.PublishAsync(evt, "events-topic", CancellationToken.None);
+// Both subscribers receive the message
+```
+
+### 4. Multi-hop pipeline: P2P → handler → PubSub
+
+```csharp
+// Handler receives from P2P, enriches, and publishes to PubSub
+await inputChannel.ReceiveAsync<string>("ingest-queue", "enricher",
+    async msg =>
+    {
+        var enriched = msg with
+        {
+            Metadata = new Dictionary<string, string> { ["enriched"] = "true" },
+        };
+        await fanoutChannel.PublishAsync(enriched, "enriched-events", CancellationToken.None);
+    }, CancellationToken.None);
+```
+
+### 5. Causation chain through real channels
+
+```csharp
+var command = IntegrationEnvelope<string>.Create("CreateUser", "WebApp", "user.create") with
+{
+    Intent = MessageIntent.Command,
+};
+var evt = IntegrationEnvelope<string>.Create("UserCreated", "UserService", "user.created",
+    correlationId: command.CorrelationId, causationId: command.MessageId) with
+{
+    Intent = MessageIntent.Event,
+};
+// Both flow through real channels — causation chain preserved
 ```
 
 ## Lab

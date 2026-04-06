@@ -1,113 +1,116 @@
 # Tutorial 02 — Setting Up Your Environment
 
-Verify your .NET 10 environment by confirming that all core platform types, enums, and namespaces are present and correctly structured.
+Wire real EIP components via dependency injection using `AspireIntegrationTestHost`. This tutorial demonstrates the Service Activator pattern — connecting messaging infrastructure to application services with request-reply and fire-and-forget processing.
 
 ## Key Types
 
 ```csharp
-// src/Contracts/IntegrationEnvelope.cs
-public record IntegrationEnvelope<T> { /* ... */ }
-
-// src/Contracts/MessagePriority.cs
-public enum MessagePriority { Low = 0, Normal = 1, High = 2, Critical = 3 }
-
-// src/Contracts/MessageIntent.cs
-public enum MessageIntent { Command = 0, Document = 1, Event = 2 }
-
-// src/Contracts/MessageHeaders.cs
-public static class MessageHeaders
+// src/Processing.Dispatcher/ServiceActivator.cs — connects messaging to services
+public sealed class ServiceActivator : IServiceActivator
 {
-    public const string TraceId = "trace-id";
-    public const string ContentType = "content-type";
-    public const string SourceTopic = "source-topic";
-    // ... 13 well-known header keys
+    // Invokes a service operation from a message, publishes reply to ReplyTo address
+    Task<ServiceActivatorResult> InvokeAsync<TRequest, TResponse>(
+        IntegrationEnvelope<TRequest> envelope,
+        Func<IntegrationEnvelope<TRequest>, CancellationToken, Task<TResponse?>> serviceOperation,
+        CancellationToken cancellationToken = default);
+
+    // Fire-and-forget: invoke service with no reply
+    Task<ServiceActivatorResult> InvokeAsync<T>(
+        IntegrationEnvelope<T> envelope,
+        Func<IntegrationEnvelope<T>, CancellationToken, Task> serviceOperation,
+        CancellationToken cancellationToken = default);
 }
 
-// src/Ingestion/IMessageBrokerProducer.cs
-public interface IMessageBrokerProducer { /* ... */ }
-
-// src/Ingestion/IMessageBrokerConsumer.cs
-public interface IMessageBrokerConsumer : IAsyncDisposable { /* ... */ }
-
-// src/Ingestion/BrokerOptions.cs
-public sealed class BrokerOptions
+// src/Processing.Dispatcher/ServiceActivatorOptions.cs
+public sealed class ServiceActivatorOptions
 {
-    public BrokerType BrokerType { get; set; } = BrokerType.NatsJetStream;
-    public string ConnectionString { get; set; } = string.Empty;
-    public int TransactionTimeoutSeconds { get; set; } = 30;
+    public string ReplySource { get; set; } = "ServiceActivator";
+    public string ReplyMessageType { get; set; } = "service-activator.reply";
 }
 
-// src/Ingestion/BrokerType.cs
-public enum BrokerType { NatsJetStream = 0, Kafka = 1, Pulsar = 2 }
+// src/Testing/AspireIntegrationTestHost.cs — DI host for integration wiring
+public sealed class AspireIntegrationTestHost : IAsyncDisposable
+{
+    public static Builder CreateBuilder();
+    public T GetService<T>() where T : notnull;
+    public MockEndpoint GetEndpoint(string name);
+}
 ```
 
 ## Exercises
 
-### 1. Verify core types exist
+### 1. Wire ServiceActivator via DI for fire-and-forget
 
 ```csharp
-var envelopeType = typeof(IntegrationEnvelope<string>);
-Assert.That(envelopeType, Is.Not.Null);
-Assert.That(envelopeType.IsGenericType || envelopeType.IsClass, Is.True);
+var builder = AspireIntegrationTestHost.CreateBuilder();
+var output = builder.AddMockEndpoint("output");
+builder.UseProducer(output);
+builder.ConfigureServices(services =>
+{
+    services.AddSingleton<IServiceActivator, ServiceActivator>();
+    services.Configure<ServiceActivatorOptions>(opt =>
+    {
+        opt.ReplySource = "OrderProcessor";
+        opt.ReplyMessageType = "order.processed";
+    });
+});
+var host = builder.Build();
 
-var producerType = typeof(IMessageBrokerProducer);
-Assert.That(producerType.IsInterface, Is.True);
+var activator = host.GetService<IServiceActivator>();
+var command = IntegrationEnvelope<string>.Create("ProcessOrder:ORD-100", "WebApp", "order.process");
 
-var consumerType = typeof(IMessageBrokerConsumer);
-Assert.That(consumerType.IsInterface, Is.True);
-Assert.That(typeof(IAsyncDisposable).IsAssignableFrom(consumerType), Is.True);
+var result = await activator.InvokeAsync(command,
+    (env, ct) => Task.CompletedTask); // Fire-and-forget
+
+// result.Succeeded == true, result.ReplySent == false
 ```
 
-### 2. Verify BrokerType enum has exactly three values
+### 2. ServiceActivator request-reply with ReplyTo
 
 ```csharp
-Assert.That(Enum.IsDefined(typeof(BrokerType), BrokerType.NatsJetStream), Is.True);
-Assert.That(Enum.IsDefined(typeof(BrokerType), BrokerType.Kafka), Is.True);
-Assert.That(Enum.IsDefined(typeof(BrokerType), BrokerType.Pulsar), Is.True);
+var request = IntegrationEnvelope<string>.Create(
+    "GetPrice:SKU-999", "CatalogUI", "price.request") with
+{
+    ReplyTo = "price-replies",
+    Intent = MessageIntent.Command,
+};
 
-var values = Enum.GetValues<BrokerType>();
-Assert.That(values, Has.Length.EqualTo(3));
+var result = await activator.InvokeAsync<string, string>(request,
+    (env, ct) => Task.FromResult<string?>("Price:149.99"));
+
+// result.ReplySent == true — reply published to "price-replies"
+// Causation chain: reply.CausationId == request.MessageId
 ```
 
-### 3. Verify MessagePriority ordinal values
+### 3. Full pipeline: P2P channel → ServiceActivator → reply
 
 ```csharp
-Assert.That((int)MessagePriority.Low, Is.EqualTo(0));
-Assert.That((int)MessagePriority.Normal, Is.EqualTo(1));
-Assert.That((int)MessagePriority.High, Is.EqualTo(2));
-Assert.That((int)MessagePriority.Critical, Is.EqualTo(3));
-
-var values = Enum.GetValues<MessagePriority>();
-Assert.That(values, Has.Length.EqualTo(4));
+await channel.ReceiveAsync<string>("stock-checks", "inventory-checker",
+    async msg =>
+    {
+        var request = msg with { ReplyTo = "stock-results" };
+        await activator.InvokeAsync<string, string>(request,
+            (env, ct) => Task.FromResult<string?>($"InStock:{env.Payload}"));
+    }, CancellationToken.None);
 ```
 
-### 4. Verify Contracts namespace contains expected types
+### 4. Multiple named endpoints for independent pipelines
 
 ```csharp
-var assembly = typeof(IntegrationEnvelope<>).Assembly;
-var typeNames = assembly.GetTypes()
-    .Where(t => t.Namespace == "EnterpriseIntegrationPlatform.Contracts")
-    .Select(t => t.Name)
-    .ToList();
-
-Assert.That(typeNames, Does.Contain("MessagePriority"));
-Assert.That(typeNames, Does.Contain("MessageIntent"));
-Assert.That(typeNames, Does.Contain("MessageHeaders"));
+var ordersBroker = builder.AddMockEndpoint("orders");
+var paymentsBroker = builder.AddMockEndpoint("payments");
+// Each endpoint routes through its own channel — fully independent
 ```
 
-### 5. Verify Ingestion namespace contains expected types
+### 5. PubSub channel with multiple handlers wired through DI
 
 ```csharp
-var assembly = typeof(IMessageBrokerProducer).Assembly;
-var typeNames = assembly.GetTypes()
-    .Where(t => t.Namespace == "EnterpriseIntegrationPlatform.Ingestion")
-    .Select(t => t.Name)
-    .ToList();
-
-Assert.That(typeNames, Does.Contain("IMessageBrokerProducer"));
-Assert.That(typeNames, Does.Contain("IMessageBrokerConsumer"));
-Assert.That(typeNames, Does.Contain("BrokerOptions"));
-Assert.That(typeNames, Does.Contain("BrokerType"));
+var channel = host.GetService<PublishSubscribeChannel>();
+await channel.SubscribeAsync<string>("system-events", "audit",
+    msg => { /* audit */ return Task.CompletedTask; }, CancellationToken.None);
+await channel.SubscribeAsync<string>("system-events", "alerting",
+    msg => { /* alert */ return Task.CompletedTask; }, CancellationToken.None);
+// Both subscribers receive every message
 ```
 
 ## Lab
