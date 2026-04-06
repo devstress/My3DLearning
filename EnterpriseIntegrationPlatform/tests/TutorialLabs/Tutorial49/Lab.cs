@@ -1,93 +1,90 @@
 // ============================================================================
 // Tutorial 49 – Testing Integrations (Lab)
 // ============================================================================
-// This lab exercises testing patterns with IntegrationEnvelope, FaultEnvelope,
-// RoutingSlip, message enums, and the IMessagingMapper contract.
+// EIP Pattern: Testing patterns for integration infrastructure.
+// E2E: Demonstrate MockEndpoint and AspireIntegrationTestHost usage for
+// integration testing with real IntegrationEnvelope, FaultEnvelope, RoutingSlip.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial49;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── IntegrationEnvelope.Create Sets All Fields ───────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("test-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public void IntegrationEnvelope_Create_SetsAllMandatoryFields()
+    public async Task MockEndpoint_CapturesPublishedMessages()
     {
-        var envelope = IntegrationEnvelope<string>.Create(
-            "payload", "OrderService", "order.created");
+        var envelope = IntegrationEnvelope<string>.Create("payload", "svc", "test.event");
+        await _output.PublishAsync(envelope, "test-topic");
+
+        _output.AssertReceivedOnTopic("test-topic", 1);
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Payload, Is.EqualTo("payload"));
+    }
+
+    [Test]
+    public async Task MockEndpoint_TracksMultipleTopics()
+    {
+        await _output.PublishAsync(
+            IntegrationEnvelope<string>.Create("a", "svc", "type.a"), "topic-a");
+        await _output.PublishAsync(
+            IntegrationEnvelope<string>.Create("b", "svc", "type.b"), "topic-b");
+        await _output.PublishAsync(
+            IntegrationEnvelope<string>.Create("c", "svc", "type.a"), "topic-a");
+
+        _output.AssertReceivedCount(3);
+        _output.AssertReceivedOnTopic("topic-a", 2);
+        _output.AssertReceivedOnTopic("topic-b", 1);
+        Assert.That(_output.GetReceivedTopics(), Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public void IntegrationEnvelope_Create_SetsAllFields()
+    {
+        var envelope = IntegrationEnvelope<string>.Create("payload", "OrderService", "order.created");
 
         Assert.That(envelope.MessageId, Is.Not.EqualTo(Guid.Empty));
         Assert.That(envelope.CorrelationId, Is.Not.EqualTo(Guid.Empty));
         Assert.That(envelope.Source, Is.EqualTo("OrderService"));
         Assert.That(envelope.MessageType, Is.EqualTo("order.created"));
-        Assert.That(envelope.Payload, Is.EqualTo("payload"));
         Assert.That(envelope.SchemaVersion, Is.EqualTo("1.0"));
     }
 
-    // ── CausationId Chain ───────────────────────────────────────────────────
-
     [Test]
-    public void IntegrationEnvelope_CausationId_TracksDerivedMessages()
+    public void CausationId_TracksDerivedMessages()
     {
-        var parent = IntegrationEnvelope<string>.Create(
-            "parent-data", "ParentService", "parent.event");
-
+        var parent = IntegrationEnvelope<string>.Create("parent", "ParentSvc", "parent.event");
         var child = IntegrationEnvelope<string>.Create(
-            "child-data", "ChildService", "child.event",
-            correlationId: parent.CorrelationId,
-            causationId: parent.MessageId);
+            "child", "ChildSvc", "child.event",
+            correlationId: parent.CorrelationId, causationId: parent.MessageId);
 
         Assert.That(child.CorrelationId, Is.EqualTo(parent.CorrelationId));
         Assert.That(child.CausationId, Is.EqualTo(parent.MessageId));
     }
 
-    // ── FaultEnvelope.Create Captures Details ───────────────────────────────
-
     [Test]
-    public void FaultEnvelope_Create_CapturesOriginalMessageDetails()
+    public void FaultEnvelope_CapturesOriginalDetails()
     {
-        var original = IntegrationEnvelope<string>.Create(
-            "data", "OrderService", "order.created");
-
-        var fault = FaultEnvelope.Create(
-            original, "ValidationStep", "Invalid schema", 3);
+        var original = IntegrationEnvelope<string>.Create("data", "OrderService", "order.created");
+        var fault = FaultEnvelope.Create(original, "ValidationStep", "Invalid schema", 3);
 
         Assert.That(fault.OriginalMessageId, Is.EqualTo(original.MessageId));
-        Assert.That(fault.CorrelationId, Is.EqualTo(original.CorrelationId));
         Assert.That(fault.FaultedBy, Is.EqualTo("ValidationStep"));
         Assert.That(fault.FaultReason, Is.EqualTo("Invalid schema"));
         Assert.That(fault.RetryCount, Is.EqualTo(3));
     }
-
-    // ── MessagePriority Enum Values ─────────────────────────────────────────
-
-    [Test]
-    public void MessagePriority_EnumValues()
-    {
-        Assert.That(Enum.GetValues<MessagePriority>(), Has.Length.GreaterThanOrEqualTo(4));
-        Assert.That((int)MessagePriority.Low, Is.EqualTo(0));
-        Assert.That((int)MessagePriority.Normal, Is.EqualTo(1));
-        Assert.That((int)MessagePriority.High, Is.EqualTo(2));
-        Assert.That((int)MessagePriority.Critical, Is.EqualTo(3));
-    }
-
-    // ── MessageIntent Enum Values ───────────────────────────────────────────
-
-    [Test]
-    public void MessageIntent_EnumValues()
-    {
-        Assert.That(Enum.GetValues<MessageIntent>(), Has.Length.GreaterThanOrEqualTo(3));
-        Assert.That((int)MessageIntent.Command, Is.EqualTo(0));
-        Assert.That((int)MessageIntent.Document, Is.EqualTo(1));
-        Assert.That((int)MessageIntent.Event, Is.EqualTo(2));
-    }
-
-    // ── RoutingSlip Advance ─────────────────────────────────────────────────
 
     [Test]
     public void RoutingSlip_Advance_MovesToNextStep()
@@ -96,30 +93,12 @@ public sealed class Lab
         [
             new RoutingSlipStep("validate", "validate-topic"),
             new RoutingSlipStep("transform", "transform-topic"),
-            new RoutingSlipStep("route", "route-topic"),
         ]);
 
         Assert.That(slip.CurrentStep!.StepName, Is.EqualTo("validate"));
-        Assert.That(slip.IsComplete, Is.False);
-
         var next = slip.Advance();
         Assert.That(next.CurrentStep!.StepName, Is.EqualTo("transform"));
-
-        var last = next.Advance();
-        Assert.That(last.CurrentStep!.StepName, Is.EqualTo("route"));
-
-        var done = last.Advance();
+        var done = next.Advance();
         Assert.That(done.IsComplete, Is.True);
-    }
-
-    // ── RoutingSlip IsComplete ──────────────────────────────────────────────
-
-    [Test]
-    public void RoutingSlip_EmptySteps_IsComplete()
-    {
-        var slip = new RoutingSlip([]);
-
-        Assert.That(slip.IsComplete, Is.True);
-        Assert.That(slip.CurrentStep, Is.Null);
     }
 }

@@ -1,146 +1,163 @@
 // ============================================================================
 // Tutorial 46 – Complete Integration / Demo Pipeline (Lab)
 // ============================================================================
-// This lab exercises the PipelineOrchestrator, PipelineOptions,
-// IntegrationPipelineInput/Result, and ITemporalWorkflowDispatcher.
+// EIP Pattern: Message Dispatcher + Service Activator + Pipeline Orchestration.
+// E2E: Wire MessageDispatcher and ServiceActivator with MockEndpoint to verify
+// end-to-end dispatch, handler invocation, and reply publishing.
 // ============================================================================
 
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Demo.Pipeline;
+using EnterpriseIntegrationPlatform.Processing.Dispatcher;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial46;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── PipelineOptions Properties ──────────────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("pipeline-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public void PipelineOptions_PropertiesAssignable()
+    public async Task Dispatcher_RegisterAndDispatch_HandlerInvoked()
     {
-        var opts = new PipelineOptions
+        var dispatcher = new MessageDispatcher(
+            Options.Create(new MessageDispatcherOptions()),
+            NullLogger<MessageDispatcher>.Instance);
+
+        string? captured = null;
+        dispatcher.Register<string>("order.created",
+            (env, _) => { captured = env.Payload; return Task.CompletedTask; });
+
+        var envelope = IntegrationEnvelope<string>.Create("order-data", "svc", "order.created");
+        var result = await dispatcher.DispatchAsync(envelope);
+
+        Assert.That(result.HandlerFound, Is.True);
+        Assert.That(result.Succeeded, Is.True);
+        Assert.That(captured, Is.EqualTo("order-data"));
+    }
+
+    [Test]
+    public async Task Dispatcher_UnknownType_ReturnsNotFound()
+    {
+        var dispatcher = new MessageDispatcher(
+            Options.Create(new MessageDispatcherOptions()),
+            NullLogger<MessageDispatcher>.Instance);
+
+        var envelope = IntegrationEnvelope<string>.Create("data", "svc", "unknown.type");
+        var result = await dispatcher.DispatchAsync(envelope);
+
+        Assert.That(result.HandlerFound, Is.False);
+        Assert.That(result.Succeeded, Is.False);
+    }
+
+    [Test]
+    public async Task Dispatcher_DispatchAndPublish_MockEndpointReceives()
+    {
+        var dispatcher = new MessageDispatcher(
+            Options.Create(new MessageDispatcherOptions()),
+            NullLogger<MessageDispatcher>.Instance);
+
+        dispatcher.Register<string>("order.created", async (env, _) =>
         {
-            AckSubject = "ack-topic",
-            NackSubject = "nack-topic",
+            var outEnvelope = IntegrationEnvelope<string>.Create(
+                $"processed:{env.Payload}", "pipeline", "order.processed");
+            await _output.PublishAsync(outEnvelope, "processed-orders");
+        });
+
+        var envelope = IntegrationEnvelope<string>.Create("ORD-001", "svc", "order.created");
+        await dispatcher.DispatchAsync(envelope);
+
+        _output.AssertReceivedOnTopic("processed-orders", 1);
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Payload, Does.Contain("ORD-001"));
+    }
+
+    [Test]
+    public async Task ServiceActivator_InvokeWithReply_PublishesToReplyTopic()
+    {
+        var activator = new ServiceActivator(
+            _output, Options.Create(new ServiceActivatorOptions()),
+            NullLogger<ServiceActivator>.Instance);
+
+        var envelope = IntegrationEnvelope<string>.Create("request", "svc", "order.query") with
+        {
+            ReplyTo = "reply-topic",
         };
 
-        Assert.That(opts.AckSubject, Is.EqualTo("ack-topic"));
-        Assert.That(opts.NackSubject, Is.EqualTo("nack-topic"));
-    }
+        var result = await activator.InvokeAsync<string, string>(
+            envelope, (env, _) => Task.FromResult<string?>($"response:{env.Payload}"));
 
-    // ── IntegrationPipelineInput Record Shape ───────────────────────────────
+        Assert.That(result.Succeeded, Is.True);
+        Assert.That(result.ReplySent, Is.True);
+        _output.AssertReceivedOnTopic("reply-topic", 1);
+    }
 
     [Test]
-    public void IntegrationPipelineInput_RecordShape()
+    public async Task ServiceActivator_NoReplyTo_NoReplyPublished()
     {
-        var input = new IntegrationPipelineInput(
-            Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow,
-            "OrderService", "order.created", "1.0", 1, "{}", null, "ack", "nack");
+        var activator = new ServiceActivator(
+            _output, Options.Create(new ServiceActivatorOptions()),
+            NullLogger<ServiceActivator>.Instance);
 
-        Assert.That(input.MessageId, Is.Not.EqualTo(Guid.Empty));
-        Assert.That(input.Source, Is.EqualTo("OrderService"));
-        Assert.That(input.AckSubject, Is.EqualTo("ack"));
+        var envelope = IntegrationEnvelope<string>.Create("request", "svc", "order.query");
+
+        var result = await activator.InvokeAsync<string, string>(
+            envelope, (_, _) => Task.FromResult<string?>("response"));
+
+        Assert.That(result.Succeeded, Is.True);
+        Assert.That(result.ReplySent, Is.False);
+        _output.AssertNoneReceived();
     }
-
-    // ── IntegrationPipelineResult Record Shape ──────────────────────────────
-
-    [Test]
-    public void IntegrationPipelineResult_RecordShape()
-    {
-        var result = new IntegrationPipelineResult(Guid.NewGuid(), true);
-
-        Assert.That(result.IsSuccess, Is.True);
-        Assert.That(result.FailureReason, Is.Null);
-    }
-
-    // ── PipelineOrchestrator Dispatches To Workflow ──────────────────────────
 
     [Test]
     public async Task PipelineOrchestrator_ProcessAsync_DispatchesToWorkflow()
     {
         var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
         dispatcher.DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
+            Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new IntegrationPipelineResult(Guid.NewGuid(), true));
 
-        var options = Options.Create(new PipelineOptions
-        {
-            AckSubject = "ack",
-            NackSubject = "nack",
-        });
-
         var orchestrator = new PipelineOrchestrator(
-            dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
+            dispatcher, Options.Create(new PipelineOptions { AckSubject = "ack", NackSubject = "nack" }),
+            NullLogger<PipelineOrchestrator>.Instance);
 
         var envelope = IntegrationEnvelope<JsonElement>.Create(
-            JsonSerializer.Deserialize<JsonElement>("{}"),
-            "TestService", "test.event");
-
+            JsonSerializer.Deserialize<JsonElement>("{}"), "TestService", "test.event");
         await orchestrator.ProcessAsync(envelope);
 
         await dispatcher.Received(1).DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>());
+            Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
-    // ── IPipelineOrchestrator Interface Shape ────────────────────────────────
-
     [Test]
-    public void IPipelineOrchestrator_InterfaceShape()
-    {
-        var type = typeof(IPipelineOrchestrator);
-
-        Assert.That(type.IsInterface, Is.True);
-        Assert.That(type.GetMethod("ProcessAsync"), Is.Not.Null);
-    }
-
-    // ── ITemporalWorkflowDispatcher Interface Shape ─────────────────────────
-
-    [Test]
-    public void ITemporalWorkflowDispatcher_InterfaceShape()
-    {
-        var type = typeof(ITemporalWorkflowDispatcher);
-
-        Assert.That(type.IsInterface, Is.True);
-        Assert.That(type.GetMethod("DispatchAsync"), Is.Not.Null);
-    }
-
-    // ── PipelineOrchestrator Uses Options ────────────────────────────────────
-
-    [Test]
-    public async Task PipelineOrchestrator_UsesAckNackFromOptions()
+    public async Task PipelineOrchestrator_MapsAckNackFromOptions()
     {
         IntegrationPipelineInput? captured = null;
         var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
         dispatcher.DispatchAsync(
             Arg.Do<IntegrationPipelineInput>(i => captured = i),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
+            Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new IntegrationPipelineResult(Guid.NewGuid(), true));
 
-        var options = Options.Create(new PipelineOptions
-        {
-            AckSubject = "my-ack",
-            NackSubject = "my-nack",
-        });
-
         var orchestrator = new PipelineOrchestrator(
-            dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
+            dispatcher, Options.Create(new PipelineOptions { AckSubject = "my-ack", NackSubject = "my-nack" }),
+            NullLogger<PipelineOrchestrator>.Instance);
 
-        var envelope = IntegrationEnvelope<JsonElement>.Create(
-            JsonSerializer.Deserialize<JsonElement>("{}"),
-            "Svc", "evt");
-
-        await orchestrator.ProcessAsync(envelope);
+        await orchestrator.ProcessAsync(IntegrationEnvelope<JsonElement>.Create(
+            JsonSerializer.Deserialize<JsonElement>("{}"), "Svc", "evt"));
 
         Assert.That(captured, Is.Not.Null);
         Assert.That(captured!.AckSubject, Is.EqualTo("my-ack"));

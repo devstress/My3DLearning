@@ -1,65 +1,70 @@
 // ============================================================================
 // Tutorial 47 – Saga Compensation (Exam)
 // ============================================================================
-// Coding challenges: multi-step compensation, failure scenarios, and
-// saga workflow verification.
+// E2E challenges: multi-step compensation flow, partial failure handling,
+// and saga workflow type verification via MockEndpoint.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Activities;
+using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial47;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Multi-Step Saga Compensation ────────────────────────────
-
     [Test]
-    public async Task Challenge1_MultiStepCompensation_AllStepsCompensated()
+    public async Task Challenge1_MultiStepCompensation_AllNotified()
     {
+        await using var output = new MockEndpoint("saga-all");
         var svc = new DefaultCompensationActivityService(
             NullLogger<DefaultCompensationActivityService>.Instance);
 
         var corrId = Guid.NewGuid();
         var steps = new[] { "validate", "persist", "route", "notify", "ack" };
-        var results = new List<bool>();
 
         foreach (var step in steps)
         {
-            results.Add(await svc.CompensateAsync(corrId, step));
+            var ok = await svc.CompensateAsync(corrId, step);
+            Assert.That(ok, Is.True);
+            await output.PublishAsync(
+                IntegrationEnvelope<string>.Create($"done:{step}", "saga", "saga.step.done"),
+                "saga-done");
         }
 
-        Assert.That(results, Has.All.True);
-        Assert.That(results, Has.Count.EqualTo(5));
+        output.AssertReceivedCount(5);
     }
 
-    // ── Challenge 2: Compensation Failure Scenario ──────────────────────────
-
     [Test]
-    public async Task Challenge2_CompensationFailure_DetectedAndHandled()
+    public async Task Challenge2_PartialFailure_FailureNotificationPublished()
     {
+        await using var output = new MockEndpoint("saga-partial");
         var mock = Substitute.For<ICompensationActivityService>();
         mock.CompensateAsync(Arg.Any<Guid>(), "step-1").Returns(true);
-        mock.CompensateAsync(Arg.Any<Guid>(), "step-2").Returns(false); // fails
+        mock.CompensateAsync(Arg.Any<Guid>(), "step-2").Returns(false);
         mock.CompensateAsync(Arg.Any<Guid>(), "step-3").Returns(true);
 
         var corrId = Guid.NewGuid();
-        var compensated = new List<(string Step, bool Success)>();
+        var failed = new List<string>();
 
         foreach (var step in new[] { "step-1", "step-2", "step-3" })
         {
-            var result = await mock.CompensateAsync(corrId, step);
-            compensated.Add((step, result));
+            var ok = await mock.CompensateAsync(corrId, step);
+            var topic = ok ? "saga-ok" : "saga-fail";
+            await output.PublishAsync(
+                IntegrationEnvelope<string>.Create(step, "saga", "saga.result"), topic);
+            if (!ok) failed.Add(step);
         }
 
-        Assert.That(compensated.Count(c => c.Success), Is.EqualTo(2));
-        Assert.That(compensated.Single(c => !c.Success).Step, Is.EqualTo("step-2"));
+        output.AssertReceivedCount(3);
+        output.AssertReceivedOnTopic("saga-ok", 2);
+        output.AssertReceivedOnTopic("saga-fail", 1);
+        Assert.That(failed, Is.EqualTo(new[] { "step-2" }));
     }
-
-    // ── Challenge 3: Workflow Type Verification ─────────────────────────────
 
     [Test]
     public void Challenge3_SagaWorkflowTypes_ExistInAssembly()
