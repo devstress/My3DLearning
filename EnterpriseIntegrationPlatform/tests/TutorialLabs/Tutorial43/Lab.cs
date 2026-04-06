@@ -1,128 +1,156 @@
 // ============================================================================
 // Tutorial 43 – Kubernetes Deployment / Configuration Options (Lab)
 // ============================================================================
-// This lab exercises the configuration and options classes used by the
-// Kubernetes deployment: TemporalOptions, PipelineOptions, JwtOptions,
-// and DisasterRecoveryOptions.
+// EIP Pattern: Environment Cascade + Configuration Resolution.
+// E2E: EnvironmentOverrideProvider backed by InMemoryConfigurationStore —
+//      resolve config per environment, fall back to default, publish
+//      resolved values to MockEndpoint.
 // ============================================================================
-
-using EnterpriseIntegrationPlatform.Demo.Pipeline;
-using EnterpriseIntegrationPlatform.DisasterRecovery;
-using EnterpriseIntegrationPlatform.Security;
-using EnterpriseIntegrationPlatform.Workflow.Temporal;
-using Microsoft.Extensions.Options;
+using EnterpriseIntegrationPlatform.Configuration;
+using EnterpriseIntegrationPlatform.Contracts;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial43;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── TemporalOptions Properties Assignable ───────────────────────────────
+    private MockEndpoint _output = null!;
+    private ConfigurationChangeNotifier _notifier = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _output = new MockEndpoint("deploy-out");
+        _notifier = new ConfigurationChangeNotifier();
+    }
+
+    [TearDown]
+    public async Task TearDown()
+    {
+        _notifier.Dispose();
+        await _output.DisposeAsync();
+    }
+
+    private InMemoryConfigurationStore CreateStore() => new(_notifier);
 
     [Test]
-    public void TemporalOptions_PropertiesAssignable()
+    public async Task EnvironmentOverride_ResolvesSpecificEnvironment()
     {
-        var opts = new TemporalOptions
+        var store = CreateStore();
+        await store.SetAsync(new ConfigurationEntry("Database:Host", "localhost", "default"));
+        await store.SetAsync(new ConfigurationEntry("Database:Host", "prod-db.internal", "prod"));
+
+        var provider = new EnvironmentOverrideProvider(store);
+        var resolved = await provider.ResolveAsync("Database:Host", "prod");
+
+        Assert.That(resolved, Is.Not.Null);
+        Assert.That(resolved!.Value, Is.EqualTo("prod-db.internal"));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            resolved.Value, "config-resolver", "config.resolved");
+        await _output.PublishAsync(envelope, "resolved-config", default);
+        _output.AssertReceivedOnTopic("resolved-config", 1);
+    }
+
+    [Test]
+    public async Task EnvironmentOverride_FallsBackToDefault()
+    {
+        var store = CreateStore();
+        await store.SetAsync(new ConfigurationEntry("Cache:Ttl", "300", "default"));
+
+        var provider = new EnvironmentOverrideProvider(store);
+        var resolved = await provider.ResolveAsync("Cache:Ttl", "staging");
+
+        Assert.That(resolved, Is.Not.Null);
+        Assert.That(resolved!.Value, Is.EqualTo("300"));
+        Assert.That(resolved.Environment, Is.EqualTo("default"));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            resolved.Value, "config-resolver", "config.fallback");
+        await _output.PublishAsync(envelope, "fallback-config", default);
+        _output.AssertReceivedOnTopic("fallback-config", 1);
+    }
+
+    [Test]
+    public async Task EnvironmentOverride_ReturnsNull_WhenNotFound()
+    {
+        var store = CreateStore();
+        var provider = new EnvironmentOverrideProvider(store);
+
+        var resolved = await provider.ResolveAsync("Missing:Key", "dev");
+        Assert.That(resolved, Is.Null);
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "not-found", "config-resolver", "config.missing");
+        await _output.PublishAsync(envelope, "missing-config", default);
+        _output.AssertReceivedOnTopic("missing-config", 1);
+    }
+
+    [Test]
+    public async Task EnvironmentOverride_ResolveMany_PublishResults()
+    {
+        var store = CreateStore();
+        await store.SetAsync(new ConfigurationEntry("App:Name", "MyApp", "default"));
+        await store.SetAsync(new ConfigurationEntry("App:Version", "2.0", "prod"));
+
+        var provider = new EnvironmentOverrideProvider(store);
+        var resolved = await provider.ResolveManyAsync(
+            new[] { "App:Name", "App:Version" }, "prod");
+
+        Assert.That(resolved, Has.Count.EqualTo(2));
+        Assert.That(resolved["App:Name"].Value, Is.EqualTo("MyApp"));
+        Assert.That(resolved["App:Version"].Value, Is.EqualTo("2.0"));
+
+        foreach (var kvp in resolved)
         {
-            ServerAddress = "temporal.prod:7233",
-            Namespace = "production",
-            TaskQueue = "order-workflows",
-        };
+            var envelope = IntegrationEnvelope<string>.Create(
+                $"{kvp.Key}={kvp.Value.Value}", "config-resolver", "config.batch");
+            await _output.PublishAsync(envelope, "batch-config", default);
+        }
 
-        Assert.That(opts.ServerAddress, Is.EqualTo("temporal.prod:7233"));
-        Assert.That(opts.Namespace, Is.EqualTo("production"));
-        Assert.That(opts.TaskQueue, Is.EqualTo("order-workflows"));
+        _output.AssertReceivedOnTopic("batch-config", 2);
     }
 
-    // ── PipelineOptions Properties Assignable ───────────────────────────────
-
     [Test]
-    public void PipelineOptions_PropertiesAssignable()
+    public async Task ConfigCascade_DevStagingProd_PublishResolved()
     {
-        var opts = new PipelineOptions
+        var store = CreateStore();
+        await store.SetAsync(new ConfigurationEntry("Broker:Url", "nats://localhost:4222", "default"));
+        await store.SetAsync(new ConfigurationEntry("Broker:Url", "nats://staging:4222", "staging"));
+        await store.SetAsync(new ConfigurationEntry("Broker:Url", "nats://prod:4222", "prod"));
+
+        var provider = new EnvironmentOverrideProvider(store);
+
+        var environments = new[] { "dev", "staging", "prod" };
+        foreach (var env in environments)
         {
-            AckSubject = "pipeline.ack",
-            NackSubject = "pipeline.nack",
-            InboundSubject = "pipeline.inbound",
-            NatsUrl = "nats://nats-server:4222",
-            ConsumerGroup = "my-group",
-        };
+            var resolved = await provider.ResolveAsync("Broker:Url", env);
+            Assert.That(resolved, Is.Not.Null);
 
-        Assert.That(opts.AckSubject, Is.EqualTo("pipeline.ack"));
-        Assert.That(opts.NackSubject, Is.EqualTo("pipeline.nack"));
-        Assert.That(opts.InboundSubject, Is.EqualTo("pipeline.inbound"));
-        Assert.That(opts.NatsUrl, Is.EqualTo("nats://nats-server:4222"));
-        Assert.That(opts.ConsumerGroup, Is.EqualTo("my-group"));
+            var envelope = IntegrationEnvelope<string>.Create(
+                resolved!.Value, "config-resolver", "config.cascade");
+            await _output.PublishAsync(envelope, $"deploy-{env}", default);
+        }
+
+        // dev falls back to default
+        var devMsg = _output.GetAllReceived<string>("deploy-dev");
+        Assert.That(devMsg[0].Payload, Is.EqualTo("nats://localhost:4222"));
+
+        _output.AssertReceivedOnTopic("deploy-staging", 1);
+        _output.AssertReceivedOnTopic("deploy-prod", 1);
     }
 
-    // ── JwtOptions Defaults ─────────────────────────────────────────────────
-
     [Test]
-    public void JwtOptions_Defaults_ValidateLifetimeAndClockSkew()
+    public async Task EnvironmentVariable_ResolveFromEnvVar()
     {
-        var opts = new JwtOptions();
+        var resolved = EnvironmentOverrideProvider.ResolveFromEnvironmentVariable("NonExistent:Key");
+        Assert.That(resolved, Is.Null);
 
-        Assert.That(opts.ValidateLifetime, Is.True);
-        Assert.That(opts.ClockSkew, Is.EqualTo(TimeSpan.FromMinutes(5)));
-        Assert.That(opts.Issuer, Is.EqualTo(string.Empty));
-        Assert.That(opts.Audience, Is.EqualTo(string.Empty));
-        Assert.That(opts.SigningKey, Is.EqualTo(string.Empty));
-    }
-
-    // ── DisasterRecoveryOptions Defaults ────────────────────────────────────
-
-    [Test]
-    public void DisasterRecoveryOptions_Defaults()
-    {
-        var opts = new DisasterRecoveryOptions();
-
-        Assert.That(opts.MaxDrillHistorySize, Is.EqualTo(100));
-        Assert.That(opts.MaxReplicationLag, Is.EqualTo(TimeSpan.FromSeconds(30)));
-        Assert.That(opts.HealthCheckInterval, Is.EqualTo(TimeSpan.FromSeconds(10)));
-        Assert.That(opts.OfflineThreshold, Is.EqualTo(3));
-        Assert.That(opts.PerItemReplicationTime, Is.EqualTo(TimeSpan.FromMilliseconds(1)));
-    }
-
-    // ── Options.Create<TemporalOptions> Works Correctly ─────────────────────
-
-    [Test]
-    public void OptionsCreate_TemporalOptions_WorksCorrectly()
-    {
-        var temporal = new TemporalOptions
-        {
-            ServerAddress = "localhost:7233",
-            Namespace = "test-ns",
-            TaskQueue = "test-queue",
-        };
-
-        var wrapped = Options.Create(temporal);
-
-        Assert.That(wrapped, Is.Not.Null);
-        Assert.That(wrapped.Value.ServerAddress, Is.EqualTo("localhost:7233"));
-        Assert.That(wrapped.Value.Namespace, Is.EqualTo("test-ns"));
-        Assert.That(wrapped.Value.TaskQueue, Is.EqualTo("test-queue"));
-    }
-
-    // ── JwtOptions.SectionName Constant ─────────────────────────────────────
-
-    [Test]
-    public void JwtOptions_SectionName_IsJwt()
-    {
-        Assert.That(JwtOptions.SectionName, Is.EqualTo("Jwt"));
-        Assert.That(TemporalOptions.SectionName, Is.EqualTo("Temporal"));
-        Assert.That(PipelineOptions.SectionName, Is.EqualTo("Pipeline"));
-        Assert.That(DisasterRecoveryOptions.SectionName, Is.EqualTo("DisasterRecovery"));
-    }
-
-    // ── All Options Classes Are Sealed ──────────────────────────────────────
-
-    [Test]
-    public void AllOptionsClasses_AreSealed()
-    {
-        Assert.That(typeof(TemporalOptions).IsSealed, Is.True);
-        Assert.That(typeof(PipelineOptions).IsSealed, Is.True);
-        Assert.That(typeof(JwtOptions).IsSealed, Is.True);
-        Assert.That(typeof(DisasterRecoveryOptions).IsSealed, Is.True);
+        var envelope = IntegrationEnvelope<string>.Create(
+            "env-var-check", "config-resolver", "config.envvar");
+        await _output.PublishAsync(envelope, "envvar-results", default);
+        _output.AssertReceivedOnTopic("envvar-results", 1);
     }
 }

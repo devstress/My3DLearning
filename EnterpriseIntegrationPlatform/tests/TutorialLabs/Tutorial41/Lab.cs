@@ -1,222 +1,174 @@
 // ============================================================================
 // Tutorial 41 – OpenClaw Web / Blazor UI Concepts (Lab)
 // ============================================================================
-// This lab exercises the underlying services behind the "Where is my message?"
-// UI: MessageStateInspector, InspectionResult, ITraceAnalyzer, and
-// IObservabilityEventLog via mocks and record shape validation.
+// EIP Pattern: Message State Tracking (backing the "Where is my message?" UI).
+// E2E: InMemoryMessageStateStore — record lifecycle events, query by
+//      correlation/business-key, publish results to MockEndpoint.
 // ============================================================================
-
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
-using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial41;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── InspectionResult Record Shape ────────────────────────────────────────
+    private MockEndpoint _output = null!;
 
-    [Test]
-    public void InspectionResult_RecordShape_HasExpectedProperties()
-    {
-        var result = new InspectionResult
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("openclaw-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
+
+    private static InMemoryMessageStateStore CreateStore() => new();
+
+    private static MessageEvent MakeEvent(
+        Guid messageId, Guid correlationId, string source, string stage,
+        DeliveryStatus status, string? businessKey = null) =>
+        new()
         {
-            Query = "ORD-123",
-            Found = true,
-            Summary = "Message delivered",
-            OllamaAvailable = false,
-            Events = new List<MessageEvent>(),
-            LatestStage = "Delivery",
-            LatestStatus = DeliveryStatus.Delivered,
+            MessageId = messageId,
+            CorrelationId = correlationId,
+            MessageType = "Order",
+            Source = source,
+            Stage = stage,
+            Status = status,
+            BusinessKey = businessKey,
         };
 
-        Assert.That(result.Query, Is.EqualTo("ORD-123"));
-        Assert.That(result.Found, Is.True);
-        Assert.That(result.Summary, Is.EqualTo("Message delivered"));
-        Assert.That(result.OllamaAvailable, Is.False);
-        Assert.That(result.Events, Is.Empty);
-        Assert.That(result.LatestStage, Is.EqualTo("Delivery"));
-        Assert.That(result.LatestStatus, Is.EqualTo(DeliveryStatus.Delivered));
+    [Test]
+    public async Task RecordEvent_QueryByCorrelation_PublishToMockEndpoint()
+    {
+        var store = CreateStore();
+        var msgId = Guid.NewGuid();
+        var corrId = Guid.NewGuid();
+
+        await store.RecordAsync(MakeEvent(msgId, corrId, "Gateway", "Ingestion", DeliveryStatus.Pending));
+
+        var events = await store.GetByCorrelationIdAsync(corrId);
+        Assert.That(events, Has.Count.EqualTo(1));
+        Assert.That(events[0].Stage, Is.EqualTo("Ingestion"));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            events[0].Stage, "state-store", "state.query");
+        await _output.PublishAsync(envelope, "state-results", default);
+        _output.AssertReceivedOnTopic("state-results", 1);
     }
 
-    // ── WhereIsByCorrelationAsync with Mocked Dependencies ──────────────────
+    [Test]
+    public async Task RecordMultipleStages_TrackLifecycle_PublishLatest()
+    {
+        var store = CreateStore();
+        var msgId = Guid.NewGuid();
+        var corrId = Guid.NewGuid();
+
+        await store.RecordAsync(MakeEvent(msgId, corrId, "Gateway", "Ingestion", DeliveryStatus.Pending));
+        await store.RecordAsync(MakeEvent(msgId, corrId, "Router", "Routing", DeliveryStatus.InFlight));
+        await store.RecordAsync(MakeEvent(msgId, corrId, "Connector", "Delivery", DeliveryStatus.Delivered));
+
+        var events = await store.GetByCorrelationIdAsync(corrId);
+        Assert.That(events, Has.Count.EqualTo(3));
+
+        var latest = await store.GetLatestByCorrelationIdAsync(corrId);
+        Assert.That(latest, Is.Not.Null);
+        Assert.That(latest!.Stage, Is.EqualTo("Delivery"));
+        Assert.That(latest.Status, Is.EqualTo(DeliveryStatus.Delivered));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            latest.Stage, "state-store", "lifecycle.complete");
+        await _output.PublishAsync(envelope, "lifecycle-events", default);
+        _output.AssertReceivedOnTopic("lifecycle-events", 1);
+    }
 
     [Test]
-    public async Task MessageStateInspector_WhereIsByCorrelationAsync_ReturnsResult()
+    public async Task QueryByBusinessKey_PublishMatchingEvents()
     {
-        var correlationId = Guid.NewGuid();
-        var events = new List<MessageEvent>
+        var store = CreateStore();
+        var corrId = Guid.NewGuid();
+
+        await store.RecordAsync(MakeEvent(Guid.NewGuid(), corrId, "Gateway", "Ingestion",
+            DeliveryStatus.Pending, "ORD-123"));
+        await store.RecordAsync(MakeEvent(Guid.NewGuid(), corrId, "Router", "Routing",
+            DeliveryStatus.InFlight, "ORD-123"));
+
+        var events = await store.GetByBusinessKeyAsync("ORD-123");
+        Assert.That(events, Has.Count.EqualTo(2));
+        Assert.That(events[0].BusinessKey, Is.EqualTo("ORD-123"));
+
+        foreach (var evt in events)
         {
-            new()
-            {
-                MessageId = Guid.NewGuid(),
-                CorrelationId = correlationId,
-                MessageType = "Order",
-                Source = "Gateway",
-                Stage = "Ingestion",
-                Status = DeliveryStatus.Pending,
-            },
-        };
+            var envelope = IntegrationEnvelope<string>.Create(
+                evt.Stage, "state-store", "bizkey.query");
+            await _output.PublishAsync(envelope, "bizkey-results", default);
+        }
 
-        var log = Substitute.For<IObservabilityEventLog>();
-        log.GetByCorrelationIdAsync(correlationId, Arg.Any<CancellationToken>())
-            .Returns(events);
-
-        var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
-        traceAnalyzer.WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("Message is at Ingestion stage");
-
-        var inspector = new MessageStateInspector(
-            log, traceAnalyzer, NullLogger<MessageStateInspector>.Instance);
-
-        var result = await inspector.WhereIsByCorrelationAsync(correlationId);
-
-        Assert.That(result.Found, Is.True);
-        Assert.That(result.Events, Has.Count.EqualTo(1));
-        Assert.That(result.LatestStage, Is.EqualTo("Ingestion"));
+        _output.AssertReceivedOnTopic("bizkey-results", 2);
     }
 
-    // ── WhereIsAsync with Mocked Dependencies (Business Key Search) ─────────
+    [Test]
+    public async Task QueryByMessageId_PublishEventHistory()
+    {
+        var store = CreateStore();
+        var msgId = Guid.NewGuid();
+        var corrId = Guid.NewGuid();
+
+        await store.RecordAsync(MakeEvent(msgId, corrId, "Gateway", "Ingestion", DeliveryStatus.Pending));
+        await store.RecordAsync(MakeEvent(msgId, corrId, "Validator", "Validation", DeliveryStatus.InFlight));
+
+        var events = await store.GetByMessageIdAsync(msgId);
+        Assert.That(events, Has.Count.EqualTo(2));
+        Assert.That(events[0].MessageId, Is.EqualTo(msgId));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            $"{events.Count} events", "state-store", "msgid.query");
+        await _output.PublishAsync(envelope, "message-history", default);
+        _output.AssertReceivedOnTopic("message-history", 1);
+    }
 
     [Test]
-    public async Task MessageStateInspector_WhereIsAsync_ReturnsResult()
+    public async Task GetLatestByCorrelation_NoneRecorded_ReturnsNull()
     {
-        var correlationId = Guid.NewGuid();
-        var events = new List<MessageEvent>
+        var store = CreateStore();
+
+        var latest = await store.GetLatestByCorrelationIdAsync(Guid.NewGuid());
+        Assert.That(latest, Is.Null);
+
+        var events = await store.GetByBusinessKeyAsync("MISSING-KEY");
+        Assert.That(events, Is.Empty);
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "not-found", "state-store", "state.empty");
+        await _output.PublishAsync(envelope, "empty-results", default);
+        _output.AssertReceivedOnTopic("empty-results", 1);
+    }
+
+    [Test]
+    public async Task PublishAllLifecycleEventsToMockEndpoint()
+    {
+        var store = CreateStore();
+        var corrId = Guid.NewGuid();
+
+        await store.RecordAsync(MakeEvent(Guid.NewGuid(), corrId, "Gateway", "Ingestion",
+            DeliveryStatus.Pending, "SHIP-456"));
+        await store.RecordAsync(MakeEvent(Guid.NewGuid(), corrId, "Transform", "Transform",
+            DeliveryStatus.InFlight, "SHIP-456"));
+        await store.RecordAsync(MakeEvent(Guid.NewGuid(), corrId, "Connector", "Delivery",
+            DeliveryStatus.Delivered, "SHIP-456"));
+
+        var events = await store.GetByCorrelationIdAsync(corrId);
+        foreach (var evt in events)
         {
-            new()
-            {
-                MessageId = Guid.NewGuid(),
-                CorrelationId = correlationId,
-                MessageType = "Shipment",
-                Source = "Warehouse",
-                Stage = "Routing",
-                Status = DeliveryStatus.InFlight,
-                BusinessKey = "SHIP-456",
-            },
-        };
+            var envelope = IntegrationEnvelope<string>.Create(
+                $"{evt.Stage}:{evt.Status}", "state-store", evt.MessageType);
+            await _output.PublishAsync(envelope, "lifecycle-stream", default);
+        }
 
-        var log = Substitute.For<IObservabilityEventLog>();
-        log.GetByBusinessKeyAsync("SHIP-456", Arg.Any<CancellationToken>())
-            .Returns(events);
-
-        var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
-        traceAnalyzer.WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("Message is being routed");
-
-        var inspector = new MessageStateInspector(
-            log, traceAnalyzer, NullLogger<MessageStateInspector>.Instance);
-
-        var result = await inspector.WhereIsAsync("SHIP-456");
-
-        Assert.That(result.Found, Is.True);
-        Assert.That(result.Query, Is.EqualTo("SHIP-456"));
-        Assert.That(result.LatestStage, Is.EqualTo("Routing"));
-    }
-
-    // ── CreateSnapshot Creates Valid Snapshot ────────────────────────────────
-
-    [Test]
-    public void MessageStateInspector_CreateSnapshot_CreatesValidSnapshot()
-    {
-        var log = Substitute.For<IObservabilityEventLog>();
-        var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
-
-        var inspector = new MessageStateInspector(
-            log, traceAnalyzer, NullLogger<MessageStateInspector>.Instance);
-
-        var envelope = IntegrationEnvelope<string>.Create("payload", "TestSvc", "order.created");
-
-        var snapshot = inspector.CreateSnapshot(envelope, "Ingestion", DeliveryStatus.Pending);
-
-        Assert.That(snapshot.MessageId, Is.EqualTo(envelope.MessageId));
-        Assert.That(snapshot.CorrelationId, Is.EqualTo(envelope.CorrelationId));
-        Assert.That(snapshot.CurrentStage, Is.EqualTo("Ingestion"));
-        Assert.That(snapshot.DeliveryStatus, Is.EqualTo(DeliveryStatus.Pending));
-        Assert.That(snapshot.Source, Is.EqualTo("TestSvc"));
-        Assert.That(snapshot.MessageType, Is.EqualTo("order.created"));
-    }
-
-    // ── Mock ITraceAnalyzer.WhereIsMessageAsync Returns Analysis ────────────
-
-    [Test]
-    public async Task Mock_ITraceAnalyzer_WhereIsMessageAsync_ReturnsAnalysis()
-    {
-        var analyzer = Substitute.For<ITraceAnalyzer>();
-        var correlationId = Guid.NewGuid();
-
-        analyzer.WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("Message is in the dead-letter queue after 3 retries");
-
-        var analysis = await analyzer.WhereIsMessageAsync(correlationId, "{}");
-
-        Assert.That(analysis, Does.Contain("dead-letter"));
-        await analyzer.Received(1).WhereIsMessageAsync(
-            correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>());
-    }
-
-    // ── Mock IObservabilityEventLog.GetByBusinessKeyAsync Returns Events ────
-
-    [Test]
-    public async Task Mock_IObservabilityEventLog_GetByBusinessKeyAsync_ReturnsEvents()
-    {
-        var log = Substitute.For<IObservabilityEventLog>();
-        var correlationId = Guid.NewGuid();
-        var events = new List<MessageEvent>
-        {
-            new()
-            {
-                MessageId = Guid.NewGuid(),
-                CorrelationId = correlationId,
-                MessageType = "Invoice",
-                Source = "Billing",
-                Stage = "Transform",
-                Status = DeliveryStatus.InFlight,
-                BusinessKey = "INV-789",
-            },
-            new()
-            {
-                MessageId = Guid.NewGuid(),
-                CorrelationId = correlationId,
-                MessageType = "Invoice",
-                Source = "Billing",
-                Stage = "Delivery",
-                Status = DeliveryStatus.Delivered,
-                BusinessKey = "INV-789",
-            },
-        };
-
-        log.GetByBusinessKeyAsync("INV-789", Arg.Any<CancellationToken>())
-            .Returns(events);
-
-        var result = await log.GetByBusinessKeyAsync("INV-789");
-
-        Assert.That(result, Has.Count.EqualTo(2));
-        Assert.That(result[0].Stage, Is.EqualTo("Transform"));
-        Assert.That(result[1].Status, Is.EqualTo(DeliveryStatus.Delivered));
-    }
-
-    // ── InspectionResult.Found is False When No Events Found ────────────────
-
-    [Test]
-    public async Task InspectionResult_Found_IsFalse_WhenNoEventsFound()
-    {
-        var log = Substitute.For<IObservabilityEventLog>();
-        log.GetByBusinessKeyAsync("MISSING-KEY", Arg.Any<CancellationToken>())
-            .Returns(new List<MessageEvent>());
-
-        var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
-
-        var inspector = new MessageStateInspector(
-            log, traceAnalyzer, NullLogger<MessageStateInspector>.Instance);
-
-        var result = await inspector.WhereIsAsync("MISSING-KEY");
-
-        Assert.That(result.Found, Is.False);
-        Assert.That(result.Events, Is.Empty);
-        Assert.That(result.Summary, Does.Contain("No messages found"));
+        _output.AssertReceivedOnTopic("lifecycle-stream", 3);
+        var all = _output.GetAllReceived<string>("lifecycle-stream");
+        Assert.That(all[0].Payload, Is.EqualTo("Ingestion:Pending"));
+        Assert.That(all[2].Payload, Is.EqualTo("Delivery:Delivered"));
     }
 }

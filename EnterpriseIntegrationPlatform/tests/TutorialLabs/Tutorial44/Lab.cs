@@ -1,176 +1,221 @@
 // ============================================================================
 // Tutorial 44 – Disaster Recovery (Lab)
 // ============================================================================
-// This lab exercises InMemoryFailoverManager, InMemoryReplicationManager,
-// DrDrillType, FailoverResult, ReplicationStatus, RecoveryObjective, and
-// DisasterRecoveryOptions records and classes.
+// EIP Pattern: Failover / Failback.
+// E2E: InMemoryFailoverManager — register regions, failover, failback,
+//      health-check updates, publish results to MockEndpoint.
 // ============================================================================
-
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.DisasterRecovery;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial44;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── FailoverResult Record Shape ─────────────────────────────────────────
+    private MockEndpoint _output = null!;
 
-    [Test]
-    public void FailoverResult_RecordShape()
-    {
-        var now = DateTimeOffset.UtcNow;
-        var result = new FailoverResult
-        {
-            Success = true,
-            PromotedRegionId = "us-west-2",
-            DemotedRegionId = "us-east-1",
-            Duration = TimeSpan.FromMilliseconds(150),
-            CompletedAt = now,
-        };
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("dr-out");
 
-        Assert.That(result.Success, Is.True);
-        Assert.That(result.PromotedRegionId, Is.EqualTo("us-west-2"));
-        Assert.That(result.DemotedRegionId, Is.EqualTo("us-east-1"));
-        Assert.That(result.Duration, Is.EqualTo(TimeSpan.FromMilliseconds(150)));
-        Assert.That(result.CompletedAt, Is.EqualTo(now));
-        Assert.That(result.ErrorMessage, Is.Null);
-    }
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
-    // ── ReplicationStatus Record Shape ──────────────────────────────────────
-
-    [Test]
-    public void ReplicationStatus_RecordShape()
-    {
-        var now = DateTimeOffset.UtcNow;
-        var status = new ReplicationStatus
-        {
-            SourceRegionId = "us-east-1",
-            TargetRegionId = "eu-west-1",
-            Lag = TimeSpan.FromSeconds(5),
-            PendingItems = 42,
-            IsHealthy = true,
-            CapturedAt = now,
-            LastReplicatedSequence = 1000,
-        };
-
-        Assert.That(status.SourceRegionId, Is.EqualTo("us-east-1"));
-        Assert.That(status.TargetRegionId, Is.EqualTo("eu-west-1"));
-        Assert.That(status.Lag, Is.EqualTo(TimeSpan.FromSeconds(5)));
-        Assert.That(status.PendingItems, Is.EqualTo(42));
-        Assert.That(status.IsHealthy, Is.True);
-        Assert.That(status.LastReplicatedSequence, Is.EqualTo(1000));
-    }
-
-    // ── DrDrillType Enum Values ─────────────────────────────────────────────
-
-    [Test]
-    public void DrDrillType_EnumValues()
-    {
-        var values = Enum.GetValues<DrDrillType>();
-
-        Assert.That(values, Does.Contain(DrDrillType.RegionFailure));
-        Assert.That(values, Does.Contain(DrDrillType.NetworkPartition));
-        Assert.That(values, Does.Contain(DrDrillType.StorageFailure));
-        Assert.That(values, Does.Contain(DrDrillType.BrokerFailure));
-        Assert.That(values, Does.Contain(DrDrillType.PlannedFailover));
-        Assert.That(values, Has.Length.EqualTo(5));
-    }
-
-    // ── InMemoryFailoverManager: Register and Get Regions ───────────────────
-
-    [Test]
-    public async Task InMemoryFailoverManager_RegisterAndGetRegions()
-    {
-        var manager = new InMemoryFailoverManager(
-            NullLogger<InMemoryFailoverManager>.Instance,
+    private static InMemoryFailoverManager CreateManager() =>
+        new(NullLogger<InMemoryFailoverManager>.Instance,
             Options.Create(new DisasterRecoveryOptions()));
 
-        await manager.RegisterRegionAsync(new RegionInfo
+    [Test]
+    public async Task RegisterRegions_PublishTopologyToMockEndpoint()
+    {
+        var mgr = CreateManager();
+
+        await mgr.RegisterRegionAsync(new RegionInfo
         {
-            RegionId = "us-east-1",
-            DisplayName = "US East",
+            RegionId = "us-east-1", DisplayName = "US East",
             State = FailoverState.Primary,
         });
-
-        await manager.RegisterRegionAsync(new RegionInfo
+        await mgr.RegisterRegionAsync(new RegionInfo
         {
-            RegionId = "eu-west-1",
-            DisplayName = "EU West",
+            RegionId = "eu-west-1", DisplayName = "EU West",
             State = FailoverState.Standby,
         });
 
-        var regions = await manager.GetAllRegionsAsync();
+        var regions = await mgr.GetAllRegionsAsync();
         Assert.That(regions, Has.Count.EqualTo(2));
 
-        var primary = await manager.GetPrimaryAsync();
-        Assert.That(primary, Is.Not.Null);
-        Assert.That(primary!.RegionId, Is.EqualTo("us-east-1"));
-        Assert.That(primary.IsPrimary, Is.True);
+        foreach (var region in regions)
+        {
+            var envelope = IntegrationEnvelope<string>.Create(
+                $"{region.RegionId}:{region.State}", "dr-manager", "topology.registered");
+            await _output.PublishAsync(envelope, "topology", default);
+        }
+
+        _output.AssertReceivedOnTopic("topology", 2);
     }
 
-    // ── InMemoryFailoverManager: Failover Promotes Target Region ────────────
-
     [Test]
-    public async Task InMemoryFailoverManager_Failover_PromotesTargetRegion()
+    public async Task Failover_PromotesTarget_PublishResult()
     {
-        var manager = new InMemoryFailoverManager(
-            NullLogger<InMemoryFailoverManager>.Instance,
-            Options.Create(new DisasterRecoveryOptions()));
+        var mgr = CreateManager();
 
-        await manager.RegisterRegionAsync(new RegionInfo
+        await mgr.RegisterRegionAsync(new RegionInfo
         {
-            RegionId = "us-east-1",
-            DisplayName = "US East",
+            RegionId = "us-east-1", DisplayName = "US East",
             State = FailoverState.Primary,
         });
-
-        await manager.RegisterRegionAsync(new RegionInfo
+        await mgr.RegisterRegionAsync(new RegionInfo
         {
-            RegionId = "us-west-2",
-            DisplayName = "US West",
+            RegionId = "us-west-2", DisplayName = "US West",
             State = FailoverState.Standby,
         });
 
-        var result = await manager.FailoverAsync("us-west-2");
-
+        var result = await mgr.FailoverAsync("us-west-2");
         Assert.That(result.Success, Is.True);
         Assert.That(result.PromotedRegionId, Is.EqualTo("us-west-2"));
         Assert.That(result.DemotedRegionId, Is.EqualTo("us-east-1"));
 
-        var newPrimary = await manager.GetPrimaryAsync();
-        Assert.That(newPrimary!.RegionId, Is.EqualTo("us-west-2"));
+        var primary = await mgr.GetPrimaryAsync();
+        Assert.That(primary!.RegionId, Is.EqualTo("us-west-2"));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            $"promoted:{result.PromotedRegionId}", "dr-manager", "failover.complete");
+        await _output.PublishAsync(envelope, "failover-events", default);
+        _output.AssertReceivedOnTopic("failover-events", 1);
     }
 
-    // ── RecoveryObjective Record Shape ──────────────────────────────────────
-
     [Test]
-    public void RecoveryObjective_RecordShape()
+    public async Task FailoverToUnknownRegion_PublishError()
     {
-        var objective = new RecoveryObjective
+        var mgr = CreateManager();
+
+        await mgr.RegisterRegionAsync(new RegionInfo
         {
-            ObjectiveId = "sla-gold",
-            Rpo = TimeSpan.FromMinutes(5),
-            Rto = TimeSpan.FromMinutes(15),
-            Description = "Gold SLA: 5-min RPO, 15-min RTO",
-        };
+            RegionId = "us-east-1", DisplayName = "US East",
+            State = FailoverState.Primary,
+        });
 
-        Assert.That(objective.ObjectiveId, Is.EqualTo("sla-gold"));
-        Assert.That(objective.Rpo, Is.EqualTo(TimeSpan.FromMinutes(5)));
-        Assert.That(objective.Rto, Is.EqualTo(TimeSpan.FromMinutes(15)));
-        Assert.That(objective.Description, Does.Contain("Gold SLA"));
+        var result = await mgr.FailoverAsync("nonexistent-region");
+        Assert.That(result.Success, Is.False);
+        Assert.That(result.ErrorMessage, Does.Contain("not registered"));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            result.ErrorMessage!, "dr-manager", "failover.error");
+        await _output.PublishAsync(envelope, "failover-errors", default);
+        _output.AssertReceivedOnTopic("failover-errors", 1);
     }
 
-    // ── DisasterRecoveryOptions Defaults ────────────────────────────────────
+    [Test]
+    public async Task FailoverToSameRegion_PublishError()
+    {
+        var mgr = CreateManager();
+
+        await mgr.RegisterRegionAsync(new RegionInfo
+        {
+            RegionId = "us-east-1", DisplayName = "US East",
+            State = FailoverState.Primary,
+        });
+
+        var result = await mgr.FailoverAsync("us-east-1");
+        Assert.That(result.Success, Is.False);
+        Assert.That(result.ErrorMessage, Does.Contain("already the primary"));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            result.ErrorMessage!, "dr-manager", "failover.noop");
+        await _output.PublishAsync(envelope, "failover-errors", default);
+        _output.AssertReceivedOnTopic("failover-errors", 1);
+    }
 
     [Test]
-    public void DisasterRecoveryOptions_Defaults_MaxDrillHistorySize()
+    public async Task FailbackRestoresOriginalPrimary_PublishResult()
     {
-        var opts = new DisasterRecoveryOptions();
+        var mgr = CreateManager();
 
-        Assert.That(opts.MaxDrillHistorySize, Is.EqualTo(100));
-        Assert.That(DisasterRecoveryOptions.SectionName, Is.EqualTo("DisasterRecovery"));
+        await mgr.RegisterRegionAsync(new RegionInfo
+        {
+            RegionId = "primary-region", DisplayName = "Primary",
+            State = FailoverState.Primary,
+        });
+        await mgr.RegisterRegionAsync(new RegionInfo
+        {
+            RegionId = "standby-region", DisplayName = "Standby",
+            State = FailoverState.Standby,
+        });
+
+        await mgr.FailoverAsync("standby-region");
+        var failback = await mgr.FailbackAsync("primary-region");
+        Assert.That(failback.Success, Is.True);
+
+        var primary = await mgr.GetPrimaryAsync();
+        Assert.That(primary!.RegionId, Is.EqualTo("primary-region"));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            $"restored:{primary.RegionId}", "dr-manager", "failback.complete");
+        await _output.PublishAsync(envelope, "failback-events", default);
+        _output.AssertReceivedOnTopic("failback-events", 1);
+    }
+
+    [Test]
+    public async Task UpdateHealthCheck_PublishTimestampChange()
+    {
+        var mgr = CreateManager();
+
+        await mgr.RegisterRegionAsync(new RegionInfo
+        {
+            RegionId = "us-east-1", DisplayName = "US East",
+            State = FailoverState.Primary,
+        });
+
+        await mgr.UpdateHealthCheckAsync("us-east-1");
+
+        var regions = await mgr.GetAllRegionsAsync();
+        var region = regions.Single(r => r.RegionId == "us-east-1");
+        Assert.That(region.LastHealthCheck, Is.GreaterThan(DateTimeOffset.MinValue));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            $"healthcheck:{region.RegionId}", "dr-manager", "health.updated");
+        await _output.PublishAsync(envelope, "health-events", default);
+        _output.AssertReceivedOnTopic("health-events", 1);
+    }
+
+    [Test]
+    public async Task GetAllRegions_PublishRegionStates()
+    {
+        var mgr = CreateManager();
+
+        await mgr.RegisterRegionAsync(new RegionInfo
+        {
+            RegionId = "us-east-1", DisplayName = "US East",
+            State = FailoverState.Primary,
+        });
+        await mgr.RegisterRegionAsync(new RegionInfo
+        {
+            RegionId = "eu-west-1", DisplayName = "EU West",
+            State = FailoverState.Standby,
+        });
+        await mgr.RegisterRegionAsync(new RegionInfo
+        {
+            RegionId = "ap-south-1", DisplayName = "AP South",
+            State = FailoverState.Standby,
+        });
+
+        var regions = await mgr.GetAllRegionsAsync();
+        Assert.That(regions, Has.Count.EqualTo(3));
+
+        foreach (var region in regions)
+        {
+            var envelope = IntegrationEnvelope<string>.Create(
+                $"{region.RegionId}:{region.State}", "dr-manager", "region.state");
+            await _output.PublishAsync(envelope, "region-inventory", default);
+        }
+
+        _output.AssertReceivedOnTopic("region-inventory", 3);
+
+        var primary = await mgr.GetPrimaryAsync();
+        Assert.That(primary!.RegionId, Is.EqualTo("us-east-1"));
     }
 }
