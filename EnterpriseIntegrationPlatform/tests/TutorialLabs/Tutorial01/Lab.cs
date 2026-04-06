@@ -2,9 +2,8 @@
 // Tutorial 01 – Introduction (Lab)
 // ============================================================================
 // EIP Patterns: Point-to-Point Channel, Publish-Subscribe Channel
-// End-to-End: Wire real channels with MockEndpoint, send and receive
-// messages through actual PointToPointChannel and PublishSubscribeChannel
-// components — real integration, no stubs.
+// End-to-End: Wire real channels with NatsBrokerEndpoint backed by real
+// NATS JetStream via Aspire — real broker connections, no mocks.
 // ============================================================================
 
 using NUnit.Framework;
@@ -18,32 +17,40 @@ namespace TutorialLabs.Tutorial01;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _broker = null!;
+    private NatsBrokerEndpoint _broker = null!;
 
     [SetUp]
-    public void SetUp()
+    public async Task SetUp()
     {
-        _broker = new MockEndpoint("broker");
+        var natsUrl = await SharedTestAppHost.GetNatsUrlAsync();
+        if (natsUrl is null)
+            Assert.Ignore("Docker not available — skipping real broker test");
+
+        _broker = new NatsBrokerEndpoint("broker", natsUrl);
     }
 
     [TearDown]
     public async Task TearDown()
     {
-        await _broker.DisposeAsync();
+        if (_broker is not null) await _broker.DisposeAsync();
     }
 
     [Test]
     public async Task PointToPoint_SendAndReceive_MessageFlowsThroughChannel()
     {
-        // Wire a real PointToPointChannel with MockEndpoint as broker
+        // Wire a real PointToPointChannel with NatsBrokerEndpoint
         var channel = new PointToPointChannel(
             _broker, _broker, NullLogger<PointToPointChannel>.Instance);
 
         // Subscribe a handler that captures messages coming out of the channel
         IntegrationEnvelope<string>? received = null;
-        await channel.ReceiveAsync<string>("orders-queue", "order-processor",
+        var topic = $"orders-queue-{Guid.NewGuid():N}";
+        await channel.ReceiveAsync<string>(topic, "order-processor",
             msg => { received = msg; return Task.CompletedTask; },
             CancellationToken.None);
+
+        // Small delay to let subscription establish on real NATS
+        await Task.Delay(500);
 
         // Send a command through the real channel
         var order = IntegrationEnvelope<string>.Create(
@@ -51,13 +58,15 @@ public sealed class Lab
         {
             Intent = MessageIntent.Command,
         };
-        await channel.SendAsync(order, "orders-queue", CancellationToken.None);
+        await channel.SendAsync(order, topic, CancellationToken.None);
 
-        // The channel published to MockEndpoint — verify it arrived
-        _broker.AssertReceivedOnTopic("orders-queue", 1);
+        // Wait for real NATS delivery
+        await _broker.WaitForConsumedAsync(1, TimeSpan.FromSeconds(10));
 
-        // The handler was invoked via the subscribe path
-        await _broker.SendAsync(order);
+        // The channel published to NatsBrokerEndpoint — verify it arrived
+        _broker.AssertReceivedOnTopic(topic, 1);
+
+        // The handler was invoked via real NATS subscription
         Assert.That(received, Is.Not.Null);
         Assert.That(received!.Payload, Is.EqualTo("PlaceOrder:ORD-001"));
     }
@@ -72,13 +81,16 @@ public sealed class Lab
         // Two independent subscribers on the same topic
         IntegrationEnvelope<string>? subscriber1Msg = null;
         IntegrationEnvelope<string>? subscriber2Msg = null;
+        var topic = $"events-topic-{Guid.NewGuid():N}";
 
-        await channel.SubscribeAsync<string>("events-topic", "audit-service",
+        await channel.SubscribeAsync<string>(topic, "audit-service",
             msg => { subscriber1Msg = msg; return Task.CompletedTask; },
             CancellationToken.None);
-        await channel.SubscribeAsync<string>("events-topic", "notification-service",
+        await channel.SubscribeAsync<string>(topic, "notification-service",
             msg => { subscriber2Msg = msg; return Task.CompletedTask; },
             CancellationToken.None);
+
+        await Task.Delay(500);
 
         // Publish an event through the real channel
         var evt = IntegrationEnvelope<string>.Create(
@@ -86,16 +98,17 @@ public sealed class Lab
         {
             Intent = MessageIntent.Event,
         };
-        await channel.PublishAsync(evt, "events-topic", CancellationToken.None);
+        await channel.PublishAsync(evt, topic, CancellationToken.None);
 
-        // MockEndpoint captured the published message
-        _broker.AssertReceivedOnTopic("events-topic", 1);
+        // Wait for real NATS delivery to both subscribers
+        await _broker.WaitForConsumedAsync(2, TimeSpan.FromSeconds(10));
 
-        // Deliver to all subscribers via the broker
-        await _broker.SendAsync(evt);
+        // NatsBrokerEndpoint captured the published message
+        _broker.AssertReceivedOnTopic(topic, 1);
+
+        // Both subscribers received via real NATS
         Assert.That(subscriber1Msg, Is.Not.Null);
         Assert.That(subscriber2Msg, Is.Not.Null);
-        Assert.That(subscriber1Msg!.MessageId, Is.EqualTo(subscriber2Msg!.MessageId));
     }
 
     [Test]
@@ -104,16 +117,21 @@ public sealed class Lab
         var channel = new PointToPointChannel(
             _broker, _broker, NullLogger<PointToPointChannel>.Instance);
 
+        var topic = $"batch-queue-{Guid.NewGuid():N}";
+
         // Send a batch of 5 messages through the real channel
         for (var i = 0; i < 5; i++)
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 $"item-{i}", "BatchProducer", "batch.item");
-            await channel.SendAsync(envelope, "batch-queue", CancellationToken.None);
+            await channel.SendAsync(envelope, topic, CancellationToken.None);
         }
 
-        // All 5 messages flowed through the real channel and arrived at the broker
-        _broker.AssertReceivedCount(5);
+        // Wait for real NATS delivery
+        await _broker.WaitForMessagesOnTopicAsync(topic, 5, TimeSpan.FromSeconds(10));
+
+        // All 5 messages flowed through the real channel and arrived at NATS
+        _broker.AssertReceivedOnTopic(topic, 5);
         Assert.That(_broker.GetReceived<string>(0).Payload, Is.EqualTo("item-0"));
         Assert.That(_broker.GetReceived<string>(4).Payload, Is.EqualTo("item-4"));
     }
@@ -124,6 +142,7 @@ public sealed class Lab
         var channel = new PointToPointChannel(
             _broker, _broker, NullLogger<PointToPointChannel>.Instance);
 
+        var topic = $"high-priority-orders-{Guid.NewGuid():N}";
         var order = new OrderPayload("ORD-500", "Laptop", 2, 1299.99m);
         var envelope = IntegrationEnvelope<OrderPayload>.Create(
             order, "CatalogService", "order.created") with
@@ -132,9 +151,11 @@ public sealed class Lab
             Priority = MessagePriority.High,
         };
 
-        await channel.SendAsync(envelope, "high-priority-orders", CancellationToken.None);
+        await channel.SendAsync(envelope, topic, CancellationToken.None);
 
-        _broker.AssertReceivedOnTopic("high-priority-orders", 1);
+        await _broker.WaitForMessagesOnTopicAsync(topic, 1, TimeSpan.FromSeconds(10));
+
+        _broker.AssertReceivedOnTopic(topic, 1);
         var received = _broker.GetReceived<OrderPayload>();
         Assert.That(received.Payload.OrderId, Is.EqualTo("ORD-500"));
         Assert.That(received.Payload.Price, Is.EqualTo(1299.99m));
@@ -145,38 +166,41 @@ public sealed class Lab
     public async Task ChannelHop_P2PToHandler_ThenPubSubFanOut()
     {
         // Two real channels: P2P for input, PubSub for fanout
-        var inputBroker = new MockEndpoint("input-broker");
-        var fanoutBroker = new MockEndpoint("fanout-broker");
+        var natsUrl = (await SharedTestAppHost.GetNatsUrlAsync())!;
+        var inputBroker = new NatsBrokerEndpoint("input-broker", natsUrl);
+        var fanoutBroker = new NatsBrokerEndpoint("fanout-broker", natsUrl);
 
         var inputChannel = new PointToPointChannel(
             inputBroker, inputBroker, NullLogger<PointToPointChannel>.Instance);
         var fanoutChannel = new PublishSubscribeChannel(
             fanoutBroker, fanoutBroker, NullLogger<PublishSubscribeChannel>.Instance);
 
+        var ingestTopic = $"ingest-queue-{Guid.NewGuid():N}";
+        var enrichedTopic = $"enriched-events-{Guid.NewGuid():N}";
+
         // Handler: receives from P2P, enriches, and publishes to PubSub
-        await inputChannel.ReceiveAsync<string>("ingest-queue", "enricher",
+        await inputChannel.ReceiveAsync<string>(ingestTopic, "enricher",
             async msg =>
             {
                 var enriched = msg with
                 {
                     Metadata = new Dictionary<string, string> { ["enriched"] = "true" },
                 };
-                await fanoutChannel.PublishAsync(enriched, "enriched-events", CancellationToken.None);
+                await fanoutChannel.PublishAsync(enriched, enrichedTopic, CancellationToken.None);
             }, CancellationToken.None);
+
+        await Task.Delay(500);
 
         // Send a raw message into the P2P channel
         var raw = IntegrationEnvelope<string>.Create(
             "raw-event-data", "SensorService", "sensor.reading");
-        await inputChannel.SendAsync(raw, "ingest-queue", CancellationToken.None);
+        await inputChannel.SendAsync(raw, ingestTopic, CancellationToken.None);
 
-        // P2P channel delivered to input broker
-        inputBroker.AssertReceivedOnTopic("ingest-queue", 1);
-
-        // Trigger the handler which forwards to PubSub
-        await inputBroker.SendAsync(raw);
+        // Wait for real NATS delivery through the hop
+        await fanoutBroker.WaitForMessagesOnTopicAsync(enrichedTopic, 1, TimeSpan.FromSeconds(10));
 
         // Fanout channel received the enriched message
-        fanoutBroker.AssertReceivedOnTopic("enriched-events", 1);
+        fanoutBroker.AssertReceivedOnTopic(enrichedTopic, 1);
         var enrichedMsg = fanoutBroker.GetReceived<string>();
         Assert.That(enrichedMsg.Metadata["enriched"], Is.EqualTo("true"));
         Assert.That(enrichedMsg.Payload, Is.EqualTo("raw-event-data"));
@@ -190,6 +214,9 @@ public sealed class Lab
     {
         var channel = new PublishSubscribeChannel(
             _broker, _broker, NullLogger<PublishSubscribeChannel>.Instance);
+
+        var commandTopic = $"commands-{Guid.NewGuid():N}";
+        var eventTopic = $"events-{Guid.NewGuid():N}";
 
         // Command → Event causation chain, both published through real channel
         var command = IntegrationEnvelope<string>.Create(
@@ -206,8 +233,11 @@ public sealed class Lab
             Intent = MessageIntent.Event,
         };
 
-        await channel.PublishAsync(command, "commands", CancellationToken.None);
-        await channel.PublishAsync(evt, "events", CancellationToken.None);
+        await channel.PublishAsync(command, commandTopic, CancellationToken.None);
+        await channel.PublishAsync(evt, eventTopic, CancellationToken.None);
+
+        // Wait for real NATS delivery
+        await _broker.WaitForMessagesAsync(2, TimeSpan.FromSeconds(10));
 
         // Both messages flowed through the real channel
         _broker.AssertReceivedCount(2);

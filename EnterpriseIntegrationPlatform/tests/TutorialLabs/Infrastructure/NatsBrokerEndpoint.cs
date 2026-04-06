@@ -34,7 +34,8 @@ public sealed class NatsBrokerEndpoint : IMessageBrokerProducer, IMessageBrokerC
     private readonly string _name;
     private readonly NatsConnection _connection;
     private readonly NatsJetStreamProducer _producer;
-    private readonly ConcurrentQueue<ReceivedMessage> _received = new();
+    private readonly ConcurrentQueue<ReceivedMessage> _published = new();
+    private readonly ConcurrentQueue<ReceivedMessage> _consumed = new();
     private readonly ConcurrentQueue<object> _inbound = new();
     private readonly List<Func<object, Task>> _handlers = new();
     private readonly List<CancellationTokenSource> _subscriptionTokens = new();
@@ -60,8 +61,8 @@ public sealed class NatsBrokerEndpoint : IMessageBrokerProducer, IMessageBrokerC
         CancellationToken cancellationToken = default)
     {
         await _producer.PublishAsync(envelope, topic, cancellationToken);
-        // Also capture locally for assertions
-        _received.Enqueue(new ReceivedMessage(envelope!, topic, DateTimeOffset.UtcNow));
+        // Capture on the producer side
+        _published.Enqueue(new ReceivedMessage(envelope!, topic, DateTimeOffset.UtcNow));
     }
 
     // ── IMessageBrokerConsumer (subscribes on real NATS) ────────────────
@@ -104,7 +105,7 @@ public sealed class NatsBrokerEndpoint : IMessageBrokerProducer, IMessageBrokerC
                     var env = EnvelopeSerializer.Deserialize<T>(msg.Data);
                     if (env is not null)
                     {
-                        _received.Enqueue(new ReceivedMessage(env!, topic, DateTimeOffset.UtcNow));
+                        _consumed.Enqueue(new ReceivedMessage(env!, topic, DateTimeOffset.UtcNow));
                         _inbound.Enqueue(env!);
                         await handler(env);
                     }
@@ -168,58 +169,83 @@ public sealed class NatsBrokerEndpoint : IMessageBrokerProducer, IMessageBrokerC
         await _producer.PublishAsync(envelope, topic, CancellationToken.None);
     }
 
-    // ── Assertions (same API as MockEndpoint) ───────────────────────────
+    // ── Assertions (same API as MockEndpoint — checks producer captures) ──
 
-    public IReadOnlyList<ReceivedMessage> Received => _received.ToArray();
+    /// <summary>All messages published through this endpoint.</summary>
+    public IReadOnlyList<ReceivedMessage> Received => _published.ToArray();
 
-    public int ReceivedCount => _received.Count;
+    /// <summary>Number of messages published.</summary>
+    public int ReceivedCount => _published.Count;
 
     public IntegrationEnvelope<T> GetReceived<T>(int index = 0) =>
-        (IntegrationEnvelope<T>)_received.ElementAt(index).Envelope;
+        (IntegrationEnvelope<T>)_published.ElementAt(index).Envelope;
 
     public IReadOnlyList<IntegrationEnvelope<T>> GetAllReceived<T>(string? topic = null) =>
-        _received
+        _published
             .Where(r => topic is null || r.Topic == topic)
             .Select(r => (IntegrationEnvelope<T>)r.Envelope)
             .ToList();
 
     public IReadOnlyList<string> GetReceivedTopics() =>
-        _received.Select(r => r.Topic).Distinct().ToList();
+        _published.Select(r => r.Topic).Distinct().ToList();
 
     public void AssertReceivedCount(int expected) =>
-        Assert.That(_received.Count, Is.EqualTo(expected),
-            $"NatsBrokerEndpoint '{_name}': expected {expected} message(s), received {_received.Count}");
+        Assert.That(_published.Count, Is.EqualTo(expected),
+            $"NatsBrokerEndpoint '{_name}': expected {expected} message(s), published {_published.Count}");
 
     public void AssertNoneReceived() =>
-        Assert.That(_received.Count, Is.EqualTo(0),
-            $"NatsBrokerEndpoint '{_name}': expected no messages, received {_received.Count}");
+        Assert.That(_published.Count, Is.EqualTo(0),
+            $"NatsBrokerEndpoint '{_name}': expected no messages, published {_published.Count}");
 
     public void AssertReceivedOnTopic(string topic, int expected) =>
         Assert.That(
-            _received.Count(r => r.Topic == topic),
+            _published.Count(r => r.Topic == topic),
             Is.EqualTo(expected),
             $"NatsBrokerEndpoint '{_name}': expected {expected} on '{topic}'");
 
+    // ── Consumer-side assertions (messages received from real NATS) ──────
+
+    /// <summary>All messages consumed from real NATS subscriptions.</summary>
+    public IReadOnlyList<ReceivedMessage> Consumed => _consumed.ToArray();
+
+    /// <summary>Number of messages consumed from real NATS.</summary>
+    public int ConsumedCount => _consumed.Count;
+
+    public IntegrationEnvelope<T> GetConsumed<T>(int index = 0) =>
+        (IntegrationEnvelope<T>)_consumed.ElementAt(index).Envelope;
+
     /// <summary>
-    /// Polls until the expected message count is reached or timeout expires.
-    /// Essential for real broker tests where delivery is asynchronous.
+    /// Polls until the expected published count is reached or timeout expires.
     /// </summary>
     public async Task WaitForMessagesAsync(int expectedCount, TimeSpan? timeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
-        while (_received.Count < expectedCount && DateTime.UtcNow < deadline)
+        while (_published.Count < expectedCount && DateTime.UtcNow < deadline)
         {
             await Task.Delay(50);
         }
     }
 
     /// <summary>
-    /// Polls until the expected message count on a specific topic is reached.
+    /// Polls until the expected published count on a specific topic is reached.
     /// </summary>
     public async Task WaitForMessagesOnTopicAsync(string topic, int expectedCount, TimeSpan? timeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
-        while (_received.Count(r => r.Topic == topic) < expectedCount && DateTime.UtcNow < deadline)
+        while (_published.Count(r => r.Topic == topic) < expectedCount && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50);
+        }
+    }
+
+    /// <summary>
+    /// Polls until the expected consumed count is reached or timeout expires.
+    /// Used for tests that verify real NATS delivery to subscribers.
+    /// </summary>
+    public async Task WaitForConsumedAsync(int expectedCount, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
+        while (_consumed.Count < expectedCount && DateTime.UtcNow < deadline)
         {
             await Task.Delay(50);
         }
@@ -227,7 +253,8 @@ public sealed class NatsBrokerEndpoint : IMessageBrokerProducer, IMessageBrokerC
 
     public void Reset()
     {
-        while (_received.TryDequeue(out _)) { }
+        while (_published.TryDequeue(out _)) { }
+        while (_consumed.TryDequeue(out _)) { }
         while (_inbound.TryDequeue(out _)) { }
         _handlers.Clear();
     }
