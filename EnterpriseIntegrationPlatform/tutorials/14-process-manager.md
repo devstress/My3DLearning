@@ -131,7 +131,7 @@ The `AtomicPipelineWorkflow` implements full **saga compensation**. Completed st
 
 ### Step 1: Trace a Compensation Sequence
 
-A workflow has steps: Persist → Validate → Transform → Deliver. Transform succeeds but Deliver fails after all retries. Open `src/Workflow.Temporal/AtomicPipelineWorkflow.cs` and trace:
+A workflow has steps: Persist → Validate → Transform → Deliver. Transform succeeds but Deliver fails after all retries. Open `src/Workflow.Temporal/Workflows/AtomicPipelineWorkflow.cs` and trace:
 
 1. Which steps need compensation? (only steps that committed work)
 2. In what order do compensation steps execute? (hint: reverse)
