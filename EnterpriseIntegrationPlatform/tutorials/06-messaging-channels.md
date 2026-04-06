@@ -1,47 +1,10 @@
 # Tutorial 06 — Messaging Channels
 
-## What You'll Learn
-
-- The difference between Point-to-Point and Publish-Subscribe channels
-- Datatype Channel for format-specific routing
-- Invalid Message Channel for validation failures
-- Messaging Bridge for cross-broker communication
+Point-to-Point, Publish-Subscribe, Datatype, Invalid Message, and Messaging Bridge channel patterns.
 
 ---
 
-## What Is a Messaging Channel?
-
-A **Messaging Channel** is a named conduit through which messages flow. In the EIP book, a channel is the logical pipe connecting a sender to a receiver. In this platform, channels are implemented on top of the broker abstraction, adding semantic behavior.
-
-```
-                    Messaging Channels
-┌─────────────────────────────────────────────────────┐
-│                                                     │
-│  Point-to-Point     Publish-Subscribe               │
-│  ┌───────────┐      ┌───────────┐                  │
-│  │  1 msg →  │      │  1 msg →  │                  │
-│  │  1 consumer│      │  N consumers│                 │
-│  └───────────┘      └───────────┘                  │
-│                                                     │
-│  Datatype           Invalid Message                 │
-│  ┌───────────┐      ┌───────────┐                  │
-│  │  Route by │      │  Failed   │                  │
-│  │  content  │      │  validation│                  │
-│  │  type     │      │  → quarantine│                │
-│  └───────────┘      └───────────┘                  │
-│                                                     │
-│  Messaging Bridge                                   │
-│  ┌───────────────────────────────────┐             │
-│  │  Source broker ──→ Target broker   │             │
-│  └───────────────────────────────────┘             │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## Point-to-Point Channel
-
-The **Point-to-Point Channel** ensures each message is consumed by **exactly one** consumer. This is the classic work queue pattern.
+## Key Types
 
 ```csharp
 // src/Ingestion/Channels/IPointToPointChannel.cs
@@ -60,24 +23,6 @@ public interface IPointToPointChannel
 }
 ```
 
-### How It Works
-
-```
-Producer → [  Queue  ] → Consumer A  (gets msg 1)
-                       → Consumer B  (gets msg 2)
-                       → Consumer C  (gets msg 3)
-                       
-Each message goes to ONE consumer (load balanced)
-```
-
-**Use when:** You have work items that should be processed exactly once — orders to fulfill, payments to process, files to transform.
-
----
-
-## Publish-Subscribe Channel
-
-The **Publish-Subscribe Channel** broadcasts each message to **all** subscribers. Every subscriber gets every message.
-
 ```csharp
 // src/Ingestion/Channels/IPublishSubscribeChannel.cs
 public interface IPublishSubscribeChannel
@@ -95,33 +40,6 @@ public interface IPublishSubscribeChannel
 }
 ```
 
-### How It Works
-
-```
-Producer → [  Topic  ] → Subscriber A  (gets ALL messages)
-                       → Subscriber B  (gets ALL messages)
-                       → Subscriber C  (gets ALL messages)
-                       
-Each message goes to EVERY subscriber (fan-out)
-```
-
-**Use when:** Multiple independent systems need the same events — audit logging, analytics, notification services.
-
-### Point-to-Point vs. Publish-Subscribe
-
-| Feature | Point-to-Point | Publish-Subscribe |
-|---------|---------------|-------------------|
-| Delivery | One consumer per message | All subscribers per message |
-| Use case | Work distribution | Event notification |
-| Scaling | Add consumers to share load | Each subscriber independent |
-| EIP Name | Point-to-Point Channel | Publish-Subscribe Channel |
-
----
-
-## Datatype Channel
-
-The **Datatype Channel** routes messages to a dedicated channel derived from their `MessageType`. Each distinct message type flows on its own channel, ensuring type-safe consumption. Use `ResolveChannel` to look up the channel name for a given message type.
-
 ```csharp
 // src/Ingestion/Channels/IDatatypeChannel.cs
 public interface IDatatypeChannel
@@ -133,24 +51,6 @@ public interface IDatatypeChannel
     string ResolveChannel(string messageType);
 }
 ```
-
-### How It Works
-
-```
-                  ┌─→ [OrderCreated channel]   (messageType: "OrderCreated")
-Message ─→ Publish┤
-                  ├─→ [InvoiceReceived channel](messageType: "InvoiceReceived")
-                  │
-                  └─→ [ShipmentDispatched channel](messageType: "ShipmentDispatched")
-```
-
-**Use when:** You have distinct message types and each type should flow on its own dedicated channel.
-
----
-
-## Invalid Message Channel
-
-The **Invalid Message Channel** quarantines messages that fail validation. Instead of silently dropping bad messages, they're routed to a special channel for inspection.
 
 ```csharp
 // src/Ingestion/Channels/IInvalidMessageChannel.cs
@@ -169,30 +69,6 @@ public interface IInvalidMessageChannel
 }
 ```
 
-> `RouteInvalidAsync` handles messages that were parsed into an envelope but failed validation. `RouteRawInvalidAsync` handles raw data that could not be deserialized into an envelope at all.
-
-### How It Works
-
-```
-Message arrives → Validate
-  ├─ Valid   → Continue processing
-  └─ Invalid → Invalid Message Channel → Inspect / Fix / Discard
-```
-
-The `InvalidMessageEnvelope` wraps the original message with error context:
-- Original envelope (preserved exactly as received)
-- Validation error description
-- Timestamp of rejection
-- Retry count (if this was a retry attempt)
-
-**Use when:** You need to capture and diagnose malformed messages without losing them.
-
----
-
-## Messaging Bridge
-
-The **Messaging Bridge** connects two different messaging systems. It consumes from one broker/channel and republishes to another.
-
 ```csharp
 // src/Ingestion/Channels/IMessagingBridge.cs
 public interface IMessagingBridge : IAsyncDisposable
@@ -207,88 +83,142 @@ public interface IMessagingBridge : IAsyncDisposable
 }
 ```
 
-### How It Works
-
-```
-┌──────────┐     ┌──────────────────┐     ┌──────────┐
-│  NATS    │ ──→ │ Messaging Bridge │ ──→ │  Kafka   │
-│ (tasks)  │     │  (consume+pub)   │     │ (events) │
-└──────────┘     └──────────────────┘     └──────────┘
-```
-
-**Use when:** You need to move messages between different broker types — for example, bridging task delivery (NATS) to event streaming (Kafka) for audit.
-
 ---
 
-## Channel Patterns in Practice
+## Exercises
 
-Here's how a typical message flow uses multiple channel types:
+### 1. Point-to-Point: single consumer receives the message
 
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+
+var envelope = IntegrationEnvelope<string>.Create(
+    payload: "order-123",
+    source: "OrderService",
+    messageType: "order.created") with
+{
+    Intent = MessageIntent.Command,
+};
+
+await producer.PublishAsync(envelope, "orders.point-to-point");
+
+await producer.Received(1).PublishAsync(
+    Arg.Is<IntegrationEnvelope<string>>(e => e.Payload == "order-123"),
+    Arg.Is("orders.point-to-point"),
+    Arg.Any<CancellationToken>());
 ```
-1. External system sends HTTP request to Gateway.Api
 
-2. Gateway publishes to Point-to-Point channel (task delivery)
-   → One worker picks it up
+### 2. Publish-Subscribe: every consumer group gets a copy
 
-3. Worker validates the message
-   → Invalid? → Invalid Message Channel (quarantine)
-   → Valid? → Continue
+```csharp
+var consumer = Substitute.For<IMessageBrokerConsumer>();
+var producer = Substitute.For<IMessageBrokerProducer>();
 
-4. Worker checks content type via Datatype Channel
-   → JSON? → JSON processor
-   → XML? → XML-to-JSON normalizer first
+var envelope = IntegrationEnvelope<string>.Create(
+    "event-data", "EventService", "event.published") with
+{
+    Intent = MessageIntent.Event,
+};
 
-5. Processed result published to Publish-Subscribe channel
-   → Subscriber A: Audit system (records the event)
-   → Subscriber B: Analytics (updates dashboards)
-   → Subscriber C: Notification service (sends confirmation)
+var groups = new[] { "billing-group", "analytics-group", "notifications-group" };
+
+foreach (var group in groups)
+{
+    await consumer.SubscribeAsync<string>(
+        "events.pubsub", group, _ => Task.CompletedTask);
+}
+
+await producer.PublishAsync(envelope, "events.pubsub");
+
+await consumer.Received(3).SubscribeAsync<string>(
+    Arg.Is("events.pubsub"),
+    Arg.Any<string>(),
+    Arg.Any<Func<IntegrationEnvelope<string>, Task>>(),
+    Arg.Any<CancellationToken>());
+
+foreach (var group in groups)
+{
+    await consumer.Received(1).SubscribeAsync<string>(
+        Arg.Is("events.pubsub"),
+        Arg.Is(group),
+        Arg.Any<Func<IntegrationEnvelope<string>, Task>>(),
+        Arg.Any<CancellationToken>());
+}
+```
+
+### 3. Datatype Channel: each message type routes to its own topic
+
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+
+var orderEnvelope = IntegrationEnvelope<string>.Create(
+    "new-order", "OrderService", "order.created");
+var paymentEnvelope = IntegrationEnvelope<string>.Create(
+    "payment-received", "PaymentService", "payment.completed");
+var inventoryEnvelope = IntegrationEnvelope<string>.Create(
+    "stock-updated", "InventoryService", "inventory.adjusted");
+
+await producer.PublishAsync(orderEnvelope, "datatype.order.created");
+await producer.PublishAsync(paymentEnvelope, "datatype.payment.completed");
+await producer.PublishAsync(inventoryEnvelope, "datatype.inventory.adjusted");
+
+await producer.Received(1).PublishAsync(
+    Arg.Any<IntegrationEnvelope<string>>(),
+    Arg.Is("datatype.order.created"),
+    Arg.Any<CancellationToken>());
+await producer.Received(1).PublishAsync(
+    Arg.Any<IntegrationEnvelope<string>>(),
+    Arg.Is("datatype.payment.completed"),
+    Arg.Any<CancellationToken>());
+await producer.Received(1).PublishAsync(
+    Arg.Any<IntegrationEnvelope<string>>(),
+    Arg.Is("datatype.inventory.adjusted"),
+    Arg.Any<CancellationToken>());
+```
+
+### 4. Invalid Message Channel: expired envelopes
+
+```csharp
+var expired = IntegrationEnvelope<string>.Create(
+    "stale-data", "LegacySystem", "legacy.update") with
+{
+    ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-5),
+};
+
+Assert.That(expired.IsExpired, Is.True);
+
+var valid = IntegrationEnvelope<string>.Create(
+    "fresh-data", "ModernSystem", "modern.update") with
+{
+    ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
+};
+
+Assert.That(valid.IsExpired, Is.False);
+
+var noExpiry = IntegrationEnvelope<string>.Create(
+    "persistent-data", "CoreService", "core.event");
+
+Assert.That(noExpiry.ExpiresAt, Is.Null);
+Assert.That(noExpiry.IsExpired, Is.False);
 ```
 
 ---
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial06/Lab.cs`](../tests/TutorialLabs/Tutorial06/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial06/Lab.cs`](../tests/TutorialLabs/Tutorial06/Lab.cs)
 
-**Objective:** Classify messaging scenarios by channel type and design a channel topology that ensures **atomic delivery** and **scalable fan-out**.
-
-### Step 1: Map Scenarios to Channel Types
-
-For each scenario, identify the correct EIP channel pattern and the platform class that implements it:
-
-| Scenario | Channel Pattern | Platform Class |
-|----------|----------------|----------------|
-| Processing purchase orders (one processor per order) | ? | `PointToPointChannel` or `PublishSubscribeChannel`? |
-| Notifying 5 systems when a shipment is dispatched | ? | ? |
-| Handling messages in XML or JSON from different partners | ? | ? |
-| Quarantining messages with missing required fields | ? | ? |
-
-Open `src/Ingestion/Channels/` and verify your answers against the actual implementations.
-
-### Step 2: Design a Messaging Bridge for Broker Migration
-
-Your company uses Kafka for all integrations but wants to add NATS for new microservices. Using the `MessagingBridge` class in `src/Ingestion/Channels/`, design a bridge configuration that:
-
-- Reads from Kafka topic `legacy.orders.created`
-- Publishes to NATS subject `eip.orders.created`
-- Preserves the `CorrelationId` and all `Metadata` across the bridge
-
-Draw the message flow and identify where **atomicity** could be lost (hint: what if the bridge crashes after reading from Kafka but before publishing to NATS?). How does the platform's Ack/Nack pattern mitigate this?
-
-### Step 3: Evaluate Scalability of Channel Patterns
-
-Compare Point-to-Point and Publish-Subscribe channels under high load:
-
-- Point-to-Point with 3 competing consumers processing 10,000 messages/second
-- Pub-Sub with 5 subscriber groups, each with 2 consumers
-
-For each, explain: How does adding more consumers affect throughput? What happens to in-flight messages? Where is the bottleneck?
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial06.Lab"
+```
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial06/Exam.cs`](../tests/TutorialLabs/Tutorial06/Exam.cs)
+> 💻 [`tests/TutorialLabs/Tutorial06/Exam.cs`](../tests/TutorialLabs/Tutorial06/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial06.Exam"
+```
 
 ---
 

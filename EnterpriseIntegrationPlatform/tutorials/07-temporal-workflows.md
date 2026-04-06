@@ -1,390 +1,178 @@
 # Tutorial 07 — Temporal Workflows
 
-## What You'll Learn
-
-- What Temporal.io is and why the platform uses it
-- How workflows orchestrate message processing
-- Durable execution and fault tolerance
-- The IntegrationPipelineWorkflow and AtomicPipelineWorkflow
-- Saga compensation for distributed transactions
+Durable workflow orchestration with `IntegrationPipelineWorkflow`, `AtomicPipelineWorkflow`, and saga compensation.
 
 ---
 
-## Why Temporal?
-
-Traditional message processing is fragile:
-
-```
-Receive → Validate → Transform → Route → Deliver
-                          ↑
-                     Server crashes here.
-                     Message is lost.
-```
-
-**Temporal.io** solves this with **durable execution**. Every workflow step is persisted. If the server crashes, Temporal automatically resumes from the last completed step:
-
-```
-Receive → Validate → Transform → [CRASH] → [RESTART] → Route → Deliver
-                                              ↑
-                                    Resumes from here
-```
-
-### Key Temporal Concepts
-
-| Concept | Description |
-|---------|-------------|
-| **Workflow** | A durable, long-running function that orchestrates activities |
-| **Activity** | A single unit of work (validate, transform, route, deliver) |
-| **Worker** | A process that polls for and executes workflows/activities |
-| **Task Queue** | Named queue where workflows and activities are dispatched |
-| **Signal** | External input to a running workflow (e.g., manual approval) |
-| **Query** | Read the current state of a running workflow |
-
----
-
-## The Integration Pipeline Workflow
-
-The core workflow orchestrates every message through the processing pipeline:
+## Key Types
 
 ```csharp
-// src/Workflow.Temporal/Workflows/IntegrationPipelineWorkflow.cs (simplified)
+// src/Workflow.Temporal/TemporalOptions.cs
+public sealed class TemporalOptions
+{
+    public const string SectionName = "Temporal";
+    public string ServerAddress { get; set; } = "localhost:15233";
+    public string Namespace { get; set; } = "default";
+    public string TaskQueue { get; set; } = "integration-workflows";
+}
+```
 
+```csharp
+// src/Workflow.Temporal/Workflows/IntegrationPipelineWorkflow.cs
 [Workflow]
 public class IntegrationPipelineWorkflow
 {
     [WorkflowRun]
     public async Task<IntegrationPipelineResult> RunAsync(
-        IntegrationPipelineInput input)
-    {
-        // Step 1: Persist the message (status: Pending)
-        await Workflow.ExecuteActivityAsync(
-            (PipelineActivities act) => act.PersistMessageAsync(input),
-            PipelineActivityOptions);
-
-        // Step 2: Log Received lifecycle event
-        await Workflow.ExecuteActivityAsync(
-            (PipelineActivities act) =>
-                act.LogStageAsync(input.MessageId, input.MessageType, "Received"),
-            PipelineActivityOptions);
-
-        // Step 3: Validate the message
-        var validation = await Workflow.ExecuteActivityAsync(
-            (IntegrationActivities act) =>
-                act.ValidateMessageAsync(input.MessageType, input.PayloadJson),
-            ValidationActivityOptions);
-
-        if (!validation.IsValid)
-        {
-            // Publish Nack and update status to Failed
-            await Workflow.ExecuteActivityAsync(
-                (PipelineActivities act) =>
-                    act.UpdateDeliveryStatusAsync(
-                        input.MessageId, input.CorrelationId,
-                        input.Timestamp, "Failed"),
-                PipelineActivityOptions);
-
-            if (input.NotificationsEnabled)
-            {
-                await Workflow.ExecuteActivityAsync(
-                    (PipelineActivities act) =>
-                        act.PublishNackAsync(
-                            input.MessageId, input.CorrelationId,
-                            validation.Reason ?? "Validation failed", input.NackSubject),
-                    PipelineActivityOptions);
-            }
-
-            return new IntegrationPipelineResult(input.MessageId, false, validation.Reason);
-        }
-
-        // Step 4: Update status to Delivered
-        await Workflow.ExecuteActivityAsync(
-            (PipelineActivities act) =>
-                act.UpdateDeliveryStatusAsync(
-                    input.MessageId, input.CorrelationId,
-                    input.Timestamp, "Delivered"),
-            PipelineActivityOptions);
-
-        // Step 5: Publish Ack
-        if (input.NotificationsEnabled)
-        {
-            await Workflow.ExecuteActivityAsync(
-                (PipelineActivities act) =>
-                    act.PublishAckAsync(input.MessageId, input.CorrelationId, input.AckSubject),
-                PipelineActivityOptions);
-        }
-
-        return new IntegrationPipelineResult(input.MessageId, true);
-    }
+        IntegrationPipelineInput input) { /* Persist → Log → Validate → Ack/Nack */ }
 }
 ```
 
-### What Makes This Durable
-
-Each `ExecuteActivityAsync` call is recorded by Temporal. If the worker crashes after Step 2 but before Step 3, Temporal will:
-
-1. Detect the worker is gone
-2. Assign the workflow to another worker
-3. Replay Steps 1 and 2 (already completed — just fast-forward)
-4. Execute Step 3 from where it left off
-
-**Zero message loss, guaranteed.**
-
----
-
-## The Atomic Pipeline Workflow
-
-The `AtomicPipelineWorkflow` adds **saga compensation** — if a step fails after earlier steps have committed side effects, compensation activities undo those effects:
-
-```
-Step 1: Reserve inventory    ✅ (committed)
-Step 2: Charge payment       ✅ (committed)
-Step 3: Send to warehouse    ❌ (FAILED)
-
-Compensation (reverse order):
-Step 2 comp: Refund payment  ✅
-Step 1 comp: Release inventory ✅
-Publish Nack with compensation details
-```
-
 ```csharp
-// src/Workflow.Temporal/Workflows/AtomicPipelineWorkflow.cs (simplified)
+// src/Workflow.Temporal/Workflows/AtomicPipelineWorkflow.cs
 [Workflow]
 public class AtomicPipelineWorkflow
 {
     [WorkflowRun]
     public async Task<AtomicPipelineResult> RunAsync(
-        IntegrationPipelineInput input)
-    {
-        var completedSteps = new List<string>();
-
-        // Step 1: Persist message as Pending
-        await Workflow.ExecuteActivityAsync(
-            (PipelineActivities act) => act.PersistMessageAsync(input),
-            PipelineActivityOptions);
-        completedSteps.Add("PersistMessage");
-
-        // Step 2: Validate message
-        var validation = await Workflow.ExecuteActivityAsync(
-            (IntegrationActivities act) =>
-                act.ValidateMessageAsync(input.MessageType, input.PayloadJson),
-            ValidationActivityOptions);
-
-        if (!validation.IsValid)
-        {
-            // Compensate all previously completed steps in reverse order
-            foreach (var step in Enumerable.Reverse(completedSteps))
-            {
-                await Workflow.ExecuteActivityAsync(
-                    (SagaCompensationActivities act) =>
-                        act.CompensateStepAsync(input.CorrelationId, step),
-                    CompensationActivityOptions);
-            }
-
-            // Save fault and publish Nack
-            return new AtomicPipelineResult(
-                input.MessageId, false, validation.Reason);
-        }
-
-        // Step 3: Update status to Delivered and Publish Ack
-        await Workflow.ExecuteActivityAsync(
-            (PipelineActivities act) =>
-                act.UpdateDeliveryStatusAsync(
-                    input.MessageId, input.CorrelationId,
-                    input.Timestamp, "Delivered"),
-            PipelineActivityOptions);
-
-        return new AtomicPipelineResult(input.MessageId, true);
-    }
+        IntegrationPipelineInput input) { /* Persist → Validate → Compensate on failure */ }
 }
 ```
-
----
-
-## Workflow Activities
-
-Activities are the building blocks that workflows orchestrate. Each activity is a stateless function that performs one task:
 
 ```csharp
-// src/Workflow.Temporal/Activities/IntegrationActivities.cs (simplified)
-// Handles validation and processing-stage logging
-
-public sealed class IntegrationActivities
+// src/Activities/IMessageValidationService.cs
+public interface IMessageValidationService
 {
-    [Activity]
-    public async Task<MessageValidationResult> ValidateMessageAsync(
-        string messageType, string payloadJson)
-    {
-        // Validate the message against schema and business rules
-        return await _validation.ValidateAsync(messageType, payloadJson);
-    }
-
-    [Activity]
-    public async Task LogProcessingStageAsync(
-        Guid messageId, string messageType, string stage)
-    {
-        // Record a lifecycle stage for observability
-    }
+    Task<MessageValidationResult> ValidateAsync(string messageType, string payloadJson);
 }
 
-// src/Workflow.Temporal/Activities/PipelineActivities.cs (simplified)
-// Handles persistence, delivery status, acknowledgments, and faults
-
-public sealed class PipelineActivities
+public record MessageValidationResult(bool IsValid, string? Reason = null)
 {
-    [Activity]
-    public async Task PersistMessageAsync(IntegrationPipelineInput input)
-    {
-        // Save message to Cassandra with status: Pending
-        await _persistence.SaveMessageAsync(input);
-    }
-
-    [Activity]
-    public async Task PublishAckAsync(
-        Guid messageId, Guid correlationId, string topic)
-    {
-        // Publish acknowledgment to Ack topic
-        await _notification.PublishAckAsync(messageId, correlationId, topic);
-    }
-
-    [Activity]
-    public async Task PublishNackAsync(
-        Guid messageId, Guid correlationId, string reason, string topic)
-    {
-        // Publish negative acknowledgment to Nack topic
-        await _notification.PublishNackAsync(messageId, correlationId, reason, topic);
-    }
+    public static MessageValidationResult Success { get; } = new(true);
+    public static MessageValidationResult Failure(string reason) => new(false, reason);
 }
 ```
-
-> **Note:** Activities are split across two classes: `IntegrationActivities` (validation and logging) and `PipelineActivities` (persistence and notifications). A third class, `SagaCompensationActivities`, handles rollback (see Tutorial 47).
-
-### Activity Design Principles
-
-1. **Stateless** — Activities don't hold state between executions
-2. **Idempotent** — Running twice produces the same result (critical for retries)
-3. **Single responsibility** — Each activity does one thing
-4. **Testable** — Activities can be unit tested in isolation with mocked dependencies
-
----
-
-## Ack/Nack Notification Loopback
-
-Every workflow ends by publishing either an **Ack** (success) or **Nack** (failure):
-
-```
-Workflow completes successfully:
-  → Publish Ack to "notifications.ack.{messageType}"
-  → External systems subscribe to confirm delivery
-
-Workflow fails (after retries):
-  → Compensate prior steps (if saga)
-  → Publish Nack to "notifications.nack.{messageType}"
-  → External systems subscribe to handle failure
-  → Message routed to DLQ for inspection
-```
-
-This ensures **closed-loop integration** — the sender always knows the outcome.
-
----
-
-## How Messages Trigger Workflows
-
-The `Demo.Pipeline` project shows how messages flow from the broker to Temporal:
-
-```
-1. IntegrationPipelineWorker (BackgroundService) subscribes to broker topic
-2. Message arrives → Worker creates IntegrationPipelineInput
-3. Worker calls TemporalWorkflowDispatcher to start a workflow
-4. Temporal assigns the workflow to a worker on the task queue
-5. Workflow executes activities in sequence
-6. Activities call domain services (persistence, validation, routing, delivery)
-7. Workflow publishes Ack or Nack and completes
-```
-
----
-
-## Testing Workflows
-
-Workflow tests use Temporal's local dev server:
 
 ```csharp
-[TestFixture]
-public class IntegrationPipelineWorkflowTests
+// src/Activities/IMessageLoggingService.cs
+public interface IMessageLoggingService
 {
-    [Test]
-    public async Task RunAsync_ValidMessage_PublishesAck()
-    {
-        // Arrange: create a valid envelope and mock services
-        var input = CreateValidInput();
-
-        // Act: run the workflow
-        var result = await RunWorkflow(input);
-
-        // Assert: workflow succeeded, Ack was published
-        Assert.That(result.IsSuccess, Is.True);
-        Assert.That(result.AckPublished, Is.True);
-    }
-
-    [Test]
-    public async Task RunAsync_InvalidMessage_PublishesNack()
-    {
-        // Arrange: create an invalid envelope
-        var input = CreateInvalidInput();
-
-        // Act: run the workflow
-        var result = await RunWorkflow(input);
-
-        // Assert: workflow failed, Nack was published
-        Assert.That(result.IsSuccess, Is.False);
-        Assert.That(result.NackPublished, Is.True);
-    }
+    Task LogAsync(Guid messageId, string messageType, string stage);
 }
+```
+
+---
+
+## Exercises
+
+### 1. Verify workflow types exist in the Temporal assembly
+
+```csharp
+var assembly = typeof(TemporalOptions).Assembly;
+
+var pipeline = assembly.GetTypes()
+    .FirstOrDefault(t => t.Name == "IntegrationPipelineWorkflow");
+Assert.That(pipeline, Is.Not.Null);
+Assert.That(pipeline!.IsClass, Is.True);
+
+var atomic = assembly.GetTypes()
+    .FirstOrDefault(t => t.Name == "AtomicPipelineWorkflow");
+Assert.That(atomic, Is.Not.Null);
+
+var saga = assembly.GetTypes()
+    .FirstOrDefault(t => t.Name == "SagaCompensationWorkflow");
+Assert.That(saga, Is.Not.Null);
+```
+
+### 2. TemporalOptions defaults and overrides
+
+```csharp
+var options = new TemporalOptions();
+
+Assert.That(options.ServerAddress, Is.EqualTo("localhost:15233"));
+Assert.That(options.Namespace, Is.EqualTo("default"));
+Assert.That(options.TaskQueue, Is.EqualTo("integration-workflows"));
+Assert.That(TemporalOptions.SectionName, Is.EqualTo("Temporal"));
+
+options = new TemporalOptions
+{
+    ServerAddress = "temporal.prod.internal:7233",
+    Namespace = "production",
+    TaskQueue = "prod-integration",
+};
+
+Assert.That(options.ServerAddress, Is.EqualTo("temporal.prod.internal:7233"));
+Assert.That(options.Namespace, Is.EqualTo("production"));
+Assert.That(options.TaskQueue, Is.EqualTo("prod-integration"));
+```
+
+### 3. Verify activity classes expose expected methods
+
+```csharp
+var assembly = typeof(TemporalOptions).Assembly;
+
+var integrationActivities = assembly.GetTypes()
+    .FirstOrDefault(t => t.Name == "IntegrationActivities");
+Assert.That(integrationActivities, Is.Not.Null);
+Assert.That(integrationActivities!.GetMethod("ValidateMessageAsync"), Is.Not.Null);
+Assert.That(integrationActivities.GetMethod("LogProcessingStageAsync"), Is.Not.Null);
+
+var pipelineActivities = assembly.GetTypes()
+    .FirstOrDefault(t => t.Name == "PipelineActivities");
+Assert.That(pipelineActivities, Is.Not.Null);
+
+var methodNames = pipelineActivities!
+    .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+    .Select(m => m.Name).ToList();
+
+Assert.That(methodNames, Does.Contain("PersistMessageAsync"));
+Assert.That(methodNames, Does.Contain("UpdateDeliveryStatusAsync"));
+Assert.That(methodNames, Does.Contain("PublishAckAsync"));
+Assert.That(methodNames, Does.Contain("PublishNackAsync"));
+Assert.That(methodNames, Does.Contain("LogStageAsync"));
+```
+
+### 4. Mock workflow activity chain: Validate → Log
+
+```csharp
+var validationService = Substitute.For<IMessageValidationService>();
+var loggingService = Substitute.For<IMessageLoggingService>();
+
+var messageId = Guid.NewGuid();
+const string messageType = "order.created";
+const string payloadJson = "{\"orderId\": \"ORD-001\"}";
+
+validationService.ValidateAsync(messageType, payloadJson)
+    .Returns(MessageValidationResult.Success);
+loggingService.LogAsync(messageId, messageType, Arg.Any<string>())
+    .Returns(Task.CompletedTask);
+
+var validationResult = await validationService.ValidateAsync(messageType, payloadJson);
+Assert.That(validationResult.IsValid, Is.True);
+
+await loggingService.LogAsync(messageId, messageType, "Validated");
+
+await validationService.Received(1).ValidateAsync(messageType, payloadJson);
+await loggingService.Received(1).LogAsync(messageId, messageType, "Validated");
 ```
 
 ---
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial07/Lab.cs`](../tests/TutorialLabs/Tutorial07/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial07/Lab.cs`](../tests/TutorialLabs/Tutorial07/Lab.cs)
 
-**Objective:** Trace how Temporal workflows enforce **atomic processing** with saga compensation, and design a failure recovery strategy for a multi-step integration pipeline.
-
-### Step 1: Trace a Failure Recovery Path
-
-A workflow has 4 steps: Validate → Transform → Route → Deliver. Step 3 (Route) fails after Step 2 has already committed its result. Open `src/Workflow.Temporal/` and trace the code path:
-
-1. What does Temporal do when Step 3 throws an exception? (hint: retry policy)
-2. If all retries are exhausted, how does the `AtomicPipelineWorkflow` trigger saga compensation?
-3. What does `SagaCompensationActivities.CompensateStepAsync` do for Steps 1 and 2?
-
-Draw the timeline showing: original steps executed, failure point, compensation steps in reverse order.
-
-### Step 2: Design Compensation for a Business Scenario
-
-Design saga compensation for an order fulfilment workflow:
-
-| Step | Action | Compensation |
-|------|--------|-------------|
-| 1 | Create customer record in CRM | ? |
-| 2 | Reserve inventory in warehouse | ? |
-| 3 | Charge payment via gateway | ? |
-| 4 | Send confirmation email | ? |
-
-For each compensation, identify: Is it idempotent? What happens if the compensation itself fails? How does the `CorrelationId` link the original action to its compensation?
-
-### Step 3: Evaluate Scalability of Workflow Workers
-
-Temporal workers poll task queues for workflow and activity tasks. Consider a scenario with 100 concurrent integrations:
-
-- How many workflow workers should you run? What happens when you add more?
-- What is the relationship between worker count and **throughput**?
-- Why does Temporal's durable execution model prevent duplicate processing even when workers scale horizontally?
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial07.Lab"
+```
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial07/Exam.cs`](../tests/TutorialLabs/Tutorial07/Exam.cs)
+> 💻 [`tests/TutorialLabs/Tutorial07/Exam.cs`](../tests/TutorialLabs/Tutorial07/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial07.Exam"
+```
 
 ---
 
