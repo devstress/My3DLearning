@@ -1,39 +1,10 @@
 # Tutorial 11 — Dynamic Router
 
-## What You'll Learn
-
-- The EIP Dynamic Router pattern and how it differs from static routing
-- How `IDynamicRouter` resolves destinations from a runtime routing table
-- How `IRouterControlChannel` lets downstream participants register/unregister
-- The `DynamicRoutingDecision` with fallback handling
-- How the routing table is built at runtime, not at deployment time
+A router whose routing table is built at runtime as downstream participants register and unregister through a control channel.
 
 ---
 
-## EIP Pattern: Dynamic Router
-
-> *"Use a Dynamic Router, a Router that can self-configure based on special configuration messages from participating destinations."*
-> — Gregor Hohpe & Bobby Woolf, *Enterprise Integration Patterns*
-
-```
-  Participant A ──register("typeA","topic-a")──▶ ┌──────────────────┐
-  Participant B ──register("typeB","topic-b")──▶ │ Control Channel   │
-  Participant C ──unregister("typeC")──────────▶ │                  │
-                                                  └────────┬─────────┘
-                                                           │ updates
-                                                           ▼
-                                                  ┌──────────────────┐
-                              ──Message──▶        │  Dynamic Router  │──▶ topic-a / topic-b / fallback
-                                                  └──────────────────┘
-```
-
-Unlike the Content-Based Router whose rules are fixed at startup, the Dynamic Router's routing table is **learned at runtime** as downstream participants register and unregister through the control channel.
-
----
-
-## Platform Implementation
-
-### IDynamicRouter
+## Key Types
 
 ```csharp
 // src/Processing.Routing/IDynamicRouter.cs
@@ -43,11 +14,7 @@ public interface IDynamicRouter
         IntegrationEnvelope<T> envelope,
         CancellationToken cancellationToken = default);
 }
-```
 
-### IRouterControlChannel
-
-```csharp
 // src/Processing.Routing/IRouterControlChannel.cs
 public interface IRouterControlChannel
 {
@@ -63,24 +30,15 @@ public interface IRouterControlChannel
 
     IReadOnlyDictionary<string, DynamicRouteEntry> GetRoutingTable();
 }
-```
 
-Downstream services call `RegisterAsync` on startup with their condition key and destination topic. The router looks up the condition field from the envelope, finds the matching entry, and publishes the message.
-
-### DynamicRoutingDecision
-
-```csharp
 // src/Processing.Routing/DynamicRoutingDecision.cs
 public sealed record DynamicRoutingDecision(
     string Destination,
     DynamicRouteEntry? MatchedEntry,
     bool IsFallback,
     string? ConditionValue);
-```
 
-### DynamicRouteEntry
-
-```csharp
+// src/Processing.Routing/DynamicRouteEntry.cs
 public sealed record DynamicRouteEntry(
     string ConditionKey,
     string Destination,
@@ -88,63 +46,143 @@ public sealed record DynamicRouteEntry(
     DateTimeOffset RegisteredAtUtc);
 ```
 
-When no routing table entry matches, the router uses the configured fallback topic (`IsFallback = true`). If no fallback is configured, it throws `InvalidOperationException`.
-
 ---
 
-## Scalability Dimension
+## Exercises
 
-The routing table is stored in a **thread-safe concurrent dictionary** shared across requests within one process. Multiple router replicas each maintain their own copy. For cross-replica consistency, control channel registrations should be broadcast (e.g. via a shared broker topic) so every replica converges on the same table. The routing evaluation itself is stateless and lock-free on read.
+### 1. Register a route and route a matching message
 
----
+```csharp
+var options = Options.Create(new DynamicRouterOptions
+{
+    ConditionField = "MessageType",
+    FallbackTopic = "unmatched-topic",
+});
 
-## Atomicity Dimension
+var router = new DynamicRouter(producer, options, NullLogger<DynamicRouter>.Instance);
 
-Routing decisions are deterministic for a given routing-table snapshot. If the process crashes after publish but before Ack, the message is redelivered and the same decision is made again (assuming the table has not changed). Registration events should also be durable — publishing registrations through the broker guarantees that table state can be rebuilt from the event log after a crash.
+await router.RegisterAsync("order.created", "orders-topic", "OrderService");
+
+var envelope = IntegrationEnvelope<string>.Create(
+    "order-data", "OrderService", "order.created");
+
+var decision = await router.RouteAsync(envelope);
+
+Assert.That(decision.Destination, Is.EqualTo("orders-topic"));
+Assert.That(decision.IsFallback, Is.False);
+Assert.That(decision.MatchedEntry, Is.Not.Null);
+Assert.That(decision.MatchedEntry!.ParticipantId, Is.EqualTo("OrderService"));
+Assert.That(decision.ConditionValue, Is.EqualTo("order.created"));
+```
+
+### 2. Unmatched message falls back to FallbackTopic
+
+```csharp
+var options = Options.Create(new DynamicRouterOptions
+{
+    ConditionField = "MessageType",
+    FallbackTopic = "catch-all-topic",
+});
+
+var router = new DynamicRouter(producer, options, NullLogger<DynamicRouter>.Instance);
+
+var envelope = IntegrationEnvelope<string>.Create(
+    "unknown-data", "UnknownService", "unknown.event");
+
+var decision = await router.RouteAsync(envelope);
+
+Assert.That(decision.Destination, Is.EqualTo("catch-all-topic"));
+Assert.That(decision.IsFallback, Is.True);
+Assert.That(decision.MatchedEntry, Is.Null);
+```
+
+### 3. Unregister removes route — subsequent message uses fallback
+
+```csharp
+var router = new DynamicRouter(producer, options, NullLogger<DynamicRouter>.Instance);
+
+await router.RegisterAsync("order.created", "orders-topic");
+
+var removed = await router.UnregisterAsync("order.created");
+Assert.That(removed, Is.True);
+
+var envelope = IntegrationEnvelope<string>.Create(
+    "order-data", "OrderService", "order.created");
+
+var decision = await router.RouteAsync(envelope);
+Assert.That(decision.IsFallback, Is.True);
+Assert.That(decision.Destination, Is.EqualTo("fallback-topic"));
+```
+
+### 4. Case-insensitive routing matches regardless of case
+
+```csharp
+var options = Options.Create(new DynamicRouterOptions
+{
+    ConditionField = "MessageType",
+    FallbackTopic = "fallback",
+    CaseInsensitive = true,
+});
+
+var router = new DynamicRouter(producer, options, NullLogger<DynamicRouter>.Instance);
+
+await router.RegisterAsync("order.created", "orders-topic");
+
+var envelope = IntegrationEnvelope<string>.Create(
+    "data", "Service", "Order.Created");
+
+var decision = await router.RouteAsync(envelope);
+
+Assert.That(decision.Destination, Is.EqualTo("orders-topic"));
+Assert.That(decision.IsFallback, Is.False);
+```
+
+### 5. Route by metadata field
+
+```csharp
+var options = Options.Create(new DynamicRouterOptions
+{
+    ConditionField = "Metadata.region",
+    FallbackTopic = "global-topic",
+});
+
+var router = new DynamicRouter(producer, options, NullLogger<DynamicRouter>.Instance);
+
+await router.RegisterAsync("eu-west", "eu-west-topic", "EUService");
+
+var envelope = IntegrationEnvelope<string>.Create(
+    "eu-data", "RegionalService", "data.sync") with
+{
+    Metadata = new Dictionary<string, string>
+    {
+        ["region"] = "eu-west",
+    },
+};
+
+var decision = await router.RouteAsync(envelope);
+
+Assert.That(decision.Destination, Is.EqualTo("eu-west-topic"));
+Assert.That(decision.IsFallback, Is.False);
+Assert.That(decision.MatchedEntry!.ParticipantId, Is.EqualTo("EUService"));
+```
 
 ---
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial11/Lab.cs`](../tests/TutorialLabs/Tutorial11/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial11/Lab.cs`](../tests/TutorialLabs/Tutorial11/Lab.cs)
 
-**Objective:** Trace how the Dynamic Router updates its routing table at runtime, analyze the EIP pattern's role in **scalable** integration topologies, and design a consistent routing strategy for distributed deployments.
-
-### Step 1: Trace a Dynamic Registration Flow
-
-Open `src/Processing.Routing/DynamicRouter.cs`. A new participant registers with `conditionKey = "invoices"` and destination `"invoice-processing"`. Then a message arrives with `MessageType = "invoices"`. Trace the code path:
-
-1. How does `RegisterAsync` store the mapping?
-2. How does `RouteAsync` look up the destination?
-3. What `RoutingDecision` is returned — does it include the matched condition for auditing?
-
-Now: Participant unregisters. A new message with the same key arrives. What happens? Where does the message go?
-
-### Step 2: Design for Multi-Replica Consistency
-
-You have 5 Dynamic Router replicas behind a load balancer. Participant D registers on Replica 1, but Replica 3 doesn't know about it. Design a solution using the platform's broker infrastructure:
-
-- Publish registration events to a `routing.registrations` topic
-- Each replica subscribes and updates its local table
-- How does this use the **Publish-Subscribe Channel** pattern to keep all replicas consistent?
-- What happens to messages during the propagation delay? Is this an **atomicity** concern?
-
-### Step 3: Compare Dynamic Router Scalability vs. Content-Based Router
-
-| Aspect | Content-Based Router | Dynamic Router |
-|--------|---------------------|---------------|
-| Rule source | Static configuration | Runtime registrations |
-| Adding new routes | ? | ? |
-| Scalability model | ? | ? |
-| Consistency across replicas | ? | ? |
-
-When would you choose a Dynamic Router over a Content-Based Router in a multi-tenant SaaS platform?
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial11.Lab"
+```
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial11/Exam.cs`](../tests/TutorialLabs/Tutorial11/Exam.cs)
+> 💻 [`tests/TutorialLabs/Tutorial11/Exam.cs`](../tests/TutorialLabs/Tutorial11/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial11.Exam"
+```
 
 ---
 
