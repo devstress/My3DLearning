@@ -4,6 +4,68 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 100 – Tutorial 46-50 Lab.cs + Exam.cs
+
+- **Date**: 2026-04-06
+- **Phase**: 27 — Coding Tutorial Labs & Exams
+- **Status**: done
+- **Goal**: Create coding labs and exams for tutorials 46-50 (CompleteIntegration, SagaCompensation, NotificationUseCases, TestingIntegrations, BestPractices).
+- **Files created**:
+  - `tests/TutorialLabs/Tutorial46/Lab.cs` — 7 tests: PipelineOrchestrator, PipelineOptions, IntegrationPipelineInput/Result, ITemporalWorkflowDispatcher mock
+  - `tests/TutorialLabs/Tutorial46/Exam.cs` — 3 tests: full pipeline flow, input mapping, dispatcher failure
+  - `tests/TutorialLabs/Tutorial47/Lab.cs` — 7 tests: DefaultCompensationActivityService, ICompensationActivityService, SagaCompensationActivities/Workflow reflection, IntegrationPipelineResult
+  - `tests/TutorialLabs/Tutorial47/Exam.cs` — 3 tests: multi-step compensation, failure scenario, workflow type verification
+  - `tests/TutorialLabs/Tutorial48/Lab.cs` — 7 tests: DefaultMessageValidationService, MessageValidationResult, DefaultMessageLoggingService, INotificationActivityService, IPersistenceActivityService
+  - `tests/TutorialLabs/Tutorial48/Exam.cs` — 3 tests: full notification flow, validation failure triggers nack, persistence activity mock
+  - `tests/TutorialLabs/Tutorial49/Lab.cs` — 7 tests: IntegrationEnvelope.Create, CausationId chain, FaultEnvelope.Create, MessagePriority/Intent enums, RoutingSlip advance/complete
+  - `tests/TutorialLabs/Tutorial49/Exam.cs` — 3 tests: three-generation causation chain, FaultEnvelope with exception, routing slip lifecycle
+  - `tests/TutorialLabs/Tutorial50/Lab.cs` — 7 tests: IsExpired, InputSanitizer idempotency, TenantResolver null handling, MessageHeaders.ReplayId, metadata round-trip, SchemaVersion default
+  - `tests/TutorialLabs/Tutorial50/Exam.cs` — 3 tests: end-to-end envelope+security+tenancy, expiration+priority, cross-cutting concerns flow
+- **Test counts**: 522 TutorialLabs tests total (+50 from this chunk).
+- **Notes**: Fixed compilation errors from previous session — RoutingSlipStep/RoutingSlip are positional records, DefaultMessageValidationService has parameterless constructor.
+
+## Chunk 099 – Tutorial 41-45 Lab.cs + Exam.cs
+
+- **Date**: 2026-04-06
+- **Phase**: 27 — Coding Tutorial Labs & Exams
+- **Status**: done
+- **Goal**: Create coding labs and exams for tutorials 41-45 (OpenClawWeb, Configuration, KubernetesDeployment, DisasterRecovery, PerformanceProfiling).
+- **Files created**:
+  - `tests/TutorialLabs/Tutorial41/Lab.cs` + `Exam.cs` — 10 tests: InspectionResult, MessageStateInspector, ITraceAnalyzer, IObservabilityEventLog, snapshot creation
+  - `tests/TutorialLabs/Tutorial42/Lab.cs` + `Exam.cs` — 10 tests: ConfigurationEntry, InMemoryConfigurationStore, FeatureFlag, InMemoryFeatureFlagService, variants, tenants
+  - `tests/TutorialLabs/Tutorial43/Lab.cs` + `Exam.cs` — 10 tests: TemporalOptions, PipelineOptions, JwtOptions, DisasterRecoveryOptions, configuration roundtrip
+  - `tests/TutorialLabs/Tutorial44/Lab.cs` + `Exam.cs` — 10 tests: FailoverResult, ReplicationStatus, DrDrillType, IFailoverManager, IRecoveryPointValidator, DisasterRecoveryOptions
+  - `tests/TutorialLabs/Tutorial45/Lab.cs` + `Exam.cs` — 10 tests: ContinuousProfiler, AllocationHotspotDetector, InMemoryBenchmarkRegistry, ProfilingOptions
+- **Test counts**: 472 TutorialLabs tests total (+50 from this chunk).
+
+## Chunk 098 – Tutorial 36-40 Lab.cs + Exam.cs
+
+- **Date**: 2026-04-06
+- **Phase**: 27 — Coding Tutorial Labs & Exams
+- **Status**: done
+- **Goal**: Create coding labs and exams for tutorials 36-40 (ConnectorEmail, ConnectorFile, OpenTelemetry, MessageLifecycle, RagOllama).
+- **Files created**:
+  - `tests/TutorialLabs/Tutorial36/Lab.cs` + `Exam.cs` — 10 tests: EmailConnectorOptions, ISmtpClientWrapper, EmailConnector lifecycle
+  - `tests/TutorialLabs/Tutorial37/Lab.cs` + `Exam.cs` — 10 tests: FileConnectorOptions, IFileSystem, FileConnector write/read/list, PhysicalFileSystem
+  - `tests/TutorialLabs/Tutorial38/Lab.cs` + `Exam.cs` — 10 tests: MessageEvent, IMessageStateStore, InspectionResult, DeliveryStatus, CorrelationPropagator
+  - `tests/TutorialLabs/Tutorial39/Lab.cs` + `Exam.cs` — 10 tests: SmartProxy, TestMessageGenerator, ControlBusOptions/Result, TestMessageResult
+  - `tests/TutorialLabs/Tutorial40/Lab.cs` + `Exam.cs` — 10 tests: IOllamaService, IRagFlowService, RagFlowChatResponse, OllamaSettings, RagFlowOptions
+- **Test counts**: 422 TutorialLabs tests total (+50 from this chunk).
+
+## Chunk 097 – Tutorial 31-35 Lab.cs + Exam.cs
+
+- **Date**: 2026-04-06
+- **Phase**: 27 — Coding Tutorial Labs & Exams
+- **Status**: done
+- **Goal**: Create coding labs and exams for tutorials 31-35 (EventSourcing, MultiTenancy, Security, ConnectorHttp, ConnectorSftp).
+- **Files created**:
+  - `tests/TutorialLabs/Tutorial31/Lab.cs` + `Exam.cs` — 10 tests: InMemoryEventStore, EventProjectionEngine, OptimisticConcurrencyException, InMemorySnapshotStore, EventSourcingOptions
+  - `tests/TutorialLabs/Tutorial32/Lab.cs` + `Exam.cs` — 10 tests: TenantResolver, TenantIsolationGuard, TenantContext, TenantIsolationException
+  - `tests/TutorialLabs/Tutorial33/Lab.cs` + `Exam.cs` — 10 tests: InputSanitizer, PayloadSizeGuard, PayloadTooLargeException, InMemorySecretProvider, SecretEntry
+  - `tests/TutorialLabs/Tutorial34/Lab.cs` + `Exam.cs` — 10 tests: InMemoryTokenCache, HttpConnectorOptions, HttpConnectorAdapter
+  - `tests/TutorialLabs/Tutorial35/Lab.cs` + `Exam.cs` — 10 tests: SftpConnectorOptions, ISftpClient reflection, SftpConnectionPool, ISftpConnector
+- **Test counts**: 372 TutorialLabs tests total (+50 from this chunk).
+
 ## Chunk 092 – Kustomize Base Directory Structure
 
 - **Date**: 2026-04-05
