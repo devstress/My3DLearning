@@ -121,20 +121,20 @@ Write C# code to construct a `RoutingSlip` with three steps:
 
 ```csharp
 var slip = new RoutingSlip([
-    new RoutingSlipStep("Validate", new Dictionary<string, string>()),
-    new RoutingSlipStep("Transform", new Dictionary<string, string>
+    new RoutingSlipStep("Validate"),
+    new RoutingSlipStep("Transform", Parameters: new Dictionary<string, string>
     {
         ["targetFormat"] = "XML",
         ["schemaVersion"] = "2.0"
     }),
-    new RoutingSlipStep("Deliver", new Dictionary<string, string>
+    new RoutingSlipStep("Deliver", Parameters: new Dictionary<string, string>
     {
         ["endpoint"] = "https://partner.example.com/api/orders"
     })
 ]);
 ```
 
-Open `src/Processing.Routing/RoutingSlip.cs` and verify the record structure. How does each step carry its own parameters? Why is this important for **atomicity** — each step is self-contained with all the data it needs.
+Open `src/Contracts/RoutingSlip.cs` and verify the record structure. How does each step carry its own parameters? Why is this important for **atomicity** — each step is self-contained with all the data it needs.
 
 ### Step 2: Trace a Partial-Completion Recovery
 

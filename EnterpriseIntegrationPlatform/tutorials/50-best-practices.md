@@ -15,7 +15,7 @@
 ### 1. Favor Loose Coupling
 
 Services should communicate through messages, not direct calls. Use the
-**Message Channel** (Tutorial 3) and **Channel Adapter** (Tutorial 48) to
+**Message Channel** (Tutorial 6) and **Channel Adapter** (Tutorial 34) to
 decouple producers from consumers.
 
 ### 2. Design for Failure
@@ -61,8 +61,8 @@ Pre-Production Verification:
   □ Helm chart validated with deploy/validate.sh (Tutorial 43)
   □ DR drill completed successfully (Tutorial 44)
   □ GC tuning verified under load (Tutorial 45)
-  □ Feature flags configured and tested (Tutorial 48)
-  □ Monitoring dashboards operational (Tutorial 42)
+  □ Feature flags configured and tested (Tutorial 42)
+  □ Monitoring dashboards operational (Tutorial 38)
   □ Alerting rules configured for error rates
   □ Runbook documented for common failure scenarios
 ```
@@ -158,22 +158,22 @@ Feature Flags:
 ```
  Foundations          Patterns           Infrastructure
  ───────────         ────────           ──────────────
- 01-04: Core         05-20: EIP        35-42: Config
- concepts            patterns           & monitoring
+ 01-04: Core         05-20: EIP        35-42: Connectors,
+ concepts            patterns           observability, AI
 
- Workflows           Operations         Mastery
+ Reliability         Operations         Mastery
  ─────────           ──────────         ───────
- 21-30: Temporal     43-45: Deploy,     46-50: End-to-end,
- & pipelines         DR, profiling      testing, best practices
+ 21-30: Scaling,     43-45: Deploy,     46-50: End-to-end,
+ rate limit, rules   DR, profiling      testing, best practices
 ```
 
 | Tutorial Range | Focus Area |
 |---------------|------------|
 | 01–04 | Core concepts, envelope, first message |
 | 05–20 | EIP patterns (channels, routers, transformers) |
-| 21–30 | Temporal workflows, saga orchestration |
-| 31–34 | Notification framework and use cases |
-| 35–42 | Configuration, monitoring, RAG, OpenClaw |
+| 21–30 | Reliability, scaling, rate limiting, rule engine |
+| 31–34 | Event sourcing, multi-tenancy, security, HTTP connector |
+| 35–42 | Connectors, observability, RAG, OpenClaw, configuration |
 | 43–45 | Kubernetes, disaster recovery, profiling |
 | 46–50 | Complete integration, testing, best practices |
 

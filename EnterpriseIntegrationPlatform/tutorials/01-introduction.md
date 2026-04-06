@@ -125,7 +125,7 @@ Every EIP pattern has a corresponding platform component:
 | Content-Based Router | `IContentBasedRouter` | `src/Processing.Routing/` |
 | Message Translator | `IMessageTranslator<TIn, TOut>` | `src/Processing.Translator/` |
 | Splitter | `IMessageSplitter<T>` | `src/Processing.Splitter/` |
-| Aggregator | `IMessageAggregator<TItem, TAgg>` | `src/Processing.Aggregator/` |
+| Aggregator | `IMessageAggregator<TItem, TAggregate>` | `src/Processing.Aggregator/` |
 | Dead Letter Channel | `IDeadLetterPublisher<T>` | `src/Processing.DeadLetter/` |
 | Process Manager | Temporal Workflows | `src/Workflow.Temporal/` |
 | Channel Adapter | `IConnector` | `src/Connector.*` |

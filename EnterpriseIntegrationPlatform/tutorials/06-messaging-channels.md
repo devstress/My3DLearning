@@ -261,11 +261,11 @@ For each scenario, identify the correct EIP channel pattern and the platform cla
 | Handling messages in XML or JSON from different partners | ? | ? |
 | Quarantining messages with missing required fields | ? | ? |
 
-Open `src/Processing.Channels/` and verify your answers against the actual implementations.
+Open `src/Ingestion/Channels/` and verify your answers against the actual implementations.
 
 ### Step 2: Design a Messaging Bridge for Broker Migration
 
-Your company uses Kafka for all integrations but wants to add NATS for new microservices. Using the `MessagingBridge` class in `src/Processing.Channels/`, design a bridge configuration that:
+Your company uses Kafka for all integrations but wants to add NATS for new microservices. Using the `MessagingBridge` class in `src/Ingestion/Channels/`, design a bridge configuration that:
 
 - Reads from Kafka topic `legacy.orders.created`
 - Publishes to NATS subject `eip.orders.created`

@@ -136,13 +136,15 @@ The source message is **Acked only after a successful `ConnectorResult`**. If th
 An external API requires a token from `https://auth.example.com/token`. Write the connector configuration:
 
 ```csharp
-await connector.SendWithTokenAsync(
+await connector.SendWithTokenAsync<string, object>(
     envelope,
-    endpoint: "https://api.partner.com/orders",
-    tokenUrl: "https://auth.example.com/token",
-    clientId: "eip-platform",
-    clientSecret: await secretProvider.GetSecretAsync("partner-api-secret"),
-    cancellationToken: ct);
+    relativeUrl: "/orders",
+    method: HttpMethod.Post,
+    tokenEndpoint: "https://auth.example.com/token",
+    tokenRequestBody: "grant_type=client_credentials&client_id=eip-platform&client_secret=" +
+        await secretProvider.GetSecretAsync("partner-api-secret"),
+    tokenHeaderName: "Authorization",
+    ct: ct);
 ```
 
 Open `src/Connector.Http/HttpConnector.cs` and trace: How does the connector obtain, cache, and refresh tokens?

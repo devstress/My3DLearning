@@ -49,7 +49,7 @@ public interface IResequencer
 
 ### MessageResequencer (concrete)
 
-The `MessageResequencer` class implements `IResequencer`. Internally it maintains a `ConcurrentDictionary<string, SortedList<int, IntegrationEnvelope<string>>>` keyed by `CorrelationId`. Each entry tracks:
+The `MessageResequencer` class implements `IResequencer`. Internally it maintains a `ConcurrentDictionary<Guid, SequenceBuffer>` keyed by `CorrelationId`. `SequenceBuffer` is a private inner class that uses a `ConcurrentDictionary<int, object>` for thread-safe storage and `OrderBy` for sequenced release. Each entry tracks:
 
 1. **Expected next sequence number** — starts at 1
 2. **Buffered messages** — sorted by `SequenceNumber`

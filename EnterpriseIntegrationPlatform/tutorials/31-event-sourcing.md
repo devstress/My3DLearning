@@ -82,7 +82,7 @@ public sealed record EventEnvelope(
 
 ```csharp
 // src/EventSourcing/OptimisticConcurrencyException.cs
-public sealed class OptimisticConcurrencyException : Exception
+public sealed class OptimisticConcurrencyException : InvalidOperationException
 {
     public string StreamId { get; }
     public long ExpectedVersion { get; }
@@ -101,7 +101,7 @@ When `AppendAsync` is called with an `expectedVersion` that does not match the s
 public static class TemporalQuery
 {
     public static async Task<(TState State, long Version)> ReplayToPointInTimeAsync<TState>(
-        IEventStore store,
+        IEventStore eventStore,
         IEventProjection<TState> projection,
         string streamId,
         DateTimeOffset pointInTime,

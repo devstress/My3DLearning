@@ -138,7 +138,7 @@ An operator searches for "failed orders from PartnerX last week." Trace the quer
 4. Return: list of failed messages with failure reasons, stages, and timestamps
 ```
 
-Open `src/Admin.Web/` and trace: How does the `/api/inspect/ask` endpoint delegate to `MessageStateInspector`? What data sources does it query?
+Open `src/OpenClaw.Web/` and trace: How does the `/api/inspect/ask` endpoint delegate to `MessageStateInspector`? What data sources does it query?
 
 ### Step 2: Design the "Where Is My Message?" Feature
 
@@ -160,13 +160,14 @@ Why does the platform show a **link** to the Aspire dashboard trace rather than 
 
 ### Step 3: Analyze UI Architecture for Operational Scalability
 
-The OpenClaw Web UI proxies all data through Admin.Api endpoints. Design the resilience strategy:
+The OpenClaw Web UI queries data directly from multiple backend services (Loki, Ollama, RagFlow). Design the resilience strategy:
 
 | Scenario | Behavior |
 |----------|----------|
-| Admin.Api healthy | Full functionality |
-| Admin.Api unreachable | Graceful fallback with cached data and "service unavailable" indicators |
-| Loki (observability) down | In-memory event log fallback |
+| All services healthy | Full functionality — lifecycle search, AI analysis, RAG knowledge |
+| Loki (observability store) down | In-memory event log fallback; DemoDataSeeder data still available |
+| Ollama unreachable | AI-powered trace analysis disabled; basic search still works |
+| RagFlow unreachable | RAG knowledge queries unavailable; inspection endpoints unaffected |
 
 How does this resilience architecture support **operational scalability** — the UI must remain useful even during partial infrastructure failures?
 
@@ -178,10 +179,10 @@ How does this resilience architecture support **operational scalability** — th
    - C) The Aspire dashboard is required by .NET
    - D) OpenClaw cannot display visual data
 
-2. How does the proxy resilience pattern in OpenClaw support **operational scalability**?
+2. How does the multi-source resilience pattern in OpenClaw support **operational scalability**?
    - A) It makes the UI faster
-   - B) When backend services are degraded, the UI shows graceful fallbacks rather than crashing — operators can still access cached data and partial functionality, maintaining operational capability during infrastructure incidents
-   - C) Proxy resilience reduces network traffic
+   - B) When backend services are degraded, the UI shows graceful fallbacks rather than crashing — operators can still search messages and access partial functionality, maintaining operational capability during infrastructure incidents
+   - C) Querying multiple sources reduces network traffic
    - D) The broker provides resilience automatically
 
 3. Why does the "Where is my message?" feature query multiple data sources?
