@@ -9,9 +9,9 @@ using System.Text.Json;
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Demo.Pipeline;
+using EnterpriseIntegrationPlatform.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
 
 namespace TutorialLabs.Tutorial14;
@@ -22,7 +22,7 @@ public sealed class Exam
     [Test]
     public async Task Challenge1_PriorityMapping_CastsEnumToInt()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
+        var dispatcher = new MockTemporalWorkflowDispatcher();
         var orchestrator = CreateOrchestrator(dispatcher);
 
         var json = JsonSerializer.Deserialize<JsonElement>("{\"item\":\"widget\"}");
@@ -32,47 +32,34 @@ public sealed class Exam
             Priority = MessagePriority.High,
         };
 
-        IntegrationPipelineInput? captured = null;
-        dispatcher.DispatchAsync(
-            Arg.Do<IntegrationPipelineInput>(i => captured = i),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
-
+        dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
+        var captured = dispatcher.LastInput;
         Assert.That(captured!.Priority, Is.EqualTo((int)MessagePriority.High));
     }
 
     [Test]
     public async Task Challenge2_IdempotentWorkflowId_DeterministicFromMessageId()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
+        var dispatcher = new MockTemporalWorkflowDispatcher();
         var orchestrator = CreateOrchestrator(dispatcher);
 
         var json = JsonSerializer.Deserialize<JsonElement>("{\"data\":1}");
         var envelope = IntegrationEnvelope<JsonElement>.Create(
             json, "Svc", "test.type");
 
-        dispatcher.DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
-
+        dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
         var expectedId = $"integration-{envelope.MessageId}";
-        await dispatcher.Received(1).DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(),
-            Arg.Is(expectedId),
-            Arg.Any<CancellationToken>());
+        Assert.That(dispatcher.LastWorkflowId, Is.EqualTo(expectedId));
     }
 
     [Test]
     public async Task Challenge3_CausationIdAndTimestamp_PreservedInInput()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
+        var dispatcher = new MockTemporalWorkflowDispatcher();
         var orchestrator = CreateOrchestrator(dispatcher);
 
         var causationId = Guid.NewGuid();
@@ -85,22 +72,17 @@ public sealed class Exam
             Timestamp = timestamp,
         };
 
-        IntegrationPipelineInput? captured = null;
-        dispatcher.DispatchAsync(
-            Arg.Do<IntegrationPipelineInput>(i => captured = i),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
-
+        dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
+        var captured = dispatcher.LastInput;
         Assert.That(captured!.CausationId, Is.EqualTo(causationId));
         Assert.That(captured.Timestamp, Is.EqualTo(timestamp));
         Assert.That(captured.SchemaVersion, Is.EqualTo(envelope.SchemaVersion));
     }
 
     private static PipelineOrchestrator CreateOrchestrator(
-        ITemporalWorkflowDispatcher dispatcher)
+        MockTemporalWorkflowDispatcher dispatcher)
     {
         var options = Options.Create(new PipelineOptions
         {

@@ -3,17 +3,17 @@
 // ============================================================================
 // EIP Pattern: Process Manager
 // E2E: PipelineOrchestrator converts IntegrationEnvelope to pipeline input
-// and dispatches to Temporal. Uses NSubstitute for ITemporalWorkflowDispatcher
-// since Temporal requires a real server.
+// and dispatches to Temporal. Uses MockTemporalWorkflowDispatcher since
+// Temporal requires a real server.
 // ============================================================================
 
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Demo.Pipeline;
+using EnterpriseIntegrationPlatform.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
 
 namespace TutorialLabs.Tutorial14;
@@ -21,10 +21,10 @@ namespace TutorialLabs.Tutorial14;
 [TestFixture]
 public sealed class Lab
 {
-    private ITemporalWorkflowDispatcher _dispatcher = null!;
+    private MockTemporalWorkflowDispatcher _dispatcher = null!;
 
     [SetUp]
-    public void SetUp() => _dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
+    public void SetUp() => _dispatcher = new MockTemporalWorkflowDispatcher();
 
     [Test]
     public async Task ProcessAsync_DispatchesCorrectWorkflowId()
@@ -32,13 +32,10 @@ public sealed class Lab
         var orchestrator = CreateOrchestrator();
         var envelope = CreateEnvelope("order-data", "OrderService", "order.created");
 
-        SetupSuccessResult(envelope.MessageId);
+        _dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
-        await _dispatcher.Received(1).DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(),
-            Arg.Is<string>(id => id == $"integration-{envelope.MessageId}"),
-            Arg.Any<CancellationToken>());
+        Assert.That(_dispatcher.LastWorkflowId, Is.EqualTo($"integration-{envelope.MessageId}"));
     }
 
     [Test]
@@ -47,15 +44,10 @@ public sealed class Lab
         var orchestrator = CreateOrchestrator();
         var envelope = CreateEnvelope("payload-data", "TestSource", "test.type");
 
-        IntegrationPipelineInput? capturedInput = null;
-        _dispatcher.DispatchAsync(
-            Arg.Do<IntegrationPipelineInput>(i => capturedInput = i),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
-
+        _dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
+        var capturedInput = _dispatcher.LastInput;
         Assert.That(capturedInput, Is.Not.Null);
         Assert.That(capturedInput!.MessageId, Is.EqualTo(envelope.MessageId));
         Assert.That(capturedInput.CorrelationId, Is.EqualTo(envelope.CorrelationId));
@@ -71,15 +63,10 @@ public sealed class Lab
         var envelope = IntegrationEnvelope<JsonElement>.Create(
             json, "Svc", "test.type");
 
-        IntegrationPipelineInput? capturedInput = null;
-        _dispatcher.DispatchAsync(
-            Arg.Do<IntegrationPipelineInput>(i => capturedInput = i),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
-
+        _dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
+        var capturedInput = _dispatcher.LastInput;
         Assert.That(capturedInput!.PayloadJson, Does.Contain("key"));
         Assert.That(capturedInput.PayloadJson, Does.Contain("value"));
     }
@@ -97,15 +84,10 @@ public sealed class Lab
             },
         };
 
-        IntegrationPipelineInput? capturedInput = null;
-        _dispatcher.DispatchAsync(
-            Arg.Do<IntegrationPipelineInput>(i => capturedInput = i),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
-
+        _dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
+        var capturedInput = _dispatcher.LastInput;
         Assert.That(capturedInput!.MetadataJson, Is.Not.Null);
         Assert.That(capturedInput.MetadataJson, Does.Contain("region"));
         Assert.That(capturedInput.MetadataJson, Does.Contain("us-east"));
@@ -117,15 +99,10 @@ public sealed class Lab
         var orchestrator = CreateOrchestrator();
         var envelope = CreateEnvelope("data", "Svc", "test.type");
 
-        IntegrationPipelineInput? capturedInput = null;
-        _dispatcher.DispatchAsync(
-            Arg.Do<IntegrationPipelineInput>(i => capturedInput = i),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
-
+        _dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
+        var capturedInput = _dispatcher.LastInput;
         Assert.That(capturedInput!.MetadataJson, Is.Null);
     }
 
@@ -135,15 +112,10 @@ public sealed class Lab
         var orchestrator = CreateOrchestrator();
         var envelope = CreateEnvelope("data", "Svc", "test.type");
 
-        IntegrationPipelineInput? capturedInput = null;
-        _dispatcher.DispatchAsync(
-            Arg.Do<IntegrationPipelineInput>(i => capturedInput = i),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
-
+        _dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
+        var capturedInput = _dispatcher.LastInput;
         Assert.That(capturedInput!.AckSubject, Is.EqualTo("integration.ack"));
         Assert.That(capturedInput.NackSubject, Is.EqualTo("integration.nack"));
     }
@@ -168,11 +140,4 @@ public sealed class Lab
             $"{{\"data\":\"{payload}\"}}");
         return IntegrationEnvelope<JsonElement>.Create(json, source, messageType);
     }
-
-    private void SetupSuccessResult(Guid messageId) =>
-        _dispatcher.DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(messageId, true));
 }
