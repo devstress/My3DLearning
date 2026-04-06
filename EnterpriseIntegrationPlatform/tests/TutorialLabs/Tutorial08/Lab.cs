@@ -1,181 +1,129 @@
 // ============================================================================
-// Tutorial 08 – Activities and Pipeline (Lab)
+// Tutorial 08 – Activities Pipeline (Lab)
 // ============================================================================
-// This lab verifies the platform's Activity classes, exercises the pipeline
-// concept (create → validate → transform → route) using mocked services,
-// and chains multiple activity calls in sequence.
+// EIP Pattern: Pipes and Filters.
+// E2E: Build pipeline with real DefaultMessageValidationService + mocked
+// services, execute pipeline stages, verify each stage processes correctly.
 // ============================================================================
 
-using System.Reflection;
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
-using EnterpriseIntegrationPlatform.Workflow.Temporal;
+using EnterpriseIntegrationPlatform.Ingestion.Channels;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial08;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Verifying Activity Types Exist ───────────────────────────────────────
-
     [Test]
-    public void IntegrationActivities_ClassExists_WithExpectedMethods()
+    public async Task ValidationStage_ValidPayload_Succeeds()
     {
-        // IntegrationActivities is the Temporal activity class that wraps
-        // validation and logging services.
-        var assembly = typeof(TemporalOptions).Assembly;
-        var activityType = assembly.GetTypes()
-            .FirstOrDefault(t => t.Name == "IntegrationActivities");
+        var validator = new DefaultMessageValidationService();
 
-        Assert.That(activityType, Is.Not.Null,
-            "IntegrationActivities should exist in Workflow.Temporal");
+        var result = await validator.ValidateAsync("order.created", "{\"orderId\":\"ORD-1\"}");
 
-        Assert.That(activityType!.GetMethod("ValidateMessageAsync"), Is.Not.Null);
-        Assert.That(activityType.GetMethod("LogProcessingStageAsync"), Is.Not.Null);
+        Assert.That(result.IsValid, Is.True);
+        Assert.That(result.Reason, Is.Null);
     }
 
     [Test]
-    public void PipelineActivities_ClassExists_WithExpectedMethods()
+    public async Task ValidationStage_EmptyPayload_Fails()
     {
-        // PipelineActivities wraps persistence and notification as activities.
-        var assembly = typeof(TemporalOptions).Assembly;
-        var activityType = assembly.GetTypes()
-            .FirstOrDefault(t => t.Name == "PipelineActivities");
+        var validator = new DefaultMessageValidationService();
 
-        Assert.That(activityType, Is.Not.Null,
-            "PipelineActivities should exist in Workflow.Temporal");
+        var result = await validator.ValidateAsync("order.created", "");
 
-        var methodNames = activityType!.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-            .Select(m => m.Name)
-            .ToList();
-
-        Assert.That(methodNames, Does.Contain("PersistMessageAsync"));
-        Assert.That(methodNames, Does.Contain("UpdateDeliveryStatusAsync"));
-        Assert.That(methodNames, Does.Contain("SaveFaultAsync"));
-        Assert.That(methodNames, Does.Contain("PublishAckAsync"));
-        Assert.That(methodNames, Does.Contain("PublishNackAsync"));
-        Assert.That(methodNames, Does.Contain("LogStageAsync"));
+        Assert.That(result.IsValid, Is.False);
+        Assert.That(result.Reason, Does.Contain("empty"));
     }
 
     [Test]
-    public void SagaCompensationActivities_ClassExists()
+    public async Task ValidationStage_NonJsonPayload_Fails()
     {
-        var assembly = typeof(TemporalOptions).Assembly;
-        var activityType = assembly.GetTypes()
-            .FirstOrDefault(t => t.Name == "SagaCompensationActivities");
+        var validator = new DefaultMessageValidationService();
 
-        Assert.That(activityType, Is.Not.Null,
-            "SagaCompensationActivities should exist in Workflow.Temporal");
+        var result = await validator.ValidateAsync("order.created", "not-json");
 
-        Assert.That(activityType!.GetMethod("CompensateStepAsync"), Is.Not.Null);
+        Assert.That(result.IsValid, Is.False);
+        Assert.That(result.Reason, Does.Contain("JSON"));
     }
 
-    // ── Pipeline Concept: Create → Validate → Transform → Route ─────────────
-
     [Test]
-    public async Task Pipeline_CreateValidateTransformRoute_AllStepsExecute()
+    public async Task PipelineChain_ValidateAndPublish_EndToEnd()
     {
-        // Simulate the full pipeline pattern using mocked services:
-        //   1. Create an envelope (the message entering the pipeline)
-        //   2. Validate the message payload
-        //   3. Transform: add routing metadata
-        //   4. Route: publish to a destination topic
-        var validationService = Substitute.For<IMessageValidationService>();
-        var loggingService = Substitute.For<IMessageLoggingService>();
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        var validator = new DefaultMessageValidationService();
+        await using var output = new MockEndpoint("output");
 
-        var messageId = Guid.NewGuid();
-        const string messageType = "order.created";
-        const string payloadJson = "{\"orderId\": \"ORD-500\"}";
-
-        // Step 1: Create envelope.
         var envelope = IntegrationEnvelope<string>.Create(
-            payloadJson, "OrderService", messageType) with
-        {
-            Intent = MessageIntent.Command,
-        };
+            "{\"item\":\"widget\"}", "FactoryService", "factory.produced");
 
-        Assert.That(envelope.MessageId, Is.Not.EqualTo(Guid.Empty));
+        var result = await validator.ValidateAsync(
+            envelope.MessageType, envelope.Payload);
+        Assert.That(result.IsValid, Is.True);
 
-        // Step 2: Validate.
-        validationService.ValidateAsync(messageType, payloadJson)
-            .Returns(MessageValidationResult.Success);
+        var channel = new PointToPointChannel(
+            output, output, NullLogger<PointToPointChannel>.Instance);
+        await channel.SendAsync(envelope, "validated-queue", CancellationToken.None);
 
-        var validationResult = await validationService.ValidateAsync(messageType, payloadJson);
-        Assert.That(validationResult.IsValid, Is.True);
-
-        // Step 3: Transform — enrich metadata with a routing hint.
-        envelope = envelope with
-        {
-            Metadata = new Dictionary<string, string>(envelope.Metadata)
-            {
-                ["region"] = "us-east",
-                ["validated"] = "true",
-            },
-        };
-
-        Assert.That(envelope.Metadata["region"], Is.EqualTo("us-east"));
-
-        // Step 4: Route — publish to destination topic.
-        await producer.PublishAsync(envelope, "orders.us-east");
-
-        await producer.Received(1).PublishAsync(
-            Arg.Is<IntegrationEnvelope<string>>(
-                e => e.Metadata.ContainsKey("region") && e.Metadata["region"] == "us-east"),
-            Arg.Is("orders.us-east"),
-            Arg.Any<CancellationToken>());
+        output.AssertReceivedCount(1);
+        Assert.That(output.GetReceived<string>().Payload, Does.Contain("widget"));
     }
 
-    // ── Chaining Multiple Activity Calls ────────────────────────────────────
+    [Test]
+    public async Task PipelineChain_ValidationFails_RoutesToInvalidChannel()
+    {
+        var validator = new DefaultMessageValidationService();
+        await using var output = new MockEndpoint("invalid-output");
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "bad-data", "LegacySystem", "legacy.event");
+
+        var result = await validator.ValidateAsync(
+            envelope.MessageType, envelope.Payload);
+        Assert.That(result.IsValid, Is.False);
+
+        var invalidOptions = Options.Create(new InvalidMessageChannelOptions
+            { InvalidMessageTopic = "invalid-msgs", Source = "Pipeline" });
+        var invalidChannel = new InvalidMessageChannel(
+            output, invalidOptions, NullLogger<InvalidMessageChannel>.Instance);
+
+        await invalidChannel.RouteInvalidAsync(
+            envelope, result.Reason!, CancellationToken.None);
+
+        output.AssertReceivedCount(1);
+        output.AssertReceivedOnTopic("invalid-msgs", 1);
+    }
 
     [Test]
-    public async Task ChainedActivities_PersistLogValidateLog_InSequence()
+    public async Task PipelineChain_PersistThenValidateThenPublish()
     {
-        // Simulate the IntegrationPipelineWorkflow's activity chain:
-        //   Persist → Log(Received) → Validate → Log(Validated or Failed)
-        var persistenceService = Substitute.For<IPersistenceActivityService>();
-        var loggingService = Substitute.For<IMessageLoggingService>();
-        var validationService = Substitute.For<IMessageValidationService>();
+        var persistence = Substitute.For<IPersistenceActivityService>();
+        var validator = new DefaultMessageValidationService();
+        await using var output = new MockEndpoint("pipeline-out");
 
         var input = new IntegrationPipelineInput(
-            MessageId: Guid.NewGuid(),
-            CorrelationId: Guid.NewGuid(),
-            CausationId: null,
-            Timestamp: DateTimeOffset.UtcNow,
-            Source: "Lab08",
-            MessageType: "lab.pipeline",
-            SchemaVersion: "1.0",
-            Priority: 1,
-            PayloadJson: "{\"item\": \"widget\"}",
-            MetadataJson: null,
-            AckSubject: "ack.lab08",
-            NackSubject: "nack.lab08");
+            MessageId: Guid.NewGuid(), CorrelationId: Guid.NewGuid(),
+            CausationId: null, Timestamp: DateTimeOffset.UtcNow,
+            Source: "Lab08", MessageType: "lab.event", SchemaVersion: "1.0",
+            Priority: 1, PayloadJson: "{\"data\":true}", MetadataJson: null,
+            AckSubject: "ack", NackSubject: "nack");
 
-        // Configure mocks.
-        persistenceService.SaveMessageAsync(input, Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
-        loggingService.LogAsync(input.MessageId, input.MessageType, Arg.Any<string>())
-            .Returns(Task.CompletedTask);
-        validationService.ValidateAsync(input.MessageType, input.PayloadJson)
-            .Returns(MessageValidationResult.Success);
+        await persistence.SaveMessageAsync(input);
+        await persistence.Received(1).SaveMessageAsync(input, Arg.Any<CancellationToken>());
 
-        // Execute chain.
-        await persistenceService.SaveMessageAsync(input);
-        await loggingService.LogAsync(input.MessageId, input.MessageType, "Received");
-        var result = await validationService.ValidateAsync(input.MessageType, input.PayloadJson);
-        await loggingService.LogAsync(input.MessageId, input.MessageType,
-            result.IsValid ? "Validated" : "ValidationFailed");
+        var validation = await validator.ValidateAsync(input.MessageType, input.PayloadJson);
+        Assert.That(validation.IsValid, Is.True);
 
-        // Verify execution order.
-        Received.InOrder(() =>
-        {
-            persistenceService.SaveMessageAsync(input, Arg.Any<CancellationToken>());
-            loggingService.LogAsync(input.MessageId, input.MessageType, "Received");
-            validationService.ValidateAsync(input.MessageType, input.PayloadJson);
-            loggingService.LogAsync(input.MessageId, input.MessageType, "Validated");
-        });
+        var envelope = IntegrationEnvelope<string>.Create(
+            input.PayloadJson, input.Source, input.MessageType);
+        await output.PublishAsync(envelope, "processed-topic");
+
+        output.AssertReceivedCount(1);
+        output.AssertReceivedOnTopic("processed-topic", 1);
     }
 }
