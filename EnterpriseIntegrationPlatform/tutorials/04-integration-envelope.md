@@ -1,137 +1,35 @@
 # Tutorial 04 — The Integration Envelope
 
-## What You'll Learn
+Deep dive into every `IntegrationEnvelope<T>` property: identity, expiration, metadata headers, sequence numbers, and immutable record semantics.
 
-- Every field of `IntegrationEnvelope<T>` and when to use it
-- Message headers and metadata conventions
-- How the envelope implements multiple EIP patterns
-- Envelope immutability and the causation chain
-
----
-
-## The Canonical Message Format
-
-The `IntegrationEnvelope<T>` is the single most important type in the platform. Every message — whether it's an HTTP request body, an SFTP file, an email, or an internal event — is wrapped in this envelope before entering the processing pipeline.
-
-```
-┌─────────────────────────────────────────────────────┐
-│                IntegrationEnvelope<T>                │
-│                                                     │
-│  ┌─── Identity ──────────────────────────────────┐  │
-│  │ MessageId      : Guid (unique per message)    │  │
-│  │ CorrelationId  : Guid (links related msgs)    │  │
-│  │ CausationId    : Guid? (parent message)       │  │
-│  └───────────────────────────────────────────────┘  │
-│                                                     │
-│  ┌─── Source & Type ─────────────────────────────┐  │
-│  │ Source         : string ("order-system")      │  │
-│  │ MessageType    : string ("OrderCreated")      │  │
-│  │ SchemaVersion  : string (default "1.0")       │  │
-│  │ Timestamp      : DateTimeOffset               │  │
-│  └───────────────────────────────────────────────┘  │
-│                                                     │
-│  ┌─── Payload ───────────────────────────────────┐  │
-│  │ Payload        : T (the actual data)          │  │
-│  └───────────────────────────────────────────────┘  │
-│                                                     │
-│  ┌─── Quality of Service ────────────────────────┐  │
-│  │ Priority       : Low | Normal | High | Crit   │  │
-│  │ ReplyTo        : string? (return address)     │  │
-│  │ ExpiresAt      : DateTimeOffset? (TTL)        │  │
-│  └───────────────────────────────────────────────┘  │
-│                                                     │
-│  ┌─── Sequencing ────────────────────────────────┐  │
-│  │ SequenceNumber : int? (position in batch)     │  │
-│  │ TotalCount     : int? (total in batch)        │  │
-│  └───────────────────────────────────────────────┘  │
-│                                                     │
-│  ┌─── Classification ───────────────────────────┐  │
-│  │ Intent         : Command | Document | Event?  │  │
-│  └───────────────────────────────────────────────┘  │
-│                                                     │
-│  ┌─── Metadata ──────────────────────────────────┐  │
-│  │ Dictionary<string, string> (extensible headers)│  │
-│  └───────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## Field-by-Field Deep Dive
-
-### Identity Fields
-
-**MessageId** — Every message gets a unique `Guid`. This is used for:
-- Idempotent processing (deduplication in Cassandra)
-- Audit trail
-- DLQ tracking
-
-**CorrelationId** — Links all messages that belong to the same logical operation. When a message is split into parts, all parts share the same `CorrelationId`. When a request gets a reply, both carry the same `CorrelationId`.
-
-**CausationId** — Points to the `MessageId` of the message that caused this one. This builds a causal chain:
-
-```
-Original Order (MessageId: A, CausationId: null)
-  └─ Validated Order (MessageId: B, CausationId: A)
-       └─ Transformed Order (MessageId: C, CausationId: B)
-            └─ Delivery Confirmation (MessageId: D, CausationId: C)
-```
-
-### Source and Type
-
-**Source** — Identifies the originating system. Examples: `"order-system"`, `"crm"`, `"partner-api"`.
-
-**MessageType** — A string discriminator for the payload type. Routing rules often match on this field.
-
-**SchemaVersion** — Version of the message contract schema (default: `"1.0"`). Allows consumers to handle schema evolution.
-
-**Timestamp** — When the message was created (UTC). Used for ordering, expiration checks, and audit.
-
-### Quality of Service
-
-**Priority** — Determines processing order when queues have backlog:
-
-| Priority | Use Case |
-|----------|----------|
-| `Critical` | System alerts, circuit breaker notifications |
-| `High` | Financial transactions, SLA-bound deliveries |
-| `Normal` | Standard business messages (default) |
-| `Low` | Analytics, batch reports, non-urgent |
-
-**ReplyTo** — Implements the **Return Address** EIP pattern. Tells the receiver where to send the response.
-
-**ExpiresAt** — Implements the **Message Expiration** EIP pattern. The `MessageExpirationChecker` in `Processing.DeadLetter` routes expired messages to the DLQ.
-
-### Sequencing
-
-**SequenceNumber** and **TotalCount** — Used by the **Splitter** and **Resequencer** patterns:
-
-```
-Original batch (5 items) → Splitter produces:
-  Item 1: SequenceNumber=1, TotalCount=5, CorrelationId=X
-  Item 2: SequenceNumber=2, TotalCount=5, CorrelationId=X
-  Item 3: SequenceNumber=3, TotalCount=5, CorrelationId=X
-  Item 4: SequenceNumber=4, TotalCount=5, CorrelationId=X
-  Item 5: SequenceNumber=5, TotalCount=5, CorrelationId=X
-```
-
-The **Aggregator** uses `TotalCount` to know when all parts have arrived.
-
-### Message Intent
-
-**Intent** (`MessageIntent?`, nullable) — Implements three EIP **Message Construction** patterns:
-
-| Intent | EIP Pattern | Meaning | Example |
-|--------|------------|---------|---------|
-| `Command` | Command Message | "Do this" — an instruction to perform an action | "ProcessPayment" |
-| `Document` | Document Message | "Here's data" — information transfer with no expected action | "QuarterlyReport" |
-| `Event` | Event Message | "This happened" — notification of something that occurred | "OrderCreated" |
-
-### Metadata
-
-The `Metadata` dictionary carries extensible key-value headers. The `MessageHeaders` static class defines well-known keys:
+## Key Types
 
 ```csharp
+// src/Contracts/IntegrationEnvelope.cs
+public record IntegrationEnvelope<T>
+{
+    public Guid MessageId { get; init; }
+    public Guid CorrelationId { get; init; }
+    public Guid? CausationId { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+    public string Source { get; init; }
+    public string MessageType { get; init; }
+    public string SchemaVersion { get; init; } = "1.0";
+    public MessagePriority Priority { get; init; } = MessagePriority.Normal;
+    public T Payload { get; init; }
+    public Dictionary<string, string> Metadata { get; init; } = new();
+    public string? ReplyTo { get; init; }
+    public DateTimeOffset? ExpiresAt { get; init; }
+    public int? SequenceNumber { get; init; }
+    public int? TotalCount { get; init; }
+    public MessageIntent? Intent { get; init; }
+    public bool IsExpired { get; }
+
+    public static IntegrationEnvelope<T> Create(T payload, string source, string messageType,
+        Guid? correlationId = null);
+}
+
+// src/Contracts/MessageHeaders.cs
 public static class MessageHeaders
 {
     public const string TraceId = "trace-id";
@@ -141,107 +39,145 @@ public static class MessageHeaders
     public const string ConsumerGroup = "consumer-group";
     public const string RetryCount = "retry-count";
     public const string SequenceNumber = "sequence-number";
-    // ... and more
+    public const string TotalCount = "total-count";
 }
 ```
 
----
+## Exercises
 
-## EIP Patterns Implemented by the Envelope
-
-The envelope alone implements **9 EIP patterns**:
-
-| EIP Pattern | Envelope Feature |
-|-------------|-----------------|
-| **Message** | The envelope IS the message |
-| **Envelope Wrapper** | Wraps raw payload with standardized metadata |
-| **Correlation Identifier** | `CorrelationId` field |
-| **Return Address** | `ReplyTo` field |
-| **Message Expiration** | `ExpiresAt` field |
-| **Message Sequence** | `SequenceNumber` + `TotalCount` fields |
-| **Format Indicator** | `MessageHeaders.ContentType` in metadata |
-| **Command Message** | `Intent = Command` |
-| **Document Message** | `Intent = Document` |
-| **Event Message** | `Intent = Event` |
-
----
-
-## Envelope Immutability
-
-`IntegrationEnvelope<T>` is a C# `record`, which means it's **immutable by default**. When a processing step needs to modify the envelope (e.g., add metadata, change the payload), it creates a **new** envelope using `with`:
+### 1. Set all properties on a complex payload envelope
 
 ```csharp
-// Original envelope
-var original = new IntegrationEnvelope<string> { /* ... */ };
+public sealed record ShipmentPayload(string ShipmentId, string Carrier, decimal WeightKg, string[] Items);
 
-// Create a new envelope with updated metadata
-var enriched = original with
+var items = new[] { "SKU-001", "SKU-002" };
+var shipment = new ShipmentPayload("SHIP-1", "FedEx", 12.5m, items);
+var correlationId = Guid.NewGuid();
+
+var envelope = IntegrationEnvelope<ShipmentPayload>.Create(
+    payload: shipment,
+    source: "WarehouseService",
+    messageType: "shipment.dispatched",
+    correlationId: correlationId) with
 {
-    Metadata = new Dictionary<string, string>(original.Metadata)
-    {
-        ["enriched-at"] = DateTimeOffset.UtcNow.ToString("O")
-    }
+    SchemaVersion = "2.0",
+    Priority = MessagePriority.High,
+    Intent = MessageIntent.Event,
+    ReplyTo = "shipment-replies",
+    ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
+    SequenceNumber = 0,
+    TotalCount = 3,
 };
 
-// The original is unchanged
-// enriched has the new metadata entry
+Assert.That(envelope.Payload.ShipmentId, Is.EqualTo("SHIP-1"));
+Assert.That(envelope.Payload.Carrier, Is.EqualTo("FedEx"));
+Assert.That(envelope.Payload.WeightKg, Is.EqualTo(12.5m));
+Assert.That(envelope.Payload.Items, Has.Length.EqualTo(2));
+Assert.That(envelope.CorrelationId, Is.EqualTo(correlationId));
+Assert.That(envelope.SchemaVersion, Is.EqualTo("2.0"));
+Assert.That(envelope.Priority, Is.EqualTo(MessagePriority.High));
+Assert.That(envelope.Intent, Is.EqualTo(MessageIntent.Event));
+Assert.That(envelope.ReplyTo, Is.EqualTo("shipment-replies"));
+Assert.That(envelope.ExpiresAt, Is.Not.Null);
+Assert.That(envelope.SequenceNumber, Is.EqualTo(0));
+Assert.That(envelope.TotalCount, Is.EqualTo(3));
 ```
 
-This immutability is critical for:
-- **Thread safety** — Multiple activities can read the same envelope concurrently
-- **Audit trail** — Each step produces a new envelope; the original is preserved
-- **Replay** — You can always replay the original, unmodified envelope
+### 2. Verify unique MessageId generation and independent CorrelationIds
 
----
+```csharp
+var ids = Enumerable.Range(0, 100)
+    .Select(_ => IntegrationEnvelope<string>.Create("payload", "source", "type").MessageId)
+    .ToList();
 
-## The Causation Chain
+Assert.That(ids.Distinct().Count(), Is.EqualTo(100),
+    "Each envelope must have a globally unique MessageId");
 
-As a message flows through the pipeline, each step creates a new envelope with `CausationId` set to the previous step's `MessageId`. This creates a traceable chain:
-
-```
-Ingress → Validate → Transform → Route → Deliver
-
-Envelope A (Ingress):    MessageId=aaa, CausationId=null
-Envelope B (Validate):   MessageId=bbb, CausationId=aaa
-Envelope C (Transform):  MessageId=ccc, CausationId=bbb
-Envelope D (Route):      MessageId=ddd, CausationId=ccc
-Envelope E (Deliver):    MessageId=eee, CausationId=ddd
+var env1 = IntegrationEnvelope<string>.Create("a", "src", "type");
+var env2 = IntegrationEnvelope<string>.Create("b", "src", "type");
+Assert.That(env1.CorrelationId, Is.Not.EqualTo(env2.CorrelationId));
 ```
 
-All five envelopes share the same `CorrelationId`. This lets you:
-- Query "show me all messages for this order" (by CorrelationId)
-- Query "what caused this message?" (by CausationId)
-- Reconstruct the full processing history
+### 3. Test IsExpired with past, future, and null ExpiresAt
 
----
+```csharp
+var expired = IntegrationEnvelope<string>.Create("stale", "source", "type") with
+{
+    ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-5),
+};
+Assert.That(expired.IsExpired, Is.True);
+
+var fresh = IntegrationEnvelope<string>.Create("fresh", "source", "type") with
+{
+    ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
+};
+Assert.That(fresh.IsExpired, Is.False);
+
+var immortal = IntegrationEnvelope<string>.Create("immortal", "source", "type");
+Assert.That(immortal.ExpiresAt, Is.Null);
+Assert.That(immortal.IsExpired, Is.False);
+```
+
+### 4. Add and read metadata headers
+
+```csharp
+var envelope = IntegrationEnvelope<string>.Create("payload", "source", "type") with
+{
+    Metadata = new Dictionary<string, string>
+    {
+        [MessageHeaders.ContentType] = "application/json",
+        [MessageHeaders.TraceId] = "abc-123-trace",
+        [MessageHeaders.SourceTopic] = "orders-topic",
+    },
+};
+
+Assert.That(envelope.Metadata[MessageHeaders.ContentType], Is.EqualTo("application/json"));
+Assert.That(envelope.Metadata[MessageHeaders.TraceId], Is.EqualTo("abc-123-trace"));
+Assert.That(envelope.Metadata[MessageHeaders.SourceTopic], Is.EqualTo("orders-topic"));
+Assert.That(envelope.Metadata, Has.Count.EqualTo(3));
+```
+
+### 5. Model a Splitter output with sequence numbers
+
+```csharp
+var correlationId = Guid.NewGuid();
+var parts = Enumerable.Range(0, 3)
+    .Select(i => IntegrationEnvelope<string>.Create(
+        payload: $"Part-{i}",
+        source: "Splitter",
+        messageType: "order.part",
+        correlationId: correlationId) with
+    {
+        SequenceNumber = i,
+        TotalCount = 3,
+    })
+    .ToList();
+
+Assert.That(parts, Has.Count.EqualTo(3));
+
+for (var i = 0; i < 3; i++)
+{
+    Assert.That(parts[i].SequenceNumber, Is.EqualTo(i));
+    Assert.That(parts[i].TotalCount, Is.EqualTo(3));
+    Assert.That(parts[i].CorrelationId, Is.EqualTo(correlationId));
+}
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial04/Lab.cs`](../tests/TutorialLabs/Tutorial04/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial04/Lab.cs`](../tests/TutorialLabs/Tutorial04/Lab.cs)
 
-**Objective:** Build causation chains and sequenced message sets that demonstrate how the Envelope Wrapper pattern preserves **atomicity** and **traceability** across a multi-step integration pipeline.
-
-### Step 1: Build a Causation Chain (Message Lineage)
-
-Write code that simulates a three-step processing pipeline. Create an original envelope with `IntegrationEnvelope<string>.Create()`. Then create a second envelope (transformation result) using a `with` expression — set its `CausationId` to the first envelope's `MessageId` and keep the same `CorrelationId`. Create a third envelope whose `CausationId` is the second. Verify all three share the same `CorrelationId` but have distinct `MessageId` values.
-
-This lineage is essential for **atomicity**: if step 3 fails, the saga compensation engine uses the `CausationId` chain to identify and roll back exactly the right upstream steps.
-
-### Step 2: Model a Splitter Output with Sequencing
-
-Create three envelopes representing a Splitter's output. Use `with` expressions to set `SequenceNumber` (0, 1, 2) and `TotalCount` (3). Also set `ExpiresAt` on one envelope to 5 minutes from now, and on another to a time in the past. Verify `IsExpired` returns the correct value.
-
-Explain why the **Message Expiration** pattern is critical for scalability: in a high-throughput system, stale messages must be routed to the Dead Letter Queue rather than consuming resources processing outdated data.
-
-### Step 3: Design an Atomicity Scenario
-
-Imagine an order message is split into 3 line-item messages. Line-item 2 fails delivery. Using the envelope fields (`CorrelationId`, `CausationId`, `SequenceNumber`, `TotalCount`), describe how the platform can: (a) identify all 3 messages as belonging to the same operation, (b) determine which specific message failed, and (c) trigger compensation for line-items 1 and 3 that already succeeded.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial04.Lab"
+```
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial04/Exam.cs`](../tests/TutorialLabs/Tutorial04/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial04/Exam.cs`](../tests/TutorialLabs/Tutorial04/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial04.Exam"
+```
 
 ---
 
