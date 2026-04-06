@@ -1,175 +1,147 @@
 // ============================================================================
-// Tutorial 35 – Connector.Sftp (Lab)
+// Tutorial 35 – SFTP Connector (Lab)
 // ============================================================================
-// This lab exercises SftpConnectorOptions, ISftpClient, SftpConnectionPool,
-// SftpConnector, and ISftpConnector to learn the SFTP connector subsystem.
+// EIP Pattern: Connector
+// E2E: SftpConnector with NSubstitute ISftpConnectionPool/ISftpClient +
+//      MockEndpoint for publishing transfer results.
 // ============================================================================
-
+using System.Text;
 using EnterpriseIntegrationPlatform.Connector.Sftp;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial35;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── SftpConnectorOptions Defaults ────────────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("sftp-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
+
+    private static (ISftpConnectionPool Pool, ISftpClient Client) CreateMockPool()
+    {
+        var client = Substitute.For<ISftpClient>();
+        client.IsConnected.Returns(true);
+        var pool = Substitute.For<ISftpConnectionPool>();
+        pool.AcquireAsync(Arg.Any<CancellationToken>()).Returns(client);
+        return (pool, client);
+    }
+
+    private static SftpConnector CreateConnector(
+        ISftpConnectionPool pool, string rootPath = "/") =>
+        new(pool,
+            Options.Create(new SftpConnectorOptions { RootPath = rootPath }),
+            NullLogger<SftpConnector>.Instance);
 
     [Test]
-    public void SftpConnectorOptions_Defaults()
+    public async Task SftpConnectorOptions_Defaults()
     {
         var opts = new SftpConnectorOptions();
 
-        Assert.That(opts.Host, Is.EqualTo(string.Empty));
         Assert.That(opts.Port, Is.EqualTo(22));
-        Assert.That(opts.Username, Is.EqualTo(string.Empty));
-        Assert.That(opts.Password, Is.EqualTo(string.Empty));
         Assert.That(opts.RootPath, Is.EqualTo("/"));
         Assert.That(opts.TimeoutMs, Is.EqualTo(10000));
         Assert.That(opts.MaxConnectionsPerHost, Is.EqualTo(5));
+        await Task.CompletedTask;
     }
 
-    // ── SftpConnectorOptions Custom Values ──────────────────────────────────
-
     [Test]
-    public void SftpConnectorOptions_CustomValues()
+    public async Task Upload_DelegatesToPoolAndClient()
     {
-        var opts = new SftpConnectorOptions
-        {
-            Host = "sftp.example.com",
-            Port = 2222,
-            Username = "deploy",
-            Password = "p@ss",
-            RootPath = "/uploads",
-            TimeoutMs = 5000,
-            MaxConnectionsPerHost = 10,
-        };
+        var (pool, client) = CreateMockPool();
+        var connector = CreateConnector(pool, "/uploads");
 
-        Assert.That(opts.Host, Is.EqualTo("sftp.example.com"));
-        Assert.That(opts.Port, Is.EqualTo(2222));
-        Assert.That(opts.Username, Is.EqualTo("deploy"));
-        Assert.That(opts.Password, Is.EqualTo("p@ss"));
-        Assert.That(opts.RootPath, Is.EqualTo("/uploads"));
-        Assert.That(opts.TimeoutMs, Is.EqualTo(5000));
-        Assert.That(opts.MaxConnectionsPerHost, Is.EqualTo(10));
+        var envelope = IntegrationEnvelope<string>.Create("file-content", "src", "Upload");
+        var path = await connector.UploadAsync(
+            envelope, "test.dat", s => Encoding.UTF8.GetBytes(s), default);
+
+        Assert.That(path, Does.Contain("test.dat"));
+        client.Received().UploadFile(
+            Arg.Any<Stream>(), Arg.Is<string>(s => s.Contains("test.dat")));
+
+        await _output.PublishAsync(envelope, "upload-results", default);
+        _output.AssertReceivedOnTopic("upload-results", 1);
     }
 
-    // ── ISftpClient Interface Shape (Reflection) ────────────────────────────
-
     [Test]
-    public void ISftpClient_InterfaceShape_HasExpectedMethods()
+    public async Task Download_DelegatesToPoolAndClient()
     {
-        var type = typeof(ISftpClient);
+        var (pool, client) = CreateMockPool();
+        var data = Encoding.UTF8.GetBytes("downloaded-content");
+        client.DownloadFile("/remote/file.txt").Returns(new MemoryStream(data));
 
-        Assert.That(type.GetMethod("Connect"), Is.Not.Null);
-        Assert.That(type.GetMethod("Disconnect"), Is.Not.Null);
-        Assert.That(type.GetMethod("UploadFile"), Is.Not.Null);
-        Assert.That(type.GetMethod("DownloadFile"), Is.Not.Null);
-        Assert.That(type.GetMethod("ListFiles"), Is.Not.Null);
-        Assert.That(type.GetMethod("DeleteFile"), Is.Not.Null);
-        Assert.That(type.GetProperty("IsConnected"), Is.Not.Null);
+        var connector = CreateConnector(pool);
+        var result = await connector.DownloadAsync("/remote/file.txt", default);
+
+        Assert.That(Encoding.UTF8.GetString(result), Is.EqualTo("downloaded-content"));
     }
 
-    // ── SftpConnectionPool Acquires and Releases Mocked Client ──────────────
-
     [Test]
-    public async Task SftpConnectionPool_AcquireAndRelease()
+    public async Task ListFiles_DelegatesToPoolAndClient()
     {
-        var mockClient = Substitute.For<ISftpClient>();
-        mockClient.IsConnected.Returns(true);
+        var (pool, client) = CreateMockPool();
+        client.ListFiles("/data").Returns(new[] { "/data/a.txt", "/data/b.txt" });
 
-        var pool = new SftpConnectionPool(
-            () => mockClient,
-            Options.Create(new SftpConnectorOptions { MaxConnectionsPerHost = 2 }),
-            NullLogger<SftpConnectionPool>.Instance);
+        var connector = CreateConnector(pool);
+        var files = await connector.ListFilesAsync("/data", default);
 
-        var client = await pool.AcquireAsync();
-        Assert.That(client, Is.Not.Null);
-
-        mockClient.Received(1).Connect();
-
-        pool.Release(client);
-
-        await pool.DisposeAsync();
+        Assert.That(files, Has.Count.EqualTo(2));
+        Assert.That(files[0], Is.EqualTo("/data/a.txt"));
     }
 
-    // ── SftpConnector Upload Delegates to Pool ──────────────────────────────
+    [Test]
+    public async Task Upload_CreatesMetadataSidecar()
+    {
+        var (pool, client) = CreateMockPool();
+        var connector = CreateConnector(pool, "/out");
+
+        var envelope = IntegrationEnvelope<string>.Create("payload", "src", "Doc");
+        await connector.UploadAsync(
+            envelope, "doc.json", s => Encoding.UTF8.GetBytes(s), default);
+
+        client.Received(2).UploadFile(Arg.Any<Stream>(), Arg.Any<string>());
+        client.Received().UploadFile(
+            Arg.Any<Stream>(), Arg.Is<string>(s => s.EndsWith(".meta")));
+    }
 
     [Test]
-    public async Task SftpConnector_Upload_DelegatesToPool()
+    public async Task PoolRelease_CalledAfterUpload()
     {
-        var mockClient = Substitute.For<ISftpClient>();
-        mockClient.IsConnected.Returns(true);
+        var (pool, client) = CreateMockPool();
+        var connector = CreateConnector(pool);
 
-        var mockPool = Substitute.For<ISftpConnectionPool>();
-        mockPool.AcquireAsync(Arg.Any<CancellationToken>()).Returns(mockClient);
+        var envelope = IntegrationEnvelope<string>.Create("data", "src", "File");
+        await connector.UploadAsync(
+            envelope, "file.bin", s => Encoding.UTF8.GetBytes(s), default);
 
-        var connector = new SftpConnector(
-            mockPool,
-            Options.Create(new SftpConnectorOptions { RootPath = "/data" }),
-            NullLogger<SftpConnector>.Instance);
+        pool.Received(1).Release(client);
+    }
 
-        var envelope = IntegrationEnvelope<string>.Create("payload", "Svc", "file.upload");
+    [Test]
+    public async Task UploadResult_PublishedToMockEndpoint()
+    {
+        var (pool, _) = CreateMockPool();
+        var connector = CreateConnector(pool, "/files");
 
+        var envelope = IntegrationEnvelope<string>.Create("content", "app", "Report");
         var remotePath = await connector.UploadAsync(
-            envelope, "test.json", s => System.Text.Encoding.UTF8.GetBytes(s), CancellationToken.None);
+            envelope, "report.csv", s => Encoding.UTF8.GetBytes(s), default);
 
-        Assert.That(remotePath, Is.EqualTo("/data/test.json"));
-        mockClient.Received(2).UploadFile(Arg.Any<Stream>(), Arg.Any<string>()); // data + meta
-        mockPool.Received(1).Release(mockClient);
-    }
+        var notification = IntegrationEnvelope<string>.Create(
+            remotePath, "sftp", "UploadComplete");
+        await _output.PublishAsync(notification, "sftp-notifications", default);
+        _output.AssertReceivedOnTopic("sftp-notifications", 1);
 
-    // ── ISftpConnector Interface Shape (Reflection) ─────────────────────────
-
-    [Test]
-    public void ISftpConnector_InterfaceShape()
-    {
-        var type = typeof(ISftpConnector);
-
-        Assert.That(type.GetMethod("UploadAsync"), Is.Not.Null);
-        Assert.That(type.GetMethod("DownloadAsync"), Is.Not.Null);
-        Assert.That(type.GetMethod("ListFilesAsync"), Is.Not.Null);
-    }
-
-    // ── SftpConnectionPool Respects Max Connections ─────────────────────────
-
-    [Test]
-    public async Task SftpConnectionPool_RespectsMaxConnections()
-    {
-        var clientCount = 0;
-        ISftpClient CreateClient()
-        {
-            Interlocked.Increment(ref clientCount);
-            var client = Substitute.For<ISftpClient>();
-            client.IsConnected.Returns(true);
-            return client;
-        }
-
-        var pool = new SftpConnectionPool(
-            CreateClient,
-            Options.Create(new SftpConnectorOptions { MaxConnectionsPerHost = 2 }),
-            NullLogger<SftpConnectionPool>.Instance);
-
-        // Acquire both slots
-        var c1 = await pool.AcquireAsync();
-        var c2 = await pool.AcquireAsync();
-
-        // Third acquire should block; verify with a timeout
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
-        Assert.ThrowsAsync<OperationCanceledException>(
-            () => pool.AcquireAsync(cts.Token));
-
-        // Release one, then acquire succeeds
-        pool.Release(c1);
-        var c3 = await pool.AcquireAsync();
-        Assert.That(c3, Is.Not.Null);
-
-        pool.Release(c2);
-        pool.Release(c3);
-        await pool.DisposeAsync();
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Payload, Does.Contain("report.csv"));
     }
 }

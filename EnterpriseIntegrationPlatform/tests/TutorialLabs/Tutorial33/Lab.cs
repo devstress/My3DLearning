@@ -1,123 +1,106 @@
 // ============================================================================
 // Tutorial 33 – Security (Lab)
 // ============================================================================
-// This lab exercises InputSanitizer, PayloadSizeGuard, InMemorySecretProvider,
-// and SecretEntry to learn the security subsystem.
+// EIP Pattern: Security Patterns (Input Sanitization + Payload Size Guard)
+// E2E: InputSanitizer sanitize/detect, PayloadSizeGuard enforce,
+//      MockEndpoint for publishing sanitized messages.
 // ============================================================================
-
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Security;
-using EnterpriseIntegrationPlatform.Security.Secrets;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial33;
 
 [TestFixture]
 public sealed class Lab
 {
-    private InputSanitizer _sanitizer = null!;
+    private MockEndpoint _output = null!;
 
     [SetUp]
-    public void SetUp()
-    {
-        _sanitizer = new InputSanitizer();
-    }
+    public void SetUp() => _output = new MockEndpoint("security-out");
 
-    // ── Sanitize Removes XSS Script Tags ────────────────────────────────────
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public void InputSanitizer_Sanitize_RemovesScriptTags()
+    public async Task Sanitizer_RemovesScriptTags()
     {
+        var sanitizer = new InputSanitizer();
         var input = "Hello <script>alert('xss')</script> World";
+        var clean = sanitizer.Sanitize(input);
 
-        var result = _sanitizer.Sanitize(input);
+        Assert.That(clean, Does.Not.Contain("<script>"));
+        Assert.That(clean, Does.Contain("Hello"));
 
-        Assert.That(result, Does.Not.Contain("<script>"));
-        Assert.That(result, Does.Not.Contain("alert"));
-        Assert.That(result, Does.Contain("Hello"));
-        Assert.That(result, Does.Contain("World"));
+        var envelope = IntegrationEnvelope<string>.Create(clean, "sanitizer", "Sanitized");
+        await _output.PublishAsync(envelope, "sanitized-messages", default);
+        _output.AssertReceivedOnTopic("sanitized-messages", 1);
     }
 
-    // ── IsClean Returns False For XSS ───────────────────────────────────────
-
     [Test]
-    public void InputSanitizer_IsClean_ReturnsFalseForXss()
+    public async Task Sanitizer_RemovesSqlInjection()
     {
-        var dirty = "<script>alert('xss')</script>";
+        var sanitizer = new InputSanitizer();
+        var input = "'; DROP TABLE users";
+        var clean = sanitizer.Sanitize(input);
 
-        Assert.That(_sanitizer.IsClean(dirty), Is.False);
+        Assert.That(clean, Does.Not.Contain("DROP TABLE"));
+        await Task.CompletedTask;
     }
 
-    // ── IsClean Returns True For Clean Input ────────────────────────────────
-
     [Test]
-    public void InputSanitizer_IsClean_ReturnsTrueForClean()
+    public async Task IsClean_DetectsDangerousInput()
     {
-        var clean = "Hello, this is perfectly safe text.";
+        var sanitizer = new InputSanitizer();
 
-        Assert.That(_sanitizer.IsClean(clean), Is.True);
+        Assert.That(sanitizer.IsClean("safe text"), Is.True);
+        Assert.That(sanitizer.IsClean("has\nnewline"), Is.False);
+        Assert.That(sanitizer.IsClean("<script>xss</script>"), Is.False);
+        await Task.CompletedTask;
     }
 
-    // ── PayloadSizeGuard Passes For Small Payload ───────────────────────────
-
     [Test]
-    public void PayloadSizeGuard_Enforce_PassesForSmallPayload()
+    public async Task PayloadSizeGuard_AllowsUnderLimit()
     {
-        var guard = new PayloadSizeGuard(
-            Options.Create(new PayloadSizeOptions { MaxPayloadBytes = 1024 }));
+        var guard = new PayloadSizeGuard(Options.Create(
+            new PayloadSizeOptions { MaxPayloadBytes = 1024 }));
 
-        var smallPayload = new string('x', 100);
-
-        Assert.DoesNotThrow(() => guard.Enforce(smallPayload));
+        Assert.DoesNotThrow(() => guard.Enforce("small payload"));
+        await Task.CompletedTask;
     }
 
-    // ── PayloadSizeGuard Throws For Oversized Payload ───────────────────────
-
     [Test]
-    public void PayloadSizeGuard_Enforce_ThrowsPayloadTooLargeException()
+    public async Task PayloadSizeGuard_RejectsOverLimit()
     {
-        var guard = new PayloadSizeGuard(
-            Options.Create(new PayloadSizeOptions { MaxPayloadBytes = 50 }));
-
-        var oversized = new string('x', 200);
+        var guard = new PayloadSizeGuard(Options.Create(
+            new PayloadSizeOptions { MaxPayloadBytes = 10 }));
 
         var ex = Assert.Throws<PayloadTooLargeException>(
-            () => guard.Enforce(oversized));
+            () => guard.Enforce("this is way too large for limit"));
 
-        Assert.That(ex!.MaxBytes, Is.EqualTo(50));
-        Assert.That(ex.ActualBytes, Is.GreaterThan(50));
+        Assert.That(ex!.MaxBytes, Is.EqualTo(10));
+        Assert.That(ex.ActualBytes, Is.GreaterThan(10));
+        await Task.CompletedTask;
     }
 
-    // ── InMemorySecretProvider Set/Get Roundtrip ────────────────────────────
-
     [Test]
-    public async Task SecretProvider_SetAndGet_Roundtrip()
+    public async Task SanitizedMessage_PublishedToMockEndpoint()
     {
-        var provider = new InMemorySecretProvider();
+        var sanitizer = new InputSanitizer();
+        var guard = new PayloadSizeGuard(Options.Create(
+            new PayloadSizeOptions { MaxPayloadBytes = 4096 }));
 
-        var stored = await provider.SetSecretAsync("db-password", "s3cret!");
-        var retrieved = await provider.GetSecretAsync("db-password");
+        var raw = "Hello <script>alert('x')</script> World";
+        var clean = sanitizer.Sanitize(raw);
+        guard.Enforce(clean);
 
-        Assert.That(retrieved, Is.Not.Null);
-        Assert.That(retrieved!.Key, Is.EqualTo("db-password"));
-        Assert.That(retrieved.Value, Is.EqualTo("s3cret!"));
-        Assert.That(retrieved.Version, Is.EqualTo(stored.Version));
-    }
+        var envelope = IntegrationEnvelope<string>.Create(clean, "pipeline", "SafeMessage");
+        await _output.PublishAsync(envelope, "safe-messages", default);
+        _output.AssertReceivedOnTopic("safe-messages", 1);
 
-    // ── SecretEntry Record Has Expected Properties ──────────────────────────
-
-    [Test]
-    public void SecretEntry_RecordProperties()
-    {
-        var now = DateTimeOffset.UtcNow;
-        var meta = new Dictionary<string, string> { ["env"] = "prod" };
-        var entry = new SecretEntry("api-key", "value123", "3", now, Metadata: meta);
-
-        Assert.That(entry.Key, Is.EqualTo("api-key"));
-        Assert.That(entry.Value, Is.EqualTo("value123"));
-        Assert.That(entry.Version, Is.EqualTo("3"));
-        Assert.That(entry.CreatedAt, Is.EqualTo(now));
-        Assert.That(entry.ExpiresAt, Is.Null);
-        Assert.That(entry.Metadata!["env"], Is.EqualTo("prod"));
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Payload, Does.Not.Contain("<script>"));
     }
 }

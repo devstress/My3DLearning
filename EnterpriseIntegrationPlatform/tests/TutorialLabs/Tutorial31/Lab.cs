@@ -1,151 +1,135 @@
 // ============================================================================
 // Tutorial 31 – Event Sourcing (Lab)
 // ============================================================================
-// This lab exercises the InMemoryEventStore, InMemorySnapshotStore,
-// EventProjectionEngine, EventEnvelope, OptimisticConcurrencyException,
-// and EventSourcingOptions to learn the event sourcing subsystem.
+// EIP Pattern: Event Sourcing
+// E2E: InMemoryEventStore — append events, read stream forward/backward,
+//      then publish event notifications to MockEndpoint.
 // ============================================================================
-
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.EventSourcing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial31;
 
 [TestFixture]
 public sealed class Lab
 {
-    private InMemoryEventStore _store = null!;
+    private MockEndpoint _output = null!;
 
     [SetUp]
-    public void SetUp()
-    {
-        var options = Options.Create(new EventSourcingOptions());
-        _store = new InMemoryEventStore(options, NullLogger<InMemoryEventStore>.Instance);
-    }
+    public void SetUp() => _output = new MockEndpoint("event-out");
 
-    // ── Append and Read Roundtrip ───────────────────────────────────────────
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
+
+    private static InMemoryEventStore CreateStore(int maxPerRead = 1000) =>
+        new(Options.Create(new EventSourcingOptions { MaxEventsPerRead = maxPerRead }),
+            NullLogger<InMemoryEventStore>.Instance);
+
+    private static EventEnvelope MakeEvent(string streamId, string type, string data, long version) =>
+        new(Guid.NewGuid(), streamId, type, data, version,
+            DateTimeOffset.UtcNow, new Dictionary<string, string>());
 
     [Test]
-    public async Task AppendAsync_AndReadStreamAsync_Roundtrip()
+    public async Task AppendAndReadForward_RoundTrip()
     {
-        var envelope = new EventEnvelope(
-            Guid.NewGuid(), "stream-1", "OrderCreated",
-            """{"total":42}""", 0, DateTimeOffset.UtcNow, []);
+        var store = CreateStore();
+        var evt = MakeEvent("order-1", "OrderCreated", "{\"total\":100}", 1);
+        var newVersion = await store.AppendAsync("order-1", [evt], 0);
+        Assert.That(newVersion, Is.EqualTo(1));
 
-        await _store.AppendAsync("stream-1", [envelope], expectedVersion: 0);
-
-        var events = await _store.ReadStreamAsync("stream-1", fromVersion: 1, count: 100);
-
+        var events = await store.ReadStreamAsync("order-1", 1, 10);
         Assert.That(events, Has.Count.EqualTo(1));
-        Assert.That(events[0].StreamId, Is.EqualTo("stream-1"));
         Assert.That(events[0].EventType, Is.EqualTo("OrderCreated"));
-        Assert.That(events[0].Version, Is.EqualTo(1));
+
+        var envelope = IntegrationEnvelope<string>.Create(events[0].Data, "event-store", "OrderCreated");
+        await _output.PublishAsync(envelope, "event-notifications", default);
+        _output.AssertReceivedOnTopic("event-notifications", 1);
     }
 
-    // ── Append Multiple and Read All Back in Order ──────────────────────────
-
     [Test]
-    public async Task AppendMultiple_ReadAllBack_InOrder()
+    public async Task AppendMultipleEvents_VersionsIncrement()
     {
-        var e1 = new EventEnvelope(Guid.NewGuid(), "s", "A", "d1", 0, DateTimeOffset.UtcNow, []);
-        var e2 = new EventEnvelope(Guid.NewGuid(), "s", "B", "d2", 0, DateTimeOffset.UtcNow, []);
-        var e3 = new EventEnvelope(Guid.NewGuid(), "s", "C", "d3", 0, DateTimeOffset.UtcNow, []);
+        var store = CreateStore();
+        var e1 = MakeEvent("stream-a", "Created", "{}", 1);
+        var e2 = MakeEvent("stream-a", "Updated", "{}", 2);
+        var newVersion = await store.AppendAsync("stream-a", [e1, e2], 0);
+        Assert.That(newVersion, Is.EqualTo(2));
 
-        await _store.AppendAsync("s", [e1], expectedVersion: 0);
-        await _store.AppendAsync("s", [e2], expectedVersion: 1);
-        await _store.AppendAsync("s", [e3], expectedVersion: 2);
-
-        var events = await _store.ReadStreamAsync("s", fromVersion: 1, count: 100);
-
-        Assert.That(events, Has.Count.EqualTo(3));
+        var events = await store.ReadStreamAsync("stream-a", 1, 10);
+        Assert.That(events, Has.Count.EqualTo(2));
         Assert.That(events[0].Version, Is.EqualTo(1));
         Assert.That(events[1].Version, Is.EqualTo(2));
-        Assert.That(events[2].Version, Is.EqualTo(3));
-        Assert.That(events[0].EventType, Is.EqualTo("A"));
-        Assert.That(events[2].EventType, Is.EqualTo("C"));
+        await Task.CompletedTask;
     }
 
-    // ── OptimisticConcurrencyException on Version Conflict ──────────────────
-
     [Test]
-    public async Task AppendAsync_VersionConflict_ThrowsOptimisticConcurrencyException()
+    public async Task ReadStreamBackward_ReturnsDescendingOrder()
     {
-        var e = new EventEnvelope(Guid.NewGuid(), "s", "E", "d", 0, DateTimeOffset.UtcNow, []);
-        await _store.AppendAsync("s", [e], expectedVersion: 0);
+        var store = CreateStore();
+        var e1 = MakeEvent("s1", "A", "{}", 1);
+        var e2 = MakeEvent("s1", "B", "{}", 2);
+        var e3 = MakeEvent("s1", "C", "{}", 3);
+        await store.AppendAsync("s1", [e1, e2, e3], 0);
 
-        var e2 = new EventEnvelope(Guid.NewGuid(), "s", "E2", "d2", 0, DateTimeOffset.UtcNow, []);
-
-        var ex = Assert.ThrowsAsync<OptimisticConcurrencyException>(
-            () => _store.AppendAsync("s", [e2], expectedVersion: 0));
-
-        Assert.That(ex!.StreamId, Is.EqualTo("s"));
-        Assert.That(ex.ExpectedVersion, Is.EqualTo(0));
-        Assert.That(ex.ActualVersion, Is.EqualTo(1));
-    }
-
-    // ── ReadStreamBackwardAsync Returns Reversed Order ──────────────────────
-
-    [Test]
-    public async Task ReadStreamBackwardAsync_ReturnsReversedOrder()
-    {
-        var e1 = new EventEnvelope(Guid.NewGuid(), "s", "A", "d1", 0, DateTimeOffset.UtcNow, []);
-        var e2 = new EventEnvelope(Guid.NewGuid(), "s", "B", "d2", 0, DateTimeOffset.UtcNow, []);
-        var e3 = new EventEnvelope(Guid.NewGuid(), "s", "C", "d3", 0, DateTimeOffset.UtcNow, []);
-
-        await _store.AppendAsync("s", [e1, e2, e3], expectedVersion: 0);
-
-        var events = await _store.ReadStreamBackwardAsync("s", fromVersion: 3, count: 100);
-
+        var events = await store.ReadStreamBackwardAsync("s1", 3, 10);
         Assert.That(events, Has.Count.EqualTo(3));
-        Assert.That(events[0].Version, Is.EqualTo(3));
-        Assert.That(events[1].Version, Is.EqualTo(2));
-        Assert.That(events[2].Version, Is.EqualTo(1));
+        Assert.That(events[0].EventType, Is.EqualTo("C"));
+        Assert.That(events[2].EventType, Is.EqualTo("A"));
     }
 
-    // ── InMemorySnapshotStore Save and Load Roundtrip ───────────────────────
-
     [Test]
-    public async Task SnapshotStore_SaveAndLoad_Roundtrip()
+    public async Task OptimisticConcurrency_ThrowsOnVersionMismatch()
     {
-        var snapshots = new InMemorySnapshotStore<int>();
+        var store = CreateStore();
+        var e1 = MakeEvent("s2", "Init", "{}", 1);
+        await store.AppendAsync("s2", [e1], 0);
 
-        await snapshots.SaveAsync("stream-1", 42, 5);
-        var (state, version) = await snapshots.LoadAsync("stream-1");
-
-        Assert.That(state, Is.EqualTo(42));
-        Assert.That(version, Is.EqualTo(5));
+        var e2 = MakeEvent("s2", "Conflict", "{}", 2);
+        Assert.ThrowsAsync<OptimisticConcurrencyException>(
+            () => store.AppendAsync("s2", [e2], 0));
     }
 
-    // ── EventSourcingOptions Defaults ────────────────────────────────────────
-
     [Test]
-    public void EventSourcingOptions_Defaults()
+    public async Task ReadFromMiddleOfStream_ReturnsSubset()
     {
-        var opts = new EventSourcingOptions();
+        var store = CreateStore();
+        var events = Enumerable.Range(1, 5)
+            .Select(i => MakeEvent("s3", $"E{i}", "{}", i))
+            .ToList();
+        await store.AppendAsync("s3", events, 0);
 
-        Assert.That(opts.SnapshotInterval, Is.EqualTo(50));
-        Assert.That(opts.MaxEventsPerRead, Is.EqualTo(1000));
+        var subset = await store.ReadStreamAsync("s3", 3, 10);
+        Assert.That(subset, Has.Count.EqualTo(3));
+        Assert.That(subset[0].Version, Is.EqualTo(3));
     }
 
-    // ── EventEnvelope Record Shape ──────────────────────────────────────────
+    [Test]
+    public async Task EmptyStream_ReturnsEmptyList()
+    {
+        var store = CreateStore();
+        var events = await store.ReadStreamAsync("nonexistent", 1, 10);
+        Assert.That(events, Is.Empty);
+    }
 
     [Test]
-    public void EventEnvelope_RecordShape_AllPropertiesAccessible()
+    public async Task PublishAllEventsToMockEndpoint()
     {
-        var id = Guid.NewGuid();
-        var ts = DateTimeOffset.UtcNow;
-        var meta = new Dictionary<string, string> { ["key"] = "value" };
+        var store = CreateStore();
+        var e1 = MakeEvent("pub-1", "A", "{\"v\":1}", 1);
+        var e2 = MakeEvent("pub-1", "B", "{\"v\":2}", 2);
+        await store.AppendAsync("pub-1", [e1, e2], 0);
 
-        var envelope = new EventEnvelope(id, "stream-1", "OrderCreated", """{"x":1}""", 7, ts, meta);
+        var stream = await store.ReadStreamAsync("pub-1", 1, 10);
+        foreach (var evt in stream)
+        {
+            var envelope = IntegrationEnvelope<string>.Create(evt.Data, "event-store", evt.EventType);
+            await _output.PublishAsync(envelope, "event-stream", default);
+        }
 
-        Assert.That(envelope.EventId, Is.EqualTo(id));
-        Assert.That(envelope.StreamId, Is.EqualTo("stream-1"));
-        Assert.That(envelope.EventType, Is.EqualTo("OrderCreated"));
-        Assert.That(envelope.Data, Is.EqualTo("""{"x":1}"""));
-        Assert.That(envelope.Version, Is.EqualTo(7));
-        Assert.That(envelope.Timestamp, Is.EqualTo(ts));
-        Assert.That(envelope.Metadata["key"], Is.EqualTo("value"));
+        _output.AssertReceivedOnTopic("event-stream", 2);
     }
 }

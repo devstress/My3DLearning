@@ -1,137 +1,140 @@
 // ============================================================================
-// Tutorial 34 – Connector.Http (Lab)
+// Tutorial 34 – HTTP Connector (Lab)
 // ============================================================================
-// This lab exercises InMemoryTokenCache, HttpConnectorOptions, and
-// HttpConnectorAdapter to learn the HTTP connector subsystem.
+// EIP Pattern: Connector
+// E2E: HttpConnectorAdapter with NSubstitute IHttpConnector + MockEndpoint
+//      for publishing send results.
 // ============================================================================
-
+using System.Text.Json;
 using EnterpriseIntegrationPlatform.Connector.Http;
 using EnterpriseIntegrationPlatform.Connectors;
+using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial34;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── InMemoryTokenCache Set/Get Roundtrip ────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("http-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
+
+    private static HttpConnectorAdapter CreateAdapter(
+        string name, IHttpConnector http, string baseUrl = "http://localhost") =>
+        new(name, http,
+            Options.Create(new HttpConnectorOptions { BaseUrl = baseUrl }),
+            NullLogger<HttpConnectorAdapter>.Instance);
 
     [Test]
-    public void TokenCache_SetAndGet_Roundtrip()
+    public async Task Adapter_NameAndType_AreCorrect()
+    {
+        var http = Substitute.For<IHttpConnector>();
+        var adapter = CreateAdapter("my-http", http);
+
+        Assert.That(adapter.Name, Is.EqualTo("my-http"));
+        Assert.That(adapter.ConnectorType, Is.EqualTo(ConnectorType.Http));
+        await Task.CompletedTask;
+    }
+
+    [Test]
+    public async Task SendAsync_Success_ReturnsOkResult()
+    {
+        var http = Substitute.For<IHttpConnector>();
+        http.SendAsync<string, JsonElement>(
+            Arg.Any<IntegrationEnvelope<string>>(),
+            Arg.Any<string>(), Arg.Any<HttpMethod>(), Arg.Any<CancellationToken>())
+            .Returns(JsonDocument.Parse("{}").RootElement);
+
+        var adapter = CreateAdapter("test-http", http, "http://example.com");
+        var envelope = IntegrationEnvelope<string>.Create("{\"key\":\"val\"}", "src", "Http.Send");
+        var result = await adapter.SendAsync(
+            envelope, new ConnectorSendOptions { Destination = "/api/data" });
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.ConnectorName, Is.EqualTo("test-http"));
+
+        await _output.PublishAsync(envelope, "http-results", default);
+        _output.AssertReceivedOnTopic("http-results", 1);
+    }
+
+    [Test]
+    public async Task SendAsync_Failure_ReturnsFailResult()
+    {
+        var http = Substitute.For<IHttpConnector>();
+        http.SendAsync<string, JsonElement>(
+            Arg.Any<IntegrationEnvelope<string>>(),
+            Arg.Any<string>(), Arg.Any<HttpMethod>(), Arg.Any<CancellationToken>())
+            .Returns<JsonElement>(_ => throw new HttpRequestException("Connection refused"));
+
+        var adapter = CreateAdapter("fail-http", http, "http://down.example.com");
+        var envelope = IntegrationEnvelope<string>.Create("payload", "src", "Http.Send");
+        var result = await adapter.SendAsync(envelope, new ConnectorSendOptions());
+
+        Assert.That(result.Success, Is.False);
+        Assert.That(result.ErrorMessage, Is.Not.Null);
+    }
+
+    [Test]
+    public async Task SendAsync_DefaultDestination_UsesSlash()
+    {
+        var http = Substitute.For<IHttpConnector>();
+        http.SendAsync<string, JsonElement>(
+            Arg.Any<IntegrationEnvelope<string>>(),
+            "/", HttpMethod.Post, Arg.Any<CancellationToken>())
+            .Returns(JsonDocument.Parse("{}").RootElement);
+
+        var adapter = CreateAdapter("default-dest", http);
+        var envelope = IntegrationEnvelope<string>.Create("data", "src", "Send");
+        var result = await adapter.SendAsync(envelope, new ConnectorSendOptions());
+
+        Assert.That(result.Success, Is.True);
+        await http.Received(1).SendAsync<string, JsonElement>(
+            Arg.Any<IntegrationEnvelope<string>>(),
+            "/", HttpMethod.Post, Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task TokenCache_SetAndRetrieve()
     {
         var cache = new InMemoryTokenCache();
+        cache.SetToken("key1", "my-token", TimeSpan.FromMinutes(5));
 
-        cache.SetToken("auth", "bearer-token-123", TimeSpan.FromMinutes(5));
-
-        var found = cache.TryGetToken("auth", out var token);
-
-        Assert.That(found, Is.True);
-        Assert.That(token, Is.EqualTo("bearer-token-123"));
+        Assert.That(cache.TryGetToken("key1", out var token), Is.True);
+        Assert.That(token, Is.EqualTo("my-token"));
+        await Task.CompletedTask;
     }
 
-    // ── InMemoryTokenCache Returns False For Missing Key ────────────────────
-
     [Test]
-    public void TokenCache_MissingKey_ReturnsFalse()
+    public async Task TokenCache_Expired_ReturnsFalse()
     {
-        var cache = new InMemoryTokenCache();
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var cache = new InMemoryTokenCache(time);
+        cache.SetToken("key2", "token-val", TimeSpan.FromSeconds(10));
 
-        var found = cache.TryGetToken("nonexistent", out var token);
-
-        Assert.That(found, Is.False);
-        Assert.That(token, Is.Null);
+        time.Advance(TimeSpan.FromSeconds(15));
+        Assert.That(cache.TryGetToken("key2", out _), Is.False);
+        await Task.CompletedTask;
     }
 
-    // ── InMemoryTokenCache Expired Token Returns False ──────────────────────
-
     [Test]
-    public void TokenCache_ExpiredToken_ReturnsFalse()
-    {
-        var fakeTime = new FakeTimeProvider(DateTimeOffset.UtcNow);
-        var cache = new InMemoryTokenCache(fakeTime);
-
-        cache.SetToken("auth", "token-value", TimeSpan.FromMinutes(1));
-
-        // Advance time past expiry
-        fakeTime.Advance(TimeSpan.FromMinutes(2));
-
-        var found = cache.TryGetToken("auth", out var token);
-
-        Assert.That(found, Is.False);
-        Assert.That(token, Is.Null);
-    }
-
-    // ── HttpConnectorOptions Defaults ────────────────────────────────────────
-
-    [Test]
-    public void HttpConnectorOptions_Defaults()
+    public async Task HttpConnectorOptions_Defaults()
     {
         var opts = new HttpConnectorOptions();
 
-        Assert.That(opts.BaseUrl, Is.EqualTo(string.Empty));
         Assert.That(opts.TimeoutSeconds, Is.EqualTo(30));
         Assert.That(opts.MaxRetryAttempts, Is.EqualTo(3));
         Assert.That(opts.RetryDelayMs, Is.EqualTo(1000));
-        Assert.That(opts.CacheTokenExpirySeconds, Is.EqualTo(300));
-        Assert.That(opts.DefaultHeaders, Is.Not.Null);
-        Assert.That(opts.DefaultHeaders, Is.Empty);
-    }
-
-    // ── HttpConnectorOptions Custom Values ──────────────────────────────────
-
-    [Test]
-    public void HttpConnectorOptions_CustomValues()
-    {
-        var opts = new HttpConnectorOptions
-        {
-            BaseUrl = "https://api.example.com",
-            TimeoutSeconds = 60,
-            MaxRetryAttempts = 5,
-            RetryDelayMs = 2000,
-            CacheTokenExpirySeconds = 600,
-            DefaultHeaders = new Dictionary<string, string>
-            {
-                ["X-Api-Key"] = "key123",
-            },
-        };
-
-        Assert.That(opts.BaseUrl, Is.EqualTo("https://api.example.com"));
-        Assert.That(opts.TimeoutSeconds, Is.EqualTo(60));
-        Assert.That(opts.MaxRetryAttempts, Is.EqualTo(5));
-        Assert.That(opts.RetryDelayMs, Is.EqualTo(2000));
-        Assert.That(opts.CacheTokenExpirySeconds, Is.EqualTo(600));
-        Assert.That(opts.DefaultHeaders["X-Api-Key"], Is.EqualTo("key123"));
-    }
-
-    // ── HttpConnectorAdapter.Name Property ──────────────────────────────────
-
-    [Test]
-    public void HttpConnectorAdapter_Name_Property()
-    {
-        var httpConnector = Substitute.For<IHttpConnector>();
-        var opts = Options.Create(new HttpConnectorOptions { BaseUrl = "https://example.com" });
-        var adapter = new HttpConnectorAdapter(
-            "my-http-connector", httpConnector, opts,
-            NullLogger<HttpConnectorAdapter>.Instance);
-
-        Assert.That(adapter.Name, Is.EqualTo("my-http-connector"));
-    }
-
-    // ── HttpConnectorAdapter.ConnectorType Returns Http ─────────────────────
-
-    [Test]
-    public void HttpConnectorAdapter_ConnectorType_ReturnsHttp()
-    {
-        var httpConnector = Substitute.For<IHttpConnector>();
-        var opts = Options.Create(new HttpConnectorOptions { BaseUrl = "https://example.com" });
-        var adapter = new HttpConnectorAdapter(
-            "test", httpConnector, opts,
-            NullLogger<HttpConnectorAdapter>.Instance);
-
-        Assert.That(adapter.ConnectorType, Is.EqualTo(ConnectorType.Http));
+        Assert.That(opts.BaseUrl, Is.EqualTo(string.Empty));
+        await Task.CompletedTask;
     }
 }

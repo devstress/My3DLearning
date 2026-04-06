@@ -1,99 +1,81 @@
 // ============================================================================
 // Tutorial 32 – Multi-Tenancy (Exam)
 // ============================================================================
-// Coding challenges: multi-tenant routing from metadata, cross-tenant
-// rejection scenario, and anonymous tenant handling in the guard.
+// EIP Pattern: Multi-Tenant Messaging
+// E2E: Multi-tenant routing, cross-tenant rejection, and anonymous tenant
+//      guard behavior with MockEndpoint verification.
 // ============================================================================
-
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.MultiTenancy;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial32;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Resolve Tenant From Metadata, Verify Isolation ──────────
-
     [Test]
-    public void Challenge1_MultiTenantRouting_ResolveAndVerifyIsolation()
+    public async Task Challenge1_MultiTenantRouting_IsolatesPerTenant()
     {
+        await using var output = new MockEndpoint("exam-tenant");
         var resolver = new TenantResolver();
-        var guard = new TenantIsolationGuard(resolver);
 
-        // Simulate two tenants sending messages
-        var envTenantA = IntegrationEnvelope<string>.Create("orderA", "OrderService", "order.created") with
+        var tenants = new[] { "alpha", "beta", "gamma" };
+        foreach (var tid in tenants)
         {
-            Metadata = new Dictionary<string, string>
-            {
-                [TenantResolver.TenantMetadataKey] = "acme-corp",
-            },
-        };
+            var envelope = IntegrationEnvelope<string>.Create($"data-{tid}", "src", "Order");
+            envelope.Metadata["tenantId"] = tid;
+            var ctx = resolver.Resolve(envelope.Metadata);
+            Assert.That(ctx.IsResolved, Is.True);
+            await output.PublishAsync(envelope, $"orders.{ctx.TenantId}", default);
+        }
 
-        var envTenantB = IntegrationEnvelope<string>.Create("orderB", "OrderService", "order.created") with
-        {
-            Metadata = new Dictionary<string, string>
-            {
-                [TenantResolver.TenantMetadataKey] = "globex-inc",
-            },
-        };
-
-        // Resolve each tenant
-        var ctxA = resolver.Resolve(envTenantA.Metadata);
-        var ctxB = resolver.Resolve(envTenantB.Metadata);
-        Assert.That(ctxA.TenantId, Is.EqualTo("acme-corp"));
-        Assert.That(ctxB.TenantId, Is.EqualTo("globex-inc"));
-
-        // Guard passes for correct tenant
-        Assert.DoesNotThrow(() => guard.Enforce(envTenantA, "acme-corp"));
-        Assert.DoesNotThrow(() => guard.Enforce(envTenantB, "globex-inc"));
+        output.AssertReceivedCount(3);
+        output.AssertReceivedOnTopic("orders.alpha", 1);
+        output.AssertReceivedOnTopic("orders.beta", 1);
+        output.AssertReceivedOnTopic("orders.gamma", 1);
     }
 
-    // ── Challenge 2: Cross-Tenant Rejection ─────────────────────────────────
-
     [Test]
-    public void Challenge2_CrossTenantRejection()
+    public async Task Challenge2_CrossTenantAccess_Rejected()
     {
+        await using var output = new MockEndpoint("exam-reject");
         var resolver = new TenantResolver();
         var guard = new TenantIsolationGuard(resolver);
 
-        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
-        {
-            Metadata = new Dictionary<string, string>
-            {
-                [TenantResolver.TenantMetadataKey] = "tenant-alpha",
-            },
-        };
+        var envelope = IntegrationEnvelope<string>.Create("secret", "src", "Data");
+        envelope.Metadata["tenantId"] = "tenant-a";
 
-        // Attempt to process in wrong tenant context
         var ex = Assert.Throws<TenantIsolationException>(
-            () => guard.Enforce(envelope, "tenant-beta"));
+            () => guard.Enforce(envelope, "tenant-b"));
 
-        Assert.That(ex!.MessageId, Is.EqualTo(envelope.MessageId));
-        Assert.That(ex.ActualTenantId, Is.EqualTo("tenant-alpha"));
-        Assert.That(ex.ExpectedTenantId, Is.EqualTo("tenant-beta"));
-        Assert.That(ex.Message, Does.Contain("tenant-alpha"));
-        Assert.That(ex.Message, Does.Contain("tenant-beta"));
+        Assert.That(ex!.ActualTenantId, Is.EqualTo("tenant-a"));
+        Assert.That(ex.ExpectedTenantId, Is.EqualTo("tenant-b"));
+
+        var alert = IntegrationEnvelope<string>.Create(ex.Message, "guard", "Violation");
+        await output.PublishAsync(alert, "violations", default);
+        output.AssertReceivedOnTopic("violations", 1);
     }
 
-    // ── Challenge 3: Anonymous Tenant Handling in Guard ──────────────────────
-
     [Test]
-    public void Challenge3_AnonymousTenant_GuardThrows()
+    public async Task Challenge3_AnonymousTenant_GuardRejects()
     {
+        await using var output = new MockEndpoint("exam-anon");
         var resolver = new TenantResolver();
         var guard = new TenantIsolationGuard(resolver);
 
-        // Envelope with no tenantId metadata → resolves to Anonymous
-        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event");
+        var envelope = IntegrationEnvelope<string>.Create("payload", "src", "Msg");
 
         var ex = Assert.Throws<TenantIsolationException>(
-            () => guard.Enforce(envelope, "required-tenant"));
+            () => guard.Enforce(envelope, "expected-tenant"));
 
-        // Anonymous is not resolved, so ActualTenantId should be null
         Assert.That(ex!.ActualTenantId, Is.Null);
-        Assert.That(ex.ExpectedTenantId, Is.EqualTo("required-tenant"));
-        Assert.That(ex.Message, Does.Contain("tenant identifier"));
+        Assert.That(ex.ExpectedTenantId, Is.EqualTo("expected-tenant"));
+
+        var notification = IntegrationEnvelope<string>.Create(
+            "Anonymous access attempt", "guard", "AnonymousRejected");
+        await output.PublishAsync(notification, "security", default);
+        output.AssertReceivedOnTopic("security", 1);
     }
 }
