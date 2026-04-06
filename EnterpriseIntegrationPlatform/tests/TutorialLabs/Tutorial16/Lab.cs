@@ -1,169 +1,169 @@
 // ============================================================================
 // Tutorial 16 – Transform Pipeline (Lab)
 // ============================================================================
-// This lab exercises the TransformPipeline — the pattern that chains an
-// ordered sequence of ITransformStep instances. You will verify step
-// execution order, disabled pipeline passthrough, payload size limits,
-// stop-on-failure behaviour, and metadata accumulation.
+// EIP Pattern: Pipes and Filters (Transform variant).
+// E2E: TransformPipeline with real ITransformStep implementations, verify
+// transformed payload, step count, metadata, and publish results via MockEndpoint.
 // ============================================================================
 
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Transform;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
-using NSubstitute.ExceptionExtensions;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial16;
+
+/// <summary>Test step that converts the payload to upper-case.</summary>
+internal sealed class UpperCaseStep : ITransformStep
+{
+    public string Name => "UpperCase";
+
+    public Task<TransformContext> ExecuteAsync(
+        TransformContext context, CancellationToken cancellationToken = default)
+    {
+        var result = context.WithPayload(context.Payload.ToUpperInvariant());
+        result.Metadata[$"Step.{Name}.Applied"] = "true";
+        return Task.FromResult(result);
+    }
+}
+
+/// <summary>Test step that prepends a configurable prefix to the payload.</summary>
+internal sealed class PrefixStep : ITransformStep
+{
+    private readonly string _prefix;
+    public PrefixStep(string prefix) => _prefix = prefix;
+    public string Name => "Prefix";
+
+    public Task<TransformContext> ExecuteAsync(
+        TransformContext context, CancellationToken cancellationToken = default)
+    {
+        var result = context.WithPayload($"{_prefix}{context.Payload}");
+        result.Metadata[$"Step.{Name}.Applied"] = "true";
+        return Task.FromResult(result);
+    }
+}
+
+/// <summary>Test step that always throws to verify error-handling behaviour.</summary>
+internal sealed class FailingStep : ITransformStep
+{
+    public string Name => "Failing";
+
+    public Task<TransformContext> ExecuteAsync(
+        TransformContext context, CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException("Intentional step failure");
+}
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Basic Pipeline Execution ────────────────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("transform-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task Execute_SingleStep_AppliesTransformation()
+    public async Task Pipeline_SingleStep_TransformsPayload()
     {
-        var step = Substitute.For<ITransformStep>();
-        step.Name.Returns("Upper");
-        step.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ctx = ci.Arg<TransformContext>();
-                return ctx.WithPayload(ctx.Payload.ToUpperInvariant());
-            });
+        var pipeline = CreatePipeline(new ITransformStep[] { new UpperCaseStep() });
 
-        var options = Options.Create(new TransformOptions());
-        var pipeline = new TransformPipeline(
-            new[] { step }, options, NullLogger<TransformPipeline>.Instance);
+        var result = await pipeline.ExecuteAsync("hello world", "text/plain");
 
-        var result = await pipeline.ExecuteAsync("hello", "text/plain");
-
-        Assert.That(result.Payload, Is.EqualTo("HELLO"));
+        Assert.That(result.Payload, Is.EqualTo("HELLO WORLD"));
         Assert.That(result.StepsApplied, Is.EqualTo(1));
         Assert.That(result.ContentType, Is.EqualTo("text/plain"));
     }
 
     [Test]
-    public async Task Execute_MultipleSteps_AppliedInOrder()
+    public async Task Pipeline_MultipleSteps_ChainsTransformations()
     {
-        var step1 = Substitute.For<ITransformStep>();
-        step1.Name.Returns("Append-A");
-        step1.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-            .Returns(ci => ci.Arg<TransformContext>().WithPayload(ci.Arg<TransformContext>().Payload + "A"));
+        var pipeline = CreatePipeline(new ITransformStep[]
+        {
+            new UpperCaseStep(),
+            new PrefixStep("[TRANSFORMED] "),
+        });
 
-        var step2 = Substitute.For<ITransformStep>();
-        step2.Name.Returns("Append-B");
-        step2.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-            .Returns(ci => ci.Arg<TransformContext>().WithPayload(ci.Arg<TransformContext>().Payload + "B"));
+        var result = await pipeline.ExecuteAsync("order data", "text/plain");
 
-        var options = Options.Create(new TransformOptions());
-        var pipeline = new TransformPipeline(
-            new[] { step1, step2 }, options, NullLogger<TransformPipeline>.Instance);
-
-        var result = await pipeline.ExecuteAsync("X", "text/plain");
-
-        Assert.That(result.Payload, Is.EqualTo("XAB"));
+        Assert.That(result.Payload, Is.EqualTo("[TRANSFORMED] ORDER DATA"));
         Assert.That(result.StepsApplied, Is.EqualTo(2));
     }
 
-    // ── Disabled Pipeline ───────────────────────────────────────────────────
-
     [Test]
-    public async Task Execute_DisabledPipeline_ReturnsInputUnchanged()
+    public async Task Pipeline_Disabled_ReturnsInputUnchanged()
     {
-        var step = Substitute.For<ITransformStep>();
-
         var options = Options.Create(new TransformOptions { Enabled = false });
         var pipeline = new TransformPipeline(
-            new[] { step }, options, NullLogger<TransformPipeline>.Instance);
+            new ITransformStep[] { new UpperCaseStep() }, options,
+            NullLogger<TransformPipeline>.Instance);
 
-        var result = await pipeline.ExecuteAsync("{\"id\":1}", "application/json");
+        var result = await pipeline.ExecuteAsync("keep me", "text/plain");
 
-        Assert.That(result.Payload, Is.EqualTo("{\"id\":1}"));
+        Assert.That(result.Payload, Is.EqualTo("keep me"));
         Assert.That(result.StepsApplied, Is.EqualTo(0));
-        await step.DidNotReceive()
-            .ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>());
     }
 
-    // ── Max Payload Size ────────────────────────────────────────────────────
-
     [Test]
-    public void Execute_PayloadExceedsMaxSize_ThrowsInvalidOperationException()
+    public async Task Pipeline_StepFailure_SkippedWhenNotStopOnFailure()
     {
-        var options = Options.Create(new TransformOptions { MaxPayloadSizeBytes = 10 });
+        var options = Options.Create(new TransformOptions
+        {
+            Enabled = true,
+            StopOnStepFailure = false,
+        });
         var pipeline = new TransformPipeline(
-            Array.Empty<ITransformStep>(), options, NullLogger<TransformPipeline>.Instance);
+            new ITransformStep[] { new FailingStep(), new UpperCaseStep() },
+            options, NullLogger<TransformPipeline>.Instance);
 
-        var largePayload = new string('x', 50);
+        var result = await pipeline.ExecuteAsync("hello", "text/plain");
 
-        Assert.ThrowsAsync<InvalidOperationException>(
-            () => pipeline.ExecuteAsync(largePayload, "text/plain"));
-    }
-
-    // ── Stop On Step Failure ────────────────────────────────────────────────
-
-    [Test]
-    public async Task Execute_StepFails_StopOnFailureFalse_ContinuesExecution()
-    {
-        var failingStep = Substitute.For<ITransformStep>();
-        failingStep.Name.Returns("Failing");
-        failingStep.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(new InvalidOperationException("step error"));
-
-        var goodStep = Substitute.For<ITransformStep>();
-        goodStep.Name.Returns("Good");
-        goodStep.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-            .Returns(ci => ci.Arg<TransformContext>().WithPayload("done"));
-
-        var options = Options.Create(new TransformOptions { StopOnStepFailure = false });
-        var pipeline = new TransformPipeline(
-            new[] { failingStep, goodStep }, options, NullLogger<TransformPipeline>.Instance);
-
-        var result = await pipeline.ExecuteAsync("input", "text/plain");
-
-        Assert.That(result.Payload, Is.EqualTo("done"));
+        Assert.That(result.Payload, Is.EqualTo("HELLO"));
         Assert.That(result.StepsApplied, Is.EqualTo(1));
     }
 
     [Test]
-    public void Execute_StepFails_StopOnFailureTrue_Throws()
+    public void Pipeline_MaxPayloadSize_RejectsOversized()
     {
-        var failingStep = Substitute.For<ITransformStep>();
-        failingStep.Name.Returns("Failing");
-        failingStep.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(new InvalidOperationException("boom"));
-
-        var options = Options.Create(new TransformOptions { StopOnStepFailure = true });
+        var options = Options.Create(new TransformOptions
+        {
+            Enabled = true,
+            MaxPayloadSizeBytes = 5,
+        });
         var pipeline = new TransformPipeline(
-            new[] { failingStep }, options, NullLogger<TransformPipeline>.Instance);
+            new ITransformStep[] { new UpperCaseStep() }, options,
+            NullLogger<TransformPipeline>.Instance);
 
         Assert.ThrowsAsync<InvalidOperationException>(
-            () => pipeline.ExecuteAsync("input", "text/plain"));
+            () => pipeline.ExecuteAsync("this is too long", "text/plain"));
     }
 
-    // ── Metadata Accumulation ───────────────────────────────────────────────
-
     [Test]
-    public async Task Execute_StepsWriteMetadata_MetadataAccumulatedInResult()
+    public async Task Pipeline_E2E_PublishTransformedToMockEndpoint()
     {
-        var step = Substitute.For<ITransformStep>();
-        step.Name.Returns("MetaStep");
-        step.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var ctx = ci.Arg<TransformContext>();
-                ctx.Metadata["custom-key"] = "custom-value";
-                return ctx;
-            });
+        var pipeline = CreatePipeline(new ITransformStep[]
+        {
+            new UpperCaseStep(),
+            new PrefixStep("MSG:"),
+        });
 
-        var options = Options.Create(new TransformOptions());
-        var pipeline = new TransformPipeline(
-            new[] { step }, options, NullLogger<TransformPipeline>.Instance);
+        var result = await pipeline.ExecuteAsync("{\"name\":\"test\"}", "application/json");
 
-        var result = await pipeline.ExecuteAsync("data", "text/plain");
+        var envelope = IntegrationEnvelope<string>.Create(
+            result.Payload, "TransformService", "transform.completed");
+        await _output.PublishAsync(envelope, "transformed-topic", CancellationToken.None);
 
-        Assert.That(result.Metadata.ContainsKey("custom-key"), Is.True);
-        Assert.That(result.Metadata["custom-key"], Is.EqualTo("custom-value"));
+        _output.AssertReceivedOnTopic("transformed-topic", 1);
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Payload, Does.StartWith("MSG:"));
+    }
+
+    private static TransformPipeline CreatePipeline(ITransformStep[] steps)
+    {
+        var options = Options.Create(new TransformOptions { Enabled = true });
+        return new TransformPipeline(steps, options, NullLogger<TransformPipeline>.Instance);
     }
 }

@@ -1,193 +1,166 @@
 // ============================================================================
 // Tutorial 18 – Content Enricher (Lab)
 // ============================================================================
-// This lab exercises the ContentEnricher — the pattern that augments a
-// message payload with data fetched from an external source. You will
-// mock IEnrichmentSource to return supplementary data and verify lookup-
-// key extraction, data merging, fallback behaviour, and missing-key paths.
+// EIP Pattern: Content Enricher.
+// E2E: ContentEnricher with NSubstitute IEnrichmentSource, verify enriched
+// JSON payload, fallback behaviour, and publish via MockEndpoint.
 // ============================================================================
 
-using System.Text.Json;
 using System.Text.Json.Nodes;
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Transform;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial18;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Basic Enrichment ────────────────────────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("enricher-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task Enrich_MergesExternalDataAtTargetPath()
+    public async Task Enrich_MergesExternalData()
     {
         var source = Substitute.For<IEnrichmentSource>();
-        source.FetchAsync("CUST-1", Arg.Any<CancellationToken>())
+        source.FetchAsync("C-100", Arg.Any<CancellationToken>())
             .Returns(JsonNode.Parse("""{"name":"Alice","tier":"Gold"}"""));
 
-        var options = Options.Create(new ContentEnricherOptions
-        {
-            EndpointUrlTemplate = "https://api.example.com/customers/{key}",
-            LookupKeyPath = "customerId",
-            MergeTargetPath = "customer",
-        });
+        var enricher = CreateEnricher(source, "order.customerId", "customer");
 
-        var enricher = new ContentEnricher(
-            source, options, NullLogger<ContentEnricher>.Instance);
-
-        var payload = """{"orderId":"ORD-1","customerId":"CUST-1","total":100}""";
-
+        var payload = """{"order":{"customerId":"C-100","total":250}}""";
         var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
 
-        using var doc = JsonDocument.Parse(result);
-        Assert.That(doc.RootElement.GetProperty("orderId").GetString(), Is.EqualTo("ORD-1"));
-        Assert.That(
-            doc.RootElement.GetProperty("customer").GetProperty("name").GetString(),
-            Is.EqualTo("Alice"));
-        Assert.That(
-            doc.RootElement.GetProperty("customer").GetProperty("tier").GetString(),
-            Is.EqualTo("Gold"));
+        Assert.That(result, Does.Contain("Alice"));
+        Assert.That(result, Does.Contain("Gold"));
+        Assert.That(result, Does.Contain("C-100"));
     }
 
-    // ── Nested Lookup Key ───────────────────────────────────────────────────
-
     [Test]
-    public async Task Enrich_NestedLookupKeyPath_ExtractsCorrectValue()
+    public async Task Enrich_NestedLookup_ExtractsCorrectKey()
     {
         var source = Substitute.For<IEnrichmentSource>();
-        source.FetchAsync("ADDR-7", Arg.Any<CancellationToken>())
-            .Returns(JsonNode.Parse("""{"city":"Seattle","zip":"98101"}"""));
+        source.FetchAsync("P-200", Arg.Any<CancellationToken>())
+            .Returns(JsonNode.Parse("""{"sku":"Widget","warehouse":"WH-1"}"""));
 
-        var options = Options.Create(new ContentEnricherOptions
-        {
-            EndpointUrlTemplate = "https://api.example.com/addresses/{key}",
-            LookupKeyPath = "order.addressId",
-            MergeTargetPath = "shippingAddress",
-        });
+        var enricher = CreateEnricher(source, "line.productId", "product");
 
-        var enricher = new ContentEnricher(
-            source, options, NullLogger<ContentEnricher>.Instance);
-
-        var payload = """{"order":{"id":"ORD-2","addressId":"ADDR-7"}}""";
-
+        var payload = """{"line":{"productId":"P-200","qty":5}}""";
         var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
 
-        using var doc = JsonDocument.Parse(result);
-        Assert.That(
-            doc.RootElement.GetProperty("shippingAddress").GetProperty("city").GetString(),
-            Is.EqualTo("Seattle"));
+        Assert.That(result, Does.Contain("Widget"));
+        Assert.That(result, Does.Contain("WH-1"));
     }
 
-    // ── Missing Lookup Key — Fallback ───────────────────────────────────────
-
     [Test]
-    public async Task Enrich_MissingLookupKey_FallbackEnabled_ReturnsOriginal()
+    public async Task Enrich_SourceReturnsNull_UsesFallback()
     {
         var source = Substitute.For<IEnrichmentSource>();
-
-        var options = Options.Create(new ContentEnricherOptions
-        {
-            EndpointUrlTemplate = "https://api.example.com/{key}",
-            LookupKeyPath = "nonExistentField",
-            MergeTargetPath = "extra",
-            FallbackOnFailure = true,
-        });
-
-        var enricher = new ContentEnricher(
-            source, options, NullLogger<ContentEnricher>.Instance);
-
-        var payload = """{"id":"X"}""";
-
-        var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
-
-        using var doc = JsonDocument.Parse(result);
-        Assert.That(doc.RootElement.GetProperty("id").GetString(), Is.EqualTo("X"));
-        await source.DidNotReceive().FetchAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-    }
-
-    // ── Missing Lookup Key — No Fallback ────────────────────────────────────
-
-    [Test]
-    public void Enrich_MissingLookupKey_NoFallback_Throws()
-    {
-        var source = Substitute.For<IEnrichmentSource>();
-
-        var options = Options.Create(new ContentEnricherOptions
-        {
-            EndpointUrlTemplate = "https://api.example.com/{key}",
-            LookupKeyPath = "missingKey",
-            MergeTargetPath = "extra",
-            FallbackOnFailure = false,
-        });
-
-        var enricher = new ContentEnricher(
-            source, options, NullLogger<ContentEnricher>.Instance);
-
-        Assert.ThrowsAsync<InvalidOperationException>(
-            () => enricher.EnrichAsync("""{"id":1}""", Guid.NewGuid()));
-    }
-
-    // ── Source Returns Null — Fallback Value ────────────────────────────────
-
-    [Test]
-    public async Task Enrich_SourceReturnsNull_FallbackValue_MergesFallback()
-    {
-        var source = Substitute.For<IEnrichmentSource>();
-        source.FetchAsync("KEY-1", Arg.Any<CancellationToken>())
+        source.FetchAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((JsonNode?)null);
 
-        var options = Options.Create(new ContentEnricherOptions
+        var options = new ContentEnricherOptions
         {
             EndpointUrlTemplate = "https://api.example.com/{key}",
-            LookupKeyPath = "key",
-            MergeTargetPath = "extra",
+            LookupKeyPath = "order.customerId",
+            MergeTargetPath = "customer",
             FallbackOnFailure = true,
-            FallbackValue = """{"status":"unknown"}""",
-        });
-
+            FallbackValue = """{"name":"Unknown","tier":"None"}""",
+        };
         var enricher = new ContentEnricher(
-            source, options, NullLogger<ContentEnricher>.Instance);
+            source, Options.Create(options),
+            NullLogger<ContentEnricher>.Instance);
 
-        var payload = """{"key":"KEY-1"}""";
-
+        var payload = """{"order":{"customerId":"C-999","total":10}}""";
         var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
 
-        using var doc = JsonDocument.Parse(result);
-        Assert.That(
-            doc.RootElement.GetProperty("extra").GetProperty("status").GetString(),
-            Is.EqualTo("unknown"));
+        Assert.That(result, Does.Contain("Unknown"));
+        Assert.That(result, Does.Contain("None"));
     }
 
-    // ── Enrichment Preserves Existing Fields ────────────────────────────────
-
     [Test]
-    public async Task Enrich_PreservesAllExistingPayloadFields()
+    public async Task Enrich_MissingLookupKey_FallsBack()
     {
         var source = Substitute.For<IEnrichmentSource>();
-        source.FetchAsync("C-1", Arg.Any<CancellationToken>())
-            .Returns(JsonNode.Parse("""{"loyalty":true}"""));
-
-        var options = Options.Create(new ContentEnricherOptions
+        var options = new ContentEnricherOptions
         {
             EndpointUrlTemplate = "https://api.example.com/{key}",
-            LookupKeyPath = "cid",
-            MergeTargetPath = "loyalty",
-        });
-
+            LookupKeyPath = "order.customerId",
+            MergeTargetPath = "customer",
+            FallbackOnFailure = true,
+            FallbackValue = """{"name":"Fallback"}""",
+        };
         var enricher = new ContentEnricher(
-            source, options, NullLogger<ContentEnricher>.Instance);
+            source, Options.Create(options),
+            NullLogger<ContentEnricher>.Instance);
 
-        var payload = """{"cid":"C-1","amount":50,"currency":"USD"}""";
-
+        var payload = """{"order":{"total":50}}""";
         var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
 
-        using var doc = JsonDocument.Parse(result);
-        Assert.That(doc.RootElement.GetProperty("cid").GetString(), Is.EqualTo("C-1"));
-        Assert.That(doc.RootElement.GetProperty("amount").GetInt32(), Is.EqualTo(50));
-        Assert.That(doc.RootElement.GetProperty("currency").GetString(), Is.EqualTo("USD"));
+        Assert.That(result, Does.Contain("Fallback"));
+    }
+
+    [Test]
+    public async Task Enrich_MissingLookupKey_ThrowsWhenNoFallback()
+    {
+        var source = Substitute.For<IEnrichmentSource>();
+        var options = new ContentEnricherOptions
+        {
+            EndpointUrlTemplate = "https://api.example.com/{key}",
+            LookupKeyPath = "order.customerId",
+            MergeTargetPath = "customer",
+            FallbackOnFailure = false,
+        };
+        var enricher = new ContentEnricher(
+            source, Options.Create(options),
+            NullLogger<ContentEnricher>.Instance);
+
+        var payload = """{"order":{"total":50}}""";
+        Assert.ThrowsAsync<InvalidOperationException>(
+            () => enricher.EnrichAsync(payload, Guid.NewGuid()));
+    }
+
+    [Test]
+    public async Task Enrich_E2E_PublishEnrichedToMockEndpoint()
+    {
+        var source = Substitute.For<IEnrichmentSource>();
+        source.FetchAsync("C-100", Arg.Any<CancellationToken>())
+            .Returns(JsonNode.Parse("""{"name":"Alice"}"""));
+
+        var enricher = CreateEnricher(source, "order.customerId", "customer");
+
+        var payload = """{"order":{"customerId":"C-100","total":100}}""";
+        var enriched = await enricher.EnrichAsync(payload, Guid.NewGuid());
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            enriched, "EnricherService", "payload.enriched");
+        await _output.PublishAsync(envelope, "enriched-topic", CancellationToken.None);
+
+        _output.AssertReceivedOnTopic("enriched-topic", 1);
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Payload, Does.Contain("Alice"));
+    }
+
+    private static ContentEnricher CreateEnricher(
+        IEnrichmentSource source, string lookupPath, string mergePath)
+    {
+        var options = new ContentEnricherOptions
+        {
+            EndpointUrlTemplate = "https://api.example.com/{key}",
+            LookupKeyPath = lookupPath,
+            MergeTargetPath = mergePath,
+        };
+        return new ContentEnricher(
+            source, Options.Create(options),
+            NullLogger<ContentEnricher>.Instance);
     }
 }

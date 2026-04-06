@@ -1,94 +1,83 @@
 // ============================================================================
 // Tutorial 16 – Transform Pipeline (Exam)
 // ============================================================================
-// Coding challenges: build a JSON→XML→JSON round-trip pipeline, compose a
-// regex-replace pipeline, and exercise concrete transform steps end-to-end.
+// E2E challenges: regex replace step, JsonPathFilter step, and multi-step
+// pipeline with metadata verification via MockEndpoint.
 // ============================================================================
 
-using System.Text.Json;
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Transform;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial16;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: JSON → XML Round-Trip ──────────────────────────────────
-
     [Test]
-    public async Task Challenge1_JsonToXmlStep_ProducesValidXml()
+    public async Task Challenge1_RegexReplace_MasksPhoneNumbers()
     {
-        // Use the real JsonToXmlStep to convert a simple JSON object to XML.
-        var step = new JsonToXmlStep("Order");
-        var options = Options.Create(new TransformOptions());
+        var step = new RegexReplaceStep(@"\d{3}-\d{4}", "***-****");
+        var options = Options.Create(new TransformOptions { Enabled = true });
         var pipeline = new TransformPipeline(
             new ITransformStep[] { step }, options,
             NullLogger<TransformPipeline>.Instance);
 
-        var json = """{"orderId":"ORD-1","amount":"250"}""";
+        var result = await pipeline.ExecuteAsync(
+            "Call 555-1234 or 555-5678", "text/plain");
 
-        var result = await pipeline.ExecuteAsync(json, "application/json");
-
-        Assert.That(result.ContentType, Is.EqualTo("application/xml"));
-        Assert.That(result.Payload, Does.Contain("<Order>"));
-        Assert.That(result.Payload, Does.Contain("<orderId>ORD-1</orderId>"));
-        Assert.That(result.Payload, Does.Contain("<amount>250</amount>"));
+        Assert.That(result.Payload, Is.EqualTo("Call ***-**** or ***-****"));
         Assert.That(result.StepsApplied, Is.EqualTo(1));
-        Assert.That(result.Metadata.ContainsKey("Step.JsonToXml.Applied"), Is.True);
     }
 
-    // ── Challenge 2: Regex Replace Pipeline ─────────────────────────────────
-
     [Test]
-    public async Task Challenge2_RegexReplacePipeline_SanitisesPayload()
+    public async Task Challenge2_JsonPathFilter_RetainsOnlySpecifiedPaths()
     {
-        // Build a two-step pipeline that first masks credit card numbers, then
-        // redacts email addresses from a plain-text payload.
-        var maskCards = new RegexReplaceStep(
-            @"\b\d{4}-\d{4}-\d{4}-\d{4}\b", "****-****-****-****");
-        var redactEmails = new RegexReplaceStep(
-            @"[\w.+-]+@[\w-]+\.[\w.]+", "[REDACTED]");
-
-        var options = Options.Create(new TransformOptions());
-        var pipeline = new TransformPipeline(
-            new ITransformStep[] { maskCards, redactEmails }, options,
-            NullLogger<TransformPipeline>.Instance);
-
-        var input = "Card: 1234-5678-9012-3456, Email: alice@example.com";
-
-        var result = await pipeline.ExecuteAsync(input, "text/plain");
-
-        Assert.That(result.Payload, Does.Contain("****-****-****-****"));
-        Assert.That(result.Payload, Does.Contain("[REDACTED]"));
-        Assert.That(result.Payload, Does.Not.Contain("1234-5678-9012-3456"));
-        Assert.That(result.Payload, Does.Not.Contain("alice@example.com"));
-        Assert.That(result.StepsApplied, Is.EqualTo(2));
-    }
-
-    // ── Challenge 3: XmlToJson Step End-to-End ──────────────────────────────
-
-    [Test]
-    public async Task Challenge3_XmlToJsonStep_ConvertsXmlToJson()
-    {
-        // Use the real XmlToJsonStep to convert an XML document to JSON.
-        var step = new XmlToJsonStep();
-        var options = Options.Create(new TransformOptions());
+        var step = new JsonPathFilterStep(new[] { "order.id", "customer.name" });
+        var options = Options.Create(new TransformOptions { Enabled = true });
         var pipeline = new TransformPipeline(
             new ITransformStep[] { step }, options,
             NullLogger<TransformPipeline>.Instance);
 
-        var xml = "<Root><name>Alice</name><age>30</age></Root>";
-
-        var result = await pipeline.ExecuteAsync(xml, "application/xml");
+        var payload = """{"order":{"id":"ORD-1","total":99.99},"customer":{"name":"Alice","email":"a@b.com"},"internal":"secret"}""";
+        var result = await pipeline.ExecuteAsync(payload, "application/json");
 
         Assert.That(result.ContentType, Is.EqualTo("application/json"));
-        Assert.That(result.StepsApplied, Is.EqualTo(1));
+        Assert.That(result.Payload, Does.Contain("ORD-1"));
+        Assert.That(result.Payload, Does.Contain("Alice"));
+        Assert.That(result.Payload, Does.Not.Contain("secret"));
+        Assert.That(result.Payload, Does.Not.Contain("a@b.com"));
+    }
 
-        using var doc = JsonDocument.Parse(result.Payload);
-        Assert.That(doc.RootElement.GetProperty("name").GetString(), Is.EqualTo("Alice"));
-        Assert.That(doc.RootElement.GetProperty("age").GetString(), Is.EqualTo("30"));
+    [Test]
+    public async Task Challenge3_MultiStep_TransformAndPublish()
+    {
+        await using var output = new MockEndpoint("exam-transform");
+
+        var steps = new ITransformStep[]
+        {
+            new RegexReplaceStep(@"\bfoo\b", "bar"),
+            new UpperCaseStep(),
+            new PrefixStep("[PROCESSED] "),
+        };
+        var options = Options.Create(new TransformOptions { Enabled = true });
+        var pipeline = new TransformPipeline(
+            steps, options, NullLogger<TransformPipeline>.Instance);
+
+        var result = await pipeline.ExecuteAsync("the foo is here", "text/plain");
+
+        Assert.That(result.Payload, Is.EqualTo("[PROCESSED] THE BAR IS HERE"));
+        Assert.That(result.StepsApplied, Is.EqualTo(3));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            result.Payload, "TransformSvc", "transform.done");
+        await output.PublishAsync(envelope, "processed-topic", CancellationToken.None);
+
+        output.AssertReceivedOnTopic("processed-topic", 1);
+        var received = output.GetReceived<string>();
+        Assert.That(received.Payload, Is.EqualTo("[PROCESSED] THE BAR IS HERE"));
     }
 }

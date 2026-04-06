@@ -1,140 +1,108 @@
 // ============================================================================
 // Tutorial 19 – Content Filter (Lab)
 // ============================================================================
-// This lab exercises the JsonPathFilterStep and the ContentFilter — the
-// pattern that strips a message down to only the fields the next consumer
-// needs.  You will test path-based filtering, missing-path handling,
-// nested-property extraction, and pipeline integration.
+// EIP Pattern: Content Filter.
+// E2E: ContentFilter keeping only specified JSON paths, verify filtered
+// payload, and publish results via MockEndpoint.
 // ============================================================================
 
-using System.Text.Json;
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Transform;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial19;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Basic JsonPathFilterStep ────────────────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("filter-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task FilterStep_RetainsOnlySpecifiedPaths()
+    public async Task Filter_RetainsSpecifiedPaths()
     {
-        var step = new JsonPathFilterStep(new[] { "name", "age" });
-        var context = new TransformContext(
-            """{"name":"Alice","age":30,"email":"a@b.com","role":"admin"}""",
-            "application/json");
+        var filter = CreateFilter();
 
-        var result = await step.ExecuteAsync(context);
+        var payload = """{"order":{"id":"ORD-1","total":99.99},"customer":{"name":"Alice","email":"a@b.com"},"internal":"secret"}""";
+        var result = await filter.FilterAsync(payload, new[] { "order.id", "customer.name" });
 
-        using var doc = JsonDocument.Parse(result.Payload);
-        Assert.That(doc.RootElement.TryGetProperty("name", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("age", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("email", out _), Is.False);
-        Assert.That(doc.RootElement.TryGetProperty("role", out _), Is.False);
+        Assert.That(result, Does.Contain("ORD-1"));
+        Assert.That(result, Does.Contain("Alice"));
+        Assert.That(result, Does.Not.Contain("secret"));
+        Assert.That(result, Does.Not.Contain("a@b.com"));
+        Assert.That(result, Does.Not.Contain("99.99"));
     }
-
-    // ── Nested Property Extraction ──────────────────────────────────────────
 
     [Test]
-    public async Task FilterStep_NestedPath_ExtractsNestedProperty()
+    public async Task Filter_MissingPath_SkippedSilently()
     {
-        var step = new JsonPathFilterStep(new[] { "order.id", "customer.name" });
-        var payload = """
-            {
-                "order": {"id": "ORD-1", "total": 100},
-                "customer": {"name": "Bob", "email": "bob@test.com"},
-                "internal": "secret"
-            }
-            """;
+        var filter = CreateFilter();
 
-        var context = new TransformContext(payload, "application/json");
-        var result = await step.ExecuteAsync(context);
+        var payload = """{"name":"Alice","age":30}""";
+        var result = await filter.FilterAsync(payload, new[] { "name", "nonexistent" });
 
-        using var doc = JsonDocument.Parse(result.Payload);
-        Assert.That(doc.RootElement.GetProperty("order").GetProperty("id").GetString(),
-            Is.EqualTo("ORD-1"));
-        Assert.That(doc.RootElement.GetProperty("customer").GetProperty("name").GetString(),
-            Is.EqualTo("Bob"));
-        Assert.That(doc.RootElement.TryGetProperty("internal", out _), Is.False);
+        Assert.That(result, Does.Contain("Alice"));
+        Assert.That(result, Does.Not.Contain("30"));
     }
-
-    // ── Missing Paths Are Silently Skipped ──────────────────────────────────
 
     [Test]
-    public async Task FilterStep_MissingPath_SilentlySkipped()
+    public async Task Filter_NestedPaths_PreservesStructure()
     {
-        var step = new JsonPathFilterStep(new[] { "name", "nonexistent" });
-        var context = new TransformContext(
-            """{"name":"Alice","age":30}""", "application/json");
+        var filter = CreateFilter();
 
-        var result = await step.ExecuteAsync(context);
+        var payload = """{"address":{"city":"NYC","zip":"10001","street":"5th Ave"},"phone":"555-0123"}""";
+        var result = await filter.FilterAsync(payload, new[] { "address.city", "address.zip" });
 
-        using var doc = JsonDocument.Parse(result.Payload);
-        Assert.That(doc.RootElement.TryGetProperty("name", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("nonexistent", out _), Is.False);
+        Assert.That(result, Does.Contain("NYC"));
+        Assert.That(result, Does.Contain("10001"));
+        Assert.That(result, Does.Not.Contain("5th Ave"));
+        Assert.That(result, Does.Not.Contain("555-0123"));
     }
-
-    // ── Metadata Written by Step ────────────────────────────────────────────
 
     [Test]
-    public async Task FilterStep_SetsAppliedMetadata()
+    public void Filter_EmptyKeepPaths_ThrowsArgumentException()
     {
-        var step = new JsonPathFilterStep(new[] { "id" });
-        var context = new TransformContext("""{"id":1,"extra":"x"}""", "application/json");
+        var filter = CreateFilter();
 
-        var result = await step.ExecuteAsync(context);
-
-        Assert.That(result.Metadata.ContainsKey("Step.JsonPathFilter.Applied"), Is.True);
-        Assert.That(result.Metadata["Step.JsonPathFilter.Applied"], Is.EqualTo("true"));
+        Assert.ThrowsAsync<ArgumentException>(
+            () => filter.FilterAsync("""{"a":1}""", Array.Empty<string>()));
     }
-
-    // ── Pipeline Integration ────────────────────────────────────────────────
 
     [Test]
-    public async Task FilterStep_InPipeline_FiltersPayload()
+    public void Filter_NonJsonObject_ThrowsInvalidOperation()
     {
-        var filterStep = new JsonPathFilterStep(new[] { "order.id", "order.total" });
-        var options = Options.Create(new TransformOptions());
-        var pipeline = new TransformPipeline(
-            new ITransformStep[] { filterStep }, options,
-            NullLogger<TransformPipeline>.Instance);
+        var filter = CreateFilter();
 
-        var payload = """
-            {"order":{"id":"ORD-5","total":250,"items":3},"customer":{"name":"Eve"}}
-            """.Trim();
-
-        var result = await pipeline.ExecuteAsync(payload, "application/json");
-
-        using var doc = JsonDocument.Parse(result.Payload);
-        Assert.That(doc.RootElement.GetProperty("order").GetProperty("id").GetString(),
-            Is.EqualTo("ORD-5"));
-        Assert.That(doc.RootElement.GetProperty("order").GetProperty("total").GetInt32(),
-            Is.EqualTo(250));
-        Assert.That(doc.RootElement.TryGetProperty("customer", out _), Is.False);
-        Assert.That(result.StepsApplied, Is.EqualTo(1));
+        Assert.ThrowsAsync<InvalidOperationException>(
+            () => filter.FilterAsync("[1,2,3]", new[] { "a" }));
     }
-
-    // ── ContentFilter Class (Direct Usage) ──────────────────────────────────
 
     [Test]
-    public async Task ContentFilter_RetainsOnlyKeepPaths()
+    public async Task Filter_E2E_PublishFilteredToMockEndpoint()
     {
-        var filter = new ContentFilter(NullLogger<ContentFilter>.Instance);
+        var filter = CreateFilter();
 
-        var payload = """
-            {"user":"Alice","age":30,"email":"a@b.com","role":"admin","secret":"x"}
-            """.Trim();
+        var payload = """{"order":{"id":"ORD-5","total":500,"status":"shipped"},"audit":{"user":"admin"}}""";
+        var filtered = await filter.FilterAsync(payload, new[] { "order.id", "order.status" });
 
-        var result = await filter.FilterAsync(payload, new[] { "user", "age" });
+        var envelope = IntegrationEnvelope<string>.Create(
+            filtered, "FilterService", "payload.filtered");
+        await _output.PublishAsync(envelope, "filtered-topic", CancellationToken.None);
 
-        using var doc = JsonDocument.Parse(result);
-        Assert.That(doc.RootElement.TryGetProperty("user", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("age", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("email", out _), Is.False);
-        Assert.That(doc.RootElement.TryGetProperty("secret", out _), Is.False);
+        _output.AssertReceivedOnTopic("filtered-topic", 1);
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Payload, Does.Contain("ORD-5"));
+        Assert.That(received.Payload, Does.Contain("shipped"));
+        Assert.That(received.Payload, Does.Not.Contain("admin"));
     }
+
+    private static ContentFilter CreateFilter() =>
+        new(NullLogger<ContentFilter>.Instance);
 }

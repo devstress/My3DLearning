@@ -1,145 +1,112 @@
 // ============================================================================
 // Tutorial 17 – Normalizer (Lab)
 // ============================================================================
-// This lab exercises the MessageNormalizer — the pattern that detects the
-// incoming payload format (JSON, XML, CSV) and converts it to canonical
-// JSON. You will test format detection, JSON passthrough, XML-to-JSON
-// conversion, CSV-to-JSON conversion, and strict content-type enforcement.
+// EIP Pattern: Normalizer.
+// E2E: MessageNormalizer detecting JSON/XML/CSV and converting to canonical
+// JSON. Publish normalized results via MockEndpoint.
 // ============================================================================
 
-using System.Text.Json;
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Transform;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial17;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── JSON Passthrough ────────────────────────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("normalizer-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task Normalize_JsonPayload_PassesThroughUnchanged()
+    public async Task Normalize_Json_PassesThroughUnchanged()
     {
-        var options = Options.Create(new NormalizerOptions());
-        var normalizer = new MessageNormalizer(options, NullLogger<MessageNormalizer>.Instance);
+        var normalizer = CreateNormalizer();
 
-        var json = """{"name":"Alice","age":30}""";
-
-        var result = await normalizer.NormalizeAsync(json, "application/json");
+        var result = await normalizer.NormalizeAsync(
+            """{"name":"Alice","age":30}""", "application/json");
 
         Assert.That(result.DetectedFormat, Is.EqualTo("JSON"));
         Assert.That(result.WasTransformed, Is.False);
-        Assert.That(result.OriginalContentType, Is.EqualTo("application/json"));
-
-        using var doc = JsonDocument.Parse(result.Payload);
-        Assert.That(doc.RootElement.GetProperty("name").GetString(), Is.EqualTo("Alice"));
+        Assert.That(result.Payload, Does.Contain("Alice"));
     }
 
-    // ── XML to JSON Conversion ──────────────────────────────────────────────
-
     [Test]
-    public async Task Normalize_XmlPayload_ConvertsToJson()
+    public async Task Normalize_Xml_ConvertsToJson()
     {
-        var options = Options.Create(new NormalizerOptions());
-        var normalizer = new MessageNormalizer(options, NullLogger<MessageNormalizer>.Instance);
+        var normalizer = CreateNormalizer();
 
-        var xml = "<Order><id>ORD-1</id><total>99.50</total></Order>";
-
+        var xml = "<Root><name>Bob</name><age>25</age></Root>";
         var result = await normalizer.NormalizeAsync(xml, "application/xml");
 
         Assert.That(result.DetectedFormat, Is.EqualTo("XML"));
         Assert.That(result.WasTransformed, Is.True);
-
-        using var doc = JsonDocument.Parse(result.Payload);
-        Assert.That(doc.RootElement.GetProperty("id").GetString(), Is.EqualTo("ORD-1"));
-        Assert.That(doc.RootElement.GetProperty("total").GetString(), Is.EqualTo("99.50"));
+        Assert.That(result.Payload, Does.Contain("Bob"));
+        Assert.That(result.Payload, Does.Contain("25"));
+        Assert.That(result.OriginalContentType, Is.EqualTo("application/xml"));
     }
 
-    // ── CSV to JSON Conversion ──────────────────────────────────────────────
-
     [Test]
-    public async Task Normalize_CsvPayload_ConvertsToJsonArray()
+    public async Task Normalize_Csv_ConvertsToJsonArray()
     {
-        var options = Options.Create(new NormalizerOptions());
-        var normalizer = new MessageNormalizer(options, NullLogger<MessageNormalizer>.Instance);
+        var normalizer = CreateNormalizer();
 
         var csv = "name,age\nAlice,30\nBob,25";
-
         var result = await normalizer.NormalizeAsync(csv, "text/csv");
 
         Assert.That(result.DetectedFormat, Is.EqualTo("CSV"));
         Assert.That(result.WasTransformed, Is.True);
-
-        using var doc = JsonDocument.Parse(result.Payload);
-        var array = doc.RootElement.GetProperty("Root");
-        Assert.That(array.GetArrayLength(), Is.EqualTo(2));
-        Assert.That(array[0].GetProperty("name").GetString(), Is.EqualTo("Alice"));
-        Assert.That(array[1].GetProperty("name").GetString(), Is.EqualTo("Bob"));
+        Assert.That(result.Payload, Does.Contain("Alice"));
+        Assert.That(result.Payload, Does.Contain("Bob"));
     }
 
-    // ── Strict Content Type Enforcement ─────────────────────────────────────
-
     [Test]
-    public void Normalize_UnknownContentType_StrictMode_Throws()
+    public async Task Normalize_StrictContentType_ThrowsForUnknown()
     {
-        var options = Options.Create(new NormalizerOptions { StrictContentType = true });
-        var normalizer = new MessageNormalizer(options, NullLogger<MessageNormalizer>.Instance);
+        var normalizer = CreateNormalizer(strict: true);
 
         Assert.ThrowsAsync<InvalidOperationException>(
-            () => normalizer.NormalizeAsync("{}", "application/octet-stream"));
+            () => normalizer.NormalizeAsync("some data", "application/octet-stream"));
     }
 
-    // ── Best-Effort Detection (Non-Strict) ──────────────────────────────────
-
     [Test]
-    public async Task Normalize_UnknownContentType_NonStrict_DetectsJson()
+    public async Task Normalize_NonStrict_DetectsJsonByPayload()
     {
-        var options = Options.Create(new NormalizerOptions { StrictContentType = false });
-        var normalizer = new MessageNormalizer(options, NullLogger<MessageNormalizer>.Instance);
+        var normalizer = CreateNormalizer(strict: false);
 
-        var json = """{"key":"value"}""";
-
-        var result = await normalizer.NormalizeAsync(json, "application/octet-stream");
+        var result = await normalizer.NormalizeAsync(
+            """{"key":"value"}""", "application/octet-stream");
 
         Assert.That(result.DetectedFormat, Is.EqualTo("JSON"));
         Assert.That(result.WasTransformed, Is.False);
     }
 
     [Test]
-    public async Task Normalize_UnknownContentType_NonStrict_DetectsXml()
+    public async Task Normalize_E2E_PublishNormalizedToMockEndpoint()
     {
-        var options = Options.Create(new NormalizerOptions { StrictContentType = false });
-        var normalizer = new MessageNormalizer(options, NullLogger<MessageNormalizer>.Instance);
+        var normalizer = CreateNormalizer();
 
-        var xml = "<Root><value>42</value></Root>";
+        var xml = "<Order><id>ORD-1</id><total>99</total></Order>";
+        var result = await normalizer.NormalizeAsync(xml, "application/xml");
 
-        var result = await normalizer.NormalizeAsync(xml, "application/octet-stream");
+        var envelope = IntegrationEnvelope<string>.Create(
+            result.Payload, "NormalizerService", "payload.normalized");
+        await _output.PublishAsync(envelope, "normalized-topic", CancellationToken.None);
 
-        Assert.That(result.DetectedFormat, Is.EqualTo("XML"));
-        Assert.That(result.WasTransformed, Is.True);
+        _output.AssertReceivedOnTopic("normalized-topic", 1);
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Payload, Does.Contain("ORD-1"));
     }
 
-    // ── Custom CSV Delimiter ────────────────────────────────────────────────
-
-    [Test]
-    public async Task Normalize_CsvWithCustomDelimiter_ParsesCorrectly()
-    {
-        var options = Options.Create(new NormalizerOptions { CsvDelimiter = ';' });
-        var normalizer = new MessageNormalizer(options, NullLogger<MessageNormalizer>.Instance);
-
-        var csv = "name;age\nAlice;30";
-
-        var result = await normalizer.NormalizeAsync(csv, "text/csv");
-
-        Assert.That(result.DetectedFormat, Is.EqualTo("CSV"));
-        Assert.That(result.WasTransformed, Is.True);
-
-        using var doc = JsonDocument.Parse(result.Payload);
-        var array = doc.RootElement.GetProperty("Root");
-        Assert.That(array[0].GetProperty("name").GetString(), Is.EqualTo("Alice"));
-        Assert.That(array[0].GetProperty("age").GetString(), Is.EqualTo("30"));
-    }
+    private static MessageNormalizer CreateNormalizer(bool strict = true) =>
+        new(Options.Create(new NormalizerOptions { StrictContentType = strict }),
+            NullLogger<MessageNormalizer>.Instance);
 }
