@@ -47,10 +47,10 @@
 
 | Chunk | Scope | Status |
 |-------|-------|--------|
-| 093 | Tutorial 11-15 Lab.cs + Exam.cs (DynamicRouter, RecipientList, RoutingSlip, ProcessManager, MessageTranslator) | not-started |
-| 094 | Tutorial 16-20 Lab.cs + Exam.cs (TransformPipeline, Normalizer, ContentEnricher, ContentFilter, Splitter) | not-started |
-| 095 | Tutorial 21-25 Lab.cs + Exam.cs (Aggregator, ScatterGather, RequestReply, RetryFramework, DeadLetterQueue) | not-started |
-| 096 | Tutorial 26-30 Lab.cs + Exam.cs (MessageReplay, Resequencer, CompetingConsumers, Throttle, RuleEngine) | not-started |
+| 093 | Tutorial 11-15 Lab.cs + Exam.cs (DynamicRouter, RecipientList, RoutingSlip, ProcessManager, MessageTranslator) | done |
+| 094 | Tutorial 16-20 Lab.cs + Exam.cs (TransformPipeline, Normalizer, ContentEnricher, ContentFilter, Splitter) | done |
+| 095 | Tutorial 21-25 Lab.cs + Exam.cs (Aggregator, ScatterGather, RequestReply, RetryFramework, DeadLetterQueue) | done |
+| 096 | Tutorial 26-30 Lab.cs + Exam.cs (MessageReplay, Resequencer, CompetingConsumers, Throttle, RuleEngine) | done |
 | 097 | Tutorial 31-35 Lab.cs + Exam.cs (EventSourcing, MultiTenancy, Security, ConnectorHttp, ConnectorSftp) | not-started |
 | 098 | Tutorial 36-40 Lab.cs + Exam.cs (ConnectorEmail, ConnectorFile, OpenTelemetry, MessageLifecycle, RagOllama) | not-started |
 | 099 | Tutorial 41-45 Lab.cs + Exam.cs (OpenClawWeb, Configuration, KubernetesDeployment, DisasterRecovery, PerformanceProfiling) | not-started |
@@ -58,7 +58,7 @@
 | 101 | Update all 50 tutorial .md files — replace MCQ Exam sections with "See coding exam" pointers, update Lab sections to reference TutorialLabs | not-started |
 | 102 | Update tutorials/README.md — document new coding-only format and TutorialLabs project | not-started |
 
-**Next chunk:** 093
+**Next chunk:** 097
 
 ---
 
