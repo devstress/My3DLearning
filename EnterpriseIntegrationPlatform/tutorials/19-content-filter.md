@@ -1,34 +1,10 @@
 # Tutorial 19 — Content Filter
 
-## What You'll Learn
-
-- The EIP Content Filter pattern for removing unwanted fields
-- How `IContentFilter` / `ContentFilter` strips payloads via JSONPath
-- The keep-paths approach: specify what to retain, everything else is removed
-- Why smaller payloads improve downstream performance and security
-- The complementary relationship with the Content Enricher
+Strip payloads down to only the fields downstream consumers need using `IContentFilter` and `JsonPathFilterStep`.
 
 ---
 
-## EIP Pattern: Content Filter
-
-> *"Use a Content Filter to remove unimportant data items from a message, leaving only the items that are important."*
-> — Gregor Hohpe & Bobby Woolf, *Enterprise Integration Patterns*
-
-```
-  ┌──────────────────┐    ┌────────────────┐    ┌───────────────┐
-  │ Full Payload     │───▶│ Content Filter │───▶│ Slim Payload  │
-  │ (20 fields)      │    │ (keepPaths)    │    │ (3 fields)    │
-  └──────────────────┘    └────────────────┘    └───────────────┘
-```
-
-The Content Filter is the inverse of the Content Enricher. Instead of adding data, it **removes everything except** the specified fields. This produces smaller, focused payloads for downstream consumers that only need a subset of the data.
-
----
-
-## Platform Implementation
-
-### IContentFilter
+## Key Types
 
 ```csharp
 // src/Processing.Transform/IContentFilter.cs
@@ -41,41 +17,117 @@ public interface IContentFilter
 }
 ```
 
-### ContentFilter (concrete)
-
-The `ContentFilter` class:
-1. Parses the incoming JSON payload
-2. Evaluates each `keepPaths` entry as a dot-separated property path (e.g. `order.id`, `customer.address.city`)
-3. Builds a new JSON document containing **only** the specified paths
-4. Paths that don't exist in the payload are silently ignored
-5. Returns the filtered JSON string
-
-### Example
-
+```csharp
+// src/Processing.Transform/JsonPathFilterStep.cs  (implements ITransformStep)
+public class JsonPathFilterStep : ITransformStep
+{
+    public JsonPathFilterStep(IEnumerable<string> keepPaths);
+    public string Name => "JsonPathFilter";
+    public Task<TransformContext> ExecuteAsync(
+        TransformContext context,
+        CancellationToken cancellationToken = default);
+}
 ```
-Input:    { "order": { "id": 1, "total": 99.50, "notes": "..." },
-            "customer": { "name": "Alice", "ssn": "123-45-6789" },
-            "internal": { "debugTrace": "..." } }
-
-keepPaths: ["order.id", "order.total", "customer.name"]
-
-Output:   { "order": { "id": 1, "total": 99.50 },
-            "customer": { "name": "Alice" } }
-```
-
-Notice that `customer.ssn` and `internal.debugTrace` are stripped — this is important for **data minimisation** and **security**.
 
 ---
 
-## Scalability Dimension
+## Exercises
 
-The content filter is **stateless and CPU-light** — JSON parsing and selective copying are fast operations. It scales horizontally without limitation. Filtering *reduces* payload size, which **decreases** downstream broker storage, network bandwidth, and consumer memory usage. In high-throughput pipelines, filtering early in the chain has a multiplier effect on overall system capacity.
+### Exercise 1: Retain only specified top-level paths
 
----
+```csharp
+var step = new JsonPathFilterStep(new[] { "name", "age" });
+var context = new TransformContext(
+    """{"name":"Alice","age":30,"email":"a@b.com","role":"admin"}""",
+    "application/json");
 
-## Atomicity Dimension
+var result = await step.ExecuteAsync(context);
 
-Filtering is a **pure, deterministic function** — the same input and keep-paths always produce the same output. This makes it fully idempotent and safe for retries. The filtered message is published before the source is Acked. If any step fails, the source message is Nacked and redelivered. Since filtering never adds data, there is no risk of inconsistency between retries.
+using var doc = JsonDocument.Parse(result.Payload);
+Assert.That(doc.RootElement.TryGetProperty("name", out _), Is.True);
+Assert.That(doc.RootElement.TryGetProperty("age", out _), Is.True);
+Assert.That(doc.RootElement.TryGetProperty("email", out _), Is.False);
+Assert.That(doc.RootElement.TryGetProperty("role", out _), Is.False);
+```
+
+### Exercise 2: Extract nested properties
+
+```csharp
+var step = new JsonPathFilterStep(new[] { "order.id", "customer.name" });
+var payload = """
+    {
+        "order": {"id": "ORD-1", "total": 100},
+        "customer": {"name": "Bob", "email": "bob@test.com"},
+        "internal": "secret"
+    }
+    """;
+
+var context = new TransformContext(payload, "application/json");
+var result = await step.ExecuteAsync(context);
+
+using var doc = JsonDocument.Parse(result.Payload);
+Assert.That(doc.RootElement.GetProperty("order").GetProperty("id").GetString(),
+    Is.EqualTo("ORD-1"));
+Assert.That(doc.RootElement.GetProperty("customer").GetProperty("name").GetString(),
+    Is.EqualTo("Bob"));
+Assert.That(doc.RootElement.TryGetProperty("internal", out _), Is.False);
+```
+
+### Exercise 3: Missing paths are silently skipped
+
+```csharp
+var step = new JsonPathFilterStep(new[] { "name", "nonexistent" });
+var context = new TransformContext(
+    """{"name":"Alice","age":30}""", "application/json");
+
+var result = await step.ExecuteAsync(context);
+
+using var doc = JsonDocument.Parse(result.Payload);
+Assert.That(doc.RootElement.TryGetProperty("name", out _), Is.True);
+Assert.That(doc.RootElement.TryGetProperty("nonexistent", out _), Is.False);
+```
+
+### Exercise 4: Filter step inside a pipeline
+
+```csharp
+var filterStep = new JsonPathFilterStep(new[] { "order.id", "order.total" });
+var options = Options.Create(new TransformOptions());
+var pipeline = new TransformPipeline(
+    new ITransformStep[] { filterStep }, options,
+    NullLogger<TransformPipeline>.Instance);
+
+var payload = """
+    {"order":{"id":"ORD-5","total":250,"items":3},"customer":{"name":"Eve"}}
+    """.Trim();
+
+var result = await pipeline.ExecuteAsync(payload, "application/json");
+
+using var doc = JsonDocument.Parse(result.Payload);
+Assert.That(doc.RootElement.GetProperty("order").GetProperty("id").GetString(),
+    Is.EqualTo("ORD-5"));
+Assert.That(doc.RootElement.GetProperty("order").GetProperty("total").GetInt32(),
+    Is.EqualTo(250));
+Assert.That(doc.RootElement.TryGetProperty("customer", out _), Is.False);
+Assert.That(result.StepsApplied, Is.EqualTo(1));
+```
+
+### Exercise 5: ContentFilter retains only keep paths
+
+```csharp
+var filter = new ContentFilter(NullLogger<ContentFilter>.Instance);
+
+var payload = """
+    {"user":"Alice","age":30,"email":"a@b.com","role":"admin","secret":"x"}
+    """.Trim();
+
+var result = await filter.FilterAsync(payload, new[] { "user", "age" });
+
+using var doc = JsonDocument.Parse(result);
+Assert.That(doc.RootElement.TryGetProperty("user", out _), Is.True);
+Assert.That(doc.RootElement.TryGetProperty("age", out _), Is.True);
+Assert.That(doc.RootElement.TryGetProperty("email", out _), Is.False);
+Assert.That(doc.RootElement.TryGetProperty("secret", out _), Is.False);
+```
 
 ---
 
@@ -83,45 +135,17 @@ Filtering is a **pure, deterministic function** — the same input and keep-path
 
 > 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial19/Lab.cs`](../tests/TutorialLabs/Tutorial19/Lab.cs)
 
-**Objective:** Apply the Content Filter pattern to remove unnecessary data, analyze data minimization for **security** and **scalability**, and design a filter-then-route pipeline.
-
-### Step 1: Configure a Content Filter
-
-A message has fields: `order.id`, `order.items[]`, `customer.email`, `customer.phone`, `customer.ssn`, `audit.createdBy`. You need only `order.id` and `customer.email` for the downstream billing system. Write the `keepPaths` configuration:
-
-```csharp
-var keepPaths = new[] { "order.id", "customer.email" };
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial19.Lab"
 ```
-
-Open `src/Processing.Transform/JsonPathFilterStep.cs` and trace: What happens to `customer.ssn`? What happens if `keepPaths` references a field that doesn't exist in the message (e.g., `customer.address.zipCode`)?
-
-### Step 2: Design for Security and Data Minimization
-
-The Content Filter is a key tool for **data minimization** (GDPR, PCI-DSS). Design a pipeline:
-
-| Consumer | Allowed Fields | Filtered Fields |
-|----------|---------------|----------------|
-| Billing | `order.id`, `customer.email`, `order.total` | PII, items, audit |
-| Analytics | `order.id`, `order.items[]`, `order.total` | All customer PII |
-| Audit | All fields | None (full record) |
-
-How does the Content Filter ensure that the billing system **never** receives `customer.ssn`? Why is this an **atomicity** concern — what happens if the filter is accidentally misconfigured?
-
-### Step 3: Design an Enrich-Then-Filter Pipeline
-
-Explain why the order matters: first Enrich (Tutorial 18) then Filter. Draw a pipeline:
-
-```
-Raw message → Content Enricher (add customer data) → Content Filter (remove sensitive fields) → Route to consumer
-```
-
-If you reverse the order (filter first, then enrich), what goes wrong? How does the pipeline order preserve both data completeness and data minimization?
 
 ## Exam
 
 > 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial19/Exam.cs`](../tests/TutorialLabs/Tutorial19/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial19.Exam"
+```
 
 ---
 

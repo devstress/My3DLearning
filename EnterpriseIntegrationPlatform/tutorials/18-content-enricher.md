@@ -1,41 +1,10 @@
 # Tutorial 18 — Content Enricher
 
-## What You'll Learn
-
-- The EIP Content Enricher pattern for augmenting messages with external data
-- How `IContentEnricher` / `ContentEnricher` merges external data into the payload
-- Enrichment sources: HTTP lookups, database queries, cache
-- The merge strategy that preserves existing fields
-- How correlation IDs enable tracing through enrichment
+Augment messages with external data via `IContentEnricher`, merging fetched fields without overwriting existing payload.
 
 ---
 
-## EIP Pattern: Content Enricher
-
-> *"Use a Content Enricher to access an external data source in order to augment a message with missing information."*
-> — Gregor Hohpe & Bobby Woolf, *Enterprise Integration Patterns*
-
-```
-  ┌──────────┐    ┌─────────────────┐    ┌──────────┐
-  │ Incoming │───▶│ Content Enricher│───▶│ Enriched │
-  │ Message  │    │                 │    │ Message  │
-  └──────────┘    └───────┬─────────┘    └──────────┘
-                          │
-                          ▼
-                  ┌───────────────┐
-                  │ External Data │
-                  │ (HTTP / DB /  │
-                  │  Cache)       │
-                  └───────────────┘
-```
-
-The enricher takes an incomplete message and supplements it with data fetched from an external source. The original payload fields are **never overwritten** — external data is merged in alongside them.
-
----
-
-## Platform Implementation
-
-### IContentEnricher
+## Key Types
 
 ```csharp
 // src/Processing.Transform/IContentEnricher.cs
@@ -48,43 +17,168 @@ public interface IContentEnricher
 }
 ```
 
-### ContentEnricher (concrete)
-
-The `ContentEnricher` class:
-1. Parses the incoming JSON payload
-2. Fetches supplementary data from the configured external source
-3. Merges the external data into the JSON document (additive — existing fields preserved)
-4. Returns the enriched JSON string
-
-The `correlationId` parameter enables distributed tracing — the enricher passes it to external HTTP calls as a request header, so the entire enrichment chain is traceable.
-
-### Merge Strategy
-
-The enricher performs a **shallow merge** by default:
-- New properties from the external source are added to the root object
-- Existing properties in the original payload are **not overwritten**
-- Nested objects can be merged at configurable depth
-
+```csharp
+// src/Processing.Transform/ContentEnricherOptions.cs
+public sealed class ContentEnricherOptions
+{
+    public string EndpointUrlTemplate { get; init; }
+    public string LookupKeyPath { get; init; }
+    public string MergeTargetPath { get; init; }
+    public bool FallbackOnFailure { get; init; }
+    public string? FallbackValue { get; init; }
+}
 ```
-Original:    { "orderId": 123, "customer": "Alice" }
-External:    { "customerTier": "Gold", "region": "EU" }
-Enriched:    { "orderId": 123, "customer": "Alice", "customerTier": "Gold", "region": "EU" }
+
+```csharp
+// src/Processing.Transform/IEnrichmentSource.cs
+public interface IEnrichmentSource
+{
+    Task<JsonNode?> FetchAsync(string key, CancellationToken cancellationToken = default);
+}
 ```
 
 ---
 
-## Scalability Dimension
+## Exercises
 
-The enricher's scalability depends on the **external data source**. The enricher itself is stateless and can be replicated freely, but each replica makes external calls (HTTP, DB). Scaling out enricher replicas increases load on the external service. Mitigate with:
-- **Caching**: Cache frequent lookups (e.g. customer tier rarely changes)
-- **Bulkheading**: Limit concurrent external calls per replica
-- **Circuit breaking**: Fail fast when the external source is down
+### Exercise 1: Merge external data at target path
 
----
+```csharp
+var source = Substitute.For<IEnrichmentSource>();
+source.FetchAsync("CUST-1", Arg.Any<CancellationToken>())
+    .Returns(JsonNode.Parse("""{"name":"Alice","tier":"Gold"}"""));
 
-## Atomicity Dimension
+var options = Options.Create(new ContentEnricherOptions
+{
+    EndpointUrlTemplate = "https://api.example.com/customers/{key}",
+    LookupKeyPath = "customerId",
+    MergeTargetPath = "customer",
+});
 
-Enrichment is **not idempotent by default** if the external data changes between retries. However, because the enricher only *adds* data and never *removes* existing fields, a retry that fetches slightly different external data produces a superset of the original enrichment. The enriched message is published before the source is Acked. If the external call fails, the enricher throws, the source message is Nacked, and the retry policy handles redelivery.
+var enricher = new ContentEnricher(
+    source, options, NullLogger<ContentEnricher>.Instance);
+
+var payload = """{"orderId":"ORD-1","customerId":"CUST-1","total":100}""";
+
+var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
+
+using var doc = JsonDocument.Parse(result);
+Assert.That(doc.RootElement.GetProperty("orderId").GetString(), Is.EqualTo("ORD-1"));
+Assert.That(
+    doc.RootElement.GetProperty("customer").GetProperty("name").GetString(),
+    Is.EqualTo("Alice"));
+Assert.That(
+    doc.RootElement.GetProperty("customer").GetProperty("tier").GetString(),
+    Is.EqualTo("Gold"));
+```
+
+### Exercise 2: Nested lookup key path extracts correct value
+
+```csharp
+var source = Substitute.For<IEnrichmentSource>();
+source.FetchAsync("ADDR-7", Arg.Any<CancellationToken>())
+    .Returns(JsonNode.Parse("""{"city":"Seattle","zip":"98101"}"""));
+
+var options = Options.Create(new ContentEnricherOptions
+{
+    EndpointUrlTemplate = "https://api.example.com/addresses/{key}",
+    LookupKeyPath = "order.addressId",
+    MergeTargetPath = "shippingAddress",
+});
+
+var enricher = new ContentEnricher(
+    source, options, NullLogger<ContentEnricher>.Instance);
+
+var payload = """{"order":{"id":"ORD-2","addressId":"ADDR-7"}}""";
+
+var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
+
+using var doc = JsonDocument.Parse(result);
+Assert.That(
+    doc.RootElement.GetProperty("shippingAddress").GetProperty("city").GetString(),
+    Is.EqualTo("Seattle"));
+```
+
+### Exercise 3: Missing lookup key with fallback returns original
+
+```csharp
+var source = Substitute.For<IEnrichmentSource>();
+
+var options = Options.Create(new ContentEnricherOptions
+{
+    EndpointUrlTemplate = "https://api.example.com/{key}",
+    LookupKeyPath = "nonExistentField",
+    MergeTargetPath = "extra",
+    FallbackOnFailure = true,
+});
+
+var enricher = new ContentEnricher(
+    source, options, NullLogger<ContentEnricher>.Instance);
+
+var payload = """{"id":"X"}""";
+
+var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
+
+using var doc = JsonDocument.Parse(result);
+Assert.That(doc.RootElement.GetProperty("id").GetString(), Is.EqualTo("X"));
+await source.DidNotReceive().FetchAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+```
+
+### Exercise 4: Source returns null — fallback value merged
+
+```csharp
+var source = Substitute.For<IEnrichmentSource>();
+source.FetchAsync("KEY-1", Arg.Any<CancellationToken>())
+    .Returns((JsonNode?)null);
+
+var options = Options.Create(new ContentEnricherOptions
+{
+    EndpointUrlTemplate = "https://api.example.com/{key}",
+    LookupKeyPath = "key",
+    MergeTargetPath = "extra",
+    FallbackOnFailure = true,
+    FallbackValue = """{"status":"unknown"}""",
+});
+
+var enricher = new ContentEnricher(
+    source, options, NullLogger<ContentEnricher>.Instance);
+
+var payload = """{"key":"KEY-1"}""";
+
+var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
+
+using var doc = JsonDocument.Parse(result);
+Assert.That(
+    doc.RootElement.GetProperty("extra").GetProperty("status").GetString(),
+    Is.EqualTo("unknown"));
+```
+
+### Exercise 5: Enrichment preserves all existing fields
+
+```csharp
+var source = Substitute.For<IEnrichmentSource>();
+source.FetchAsync("C-1", Arg.Any<CancellationToken>())
+    .Returns(JsonNode.Parse("""{"loyalty":true}"""));
+
+var options = Options.Create(new ContentEnricherOptions
+{
+    EndpointUrlTemplate = "https://api.example.com/{key}",
+    LookupKeyPath = "cid",
+    MergeTargetPath = "loyalty",
+});
+
+var enricher = new ContentEnricher(
+    source, options, NullLogger<ContentEnricher>.Instance);
+
+var payload = """{"cid":"C-1","amount":50,"currency":"USD"}""";
+
+var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
+
+using var doc = JsonDocument.Parse(result);
+Assert.That(doc.RootElement.GetProperty("cid").GetString(), Is.EqualTo("C-1"));
+Assert.That(doc.RootElement.GetProperty("amount").GetInt32(), Is.EqualTo(50));
+Assert.That(doc.RootElement.GetProperty("currency").GetString(), Is.EqualTo("USD"));
+```
 
 ---
 
@@ -92,44 +186,17 @@ Enrichment is **not idempotent by default** if the external data changes between
 
 > 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial18/Lab.cs`](../tests/TutorialLabs/Tutorial18/Lab.cs)
 
-**Objective:** Design enrichment strategies using external data sources, analyze **atomicity** when enrichment depends on external service availability, and evaluate caching for **scalable** enrichment.
-
-### Step 1: Design a Two-Step Enrichment
-
-An order message `{ "orderId": 42 }` needs customer data, but only contains `orderId` — not `customerId`. Design the enrichment flow:
-
-1. Step 1: Look up `customerId` from `GET /api/orders/42` → returns `{ "customerId": "CUST-7" }`
-2. Step 2: Enrich with customer data from `GET /api/customers/CUST-7` → returns `{ "name": "Alice", "tier": "gold" }`
-
-Open `src/Processing.Transform/ContentEnricher.cs` and identify how the enricher merges external data into the envelope. Does it mutate the original or create a new enriched envelope?
-
-### Step 2: Analyze Enrichment Failure Atomicity
-
-The external HTTP service is down during enrichment. Trace what happens:
-
-1. Does the enricher retry? What retry policy applies?
-2. If all retries fail, where does the message go?
-3. Is the original message preserved untouched for retry later?
-
-Now consider: the enricher calls two services. Service A succeeds but Service B fails. Is the partial enrichment from Service A committed? How does this affect **atomicity**? Design a strategy: should partial enrichment be discarded or preserved?
-
-### Step 3: Design a Caching Strategy for Scalability
-
-At 10,000 messages/second, each enrichment requires an HTTP call to an external CRM. Without caching, that's 10,000 HTTP calls/second. Design a caching strategy:
-
-| Cache Level | TTL | Hit Rate | Scalability Impact |
-|-------------|-----|----------|-------------------|
-| In-memory (per-worker) | 60s | ~80% | Reduces to 2,000 calls/second |
-| Distributed (Redis) | 5min | ~95% | Reduces to 500 calls/second |
-| Database fallback | 1hr | ~99% | ? |
-
-Open `src/Processing.Transform/` and check if the platform implements caching. How does cache invalidation interact with message **consistency**?
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial18.Lab"
+```
 
 ## Exam
 
 > 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial18/Exam.cs`](../tests/TutorialLabs/Tutorial18/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial18.Exam"
+```
 
 ---
 

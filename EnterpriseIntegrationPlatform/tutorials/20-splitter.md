@@ -1,36 +1,10 @@
 # Tutorial 20 — Splitter
 
-## What You'll Learn
-
-- The EIP Splitter pattern for breaking composite messages into individual items
-- How `IMessageSplitter<T>` and `ISplitStrategy<T>` separate concerns
-- `JsonArraySplitStrategy` for splitting JSON arrays
-- How each split item gets a shared `CorrelationId`, unique `SequenceNumber`, and `TotalCount`
-- The `SplitResult` with item count and published envelopes
+Break composite messages into individual items using `IMessageSplitter<T>` with pluggable `ISplitStrategy<T>`.
 
 ---
 
-## EIP Pattern: Splitter
-
-> *"Use a Splitter to break out the composite message into a series of individual messages, each containing data related to one item."*
-> — Gregor Hohpe & Bobby Woolf, *Enterprise Integration Patterns*
-
-```
-  ┌───────────────────┐    ┌──────────┐    ┌─────┐
-  │ Composite Message │───▶│ Splitter │───▶│ A   │ (seq 0, total 3)
-  │ [A, B, C]         │    │          │───▶│ B   │ (seq 1, total 3)
-  └───────────────────┘    │          │───▶│ C   │ (seq 2, total 3)
-                           └──────────┘
-         All items share the same CorrelationId
-```
-
-A batch message arrives containing multiple items. The Splitter publishes each item as an independent message, tagged with correlation metadata so they can be reassembled later by an Aggregator (Tutorial 21).
-
----
-
-## Platform Implementation
-
-### IMessageSplitter<T>
+## Key Types
 
 ```csharp
 // src/Processing.Splitter/IMessageSplitter.cs
@@ -42,8 +16,6 @@ public interface IMessageSplitter<T>
 }
 ```
 
-### ISplitStrategy<T>
-
 ```csharp
 // src/Processing.Splitter/ISplitStrategy.cs
 public interface ISplitStrategy<T>
@@ -51,24 +23,6 @@ public interface ISplitStrategy<T>
     IReadOnlyList<T> Split(T composite);
 }
 ```
-
-The splitter delegates to a strategy for the actual splitting logic. This separation allows different strategies (JSON array, XML child elements, line-based) to be swapped without changing the splitter.
-
-### JsonArraySplitStrategy
-
-```csharp
-// src/Processing.Splitter/JsonArraySplitStrategy.cs
-public IReadOnlyList<JsonElement> Split(JsonElement composite)
-{
-    // Resolves the target array (root array or named property)
-    // Clones each element to decouple from the source JsonDocument
-    // Returns individual items as a list
-}
-```
-
-If the root payload is not an array, set `SplitterOptions.ArrayPropertyName` to specify which property holds the array (e.g. `"items"` for `{ "items": [...] }`).
-
-### SplitResult
 
 ```csharp
 // src/Processing.Splitter/SplitResult.cs
@@ -79,22 +33,129 @@ public sealed record SplitResult<T>(
     int ItemCount);
 ```
 
-Each split envelope receives:
-- **Same `CorrelationId`** as the source — links all items to the original batch
-- **Unique `SequenceNumber`** (0, 1, 2, …) — ordering within the batch
-- **`TotalCount`** in metadata — how many items the batch contained
+```csharp
+// src/Processing.Splitter/SplitterOptions.cs
+public sealed class SplitterOptions
+{
+    public string TargetTopic { get; init; }
+    public string? ArrayPropertyName { get; init; }
+}
+```
 
 ---
 
-## Scalability Dimension
+## Exercises
 
-The splitter is **stateless** — it reads one composite message and produces N individual messages. Horizontal scaling via competing consumers is straightforward. Note that splitting **amplifies** message count: a batch of 100 items produces 100 messages. Capacity planning must account for this amplification factor on the target topic and downstream consumers.
+### Exercise 1: Split comma-separated string into individual envelopes
 
----
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+var strategy = new FuncSplitStrategy<string>(
+    composite => composite.Split(',').ToList());
 
-## Atomicity Dimension
+var options = Options.Create(new SplitterOptions { TargetTopic = "items-topic" });
+var splitter = new MessageSplitter<string>(
+    strategy, producer, options,
+    NullLogger<MessageSplitter<string>>.Instance);
 
-All split items are published to the target topic before the source message is Acked. If any publish fails, the source is Nacked and redelivered. On retry, the entire batch is re-split, producing the same items (splitting is deterministic). Downstream consumers use `MessageId` for deduplication. The `CorrelationId` + `SequenceNumber` + `TotalCount` triplet enables the Aggregator to know exactly when all items have arrived.
+var source = IntegrationEnvelope<string>.Create(
+    "apple,banana,cherry", "InventoryService", "batch.items");
+
+var result = await splitter.SplitAsync(source);
+
+Assert.That(result.ItemCount, Is.EqualTo(3));
+Assert.That(result.TargetTopic, Is.EqualTo("items-topic"));
+Assert.That(result.SourceMessageId, Is.EqualTo(source.MessageId));
+Assert.That(result.SplitEnvelopes[0].Payload, Is.EqualTo("apple"));
+Assert.That(result.SplitEnvelopes[1].Payload, Is.EqualTo("banana"));
+Assert.That(result.SplitEnvelopes[2].Payload, Is.EqualTo("cherry"));
+```
+
+### Exercise 2: Split preserves CorrelationId and sets CausationId
+
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+var strategy = new FuncSplitStrategy<string>(s => new[] { s });
+
+var options = Options.Create(new SplitterOptions { TargetTopic = "topic" });
+var splitter = new MessageSplitter<string>(
+    strategy, producer, options,
+    NullLogger<MessageSplitter<string>>.Instance);
+
+var source = IntegrationEnvelope<string>.Create(
+    "payload", "Service", "event.type");
+
+var result = await splitter.SplitAsync(source);
+
+var splitEnv = result.SplitEnvelopes[0];
+Assert.That(splitEnv.CorrelationId, Is.EqualTo(source.CorrelationId));
+Assert.That(splitEnv.CausationId, Is.EqualTo(source.MessageId));
+Assert.That(splitEnv.MessageId, Is.Not.EqualTo(source.MessageId));
+```
+
+### Exercise 3: No target topic configured throws
+
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+var strategy = new FuncSplitStrategy<string>(s => new[] { s });
+
+var options = Options.Create(new SplitterOptions { TargetTopic = "" });
+var splitter = new MessageSplitter<string>(
+    strategy, producer, options,
+    NullLogger<MessageSplitter<string>>.Instance);
+
+var source = IntegrationEnvelope<string>.Create("data", "Svc", "evt");
+
+Assert.ThrowsAsync<InvalidOperationException>(
+    () => splitter.SplitAsync(source));
+```
+
+### Exercise 4: Zero items returns empty result, no publish
+
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+var strategy = new FuncSplitStrategy<string>(_ => Array.Empty<string>());
+
+var options = Options.Create(new SplitterOptions { TargetTopic = "topic" });
+var splitter = new MessageSplitter<string>(
+    strategy, producer, options,
+    NullLogger<MessageSplitter<string>>.Instance);
+
+var source = IntegrationEnvelope<string>.Create("empty", "Svc", "evt");
+
+var result = await splitter.SplitAsync(source);
+
+Assert.That(result.ItemCount, Is.EqualTo(0));
+Assert.That(result.SplitEnvelopes, Is.Empty);
+await producer.DidNotReceive()
+    .PublishAsync(Arg.Any<IntegrationEnvelope<string>>(),
+        Arg.Any<string>(), Arg.Any<CancellationToken>());
+```
+
+### Exercise 5: JsonArraySplitStrategy splits top-level array
+
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+var splitOptions = Options.Create(new SplitterOptions { TargetTopic = "json-items" });
+var strategy = new JsonArraySplitStrategy(splitOptions);
+
+var splitter = new MessageSplitter<JsonElement>(
+    strategy, producer, splitOptions,
+    NullLogger<MessageSplitter<JsonElement>>.Instance);
+
+var jsonArray = JsonSerializer.Deserialize<JsonElement>(
+    """[{"id":1},{"id":2},{"id":3}]""");
+
+var source = IntegrationEnvelope<JsonElement>.Create(
+    jsonArray, "BatchService", "batch.created");
+
+var result = await splitter.SplitAsync(source);
+
+Assert.That(result.ItemCount, Is.EqualTo(3));
+Assert.That(result.SplitEnvelopes[0].Payload.GetProperty("id").GetInt32(), Is.EqualTo(1));
+Assert.That(result.SplitEnvelopes[1].Payload.GetProperty("id").GetInt32(), Is.EqualTo(2));
+Assert.That(result.SplitEnvelopes[2].Payload.GetProperty("id").GetInt32(), Is.EqualTo(3));
+```
 
 ---
 
@@ -102,45 +163,17 @@ All split items are published to the target topic before the source message is A
 
 > 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial20/Lab.cs`](../tests/TutorialLabs/Tutorial20/Lab.cs)
 
-**Objective:** Split composite messages into individual items, trace how `SequenceNumber` and `TotalCount` enable the Aggregator to reassemble split messages, and analyze **atomicity** when a split item fails.
-
-### Step 1: Split a Composite Message
-
-A message `{ "orders": [{ "id": 1, "total": 50 }, { "id": 2, "total": 150 }, { "id": 3, "total": 75 }] }` is split using `JsonArraySplitStrategy` with `ArrayPropertyName = "orders"`. Open `src/Processing.Splitter/` and trace:
-
-1. How many envelopes are in `SplitResult.SplitEnvelopes`?
-2. What is `ItemCount`?
-3. What `SequenceNumber` and `TotalCount` does each split envelope carry?
-4. Do all split envelopes share the same `CorrelationId` as the original?
-
-### Step 2: Trace Atomicity When a Split Item Fails
-
-After splitting, the 3 items are processed independently. Item 2 (sequence 1) fails delivery:
-
-| Item | SequenceNumber | Status |
-|------|---------------|--------|
-| `{ "id": 1 }` | 0 | ✅ Delivered |
-| `{ "id": 2 }` | 1 | ❌ Failed |
-| `{ "id": 3 }` | 2 | ✅ Delivered |
-
-Questions:
-- How does the Aggregator (Tutorial 21) detect that item 2 is missing? (hint: `TotalCount = 3` but only 2 arrived)
-- Should the Aggregator wait indefinitely or timeout? What timeout strategy preserves **atomicity**?
-- Should items 1 and 3 be rolled back (saga compensation), or should only item 2 be retried?
-
-### Step 3: Evaluate Splitter Scalability
-
-Splitting a message with 1,000 items creates 1,000 individual messages. Analyze:
-
-- Each split message is independently processed — what parallelism level is achievable?
-- What is the memory impact of cloning 1,000 JSON elements? (hint: `JsonSerializer.SerializeToElement` creates deep copies)
-- Why does `JsonArraySplitStrategy` clone each element rather than using references? What **concurrency** bug would occur without cloning?
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial20.Lab"
+```
 
 ## Exam
 
 > 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial20/Exam.cs`](../tests/TutorialLabs/Tutorial20/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial20.Exam"
+```
 
 ---
 
