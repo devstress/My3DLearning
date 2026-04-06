@@ -8,7 +8,7 @@
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -43,10 +43,10 @@ public sealed class Exam
     public async Task Challenge2_PartialFailure_FailureNotificationPublished()
     {
         await using var output = new MockEndpoint("saga-partial");
-        var mock = Substitute.For<ICompensationActivityService>();
-        mock.CompensateAsync(Arg.Any<Guid>(), "step-1").Returns(true);
-        mock.CompensateAsync(Arg.Any<Guid>(), "step-2").Returns(false);
-        mock.CompensateAsync(Arg.Any<Guid>(), "step-3").Returns(true);
+        var mock = new MockCompensationActivityService()
+            .WithStepResult("step-1", true)
+            .WithStepResult("step-2", false)
+            .WithStepResult("step-3", true);
 
         var corrId = Guid.NewGuid();
         var failed = new List<string>();

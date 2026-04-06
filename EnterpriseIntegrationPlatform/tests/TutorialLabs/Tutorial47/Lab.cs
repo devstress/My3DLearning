@@ -9,7 +9,7 @@
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -62,8 +62,8 @@ public sealed class Lab
     [Test]
     public async Task MockCompensation_FailureDetected_NackPublished()
     {
-        var mock = Substitute.For<ICompensationActivityService>();
-        mock.CompensateAsync(Arg.Any<Guid>(), "persist").Returns(false);
+        var mock = new MockCompensationActivityService()
+            .WithStepResult("persist", false);
 
         var corrId = Guid.NewGuid();
         var result = await mock.CompensateAsync(corrId, "persist");

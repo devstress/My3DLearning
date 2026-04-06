@@ -8,7 +8,7 @@
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -55,7 +55,7 @@ public sealed class Exam
     public async Task Challenge3_PersistenceActivity_SaveAndUpdate()
     {
         await using var output = new MockEndpoint("persist");
-        var persistence = Substitute.For<IPersistenceActivityService>();
+        var persistence = new MockPersistenceActivityService();
 
         var input = new IntegrationPipelineInput(
             Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow,
@@ -71,7 +71,7 @@ public sealed class Exam
             IntegrationEnvelope<string>.Create("Delivered", "pipeline", "delivery.status"),
             "delivery-confirmations");
 
-        await persistence.Received(1).SaveMessageAsync(input, Arg.Any<CancellationToken>());
+        persistence.AssertSaveCount(1);
         output.AssertReceivedOnTopic("delivery-confirmations", 1);
     }
 }

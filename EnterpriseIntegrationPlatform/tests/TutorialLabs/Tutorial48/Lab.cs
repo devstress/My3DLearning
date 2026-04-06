@@ -9,7 +9,7 @@
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -43,9 +43,8 @@ public sealed class Lab
     [Test]
     public async Task Validate_Failure_PublishesNack()
     {
-        var validator = Substitute.For<IMessageValidationService>();
-        validator.ValidateAsync("bad.type", Arg.Any<string>())
-            .Returns(MessageValidationResult.Failure("Unknown type"));
+        var validator = new MockMessageValidationService()
+            .WithResult("bad.type", MessageValidationResult.Failure("Unknown type"));
 
         var result = await validator.ValidateAsync("bad.type", "{}");
         Assert.That(result.IsValid, Is.False);
