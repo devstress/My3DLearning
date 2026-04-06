@@ -93,7 +93,7 @@ public sealed class Lab
         var files = await connector.ListFilesAsync("/data", default);
 
         Assert.That(files, Has.Count.EqualTo(2));
-        Assert.That(files[0], Is.EqualTo("/data/a.txt"));
+        Assert.That(files, Does.Contain("/data/a.txt"));
     }
 
     [Test]

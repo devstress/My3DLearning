@@ -2,7 +2,7 @@
 // Tutorial 40 – RAG & Ollama / AI (Lab)
 // ============================================================================
 // EIP Pattern: AI-enriched integration.
-// E2E: Mock IOllamaService and IRagFlowService with NSubstitute, wire
+// E2E: Mock IOllamaService and IRagFlowService with MockOllamaService/MockRagFlowService, wire
 // MockEndpoint to simulate AI-enriched message pipelines.
 // ============================================================================
 
