@@ -1,31 +1,44 @@
 // ============================================================================
 // Tutorial 05 – Message Brokers (Exam)
 // ============================================================================
-// Coding challenges: multi-broker fan-out, consumer group isolation, and
-// verifying message ordering via sequence numbers.
+// EIP Pattern: Message Endpoint
+// End-to-End: Multi-broker fan-out, selective consumer filtering, and full
+// AspireIntegrationTestHost pipeline with broker configuration.
 // ============================================================================
 
+using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
-using NSubstitute;
-using NUnit.Framework;
 
 namespace TutorialLabs.Tutorial05;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Multi-Broker Publishing ────────────────────────────────
+    private MockEndpoint _nats = null!;
+    private MockEndpoint _kafka = null!;
+    private MockEndpoint _pulsar = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _nats = new MockEndpoint("nats");
+        _kafka = new MockEndpoint("kafka");
+        _pulsar = new MockEndpoint("pulsar");
+    }
+
+    [TearDown]
+    public async Task TearDown()
+    {
+        await _nats.DisposeAsync();
+        await _kafka.DisposeAsync();
+        await _pulsar.DisposeAsync();
+    }
 
     [Test]
-    public async Task Challenge1_PublishSameMessage_ToDifferentBrokers()
+    public async Task EndToEnd_MultiBrokerFanOut_AllEndpointsReceive()
     {
-        // In a multi-broker architecture you might publish the same event
-        // to NATS (for real-time) and Kafka (for long-term retention).
-        var natsProducer = Substitute.For<IMessageBrokerProducer>();
-        var kafkaProducer = Substitute.For<IMessageBrokerProducer>();
-        var pulsarProducer = Substitute.For<IMessageBrokerProducer>();
-
         var envelope = IntegrationEnvelope<string>.Create(
             "critical-event", "AlertService", "alert.raised") with
         {
@@ -33,109 +46,63 @@ public sealed class Exam
             Intent = MessageIntent.Event,
         };
 
-        // Publish the same envelope to all three brokers.
-        await natsProducer.PublishAsync(envelope, "alerts");
-        await kafkaProducer.PublishAsync(envelope, "alerts");
-        await pulsarProducer.PublishAsync(envelope, "alerts");
+        await _nats.PublishAsync(envelope, "alerts");
+        await _kafka.PublishAsync(envelope, "alerts");
+        await _pulsar.PublishAsync(envelope, "alerts");
 
-        // Each broker received exactly one publish.
-        await natsProducer.Received(1).PublishAsync(
-            Arg.Is<IntegrationEnvelope<string>>(e => e.Payload == "critical-event"),
-            Arg.Is("alerts"),
-            Arg.Any<CancellationToken>());
+        _nats.AssertReceivedCount(1);
+        _kafka.AssertReceivedCount(1);
+        _pulsar.AssertReceivedCount(1);
 
-        await kafkaProducer.Received(1).PublishAsync(
-            Arg.Is<IntegrationEnvelope<string>>(e => e.Payload == "critical-event"),
-            Arg.Is("alerts"),
-            Arg.Any<CancellationToken>());
-
-        await pulsarProducer.Received(1).PublishAsync(
-            Arg.Is<IntegrationEnvelope<string>>(e => e.Payload == "critical-event"),
-            Arg.Is("alerts"),
-            Arg.Any<CancellationToken>());
+        Assert.That(_nats.GetReceived<string>().Payload, Is.EqualTo("critical-event"));
+        Assert.That(_kafka.GetReceived<string>().Payload, Is.EqualTo("critical-event"));
+        Assert.That(_pulsar.GetReceived<string>().Payload, Is.EqualTo("critical-event"));
     }
 
-    // ── Challenge 2: Consumer Groups with Different Group Names ─────────────
-
     [Test]
-    public async Task Challenge2_DifferentConsumerGroups_ReceiveIndependently()
+    public async Task EndToEnd_SelectiveConsumer_FiltersMessages()
     {
-        // Three independent consumer groups on the same topic.
-        // Each group processes messages independently.
-        var consumer = Substitute.For<IMessageBrokerConsumer>();
-
-        var groups = new[] { "billing-group", "analytics-group", "audit-group" };
-        const string topic = "order-events";
-
-        foreach (var group in groups)
-        {
-            await consumer.SubscribeAsync<string>(
-                topic, group, _ => Task.CompletedTask);
-        }
-
-        // Verify subscribe was called three times — once per group.
-        await consumer.Received(3).SubscribeAsync<string>(
-            Arg.Is(topic),
-            Arg.Any<string>(),
-            Arg.Any<Func<IntegrationEnvelope<string>, Task>>(),
-            Arg.Any<CancellationToken>());
-
-        // Verify each group name was used exactly once.
-        foreach (var group in groups)
-        {
-            await consumer.Received(1).SubscribeAsync<string>(
-                Arg.Is(topic),
-                Arg.Is(group),
-                Arg.Any<Func<IntegrationEnvelope<string>, Task>>(),
-                Arg.Any<CancellationToken>());
-        }
-    }
-
-    // ── Challenge 3: Message Ordering via Sequence Numbers ──────────────────
-
-    [Test]
-    public async Task Challenge3_SequenceNumberedMessages_MaintainOrder()
-    {
-        // Publish a sequence of messages and verify ordering is preserved
-        // by checking SequenceNumber and TotalCount on each envelope.
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var correlationId = Guid.NewGuid();
-        const int totalMessages = 5;
-
-        var envelopes = Enumerable.Range(0, totalMessages)
-            .Select(i => IntegrationEnvelope<string>.Create(
-                payload: $"chunk-{i}",
-                source: "Splitter",
-                messageType: "data.chunk",
-                correlationId: correlationId) with
+        var results = new List<string>();
+        await _nats.SubscribeAsync<string>("orders", "group",
+            env => env.Priority == MessagePriority.High,
+            msg =>
             {
-                SequenceNumber = i,
-                TotalCount = totalMessages,
-            })
-            .ToList();
+                results.Add(msg.Payload);
+                return Task.CompletedTask;
+            });
 
-        // Publish all in order.
-        foreach (var env in envelopes)
+        var highPriority = IntegrationEnvelope<string>.Create(
+            "urgent-order", "svc", "order") with { Priority = MessagePriority.High };
+        var lowPriority = IntegrationEnvelope<string>.Create(
+            "normal-order", "svc", "order") with { Priority = MessagePriority.Low };
+
+        await _nats.SendAsync(highPriority);
+        await _nats.SendAsync(lowPriority);
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0], Is.EqualTo("urgent-order"));
+    }
+
+    [Test]
+    public async Task EndToEnd_FullPipeline_HostWithBrokerConfig()
+    {
+        var builder = AspireIntegrationTestHost.CreateBuilder();
+        var output = builder.AddMockEndpoint("output");
+        builder.UseProducer(output);
+        builder.Configure<BrokerOptions>(opts =>
         {
-            await producer.PublishAsync(env, "data-chunks");
-        }
+            opts.BrokerType = BrokerType.NatsJetStream;
+            opts.ConnectionString = "nats://localhost:15222";
+        });
+        await using var host = builder.Build();
 
-        // Verify the sequence numbers form an unbroken 0..N-1 range.
-        for (var i = 0; i < totalMessages; i++)
-        {
-            Assert.That(envelopes[i].SequenceNumber, Is.EqualTo(i));
-            Assert.That(envelopes[i].TotalCount, Is.EqualTo(totalMessages));
-            Assert.That(envelopes[i].Payload, Is.EqualTo($"chunk-{i}"));
-        }
+        var producer = host.GetService<IMessageBrokerProducer>();
+        var envelope = IntegrationEnvelope<string>.Create(
+            "host-message", "HostService", "host.event");
 
-        // All share the same CorrelationId.
-        Assert.That(envelopes.Select(e => e.CorrelationId).Distinct().Count(),
-            Is.EqualTo(1));
+        await producer.PublishAsync(envelope, "host-topic");
 
-        // The producer received exactly totalMessages publish calls.
-        await producer.Received(totalMessages).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Is("data-chunks"),
-            Arg.Any<CancellationToken>());
+        output.AssertReceivedCount(1);
+        Assert.That(output.GetReceived<string>().Payload, Is.EqualTo("host-message"));
     }
 }

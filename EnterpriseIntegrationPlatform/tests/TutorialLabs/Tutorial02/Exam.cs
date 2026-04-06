@@ -1,121 +1,105 @@
 // ============================================================================
 // Tutorial 02 – Environment Setup (Exam)
 // ============================================================================
-// Coding challenges that test your understanding of the platform's
-// configuration types and well-known header constants.
+// EIP Pattern: Service Activator
+// End-to-End: Advanced DI wiring — full channel pipelines, multiple
+// endpoints, and service-activated message forwarding.
 // ============================================================================
 
-using System.Reflection;
+using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
-using NUnit.Framework;
+using EnterpriseIntegrationPlatform.Ingestion.Channels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace TutorialLabs.Tutorial02;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Validate BrokerOptions Properties ──────────────────────
+    private AspireIntegrationTestHost _host = null!;
+    private MockEndpoint _output = null!;
 
-    [Test]
-    public void Challenge1_BrokerOptions_HasBrokerTypeProperty()
+    [TearDown]
+    public async Task TearDown()
     {
-        var property = typeof(BrokerOptions).GetProperty("BrokerType");
-        Assert.That(property, Is.Not.Null, "BrokerOptions must have a BrokerType property");
-        Assert.That(property!.PropertyType, Is.EqualTo(typeof(BrokerType)));
-        Assert.That(property.CanRead, Is.True);
-        Assert.That(property.CanWrite, Is.True);
+        if (_host is not null) await _host.DisposeAsync();
+        if (_output is not null) await _output.DisposeAsync();
     }
 
     [Test]
-    public void Challenge1_BrokerOptions_HasConnectionStringProperty()
+    public async Task EndToEnd_FullDIPipeline_PointToPointSendsToMock()
     {
-        var property = typeof(BrokerOptions).GetProperty("ConnectionString");
-        Assert.That(property, Is.Not.Null, "BrokerOptions must have a ConnectionString property");
-        Assert.That(property!.PropertyType, Is.EqualTo(typeof(string)));
+        var builder = AspireIntegrationTestHost.CreateBuilder();
+        _output = builder.AddMockEndpoint("output");
+        builder.UseProducer(_output).UseConsumer(_output);
+        builder.ConfigureServices(services =>
+            services.AddSingleton<PointToPointChannel>());
+        _host = builder.Build();
+
+        var channel = _host.GetService<PointToPointChannel>();
+        var envelope = IntegrationEnvelope<string>.Create(
+            "DI-wired-message", "ExamService", "exam.test");
+
+        await channel.SendAsync(envelope, "exam-queue", CancellationToken.None);
+
+        _output.AssertReceivedCount(1);
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Payload, Is.EqualTo("DI-wired-message"));
+        Assert.That(received.Source, Is.EqualTo("ExamService"));
     }
 
     [Test]
-    public void Challenge1_BrokerOptions_HasTransactionTimeoutProperty()
+    public async Task EndToEnd_MultipleEndpoints_IndependentMessageCapture()
     {
-        var property = typeof(BrokerOptions).GetProperty("TransactionTimeoutSeconds");
-        Assert.That(property, Is.Not.Null,
-            "BrokerOptions must have a TransactionTimeoutSeconds property");
-        Assert.That(property!.PropertyType, Is.EqualTo(typeof(int)));
+        var builder = AspireIntegrationTestHost.CreateBuilder();
+        var orders = builder.AddMockEndpoint("orders");
+        var payments = builder.AddMockEndpoint("payments");
+        _output = orders;
+        _host = builder.Build();
+
+        var orderEnv = IntegrationEnvelope<string>.Create(
+            "new-order", "OrderService", "order.created");
+        var paymentEnv = IntegrationEnvelope<string>.Create(
+            "payment-received", "PaymentService", "payment.received");
+
+        await orders.PublishAsync(orderEnv, "orders-topic");
+        await payments.PublishAsync(paymentEnv, "payments-topic");
+
+        orders.AssertReceivedCount(1);
+        payments.AssertReceivedCount(1);
+        Assert.That(orders.GetReceived<string>().Payload, Is.EqualTo("new-order"));
+        Assert.That(payments.GetReceived<string>().Payload, Is.EqualTo("payment-received"));
     }
 
     [Test]
-    public void Challenge1_BrokerOptions_HasSectionNameConstant()
+    public async Task EndToEnd_ServiceActivator_ProcessesAndForwards()
     {
-        // The SectionName constant binds to the "Broker" configuration section.
-        Assert.That(BrokerOptions.SectionName, Is.EqualTo("Broker"));
-    }
+        var builder = AspireIntegrationTestHost.CreateBuilder();
+        var input = builder.AddMockEndpoint("input");
+        _output = builder.AddMockEndpoint("output");
+        builder.UseProducer(_output).UseConsumer(input);
+        builder.ConfigureServices(services =>
+            services.AddSingleton<PointToPointChannel>());
+        _host = builder.Build();
 
-    [Test]
-    public void Challenge1_BrokerOptions_DefaultValues_AreCorrect()
-    {
-        var options = new BrokerOptions();
+        var channel = _host.GetService<PointToPointChannel>();
 
-        Assert.That(options.BrokerType, Is.EqualTo(BrokerType.NatsJetStream));
-        Assert.That(options.ConnectionString, Is.EqualTo(string.Empty));
-        Assert.That(options.TransactionTimeoutSeconds, Is.EqualTo(30));
-    }
+        // Subscribe the channel to receive on input and forward handler to output
+        await channel.ReceiveAsync<string>("input-channel", "activator-group",
+            async msg =>
+            {
+                var forwarded = msg with { Source = "Activator" };
+                await _output.PublishAsync(forwarded, "output-topic");
+            }, CancellationToken.None);
 
-    // ── Challenge 2: Verify MessageHeaders Constants ────────────────────────
+        // Send a message into the input endpoint
+        var envelope = IntegrationEnvelope<string>.Create(
+            "activate-me", "Producer", "activate");
+        await input.SendAsync(envelope);
 
-    [Test]
-    public void Challenge2_MessageHeaders_HasExpectedTraceHeaders()
-    {
-        // Observability headers for distributed tracing.
-        Assert.That(MessageHeaders.TraceId, Is.EqualTo("trace-id"));
-        Assert.That(MessageHeaders.SpanId, Is.EqualTo("span-id"));
-    }
-
-    [Test]
-    public void Challenge2_MessageHeaders_HasContentTypeHeader()
-    {
-        Assert.That(MessageHeaders.ContentType, Is.EqualTo("content-type"));
-    }
-
-    [Test]
-    public void Challenge2_MessageHeaders_HasSourceTopicHeader()
-    {
-        Assert.That(MessageHeaders.SourceTopic, Is.EqualTo("source-topic"));
-    }
-
-    [Test]
-    public void Challenge2_MessageHeaders_HasReplayIdHeader()
-    {
-        Assert.That(MessageHeaders.ReplayId, Is.EqualTo("replay-id"));
-    }
-
-    [Test]
-    public void Challenge2_MessageHeaders_AllConstantsAreNonEmpty()
-    {
-        // Use reflection to verify every public const string is non-empty.
-        var fields = typeof(MessageHeaders)
-            .GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(f => f.IsLiteral && f.FieldType == typeof(string))
-            .ToList();
-
-        Assert.That(fields, Is.Not.Empty, "MessageHeaders should have string constants");
-
-        foreach (var field in fields)
-        {
-            var value = (string?)field.GetValue(null);
-            Assert.That(value, Is.Not.Null.And.Not.Empty,
-                $"MessageHeaders.{field.Name} must not be null or empty");
-        }
-    }
-
-    [Test]
-    public void Challenge2_MessageHeaders_ContainsAtLeast15Constants()
-    {
-        // Ensure the platform defines a rich set of well-known header keys.
-        var constantCount = typeof(MessageHeaders)
-            .GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Count(f => f.IsLiteral && f.FieldType == typeof(string));
-
-        Assert.That(constantCount, Is.GreaterThanOrEqualTo(15));
+        _output.AssertReceivedCount(1);
+        Assert.That(_output.GetReceived<string>().Source, Is.EqualTo("Activator"));
     }
 }

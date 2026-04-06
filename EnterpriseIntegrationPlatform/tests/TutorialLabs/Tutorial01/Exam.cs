@@ -1,97 +1,95 @@
 // ============================================================================
-// Tutorial 01 – Introduction to Enterprise Integration (Exam)
+// Tutorial 01 – Introduction (Exam)
 // ============================================================================
-// Coding challenges that test your understanding of the IntegrationEnvelope,
-// message intents, causation chains, and record immutability.
+// EIP Pattern: Canonical Data Model
+// End-to-End: Complex envelope scenarios through MockEndpoint — domain
+// objects, causation chains, and record immutability verified at output.
 // ============================================================================
 
-using EnterpriseIntegrationPlatform.Contracts;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
+using EnterpriseIntegrationPlatform.Contracts;
 
 namespace TutorialLabs.Tutorial01;
 
-// A simple domain record used in the exam challenges.
 public sealed record OrderPayload(string OrderId, string Product, int Quantity, decimal Price);
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Wrap a Domain Object in an Envelope ────────────────────
+    private MockEndpoint _output = null!;
 
-    [Test]
-    public void Challenge1_CreateEnvelopeForOrderPayload()
+    [SetUp]
+    public void SetUp()
     {
-        // Create an OrderPayload and wrap it in an IntegrationEnvelope.
-        var order = new OrderPayload("ORD-001", "Widget", 5, 29.99m);
-
-        var envelope = IntegrationEnvelope<OrderPayload>.Create(
-            payload: order,
-            source: "OrderService",
-            messageType: "order.created");
-
-        // Verify the envelope wraps the domain object correctly.
-        Assert.That(envelope.Payload.OrderId, Is.EqualTo("ORD-001"));
-        Assert.That(envelope.Payload.Product, Is.EqualTo("Widget"));
-        Assert.That(envelope.Payload.Quantity, Is.EqualTo(5));
-        Assert.That(envelope.Payload.Price, Is.EqualTo(29.99m));
-        Assert.That(envelope.Source, Is.EqualTo("OrderService"));
-        Assert.That(envelope.MessageType, Is.EqualTo("order.created"));
-        Assert.That(envelope.MessageId, Is.Not.EqualTo(Guid.Empty));
+        _output = new MockEndpoint("output");
     }
 
-    // ── Challenge 2: Build a CausationId Chain ──────────────────────────────
+    [TearDown]
+    public async Task TearDown()
+    {
+        await _output.DisposeAsync();
+    }
 
     [Test]
-    public void Challenge2_CausationIdLinking_MessageBCausedByA()
+    public async Task EndToEnd_DomainObject_AllFieldsSurviveRoundTrip()
     {
-        // Message A is the originating command.
+        var order = new OrderPayload("ORD-001", "Widget", 5, 29.99m);
+        var envelope = IntegrationEnvelope<OrderPayload>.Create(
+            order, "OrderService", "order.created");
+
+        await _output.PublishAsync(envelope, "orders");
+
+        _output.AssertReceivedCount(1);
+        var received = _output.GetReceived<OrderPayload>();
+        Assert.That(received.Payload.OrderId, Is.EqualTo("ORD-001"));
+        Assert.That(received.Payload.Price, Is.EqualTo(29.99m));
+        Assert.That(received.Source, Is.EqualTo("OrderService"));
+        Assert.That(received.MessageId, Is.EqualTo(envelope.MessageId));
+    }
+
+    [Test]
+    public async Task EndToEnd_CausationChain_PreservedThroughPipeline()
+    {
         var messageA = IntegrationEnvelope<string>.Create(
-            payload: "PlaceOrder",
-            source: "WebApp",
-            messageType: "order.place") with
+            "PlaceOrder", "WebApp", "order.place") with
         {
             Intent = MessageIntent.Command,
         };
 
-        // Message B is caused by A — its CausationId points to A's MessageId
-        // and both share the same CorrelationId for end-to-end tracing.
         var messageB = IntegrationEnvelope<string>.Create(
-            payload: "OrderPlaced",
-            source: "OrderService",
-            messageType: "order.placed",
+            "OrderPlaced", "OrderService", "order.placed",
             correlationId: messageA.CorrelationId,
             causationId: messageA.MessageId) with
         {
             Intent = MessageIntent.Event,
         };
 
-        // Verify the causal link.
-        Assert.That(messageB.CausationId, Is.EqualTo(messageA.MessageId));
-        Assert.That(messageB.CorrelationId, Is.EqualTo(messageA.CorrelationId));
-        Assert.That(messageB.MessageId, Is.Not.EqualTo(messageA.MessageId));
+        await _output.PublishAsync(messageA, "commands");
+        await _output.PublishAsync(messageB, "events");
+
+        _output.AssertReceivedCount(2);
+        var receivedB = _output.GetReceived<string>(1);
+        Assert.That(receivedB.CausationId, Is.EqualTo(messageA.MessageId));
+        Assert.That(receivedB.CorrelationId, Is.EqualTo(messageA.CorrelationId));
+        Assert.That(receivedB.MessageId, Is.Not.EqualTo(messageA.MessageId));
     }
 
-    // ── Challenge 3: Verify Envelope Immutability ───────────────────────────
-
     [Test]
-    public void Challenge3_RecordImmutability_WithExpressionCreatesNewInstance()
+    public async Task EndToEnd_ImmutableEnvelope_OriginalAndModifiedBothPreserved()
     {
-        // Records are immutable — you cannot change properties after creation.
-        // The `with` expression creates a shallow copy with modified values.
         var original = IntegrationEnvelope<string>.Create(
             "original-payload", "TestService", "test.message");
-
         var modified = original with { Priority = MessagePriority.High };
 
-        // The original is untouched.
-        Assert.That(original.Priority, Is.EqualTo(MessagePriority.Normal));
+        await _output.PublishAsync(original, "normal");
+        await _output.PublishAsync(modified, "high");
 
-        // The modified copy has the new priority but retains all other values.
-        Assert.That(modified.Priority, Is.EqualTo(MessagePriority.High));
-        Assert.That(modified.MessageId, Is.EqualTo(original.MessageId));
-        Assert.That(modified.Payload, Is.EqualTo(original.Payload));
-
-        // They are different object references.
-        Assert.That(ReferenceEquals(original, modified), Is.False);
+        _output.AssertReceivedCount(2);
+        var first = _output.GetReceived<string>(0);
+        var second = _output.GetReceived<string>(1);
+        Assert.That(first.Priority, Is.EqualTo(MessagePriority.Normal));
+        Assert.That(second.Priority, Is.EqualTo(MessagePriority.High));
+        Assert.That(first.MessageId, Is.EqualTo(second.MessageId));
     }
 }

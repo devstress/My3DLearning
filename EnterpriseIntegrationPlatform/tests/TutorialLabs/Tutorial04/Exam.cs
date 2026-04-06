@@ -1,28 +1,44 @@
 // ============================================================================
-// Tutorial 04 – The Integration Envelope (Exam)
+// Tutorial 04 – Integration Envelope (Exam)
 // ============================================================================
-// Coding challenges: populate full metadata, build a multi-hop causation
-// chain, and round-trip an envelope through JSON serialization.
+// EIP Pattern: Envelope Wrapper
+// End-to-End: Full metadata through PointToPointChannel, multi-hop causation
+// chains, and split-message sequences — all verified at MockEndpoint output.
 // ============================================================================
 
-using System.Text.Json;
-using EnterpriseIntegrationPlatform.Contracts;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
+using EnterpriseIntegrationPlatform.Contracts;
+using EnterpriseIntegrationPlatform.Ingestion.Channels;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace TutorialLabs.Tutorial04;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Envelope with Full Metadata ────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _output = new MockEndpoint("output");
+    }
+
+    [TearDown]
+    public async Task TearDown()
+    {
+        await _output.DisposeAsync();
+    }
 
     [Test]
-    public void Challenge1_FullMetadata_AllHeaderConstants()
+    public async Task EndToEnd_FullMetadata_ThroughPointToPointChannel()
     {
-        // Populate an envelope's Metadata dictionary with every
-        // MessageHeaders constant that has a sensible string value.
+        var channel = new PointToPointChannel(
+            _output, _output, NullLogger<PointToPointChannel>.Instance);
+
         var envelope = IntegrationEnvelope<string>.Create(
-            "full-metadata-payload", "MetadataService", "metadata.test") with
+            "full-metadata", "MetadataService", "metadata.test") with
         {
             Priority = MessagePriority.High,
             Intent = MessageIntent.Command,
@@ -35,144 +51,87 @@ public sealed class Exam
                 [MessageHeaders.TraceId] = "trace-001",
                 [MessageHeaders.SpanId] = "span-001",
                 [MessageHeaders.ContentType] = "application/json",
-                [MessageHeaders.SchemaVersion] = "1.0",
-                [MessageHeaders.SourceTopic] = "commands-topic",
-                [MessageHeaders.ConsumerGroup] = "cmd-processors",
-                [MessageHeaders.LastAttemptAt] = DateTimeOffset.UtcNow.ToString("O"),
-                [MessageHeaders.RetryCount] = "0",
-                [MessageHeaders.ReplyTo] = "reply-topic",
-                [MessageHeaders.ExpiresAt] = DateTimeOffset.UtcNow.AddMinutes(30).ToString("O"),
-                [MessageHeaders.SequenceNumber] = "0",
-                [MessageHeaders.TotalCount] = "1",
-                [MessageHeaders.Intent] = "Command",
-                [MessageHeaders.MessageHistory] = "[]",
-                [MessageHeaders.ReplayId] = Guid.NewGuid().ToString(),
             },
         };
 
-        // Verify all 15 metadata entries are present.
-        Assert.That(envelope.Metadata, Has.Count.EqualTo(15));
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.TraceId), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.SpanId), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.ContentType), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.SchemaVersion), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.SourceTopic), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.ConsumerGroup), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.LastAttemptAt), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.RetryCount), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.ReplyTo), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.ExpiresAt), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.SequenceNumber), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.TotalCount), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.Intent), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.MessageHistory), Is.True);
-        Assert.That(envelope.Metadata.ContainsKey(MessageHeaders.ReplayId), Is.True);
+        await channel.SendAsync(envelope, "metadata-queue", CancellationToken.None);
+
+        _output.AssertReceivedCount(1);
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Priority, Is.EqualTo(MessagePriority.High));
+        Assert.That(received.ReplyTo, Is.EqualTo("reply-topic"));
+        Assert.That(received.Metadata[MessageHeaders.TraceId], Is.EqualTo("trace-001"));
+        Assert.That(received.ExpiresAt, Is.Not.Null);
     }
 
-    // ── Challenge 2: Multi-Hop Causation Chain ──────────────────────────────
-
     [Test]
-    public void Challenge2_CausationChain_A_CausesB_CausesC()
+    public async Task EndToEnd_MultiHopCausation_AllLinksPreserved()
     {
-        // Envelope A: the originating command.
         var envelopeA = IntegrationEnvelope<string>.Create(
-            payload: "PlaceOrder",
-            source: "WebApp",
-            messageType: "order.place") with
+            "PlaceOrder", "WebApp", "order.place") with
         {
             Intent = MessageIntent.Command,
         };
 
-        // Envelope B: caused by A (order placed event).
         var envelopeB = IntegrationEnvelope<string>.Create(
-            payload: "OrderPlaced",
-            source: "OrderService",
-            messageType: "order.placed",
+            "OrderPlaced", "OrderService", "order.placed",
             correlationId: envelopeA.CorrelationId,
             causationId: envelopeA.MessageId) with
         {
             Intent = MessageIntent.Event,
         };
 
-        // Envelope C: caused by B (invoice generated).
         var envelopeC = IntegrationEnvelope<string>.Create(
-            payload: "InvoiceGenerated",
-            source: "BillingService",
-            messageType: "invoice.generated",
+            "InvoiceGenerated", "BillingService", "invoice.generated",
             correlationId: envelopeA.CorrelationId,
             causationId: envelopeB.MessageId) with
         {
             Intent = MessageIntent.Document,
         };
 
-        // All three share the same CorrelationId for end-to-end tracing.
-        Assert.That(envelopeB.CorrelationId, Is.EqualTo(envelopeA.CorrelationId));
-        Assert.That(envelopeC.CorrelationId, Is.EqualTo(envelopeA.CorrelationId));
+        await _output.PublishAsync(envelopeA, "commands");
+        await _output.PublishAsync(envelopeB, "events");
+        await _output.PublishAsync(envelopeC, "documents");
 
-        // The causation chain links: A → B → C.
-        Assert.That(envelopeA.CausationId, Is.Null, "A has no parent");
-        Assert.That(envelopeB.CausationId, Is.EqualTo(envelopeA.MessageId));
-        Assert.That(envelopeC.CausationId, Is.EqualTo(envelopeB.MessageId));
+        _output.AssertReceivedCount(3);
+        var rA = _output.GetReceived<string>(0);
+        var rB = _output.GetReceived<string>(1);
+        var rC = _output.GetReceived<string>(2);
 
-        // Each has a unique MessageId.
-        var ids = new[] { envelopeA.MessageId, envelopeB.MessageId, envelopeC.MessageId };
-        Assert.That(ids.Distinct().Count(), Is.EqualTo(3));
+        Assert.That(rA.CausationId, Is.Null);
+        Assert.That(rB.CausationId, Is.EqualTo(rA.MessageId));
+        Assert.That(rC.CausationId, Is.EqualTo(rB.MessageId));
+        Assert.That(rB.CorrelationId, Is.EqualTo(rA.CorrelationId));
+        Assert.That(rC.CorrelationId, Is.EqualTo(rA.CorrelationId));
     }
 
-    // ── Challenge 3: JSON Serialization Round-Trip ──────────────────────────
-
     [Test]
-    public void Challenge3_JsonSerialization_RoundTrip()
+    public async Task EndToEnd_SplitSequence_AllPartsPreserved()
     {
-        var original = IntegrationEnvelope<string>.Create(
-            payload: "serialize-me",
-            source: "SerializerService",
-            messageType: "test.serialize") with
+        var correlationId = Guid.NewGuid();
+        const int total = 5;
+
+        for (var i = 0; i < total; i++)
         {
-            SchemaVersion = "2.0",
-            Priority = MessagePriority.Critical,
-            Intent = MessageIntent.Event,
-            ReplyTo = "reply-channel",
-            ExpiresAt = DateTimeOffset.Parse("2099-12-31T23:59:59+00:00"),
-            SequenceNumber = 5,
-            TotalCount = 10,
-            Metadata = new Dictionary<string, string>
+            var part = IntegrationEnvelope<string>.Create(
+                $"chunk-{i}", "Splitter", "data.chunk",
+                correlationId: correlationId) with
             {
-                [MessageHeaders.ContentType] = "application/json",
-                [MessageHeaders.TraceId] = "trace-xyz",
-            },
-        };
+                SequenceNumber = i,
+                TotalCount = total,
+            };
+            await _output.PublishAsync(part, "chunks");
+        }
 
-        var options = new JsonSerializerOptions
+        _output.AssertReceivedCount(total);
+        var all = _output.GetAllReceived<string>("chunks");
+
+        for (var i = 0; i < total; i++)
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
-        };
-
-        // Serialize to JSON.
-        var json = JsonSerializer.Serialize(original, options);
-        Assert.That(json, Is.Not.Null.And.Not.Empty);
-
-        // Deserialize back.
-        var restored = JsonSerializer.Deserialize<IntegrationEnvelope<string>>(json, options);
-        Assert.That(restored, Is.Not.Null);
-
-        // Verify all fields survived the round-trip.
-        Assert.That(restored!.MessageId, Is.EqualTo(original.MessageId));
-        Assert.That(restored.CorrelationId, Is.EqualTo(original.CorrelationId));
-        Assert.That(restored.CausationId, Is.EqualTo(original.CausationId));
-        Assert.That(restored.Source, Is.EqualTo(original.Source));
-        Assert.That(restored.MessageType, Is.EqualTo(original.MessageType));
-        Assert.That(restored.SchemaVersion, Is.EqualTo("2.0"));
-        Assert.That(restored.Priority, Is.EqualTo(MessagePriority.Critical));
-        Assert.That(restored.Intent, Is.EqualTo(MessageIntent.Event));
-        Assert.That(restored.Payload, Is.EqualTo("serialize-me"));
-        Assert.That(restored.ReplyTo, Is.EqualTo("reply-channel"));
-        Assert.That(restored.SequenceNumber, Is.EqualTo(5));
-        Assert.That(restored.TotalCount, Is.EqualTo(10));
-        Assert.That(restored.Metadata[MessageHeaders.ContentType],
-            Is.EqualTo("application/json"));
-        Assert.That(restored.Metadata[MessageHeaders.TraceId],
-            Is.EqualTo("trace-xyz"));
+            Assert.That(all[i].SequenceNumber, Is.EqualTo(i));
+            Assert.That(all[i].TotalCount, Is.EqualTo(total));
+            Assert.That(all[i].Payload, Is.EqualTo($"chunk-{i}"));
+            Assert.That(all[i].CorrelationId, Is.EqualTo(correlationId));
+        }
     }
 }
