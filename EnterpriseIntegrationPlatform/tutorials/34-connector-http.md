@@ -129,6 +129,8 @@ The source message is **Acked only after a successful `ConnectorResult`**. If th
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial34/Lab.cs`](../tests/TutorialLabs/Tutorial34/Lab.cs)
+
 **Objective:** Trace the HTTP connector's token-based authentication, analyze retry behavior for **atomic** delivery to external APIs, and evaluate token caching for **scalable** high-volume integration.
 
 ### Step 1: Configure Token-Based Authentication
@@ -173,23 +175,9 @@ Why is token caching essential for **throughput scalability**? What risk does st
 
 ## Exam
 
-1. An external API returns HTTP 503. What should the HTTP connector do for **atomic** delivery?
-   - A) Immediately route to DLQ
-   - B) Retry with exponential backoff — HTTP 503 is a transient error indicating the service is temporarily overloaded; retries allow the service to recover before failing permanently to DLQ
-   - C) Retry indefinitely until the service recovers
-   - D) Return success to the pipeline
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial34/Exam.cs`](../tests/TutorialLabs/Tutorial34/Exam.cs)
 
-2. Why does the connector cache authentication tokens?
-   - A) Tokens expire too quickly to use
-   - B) At high throughput, requesting a new token for every message would overwhelm the auth server and add unacceptable latency — caching amortizes the auth cost over thousands of messages
-   - C) Token caching is required by OAuth 2.0
-   - D) The auth server doesn't support concurrent requests
-
-3. How does the connector distinguish retryable from non-retryable HTTP errors?
-   - A) All HTTP errors are retryable
-   - B) HTTP 5xx (server errors) and 429 (rate limited) are retryable — the server may recover; HTTP 4xx (client errors like 400, 401, 403) are permanent — retrying won't fix the request, so fast-failing to DLQ preserves pipeline throughput
-   - C) Only HTTP 500 is retryable
-   - D) The broker determines retryability
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

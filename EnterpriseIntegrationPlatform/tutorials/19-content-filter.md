@@ -81,6 +81,8 @@ Filtering is a **pure, deterministic function** — the same input and keep-path
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial19/Lab.cs`](../tests/TutorialLabs/Tutorial19/Lab.cs)
+
 **Objective:** Apply the Content Filter pattern to remove unnecessary data, analyze data minimization for **security** and **scalability**, and design a filter-then-route pipeline.
 
 ### Step 1: Configure a Content Filter
@@ -117,23 +119,9 @@ If you reverse the order (filter first, then enrich), what goes wrong? How does 
 
 ## Exam
 
-1. A keep-path references a field that doesn't exist in the message. What should the Content Filter do?
-   - A) Throw an exception and route to DLQ
-   - B) Silently omit the missing field from the output — the filter operates on what's present, producing a valid subset without failing, which supports graceful handling of schema variations
-   - C) Add the field with a null value
-   - D) Block the message until the field is available
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial19/Exam.cs`](../tests/TutorialLabs/Tutorial19/Exam.cs)
 
-2. Why is the Content Filter critical for **PCI-DSS and GDPR compliance** in enterprise integration?
-   - A) It encrypts sensitive fields automatically
-   - B) It ensures each downstream consumer receives only the data it needs — preventing over-exposure of PII and cardholder data by stripping unauthorized fields before routing
-   - C) It logs all sensitive data access for audit
-   - D) It replaces sensitive data with synthetic values
-
-3. In a high-throughput pipeline, how does content filtering improve **scalability**?
-   - A) Filtering doesn't affect performance
-   - B) Removing unnecessary fields reduces message size — smaller messages mean lower broker storage costs, faster serialization, and reduced network bandwidth across the entire downstream processing chain
-   - C) Filtering enables parallel processing
-   - D) Filtered messages skip the routing step
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

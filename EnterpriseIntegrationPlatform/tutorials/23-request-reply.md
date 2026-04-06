@@ -97,6 +97,8 @@ The request is published to the request topic and the correlator subscribes to t
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial23/Lab.cs`](../tests/TutorialLabs/Tutorial23/Lab.cs)
+
 **Objective:** Trace the Request-Reply correlation mechanism, analyze timeout behavior, and design for **scalable** request-reply across distributed services.
 
 ### Step 1: Trace Request-Reply Correlation
@@ -129,23 +131,9 @@ At high throughput, many concurrent request-reply operations share the same repl
 
 ## Exam
 
-1. Why does the Request-Reply correlator subscribe to the reply topic **before** publishing the request?
-   - A) Subscribing is faster than publishing
-   - B) A fast responder could publish the reply before the requester is listening — pre-subscribing eliminates this race condition, ensuring the reply is never lost even with sub-millisecond response times
-   - C) The broker requires subscriptions before publishes
-   - D) Pre-subscribing reduces network latency
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial23/Exam.cs`](../tests/TutorialLabs/Tutorial23/Exam.cs)
 
-2. How does the `CorrelationId` enable **scalable** request-reply with many concurrent requests on the same topic?
-   - A) The broker routes replies based on `CorrelationId` automatically
-   - B) Each requester filters incoming replies by `CorrelationId` — only the matching reply is accepted, allowing thousands of concurrent request-reply operations to share a single reply topic without interference
-   - C) `CorrelationId` is used for message encryption
-   - D) Each request must use a unique reply topic
-
-3. What resource **scalability** concern does the timeout address in request-reply?
-   - A) Timeouts improve message throughput
-   - B) Without timeouts, requests that never receive replies would hold resources (memory, channel subscriptions) indefinitely — the timeout ensures cleanup even when responders fail, preventing memory leaks under sustained load
-   - C) Timeouts are only needed for testing
-   - D) The broker automatically cleans up timed-out requests
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

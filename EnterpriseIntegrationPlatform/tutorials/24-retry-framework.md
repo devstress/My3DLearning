@@ -124,6 +124,8 @@ When all retry attempts are exhausted (`IsSucceeded = false`), the message shoul
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial24/Lab.cs`](../tests/TutorialLabs/Tutorial24/Lab.cs)
+
 **Objective:** Calculate exponential backoff delays, analyze why jitter is critical for **scalable** retry under thundering-herd conditions, and design a retry classification strategy.
 
 ### Step 1: Calculate Backoff Delays
@@ -170,23 +172,9 @@ Why is fast-failing non-retryable errors critical for **pipeline throughput**? W
 
 ## Exam
 
-1. With `InitialDelayMs = 1000` and `BackoffMultiplier = 2.0`, what is the delay before the 4th retry attempt?
-   - A) 4000ms
-   - B) 8000ms — the delay doubles each attempt: 1000, 2000, 4000, 8000
-   - C) 3000ms
-   - D) 16000ms
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial24/Exam.cs`](../tests/TutorialLabs/Tutorial24/Exam.cs)
 
-2. Why is jitter critical for **scalable** retry strategies in distributed systems?
-   - A) Jitter makes retries faster
-   - B) Without jitter, all consumers retry at identical intervals — creating synchronized spikes that can overwhelm the recovering service; jitter spreads retries over time, enabling gradual recovery
-   - C) Jitter is only needed for testing
-   - D) The broker requires jitter in retry delays
-
-3. Why should non-retryable errors (e.g., `JsonException`) be routed to the DLQ immediately instead of retried?
-   - A) Non-retryable errors are rare and don't matter
-   - B) Retrying a permanent error wastes processing capacity and delays handling of valid messages — fast-failing to DLQ preserves pipeline **throughput** and enables rapid human intervention
-   - C) The DLQ can fix the error automatically
-   - D) Non-retryable errors eventually succeed after enough retries
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

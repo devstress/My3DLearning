@@ -137,6 +137,8 @@ Lifecycle recording is a **best-effort side effect** — it must not block or fa
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial39/Lab.cs`](../tests/TutorialLabs/Tutorial39/Lab.cs)
+
 **Objective:** Use the message lifecycle tracking system to diagnose stuck messages, design retention policies for **scalable** storage, and compare lifecycle tracking with OpenTelemetry tracing.
 
 ### Step 1: Diagnose a Stuck Message
@@ -179,23 +181,9 @@ Why does the platform maintain both systems? What does each provide that the oth
 
 ## Exam
 
-1. A message is stuck in "Transforming" state for 15 minutes. What does this indicate?
-   - A) The message was successfully delivered
-   - B) The transformation activity is either blocked (deadlock, external dependency), has failed without updating state, or the worker processing it has crashed — the lifecycle tracking enables targeted investigation of the exact stuck stage
-   - C) The message was routed to the DLQ
-   - D) The lifecycle store has a bug
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial39/Exam.cs`](../tests/TutorialLabs/Tutorial39/Exam.cs)
 
-2. Why does the platform record lifecycle events separately from OpenTelemetry traces?
-   - A) They serve the same purpose
-   - B) Lifecycle tracking provides business-level "where is my message?" visibility with longer retention; OpenTelemetry provides technical performance metrics with shorter retention — together they serve both operators and developers
-   - C) OpenTelemetry cannot track message state
-   - D) Lifecycle events are faster to query
-
-3. How does tiered retention support **storage scalability** for lifecycle data?
-   - A) All data is kept forever at full detail
-   - B) Recent data is kept at full detail for debugging; older data is summarized to reduce storage — this balances operational needs (recent incidents require full detail) with cost (years of data at full detail would be prohibitively expensive)
-   - C) Retention policies are only needed for compliance
-   - D) The message broker handles retention automatically
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

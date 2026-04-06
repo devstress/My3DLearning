@@ -143,6 +143,8 @@ Rule evaluation happens **within the pipeline transaction**. If the selected act
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial30/Lab.cs`](../tests/TutorialLabs/Tutorial30/Lab.cs)
+
 **Objective:** Write business rules with conditions and logic operators, trace priority-based evaluation, and analyze rule caching for **scalable** high-throughput routing decisions.
 
 ### Step 1: Write a Priority-Based Business Rule
@@ -188,23 +190,9 @@ At 50,000 messages/second with 100 rules, each message evaluates up to 100 condi
 
 ## Exam
 
-1. A rule engine has 3 rules with priorities 1, 5, 10. A message matches rules at priorities 5 and 10. Which rule is applied?
-   - A) Both rules are applied (fan-out)
-   - B) Priority 5 — the engine evaluates in priority order and stops at the first match, ensuring deterministic and **atomic** routing to exactly one destination
-   - C) Priority 10 — the last match wins
-   - D) The engine randomly selects one
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial30/Exam.cs`](../tests/TutorialLabs/Tutorial30/Exam.cs)
 
-2. Why does the rule engine use `And`/`Or` logic operators for conditions?
-   - A) They're required by the .NET compiler
-   - B) `And` requires all conditions to match (strict targeting); `Or` requires any condition to match (broad targeting) — this enables both precise and flexible routing rules for different business scenarios
-   - C) Logic operators improve serialization performance
-   - D) They're equivalent — both produce the same result
-
-3. How does rule caching improve **throughput scalability**?
-   - A) Caching stores message results, not rules
-   - B) Compiled rules are cached in memory — avoiding repeated parsing and compilation of rule definitions for every message; since rules change infrequently but messages arrive at high volume, caching amortizes the compilation cost over millions of evaluations
-   - C) Caching is only useful during testing
-   - D) Rules are too small to benefit from caching
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

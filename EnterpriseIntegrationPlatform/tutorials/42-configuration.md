@@ -148,6 +148,8 @@ Configuration updates are **versioned** — each `SetAsync` is atomic and create
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial42/Lab.cs`](../tests/TutorialLabs/Tutorial42/Lab.cs)
+
 **Objective:** Design feature flags with percentage rollouts, trace configuration change propagation, and analyze how environment overrides support **scalable** multi-environment deployments.
 
 ### Step 1: Design a Feature Flag with Gradual Rollout
@@ -199,23 +201,9 @@ How does this enable **scalable** multi-environment deployments without changing
 
 ## Exam
 
-1. Why does the platform use configuration change notification rather than reading config on every message?
-   - A) Reading configuration is too slow
-   - B) Reading config on every message would create a hot path to the configuration store — potentially millions of reads/second; change notification pushes updates only when values change, reducing load by orders of magnitude
-   - C) The configuration store doesn't support reads
-   - D) Notifications are required by .NET
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial42/Exam.cs`](../tests/TutorialLabs/Tutorial42/Exam.cs)
 
-2. How do feature flags with percentage rollouts support **safe scalability** of new features?
-   - A) They make features faster
-   - B) Gradual rollout (10% → 50% → 100%) limits the blast radius of bugs — if the new algorithm causes failures, only a percentage of traffic is affected, enabling rapid rollback without impacting all tenants
-   - C) Percentage rollouts are required for production
-   - D) Feature flags reduce memory usage
-
-3. Why does the `EIP__` environment variable prefix convention support **multi-environment scalability**?
-   - A) The prefix is shorter than other options
-   - B) Environment variables override configuration store values per deployment — the same code artifact deploys to dev, staging, and production with different behavior controlled by environment, eliminating configuration file management across environments
-   - C) The .NET runtime requires specific prefixes
-   - D) The prefix prevents name collisions with system variables
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

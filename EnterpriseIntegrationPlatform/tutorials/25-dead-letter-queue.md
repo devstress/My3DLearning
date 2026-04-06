@@ -133,6 +133,8 @@ Dead-lettering is the **last resort** — it runs only after all retries are exh
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial25/Lab.cs`](../tests/TutorialLabs/Tutorial25/Lab.cs)
+
 **Objective:** Trace the Dead Letter Queue lifecycle from failure to replay, analyze how the DLQ preserves **zero message loss atomicity**, and design an operational replay workflow.
 
 ### Step 1: Trace an Expired Message to the DLQ
@@ -172,23 +174,9 @@ Why is preserving the complete original envelope critical for DLQ operations? Wh
 
 ## Exam
 
-1. Why does the platform preserve the **complete original envelope** in the Dead Letter Queue?
-   - A) It's a storage requirement of the broker
-   - B) The original envelope enables accurate replay — operators can inspect the exact payload, metadata, and headers that caused the failure, and re-publish it unchanged for reprocessing after fixing the root cause
-   - C) The envelope is needed for deduplication
-   - D) Only the error details are stored
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial25/Exam.cs`](../tests/TutorialLabs/Tutorial25/Exam.cs)
 
-2. How does the DLQ pattern ensure **zero message loss** in the integration platform?
-   - A) The DLQ stores messages in memory for fast retrieval
-   - B) Every message that cannot be processed successfully — whether due to expiration, validation failure, or exhausted retries — is routed to the DLQ rather than being silently dropped, ensuring nothing is ever lost
-   - C) The broker prevents message deletion
-   - D) Messages are automatically retried from the DLQ every minute
-
-3. What **atomicity** guarantee must a DLQ replay operation provide?
-   - A) The replay can be partial — some fields are replayed while others are skipped
-   - B) The replay must either fully re-publish the original message to its target topic or fail cleanly — partial replays could cause duplicate processing or data corruption
-   - C) The DLQ entry must be deleted before replay
-   - D) Replay is only possible within 24 hours of the original failure
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

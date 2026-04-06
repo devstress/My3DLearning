@@ -248,6 +248,8 @@ You need `Microsoft.NETCore.App 10.x.x` and `Microsoft.AspNetCore.App 10.x.x`.
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial02/Lab.cs`](../tests/TutorialLabs/Tutorial02/Lab.cs)
+
 **Objective:** Build the solution, launch the Aspire orchestrator, and explore how the platform's service topology implements the EIP Messaging Gateway and Control Bus patterns.
 
 ### Step 1: Build and Launch
@@ -286,23 +288,9 @@ Using the Aspire dashboard's **Traces** tab, identify the OpenTelemetry spans cr
 
 ## Exam
 
-1. In the EIP Messaging Gateway pattern, what is the gateway's primary responsibility?
-   - A) Transform message payloads between formats
-   - B) Provide a single entry point that encapsulates messaging-specific logic and shields external systems from internal broker details
-   - C) Store messages permanently in a database
-   - D) Route messages based on content inspection
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial02/Exam.cs`](../tests/TutorialLabs/Tutorial02/Exam.cs)
 
-2. Why does the platform use .NET Aspire to orchestrate services rather than starting each service manually?
-   - A) Aspire encrypts all inter-service communication automatically
-   - B) Aspire ensures services start in dependency order with shared configuration, health checks, and observability — critical for a distributed integration platform's operational reliability
-   - C) Manual startup is not supported by .NET 10
-   - D) Aspire compiles all services into a single executable
-
-3. How does the Control Bus pattern (implemented by Admin.Api) support **operational scalability**?
-   - A) It routes business messages to faster consumers
-   - B) It provides centralized runtime management — feature flags, DLQ resubmission, and health monitoring — without modifying or redeploying processing pipelines
-   - C) It increases the number of broker partitions automatically
-   - D) It caches all messages in memory for faster retrieval
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

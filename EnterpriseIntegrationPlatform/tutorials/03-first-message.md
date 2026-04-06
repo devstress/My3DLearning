@@ -268,6 +268,8 @@ public class IntegrationEnvelopeTests
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial03/Lab.cs`](../tests/TutorialLabs/Tutorial03/Lab.cs)
+
 **Objective:** Create an `IntegrationEnvelope<T>`, publish it to a Message Channel, and trace the Correlation Identifier through a publish-subscribe round-trip.
 
 ### Step 1: Create and Inspect an Integration Envelope
@@ -305,23 +307,9 @@ Explain which EIP patterns are at play: **Publish-Subscribe Channel** (different
 
 ## Exam
 
-1. What is the purpose of the `CorrelationId` field on `IntegrationEnvelope<T>`?
-   - A) It uniquely identifies a single message in the broker's storage
-   - B) It links all messages that belong to the same logical business transaction, even across splits, transformations, and aggregations
-   - C) It stores the consumer group name for load balancing
-   - D) It provides the encryption key for message payloads
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial03/Exam.cs`](../tests/TutorialLabs/Tutorial03/Exam.cs)
 
-2. Which `MessageIntent` value should be assigned to a message that instructs a downstream service to perform an action (e.g., "process this payment")?
-   - A) `MessageIntent.Event`
-   - B) `MessageIntent.Document`
-   - C) `MessageIntent.Command`
-   - D) There is no distinction — all messages are treated identically
-
-3. How does the broker abstraction (`IMessageBrokerProducer` / `IMessageBrokerConsumer`) support **atomic processing** in the message lifecycle?
-   - A) It encrypts every message before publishing
-   - B) It ensures the message is durably persisted in the broker before returning from `PublishAsync`, so the message survives producer crashes
-   - C) It compresses the payload to reduce latency
-   - D) It creates a database transaction around the publish call
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

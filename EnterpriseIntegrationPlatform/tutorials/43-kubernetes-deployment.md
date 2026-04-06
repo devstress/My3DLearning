@@ -198,6 +198,8 @@ continuity. Liveness probes automatically restart unhealthy pods.
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial43/Lab.cs`](../tests/TutorialLabs/Tutorial43/Lab.cs)
+
 **Objective:** Configure Kubernetes HPA for auto-scaling integration workers, analyze graceful shutdown for **atomic** in-flight message handling, and design Kustomize overlays for multi-environment deployment.
 
 ### Step 1: Configure HPA with Multi-Metric Scaling
@@ -261,22 +263,10 @@ How does Kustomize differ from Helm for multi-environment deployment? Which is m
 
 ## Exam
 
-1. What happens to in-flight messages when a pod is terminated during a rolling update?
-   - A) Messages are lost
-   - B) The pod completes processing in-flight messages during the termination grace period, Acks completed work, and Nacks incomplete messages — the broker redelivers Nack'd messages to healthy pods, ensuring **zero message loss**
-   - C) All messages are automatically retried from the beginning
-   - D) The broker waits for the pod to restart
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial43/Exam.cs`](../tests/TutorialLabs/Tutorial43/Exam.cs)
 
-2. Why should the memory HPA threshold be set higher than CPU for integration workers?
-   - A) Memory is always less constrained than CPU
-   - B) Pipeline workers are typically CPU-bound from JSON parsing and regex evaluation; memory growth is gradual (from caching and enrichment) — setting memory threshold higher prevents premature scaling while still catching memory-intensive workload changes
-   - C) Kubernetes requires different thresholds
-   - D) Memory scaling is faster than CPU scaling
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
-3. How does Kubernetes auto-scaling support **integration platform scalability**?
-   - A) HPA only works with web servers
-   - B) HPA automatically adjusts the number of pipeline worker pods based on actual load — during peak hours, more workers process messages in parallel; during off-peak, resources are released, optimizing cost while maintaining throughput SLAs
-   - C) Auto-scaling requires manual approval
-   - D) The broker handles scaling internally
+---
 
 **Previous: [← Tutorial 42](42-configuration.md)** | **Next: [Tutorial 44 →](44-disaster-recovery.md)**

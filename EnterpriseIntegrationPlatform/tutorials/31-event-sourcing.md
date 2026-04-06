@@ -150,6 +150,8 @@ Optimistic concurrency ensures **consistency without locks**. The `expectedVersi
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial31/Lab.cs`](../tests/TutorialLabs/Tutorial31/Lab.cs)
+
 **Objective:** Analyze event sourcing's append-only model for **audit-complete atomicity**, trace optimistic concurrency conflict resolution, and design snapshot strategies for **scalable** aggregate reconstruction.
 
 ### Step 1: Calculate Aggregate Reconstruction Cost
@@ -188,23 +190,9 @@ Use `TemporalQuery.ReplayToPointInTimeAsync` to reconstruct an order aggregate's
 
 ## Exam
 
-1. Why does event sourcing use an append-only log rather than mutable state updates?
-   - A) Append-only is faster for write operations
-   - B) Every state change is permanently recorded as an immutable event — this provides a complete audit trail, enables temporal queries (reconstructing past state), and guarantees **atomic** state transitions through optimistic concurrency
-   - C) Databases don't support mutable updates
-   - D) Append-only reduces storage costs
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial31/Exam.cs`](../tests/TutorialLabs/Tutorial31/Exam.cs)
 
-2. How does optimistic concurrency prevent **atomicity** violations in concurrent event sourcing?
-   - A) It uses distributed locks to prevent concurrent access
-   - B) Each append specifies the expected version — if another command modified the stream first, the version mismatch is detected and the second command fails cleanly, ensuring only one writer succeeds per state transition
-   - C) Events are automatically merged when conflicts occur
-   - D) The event store queues concurrent commands
-
-3. How do snapshots improve **aggregate reconstruction scalability**?
-   - A) Snapshots reduce the number of events stored
-   - B) A snapshot captures aggregate state at a point in time — reconstruction replays only events after the snapshot instead of the entire history, reducing reconstruction time from O(N) to O(recent events)
-   - C) Snapshots are required by the event store
-   - D) Snapshots improve write performance
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

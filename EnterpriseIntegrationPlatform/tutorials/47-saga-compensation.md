@@ -250,6 +250,8 @@ available in a distributed system without two-phase commit.
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial47/Lab.cs`](../tests/TutorialLabs/Tutorial47/Lab.cs)
+
 **Objective:** Design saga compensation for multi-step workflows, analyze compensation failure strategies, and compare workflow types for **throughput vs. consistency** trade-offs.
 
 ### Step 1: Design Compensation for Non-Reversible Actions
@@ -297,22 +299,10 @@ When would you choose `IntegrationPipelineWorkflow` over `AtomicPipelineWorkflow
 
 ## Exam
 
-1. What should happen when a compensation activity itself fails?
-   - A) Silently mark the saga as compensated
-   - B) Retry with idempotent compensation (using `CorrelationId` to prevent duplicates); if retries are exhausted, escalate to the operations team — some compensations require human intervention when automated rollback fails
-   - C) Restart the entire original workflow
-   - D) Skip the failed compensation and continue
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial47/Exam.cs`](../tests/TutorialLabs/Tutorial47/Exam.cs)
 
-2. Why is email delivery the hardest action to compensate in a saga?
-   - A) Email is too slow for saga patterns
-   - B) Email is non-reversible — once sent, it cannot be recalled; any "compensation" (like a cancellation email) creates additional customer communication rather than truly undoing the action, making it a practical limit of saga **atomicity**
-   - C) SMTP doesn't support compensation
-   - D) Email compensation is straightforward
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
-3. When would you choose higher throughput (`IntegrationPipelineWorkflow`) over consistency (`AtomicPipelineWorkflow`)?
-   - A) Always choose consistency
-   - B) When the cost of occasional message loss or duplicate processing is acceptable — e.g., analytics events, metric updates, or log forwarding where throughput matters more than per-message **atomicity**
-   - C) Throughput is always preferable
-   - D) The two workflows are identical in behavior
+---
 
 **Previous: [← Tutorial 46](46-complete-integration.md)** | **Next: [Tutorial 48 →](48-notification-use-cases.md)**

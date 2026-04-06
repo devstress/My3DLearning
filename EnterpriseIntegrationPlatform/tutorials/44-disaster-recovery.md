@@ -136,6 +136,8 @@ This guarantees no acknowledged message is lost during failover.
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial44/Lab.cs`](../tests/TutorialLabs/Tutorial44/Lab.cs)
+
 **Objective:** Calculate RPO/RTO for different replication configurations, design a DR drill for Cassandra failover, and analyze broker replication trade-offs for **atomic** message durability.
 
 ### Step 1: Calculate RPO Under Different Configurations
@@ -179,22 +181,10 @@ For notification delivery (Tutorial 48), which trade-off would you choose? Why?
 
 ## Exam
 
-1. What is the relationship between `min.insync.replicas` and **message atomicity**?
-   - A) It controls how fast messages are delivered
-   - B) `min.insync.replicas` determines how many broker replicas must acknowledge a write before the producer considers it committed — with `=1`, a broker failure can lose unsynced messages; with `=2`, the message survives single-node failures
-   - C) It limits the number of consumers per partition
-   - D) It controls message compression level
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial44/Exam.cs`](../tests/TutorialLabs/Tutorial44/Exam.cs)
 
-2. Why must a DR drill verify data consistency **after** failover?
-   - A) Data is always consistent during failover
-   - B) Replication lag during failover can cause the secondary to be behind the primary — verifying consistency ensures no messages were lost during the transition, maintaining the platform's **zero message loss** guarantee
-   - C) Consistency checks are only needed quarterly
-   - D) The broker handles consistency automatically
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
-3. How does increasing `num_replicas` improve **durability** at the cost of **scalability**?
-   - A) More replicas improve read performance
-   - B) Each write must be acknowledged by more nodes (quorum) — this increases write latency and network cost, but guarantees the message survives node failures; the trade-off between durability and throughput must be tuned per workload
-   - C) Replicas reduce storage costs
-   - D) num_replicas only affects read performance
+---
 
 **Previous: [← Tutorial 43](43-kubernetes-deployment.md)** | **Next: [Tutorial 45 →](45-performance-profiling.md)**

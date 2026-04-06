@@ -90,6 +90,8 @@ Enrichment is **not idempotent by default** if the external data changes between
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial18/Lab.cs`](../tests/TutorialLabs/Tutorial18/Lab.cs)
+
 **Objective:** Design enrichment strategies using external data sources, analyze **atomicity** when enrichment depends on external service availability, and evaluate caching for **scalable** enrichment.
 
 ### Step 1: Design a Two-Step Enrichment
@@ -125,23 +127,9 @@ Open `src/Processing.Transform/` and check if the platform implements caching. H
 
 ## Exam
 
-1. The Content Enricher calls an external service that is temporarily unavailable. What is the correct **atomic** behavior?
-   - A) Skip enrichment and forward the message without the additional data
-   - B) Preserve the original message, retry according to policy, and if all retries fail route to the DLQ — the message is never forwarded with missing enrichment data
-   - C) Cache the last known good response and use it
-   - D) Block all messages until the external service recovers
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial18/Exam.cs`](../tests/TutorialLabs/Tutorial18/Exam.cs)
 
-2. How does caching in the Content Enricher improve **scalability** without sacrificing data accuracy?
-   - A) Caching eliminates the need for external services entirely
-   - B) Frequently accessed enrichment data (e.g., customer records) is cached with a TTL — this reduces external API calls by 80-95% while ensuring data freshness through time-based expiration
-   - C) The cache stores messages, not enrichment data
-   - D) Caching is only useful for batch processing
-
-3. How are the Content Enricher and Content Filter (Tutorial 19) **complementary** in a pipeline?
-   - A) They do the same thing in reverse order
-   - B) The Enricher adds data from external sources, then the Filter removes fields not needed downstream — together they ensure each consumer receives exactly the data it needs, no more and no less
-   - C) The Filter must always run before the Enricher
-   - D) They cannot be used in the same pipeline
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

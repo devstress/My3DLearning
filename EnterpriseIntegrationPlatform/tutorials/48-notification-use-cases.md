@@ -219,6 +219,8 @@ enable instant, zero-deployment changes to notification behavior.
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial48/Lab.cs`](../tests/TutorialLabs/Tutorial48/Lab.cs)
+
 **Objective:** Design notification failure handling, analyze mapper configurability for **scalable** multi-format notification delivery, and trace feature flag interaction with notification flows.
 
 ### Step 1: Design UC6 — Notification Publish Failure
@@ -270,22 +272,10 @@ Is the feature flag check **atomic** with the notification publish? What race co
 
 ## Exam
 
-1. When the notification publish fails, why should the pipeline continue rather than failing?
-   - A) Notifications are always optional
-   - B) The notification reports the outcome of processing — the message itself was already successfully delivered; blocking the pipeline on notification failure would hold up subsequent messages for a non-critical status report
-   - C) The broker automatically retries notifications
-   - D) Notification failures never occur in production
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial48/Exam.cs`](../tests/TutorialLabs/Tutorial48/Exam.cs)
 
-2. Why should notification format (XML/JSON) be configurable per integration partner?
-   - A) JSON is always better than XML
-   - B) Different partner systems expect different formats — a healthcare partner may require XML (HL7/CDA), while a modern API partner expects JSON; per-partner configurability enables **scalable** onboarding of diverse integration consumers
-   - C) Format configuration improves throughput
-   - D) The broker requires specific formats
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
-3. What **atomicity** concern arises from feature flag checks in the notification flow?
-   - A) Feature flags are always atomic
-   - B) If the flag is disabled between the check and the publish, a notification might be sent despite the flag being off — this race window is typically acceptable (milliseconds), but for strict compliance, the check and publish should be treated as a critical section
-   - C) Feature flags don't affect notifications
-   - D) The flag value is cached permanently
+---
 
 **Previous: [← Tutorial 47](47-saga-compensation.md)** | **Next: [Tutorial 49 →](49-testing-integrations.md)**

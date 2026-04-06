@@ -98,6 +98,8 @@ The platform enforces **no silent drops** in production deployments. When a `Dis
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial10/Lab.cs`](../tests/TutorialLabs/Tutorial10/Lab.cs)
+
 **Objective:** Configure message filter rules, analyze the no-silent-drop guarantee with `RequireDiscardTopic`, and design a filter topology for **scalable** multi-stage message processing.
 
 ### Step 1: Configure a Filter with Discard Routing
@@ -144,23 +146,9 @@ How does each filter's **discard topic** become a different team's input? How do
 
 ## Exam
 
-1. A message fails all filter conditions but no `DiscardTopic` is configured and `RequireDiscardTopic = false`. What happens?
-   - A) The filter throws an `InvalidOperationException`
-   - B) The message is silently dropped — the filter logs a warning but takes no further action
-   - C) The message is automatically routed to the Dead Letter Queue
-   - D) The filter retries evaluation with relaxed conditions
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial10/Exam.cs`](../tests/TutorialLabs/Tutorial10/Exam.cs)
 
-2. How does the Message Filter differ from the Content-Based Router in the EIP pattern catalog?
-   - A) They are identical patterns with different names
-   - B) The Router selects one of many output channels based on content; the Filter has a binary decision — pass or discard — making it simpler and more efficient for yes/no criteria
-   - C) The Filter can route to multiple topics simultaneously
-   - D) The Router only works with XML messages
-
-3. Why is `RequireDiscardTopic` essential for **production atomicity** in enterprise integration?
-   - A) It improves message throughput by forcing batch processing
-   - B) It prevents silent message loss — in production, every message must be accounted for, and throwing an exception forces the team to configure a discard destination before deployment
-   - C) It enables faster regex evaluation
-   - D) It is required by the NATS JetStream protocol
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

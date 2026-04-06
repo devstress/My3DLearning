@@ -100,6 +100,8 @@ All split items are published to the target topic before the source message is A
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial20/Lab.cs`](../tests/TutorialLabs/Tutorial20/Lab.cs)
+
 **Objective:** Split composite messages into individual items, trace how `SequenceNumber` and `TotalCount` enable the Aggregator to reassemble split messages, and analyze **atomicity** when a split item fails.
 
 ### Step 1: Split a Composite Message
@@ -136,23 +138,9 @@ Splitting a message with 1,000 items creates 1,000 individual messages. Analyze:
 
 ## Exam
 
-1. After splitting, why does each split envelope carry `SequenceNumber` and `TotalCount`?
-   - A) For sorting messages alphabetically
-   - B) These fields enable the downstream Aggregator to detect missing items and reassemble the complete set — without them, the Aggregator cannot determine when all pieces have arrived or which pieces are missing
-   - C) The broker requires sequence numbers for storage
-   - D) They are used for message deduplication
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial20/Exam.cs`](../tests/TutorialLabs/Tutorial20/Exam.cs)
 
-2. Why does the Splitter clone each array element rather than using references to the original?
-   - A) .NET doesn't support object references in records
-   - B) Cloning ensures each split message is independently serializable and processable — without cloning, concurrent modifications by downstream consumers could corrupt the shared source data, violating processing **atomicity**
-   - C) Cloning is faster than referencing
-   - D) The broker serializer requires cloned objects
-
-3. A batch message with 100 items is split. Item 47 fails after items 1-46 and 48-100 succeed. What is the **scalable** recovery strategy?
-   - A) Retry all 100 items from the beginning
-   - B) Retry only item 47 using its `CorrelationId` and `SequenceNumber` — the other 99 items are already committed and don't need reprocessing, enabling efficient partial recovery
-   - C) Route all 100 items to the Dead Letter Queue
-   - D) Wait for item 47 to auto-heal
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

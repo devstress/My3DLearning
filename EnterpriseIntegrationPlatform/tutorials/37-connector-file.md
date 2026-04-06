@@ -97,6 +97,8 @@ File I/O is bound by disk throughput and network filesystem latency (for NFS/SMB
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial37/Lab.cs`](../tests/TutorialLabs/Tutorial37/Lab.cs)
+
 **Objective:** Configure file-based delivery for batch processing, analyze concurrent write safety, and trace how `{MessageId}` filenames prevent conflicts in **scaled** consumer deployments.
 
 ### Step 1: Configure a File Connector
@@ -138,23 +140,9 @@ The file connector uses `Func<T, byte[]>` for serialization rather than acceptin
 
 ## Exam
 
-1. Why does the file connector use `{MessageId}` in the filename pattern?
-   - A) Message IDs are shorter than timestamps
-   - B) `MessageId` is globally unique — using it in filenames prevents collision when multiple consumer replicas write to the same directory, and makes redeliveries idempotent (same file is overwritten, not duplicated)
-   - C) The filesystem requires GUIDs as filenames
-   - D) MessageId is the only available placeholder
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial37/Exam.cs`](../tests/TutorialLabs/Tutorial37/Exam.cs)
 
-2. Why does the connector use `Func<T, byte[]>` for serialization?
-   - A) Bytes are smaller than strings
-   - B) `byte[]` supports any output format — JSON, XML, binary (Avro, Protobuf) — while `string` would limit the connector to text-only formats; this makes the connector **format-agnostic** and scalable across integration needs
-   - C) The filesystem only stores bytes
-   - D) String serialization is not supported in .NET
-
-3. How does write-then-rename ensure **atomic** file visibility?
-   - A) Renaming is faster than writing
-   - B) The receiver's file scanner only sees the final filename — the temp file is invisible to scanners looking for the expected pattern; rename is atomic at the OS level, so the file transitions from invisible to complete in one step
-   - C) The filesystem guarantees transactional writes
-   - D) Temp files are automatically deleted
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

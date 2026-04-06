@@ -195,6 +195,8 @@ Each consumer processes messages independently and Acks them individually. If a 
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial28/Lab.cs`](../tests/TutorialLabs/Tutorial28/Lab.cs)
+
 **Objective:** Trace the auto-scaling orchestrator with backpressure signaling, analyze cooldown to prevent scaling flap, and design a production backpressure integration.
 
 ### Step 1: Trace the Scaling Decision Path
@@ -235,23 +237,9 @@ How does backpressure prevent **cascade failures** in a scalable system? What ha
 
 ## Exam
 
-1. A topic has 8 partitions and the orchestrator scales to 12 consumers. What happens?
-   - A) All 12 consumers share the 8 partitions equally
-   - B) 8 consumers each get 1 partition; 4 consumers are idle — Kafka cannot assign more consumers than partitions in a consumer group; `MaxConsumers` should be set to match partition count
-   - C) The broker creates 4 additional partitions automatically
-   - D) The extra consumers process from a different topic
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial28/Exam.cs`](../tests/TutorialLabs/Tutorial28/Exam.cs)
 
-2. Why is cooldown critical for **scalable** auto-scaling?
-   - A) Cooldown reduces memory usage
-   - B) Without cooldown, oscillating lag near the threshold causes rapid scale-up/scale-down flapping — cooldown ensures each scaling decision has time to take effect before the next evaluation, preventing resource waste and instability
-   - C) Cooldown is only needed during maintenance windows
-   - D) The broker enforces cooldown automatically
-
-3. How does backpressure signaling maintain **system-level atomicity** under overload?
-   - A) Backpressure drops excess messages to protect the system
-   - B) Backpressure slows or pauses upstream producers — this prevents message accumulation that would exceed processing capacity, ensuring every accepted message can be processed atomically rather than overwhelming the pipeline
-   - C) Backpressure increases consumer count beyond the maximum
-   - D) Backpressure is only relevant for batch processing
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

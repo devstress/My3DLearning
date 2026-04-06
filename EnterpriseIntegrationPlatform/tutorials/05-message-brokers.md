@@ -234,6 +234,8 @@ Is this task delivery (process and acknowledge)?
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial05/Lab.cs`](../tests/TutorialLabs/Tutorial05/Lab.cs)
+
 **Objective:** Design a broker topic hierarchy for a multi-tenant system and analyze how different broker architectures affect **scalability** and **message ordering guarantees**.
 
 ### Step 1: Design a Multi-Region Topic Hierarchy
@@ -268,23 +270,9 @@ The platform uses `IMessageBrokerProducer` / `IMessageBrokerConsumer` to abstrac
 
 ## Exam
 
-1. What is head-of-line (HOL) blocking and why is it a **scalability** problem?
-   - A) HOL blocking occurs when a slow message in a partition delays all subsequent messages; NATS queue groups avoid it because any available consumer can pick up any message
-   - B) HOL blocking is a network-layer issue that all brokers handle identically
-   - C) HOL blocking only affects messages with `MessagePriority.Low`
-   - D) HOL blocking means messages are delivered out of order
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial05/Exam.cs`](../tests/TutorialLabs/Tutorial05/Exam.cs)
 
-2. Why does the platform define `IMessageBrokerProducer` and `IMessageBrokerConsumer` as abstractions rather than coding directly against a specific broker SDK?
-   - A) The broker SDKs do not support .NET 10
-   - B) It allows the broker implementation to be swapped at deployment time without changing application code — enabling different scalability and atomicity trade-offs per workload
-   - C) Abstractions are required by the C# compiler for async methods
-   - D) Each broker uses a different serialization format
-
-3. When would you choose Apache Pulsar's Key_Shared subscription over Kafka's partition-based consumption for **multi-tenant scalability**?
-   - A) When you need strict global order across all keys
-   - B) When you want per-key ordering without cross-key head-of-line blocking — one tenant's slow processing should not affect others
-   - C) When your messages do not have any key
-   - D) When you require messages to be stored for less than 24 hours
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

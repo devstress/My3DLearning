@@ -148,6 +148,8 @@ RAG is a **read-only, advisory feature** — it does not modify messages or pipe
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial40/Lab.cs`](../tests/TutorialLabs/Tutorial40/Lab.cs)
+
 **Objective:** Design a RAG query flow for operational troubleshooting, analyze graceful degradation when AI infrastructure is unavailable, and evaluate self-hosted vs. cloud AI for **scalable** integration platform operations.
 
 ### Step 1: Design a RAG Troubleshooting Flow
@@ -193,23 +195,9 @@ Why does the platform default to self-hosted Ollama? Consider: enterprise integr
 
 ## Exam
 
-1. Why must the RAG/AI system never be in the critical message processing path?
-   - A) AI responses are too slow for real-time processing
-   - B) AI infrastructure failures must not impact message processing — the integration platform's primary responsibility is atomic message delivery, and coupling it to AI availability would make GPU outages cascade into integration failures
-   - C) AI models cannot process binary data
-   - D) The broker doesn't support AI integration
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial40/Exam.cs`](../tests/TutorialLabs/Tutorial40/Exam.cs)
 
-2. Why does the platform default to self-hosted Ollama rather than a cloud AI provider?
-   - A) Ollama is faster than cloud providers
-   - B) Enterprise integration platforms process sensitive business data from multiple tenants — self-hosting ensures payload data never leaves the organization's infrastructure, meeting data residency and privacy requirements
-   - C) Cloud AI providers don't support .NET
-   - D) Self-hosting is always cheaper
-
-3. How does RAG improve **operational scalability** for a large integration platform?
-   - A) RAG processes messages faster
-   - B) RAG enables natural-language troubleshooting across millions of messages — operators can ask "why did this fail?" instead of manually searching DLQ entries, lifecycle events, and logs, dramatically reducing mean-time-to-resolution
-   - C) RAG reduces the number of integration patterns needed
-   - D) RAG automatically fixes failed messages
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

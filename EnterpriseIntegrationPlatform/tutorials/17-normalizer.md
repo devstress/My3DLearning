@@ -97,6 +97,8 @@ Normalization happens **before** any downstream processing. If normalization fai
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial17/Lab.cs`](../tests/TutorialLabs/Tutorial17/Lab.cs)
+
 **Objective:** Configure the Normalizer for multi-format input handling, analyze how the Canonical Data Model pattern enables **scalable** integration with diverse source systems, and design normalization strategies for edge cases.
 
 ### Step 1: Configure a CSV Normalizer
@@ -137,23 +139,9 @@ A payload arrives with `contentType = "application/json"` but contains invalid J
 
 ## Exam
 
-1. Why does the platform normalize all messages to a **Canonical Data Model** (JSON)?
-   - A) JSON is faster to parse than all other formats
-   - B) A single canonical format means adding a new source system requires only one new translator — not one for every downstream consumer — making the integration platform scale linearly with the number of systems
-   - C) JSON is required by the NATS protocol
-   - D) The .NET runtime only supports JSON serialization
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial17/Exam.cs`](../tests/TutorialLabs/Tutorial17/Exam.cs)
 
-2. What is the risk of setting `StrictContentType = false` in a production environment?
-   - A) No risk — lenient mode is always preferred
-   - B) A message could be misinterpreted — e.g., XML interpreted as JSON due to format sniffing — leading to corrupt data flowing through the pipeline undetected, violating **data atomicity**
-   - C) Lenient mode disables all content validation
-   - D) Strict mode is slower than lenient mode
-
-3. How does the Normalizer pattern reduce **integration complexity** when scaling from 5 to 50 connected systems?
-   - A) It doesn't — complexity grows equally regardless
-   - B) Without normalization, N sources × M consumers = N×M translators; with normalization, only N + M translators are needed — this is the difference between O(N²) and O(N) scaling
-   - C) The Normalizer caches all messages, reducing duplicate processing
-   - D) The Normalizer compresses messages to reduce broker storage
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

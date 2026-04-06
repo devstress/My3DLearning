@@ -113,6 +113,8 @@ The routing slip is stored in the envelope's `Metadata` dictionary as serialised
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial13/Lab.cs`](../tests/TutorialLabs/Tutorial13/Lab.cs)
+
 **Objective:** Build a Routing Slip, trace failure recovery with partial completion, and compare the Routing Slip pattern's **scalability** against Process Manager workflows.
 
 ### Step 1: Build a Routing Slip with Parameters
@@ -160,23 +162,9 @@ When would you choose a Routing Slip over a full Temporal workflow? Consider: si
 
 ## Exam
 
-1. A Routing Slip message has completed steps 1-3 of 5. The worker crashes. What happens on redelivery?
-   - A) All 5 steps execute from the beginning
-   - B) The slip indicates steps 1-3 are complete — only steps 4-5 are in `RemainingSlip`, so processing resumes from step 4 without re-executing completed work
-   - C) The message is routed to the Dead Letter Queue
-   - D) A new slip is created with all 5 steps
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial13/Exam.cs`](../tests/TutorialLabs/Tutorial13/Exam.cs)
 
-2. Why does the Routing Slip pattern carry processing state **inside the message** rather than in an external store?
-   - A) External stores are too slow for message processing
-   - B) The message is self-contained — any processor can pick it up and resume, enabling **horizontal scaling** without shared state coordination between consumers
-   - C) The message broker requires all state in the payload
-   - D) External stores don't support key-value parameters
-
-3. What is the key **scalability** advantage of a Routing Slip over a centralized Process Manager?
-   - A) Routing slips are faster to serialize
-   - B) No central coordinator is needed — each step independently reads the slip and forwards to the next, so the pattern scales linearly with more processors and has no single-point-of-failure bottleneck
-   - C) Process Managers cannot run on multiple machines
-   - D) Routing slips support more data formats
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

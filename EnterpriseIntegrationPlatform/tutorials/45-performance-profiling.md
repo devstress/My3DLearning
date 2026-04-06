@@ -191,6 +191,8 @@ Ack/Nack cycle within configured timeout windows.
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial45/Lab.cs`](../tests/TutorialLabs/Tutorial45/Lab.cs)
+
 **Objective:** Use profiling tools to identify performance bottlenecks, analyze GC behavior under load, and design optimization strategies for **scalable** high-throughput message processing.
 
 ### Step 1: Monitor GC Behavior Under Load
@@ -245,22 +247,10 @@ Design a profiling experiment to measure this trade-off. When is LOH compaction 
 
 ## Exam
 
-1. A Gen 0:Gen 2 collection ratio of 5:1 indicates what **performance scalability** problem?
-   - A) The application is running normally
-   - B) Objects are surviving to older generations — indicating either long-lived allocations or GC pressure; frequent Gen 2 collections cause stop-the-world pauses that degrade throughput and P99 latency under high message load
-   - C) The application needs more CPU cores
-   - D) Gen 2 collections are always harmful
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial45/Exam.cs`](../tests/TutorialLabs/Tutorial45/Exam.cs)
 
-2. Why is pre-compiling regex patterns critical for **routing scalability**?
-   - A) Pre-compilation improves code readability
-   - B) Without pre-compilation, each message evaluation creates a new Regex object — causing allocation churn, GC pressure, and increased P99 latency; pre-compiled patterns are allocated once and reused across millions of evaluations
-   - C) The .NET regex engine requires pre-compilation
-   - D) Pre-compilation enables case-insensitive matching
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
-3. When profiling an integration platform, why is P99 latency more important than average latency?
-   - A) P99 is easier to calculate
-   - B) Integration platforms process millions of messages — the average hides tail-latency spikes from GC pauses, lock contention, or external service timeouts; P99 reveals the worst experience for 1% of messages, which at scale affects thousands of messages per hour
-   - C) Average latency is always lower than P99
-   - D) P99 is a marketing metric
+---
 
 **Previous: [← Tutorial 44](44-disaster-recovery.md)** | **Next: [Tutorial 46 →](46-complete-integration.md)**

@@ -94,6 +94,8 @@ This ensures either all recipients get the message or the source is redelivered.
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial12/Lab.cs`](../tests/TutorialLabs/Tutorial12/Lab.cs)
+
 **Objective:** Analyze how the Recipient List pattern enables **scalable fan-out** to multiple destinations, design duplicate-safe publishing, and measure the performance impact of parallel vs. sequential delivery.
 
 ### Step 1: Trace a Recipient List Resolution
@@ -131,23 +133,9 @@ With 10 recipients and one slow destination (3-second latency):
 
 ## Exam
 
-1. A Recipient List resolves 5 destinations. Publishing to destination 3 fails. What should the platform do to maintain **atomicity**?
-   - A) Silently skip destination 3 and Ack the remaining 4
-   - B) Log the failure and track partial delivery — the message enters a compensable state where the failed destination can be retried independently without re-publishing to the successful 4
-   - C) Retry all 5 destinations from the beginning
-   - D) Route the entire message to the Dead Letter Queue
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial12/Exam.cs`](../tests/TutorialLabs/Tutorial12/Exam.cs)
 
-2. Why does the Recipient List remove duplicate destinations before publishing?
-   - A) Duplicates are not supported by the NATS protocol
-   - B) Publishing the same message to the same topic multiple times creates duplicate processing downstream — de-duplication ensures **idempotent fan-out** at the routing layer
-   - C) Duplicate topics cause build errors
-   - D) The broker ignores duplicate publishes automatically
-
-3. How does parallel publishing to multiple recipients improve **throughput scalability**?
-   - A) It reduces the total message size
-   - B) Total fan-out latency equals the slowest recipient (not the sum of all) — this is critical when scaling to dozens of recipients, as sequential publishing would create unacceptable pipeline latency
-   - C) Parallel publishing uses less memory than sequential
-   - D) The broker handles parallelism internally regardless of how the producer publishes
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 
