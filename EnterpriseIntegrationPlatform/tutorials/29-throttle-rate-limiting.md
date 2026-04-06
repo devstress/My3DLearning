@@ -152,6 +152,8 @@ When `AcquireAsync` delays a message, the message remains **uncommitted** — no
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial29/Lab.cs`](../tests/TutorialLabs/Tutorial29/Lab.cs)
+
 **Objective:** Design throttle policies for multi-tenant rate limiting, trace the token bucket algorithm, and analyze why per-tenant throttling is essential for **fair scalability**.
 
 ### Step 1: Design a Multi-Tenant Throttle Policy
@@ -192,23 +194,9 @@ How does per-tenant throttling prevent the **noisy neighbor** problem? Why is th
 
 ## Exam
 
-1. A token bucket with rate=100/s and burst=500 receives 600 messages in 1 second. What happens?
-   - A) All 600 messages are processed immediately
-   - B) The first 500 are processed from the burst allowance; the remaining 100 wait for token replenishment at 100/s — after 1 second, all 600 have been processed; messages beyond capacity wait up to `MaxWait` before being rejected
-   - C) All 600 messages are rejected
-   - D) The burst limit is increased automatically
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial29/Exam.cs`](../tests/TutorialLabs/Tutorial29/Exam.cs)
 
-2. Why is per-tenant throttling essential for **multi-tenant scalability**?
-   - A) Per-tenant throttling uses less memory
-   - B) Without per-tenant isolation, one tenant's traffic spike would exhaust the global rate limit and block all other tenants — the noisy neighbor problem; per-tenant throttling ensures fair resource allocation
-   - C) The broker requires per-tenant configuration
-   - D) Global throttling is always preferable for simplicity
-
-3. What happens when a message exceeds the `MaxWait` timeout in the throttle?
-   - A) The message is processed anyway
-   - B) The message is rejected with an appropriate error — this prevents unbounded queue growth and provides backpressure to the upstream sender, maintaining system stability under sustained overload
-   - C) The throttle increases its rate automatically
-   - D) The message is routed to a different topic
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

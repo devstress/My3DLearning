@@ -115,6 +115,8 @@ Each `AggregateAsync` call atomically adds the item to the store and checks comp
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial21/Lab.cs`](../tests/TutorialLabs/Tutorial21/Lab.cs)
+
 **Objective:** Trace the Aggregator's completion logic, design timeout strategies, and analyze how **idempotent** aggregation ensures **atomic** reassembly of split messages.
 
 ### Step 1: Trace Aggregation Completion
@@ -146,23 +148,9 @@ Open `src/Processing.Aggregator/` and verify: How does `IMessageAggregateStore` 
 
 ## Exam
 
-1. A Splitter produces 5 items. The Aggregator receives items 0, 1, 3, 4 but item 2 never arrives. What should happen after the timeout?
-   - A) Wait indefinitely — the aggregate must be complete
-   - B) Complete with 4 items, mark as partial, and route for manual review — a timeout prevents indefinite resource consumption while preserving the received work for inspection
-   - C) Discard all 4 received items
-   - D) Re-request item 2 from the Splitter
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial21/Exam.cs`](../tests/TutorialLabs/Tutorial21/Exam.cs)
 
-2. Why must the Aggregator's store be **idempotent** on `MessageId`?
-   - A) Idempotency is required by the NUnit testing framework
-   - B) In at-least-once delivery systems, duplicate messages are expected — without idempotency, the aggregate count would be corrupted, potentially triggering premature completion or preventing completion entirely
-   - C) Idempotency improves serialization performance
-   - D) The broker guarantees exactly-once delivery, so idempotency is unnecessary
-
-3. How does the Splitter-Aggregator pair maintain **end-to-end atomicity** for a batch message?
-   - A) The Splitter and Aggregator share a database transaction
-   - B) The `CorrelationId` links all split items; `SequenceNumber` and `TotalCount` enable the Aggregator to verify completeness — only when all items succeed (or timeout triggers) is the aggregate result committed or compensated
-   - C) The broker ensures all items are delivered simultaneously
-   - D) Each split item is independently atomic — there is no end-to-end guarantee
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

@@ -267,6 +267,8 @@ integration tests confirm that DLQ routing works with real brokers.
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial49/Lab.cs`](../tests/TutorialLabs/Tutorial49/Lab.cs)
+
 **Objective:** Design a testing strategy for integration platforms, analyze the testing pyramid for **scalable** quality assurance, and evaluate infrastructure testing with Testcontainers.
 
 ### Step 1: Design the Testing Pyramid
@@ -314,22 +316,10 @@ How would you use NBomber to measure this? What overhead percentage is acceptabl
 
 ## Exam
 
-1. Why are unit-level verifications preferred over integration-level for most component validation?
-   - A) Integration scenarios are more accurate
-   - B) Unit-level verifications run in milliseconds without infrastructure dependencies — enabling developers to validate hundreds of scenarios in seconds; this **scales** development velocity because the fast feedback loop catches errors before expensive integration runs
-   - C) Unit-level verifications catch all bugs
-   - D) Integration scenarios are not reliable
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial49/Exam.cs`](../tests/TutorialLabs/Tutorial49/Exam.cs)
 
-2. When should you use Testcontainers for integration verification instead of mocks?
-   - A) Always — mocks are unreliable
-   - B) When the verification depends on real infrastructure behavior — e.g., broker delivery guarantees, database consistency, connection pooling — that cannot be accurately simulated with mocks
-   - C) Never — integration verification is too slow
-   - D) Only for performance measurement
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
-3. Why is load profiling essential for **scalability** validation of an integration platform?
-   - A) Load profiling improves code quality
-   - B) Integration platforms must sustain high throughput under production conditions — load profiling reveals bottlenecks (GC pressure, lock contention, broker capacity) that only appear under sustained load and would cause production failures
-   - C) Load profiling is only needed before launch
-   - D) The broker handles load automatically
+---
 
 **Previous: [← Tutorial 48](48-notification-use-cases.md)** | **Next: [Tutorial 50 →](50-best-practices.md)**

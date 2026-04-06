@@ -217,6 +217,8 @@ All five envelopes share the same `CorrelationId`. This lets you:
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial04/Lab.cs`](../tests/TutorialLabs/Tutorial04/Lab.cs)
+
 **Objective:** Build causation chains and sequenced message sets that demonstrate how the Envelope Wrapper pattern preserves **atomicity** and **traceability** across a multi-step integration pipeline.
 
 ### Step 1: Build a Causation Chain (Message Lineage)
@@ -237,23 +239,9 @@ Imagine an order message is split into 3 line-item messages. Line-item 2 fails d
 
 ## Exam
 
-1. Why is `IntegrationEnvelope<T>` defined as a C# `record` rather than a `class`?
-   - A) Records are faster to serialize than classes
-   - B) Records provide immutability via `with` expressions, ensuring envelopes are never accidentally mutated during concurrent processing — critical for thread-safe scalability
-   - C) The .NET runtime requires records for generic types
-   - D) Records automatically encrypt their properties
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial04/Exam.cs`](../tests/TutorialLabs/Tutorial04/Exam.cs)
 
-2. In a causation chain where message A is split into messages B₁, B₂, and B₃, what value should the `CausationId` of each split message contain?
-   - A) Its own `MessageId`
-   - B) The `CorrelationId` of message A
-   - C) The `MessageId` of message A — the parent that caused the split
-   - D) A new randomly generated `Guid`
-
-3. How does the `IsExpired` check contribute to the platform's **zero message loss** guarantee?
-   - A) Expired messages are silently dropped to save resources
-   - B) Expired messages are routed to the Dead Letter Queue with reason "expired", ensuring they are never silently lost but also don't consume processing capacity for stale data
-   - C) The broker automatically deletes expired messages
-   - D) `IsExpired` prevents messages from being published in the first place
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

@@ -106,6 +106,8 @@ Routing decisions are deterministic for a given routing-table snapshot. If the p
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial11/Lab.cs`](../tests/TutorialLabs/Tutorial11/Lab.cs)
+
 **Objective:** Trace how the Dynamic Router updates its routing table at runtime, analyze the EIP pattern's role in **scalable** integration topologies, and design a consistent routing strategy for distributed deployments.
 
 ### Step 1: Trace a Dynamic Registration Flow
@@ -140,23 +142,9 @@ When would you choose a Dynamic Router over a Content-Based Router in a multi-te
 
 ## Exam
 
-1. What EIP pattern does the Dynamic Router implement that the Content-Based Router does not?
-   - A) Message Filter with discard
-   - B) A self-updating routing table where downstream participants register and unregister their interests at runtime, enabling topology changes without redeploying the router
-   - C) Priority-based message queuing
-   - D) Batch message processing
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial11/Exam.cs`](../tests/TutorialLabs/Tutorial11/Exam.cs)
 
-2. In a horizontally scaled deployment with multiple router instances, what is the main **consistency** challenge?
-   - A) All routers must share a single-threaded execution context
-   - B) Registration changes on one instance must propagate to all others — during propagation, different instances may route the same message to different destinations
-   - C) Dynamic routers cannot be scaled horizontally
-   - D) Each router instance requires its own broker connection
-
-3. How does the Dynamic Router pattern support **scalable** integration topology changes?
-   - A) It requires a full system restart to add new routes
-   - B) New services register their routing interests at startup — the router begins directing matching messages to them immediately, with no configuration changes or redeployments needed
-   - C) It pre-allocates routes for all possible message types
-   - D) It uses a database trigger to detect new services
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

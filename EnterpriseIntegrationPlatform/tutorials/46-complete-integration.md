@@ -231,6 +231,8 @@ outcome.
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial46/Lab.cs`](../tests/TutorialLabs/Tutorial46/Lab.cs)
+
 **Objective:** Trace a complete message through all 8 processing stages, analyze how each stage contributes to **end-to-end atomicity**, and design a pipeline extension.
 
 ### Step 1: Trace a Message Through All 8 Stages
@@ -273,22 +275,10 @@ Justify your choice based on **atomicity** and **compliance** requirements.
 
 ## Exam
 
-1. The HTTP connector (Stage 6) returns HTTP 503. How does the platform maintain **end-to-end atomicity**?
-   - A) The message is lost
-   - B) Temporal's retry policy retries the delivery activity; if all retries fail, the message is Nack'd (UC3), routed to the DLQ with full context, and the originating system is notified of the failure — every stage's work is either committed or compensated
-   - C) The workflow restarts from Stage 1
-   - D) The connector silently drops the message
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial46/Exam.cs`](../tests/TutorialLabs/Tutorial46/Exam.cs)
 
-2. Why are the 8 stages separated into distinct activities rather than one monolithic handler?
-   - A) .NET requires separate classes
-   - B) Each stage is an independent filter with its own retry policy, scaling characteristics, and failure handling — this Pipes and Filters architecture enables independent optimization and ensures a failure in one stage doesn't require re-executing all stages
-   - C) Monolithic handlers are not supported by Temporal
-   - D) Eight stages are required by the EIP book
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
-3. What is the most challenging **atomicity** scenario in the complete pipeline?
-   - A) All stages succeed
-   - B) Stage 6 (Deliver) succeeds but Stage 7 (Persist) fails — the external system received the message but the platform has no record; compensation requires checking the external system's state and reconciling, which cannot be fully automated
-   - C) Stage 1 (Receive) fails
-   - D) Stage 8 (Notify) fails
+---
 
 **Previous: [← Tutorial 45](45-performance-profiling.md)** | **Next: [Tutorial 47 →](47-saga-compensation.md)**

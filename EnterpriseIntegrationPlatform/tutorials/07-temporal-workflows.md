@@ -345,6 +345,8 @@ public class IntegrationPipelineWorkflowTests
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial07/Lab.cs`](../tests/TutorialLabs/Tutorial07/Lab.cs)
+
 **Objective:** Trace how Temporal workflows enforce **atomic processing** with saga compensation, and design a failure recovery strategy for a multi-step integration pipeline.
 
 ### Step 1: Trace a Failure Recovery Path
@@ -380,23 +382,9 @@ Temporal workers poll task queues for workflow and activity tasks. Consider a sc
 
 ## Exam
 
-1. What happens when a Temporal workflow worker crashes in the middle of executing an activity?
-   - A) The message is lost permanently
-   - B) Another worker picks up the activity from the last checkpoint — Temporal's event history ensures exactly-once execution semantics with durable state
-   - C) The entire workflow restarts from Step 1
-   - D) The broker automatically retries the message
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial07/Exam.cs`](../tests/TutorialLabs/Tutorial07/Exam.cs)
 
-2. In the Saga Compensation pattern, why must compensation steps execute in **reverse order**?
-   - A) Reverse order is faster for the runtime to schedule
-   - B) Later steps may depend on earlier steps' state — compensating in reverse ensures each rollback sees a consistent state from the steps that preceded it
-   - C) The EIP book mandates reverse order for all patterns
-   - D) Temporal only supports reverse-order execution
-
-3. How does Temporal's durable execution model ensure **atomicity** across a multi-step integration pipeline?
-   - A) It wraps all steps in a database transaction
-   - B) It persists each step's completion in an event history — if a worker fails, another worker replays the history and resumes from the exact point of failure, never re-executing completed steps
-   - C) It locks the message broker partition until all steps complete
-   - D) It copies messages to a backup queue before processing
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

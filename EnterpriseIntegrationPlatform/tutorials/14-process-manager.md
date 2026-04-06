@@ -127,6 +127,8 @@ The `AtomicPipelineWorkflow` implements full **saga compensation**. Completed st
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial14/Lab.cs`](../tests/TutorialLabs/Tutorial14/Lab.cs)
+
 **Objective:** Trace the Process Manager's orchestration of multi-step workflows with saga compensation, and analyze how centralized coordination enables **atomic** all-or-nothing processing.
 
 ### Step 1: Trace a Compensation Sequence
@@ -169,23 +171,9 @@ When would a Process Manager's centralized coordination be worth the **scalabili
 
 ## Exam
 
-1. In a Process Manager with saga compensation, why must compensation steps execute in **reverse order**?
-   - A) It's a convention with no technical reason
-   - B) Later steps may depend on earlier steps' committed state — reverse-order compensation ensures each rollback sees the state from the steps that preceded it, maintaining consistency
-   - C) Temporal only supports reverse execution
-   - D) Reverse order is faster for the scheduler
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial14/Exam.cs`](../tests/TutorialLabs/Tutorial14/Exam.cs)
 
-2. A compensation step itself fails. What is the correct platform behavior for maintaining **atomicity**?
-   - A) Silently ignore the failure and mark the saga as complete
-   - B) Log the failure, mark the saga as partially compensated, and alert the operations team — some atomicity violations require human intervention when automatic compensation is impossible
-   - C) Restart the entire original workflow from Step 1
-   - D) Route the compensation failure to the Dead Letter Queue and retry indefinitely
-
-3. What is the key advantage of the Process Manager pattern over the Routing Slip for **enterprise-grade atomicity**?
-   - A) Process Managers are faster for simple linear pipelines
-   - B) The Process Manager maintains a durable execution history with full saga compensation — if any step fails, all committed work can be rolled back to restore consistency
-   - C) Process Managers don't require a message broker
-   - D) Routing Slips cannot carry parameters
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

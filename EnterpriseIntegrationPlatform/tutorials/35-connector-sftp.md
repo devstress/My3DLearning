@@ -87,6 +87,8 @@ The `UploadAsync` method ensures **all-or-nothing delivery**. If the upload fail
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial35/Lab.cs`](../tests/TutorialLabs/Tutorial35/Lab.cs)
+
 **Objective:** Design connection pooling for SFTP under high consumer concurrency, trace the upload lifecycle, and analyze **atomic** file delivery guarantees.
 
 ### Step 1: Design Connection Pooling
@@ -130,23 +132,9 @@ If the upload fails after 50%, the temp file is cleaned up. If the rename fails,
 
 ## Exam
 
-1. Why is connection pooling essential for SFTP connector **scalability**?
-   - A) SFTP servers have unlimited connections
-   - B) SFTP servers have strict connection limits — without pooling, concurrent consumer replicas would exceed the limit and fail; pooling ensures connections are shared efficiently across all consumers
-   - C) Pooling reduces file size
-   - D) Each consumer needs its own dedicated SFTP server
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial35/Exam.cs`](../tests/TutorialLabs/Tutorial35/Exam.cs)
 
-2. How does the temp-file-then-rename pattern ensure **atomic** file delivery?
-   - A) Renaming is faster than uploading
-   - B) The receiver never sees partial files — the temp file is invisible to the receiver's file scanner, and the rename operation is atomic at the filesystem level, so the file transitions from invisible to complete in one step
-   - C) The SFTP protocol guarantees atomicity
-   - D) Temp files are automatically deleted after 30 seconds
-
-3. What happens if the SFTP connection is lost during an upload?
-   - A) The partial file is delivered to the receiver
-   - B) The temp file remains on the server but is not renamed — the connector retries the entire upload; if all retries fail, the message is routed to the DLQ and the orphaned temp file can be cleaned up by a scheduled job
-   - C) The connection automatically reconnects and resumes
-   - D) The broker retries the upload internally
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

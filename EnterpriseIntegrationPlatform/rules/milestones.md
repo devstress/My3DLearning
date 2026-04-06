@@ -26,13 +26,32 @@
 
 48 src projects. All 50 tutorials rewritten with BizTalk-style Lab + Exam exercises focused on EIP patterns, scalability, and atomicity.
 
-**Next chunk:** (none — all current work complete)
-
 ---
 
-## Next Chunk
+## Phase 27 — Coding Tutorial Labs & Exams
 
-(none)
+**Goal:** Convert all 50 tutorials from conceptual/MCQ format to coding-only format. Each tutorial gets:
+- `tests/TutorialLabs/TutorialXX/Lab.cs` — Complete, runnable NUnit test class demonstrating the pattern
+- `tests/TutorialLabs/TutorialXX/Exam.cs` — Coding exam challenges (NOT multiple choice)
+- Updated tutorial `.md` file pointing to the implementation folder
+
+**Project:** `tests/TutorialLabs/TutorialLabs.csproj` (added to solution, references all src projects)
+
+**Key API findings for remaining chunks:**
+- **DynamicRouter**: implements `IDynamicRouter` + `IRouterControlChannel`. Constructor: `IMessageBrokerProducer`, `IOptions<DynamicRouterOptions>`, `ILogger<DynamicRouter>`. Methods: `RegisterAsync()`, `UnregisterAsync()`, `RouteAsync<T>()`, `GetRoutingTable()`.
+- **RecipientListRouter**: implements `IRecipientList`. Constructor: `IMessageBrokerProducer`, `IOptions<RecipientListOptions>`, `ILogger<RecipientListRouter>`. Uses `RecipientListRule` with `RoutingOperator`.
+- **RoutingSlipRouter**: implements `IRoutingSlipRouter`. Constructor: `IEnumerable<IRoutingSlipStepHandler>`, `IMessageBrokerProducer`, `ILogger<RoutingSlipRouter>`. Handlers implement `IRoutingSlipStepHandler`.
+- **Process Manager**: `PipelineOrchestrator` and `ITemporalWorkflowDispatcher` in `Demo.Pipeline`. Uses `IntegrationPipelineInput`/`IntegrationPipelineResult` from Activities.
+- **MessageTranslator<TIn,TOut>**: takes `IPayloadTransform<TIn,TOut>`, `IMessageBrokerProducer`, `IOptions<TranslatorOptions>`, `ILogger`. `FuncPayloadTransform<TIn,TOut>` wraps a delegate.
+- **Transform steps**: `JsonToXmlStep`, `XmlToJsonStep`, `RegexReplaceStep`, `JsonPathFilterStep`, `TransformPipeline`.
+
+| Chunk | Scope | Status |
+|-------|-------|--------|
+✅ Phase 27 complete — see completion-log.md.
+
+522 TutorialLabs tests (350 lab + 150 exam + 22 extra). All 50 tutorials updated with coding lab/exam pointers.
+
+**Next chunk:** None — all chunks complete.
 
 ---
 

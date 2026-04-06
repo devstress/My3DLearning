@@ -97,6 +97,8 @@ Scatter-Gather has **best-effort semantics** within the timeout window. If a rec
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial22/Lab.cs`](../tests/TutorialLabs/Tutorial22/Lab.cs)
+
 **Objective:** Trace the Scatter-Gather pattern's parallel request-response flow, analyze timeout behavior for **partial results**, and design a "best-of-N" selection strategy.
 
 ### Step 1: Trace a Scatter-Gather with Timeout
@@ -139,23 +141,9 @@ How does the Scatter-Gather pattern enable **scalable** multi-supplier/multi-ser
 
 ## Exam
 
-1. A Scatter-Gather operation sends to 5 recipients with a 3-second timeout. Only 3 respond in time. What does the result indicate?
-   - A) Failure — all recipients must respond
-   - B) `TimedOut = true` with 3 responses — the caller receives partial results and can decide how to proceed based on business logic (e.g., select best from available)
-   - C) The operation retries the 2 missing recipients
-   - D) The 3 responses are discarded and the operation fails
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial22/Exam.cs`](../tests/TutorialLabs/Tutorial22/Exam.cs)
 
-2. How does the Scatter-Gather pattern improve **integration scalability** compared to sequential service calls?
-   - A) It uses less memory per request
-   - B) Latency equals the slowest responder (or timeout), not the sum of all — adding more recipients doesn't increase total latency, enabling efficient multi-source integration at scale
-   - C) It reduces the number of network connections
-   - D) Sequential calls are always faster for small numbers of recipients
-
-3. What **atomicity** consideration arises when the Scatter-Gather selects one response from many?
-   - A) All responses must be stored permanently
-   - B) The selected response must be committed atomically — if the downstream commit fails, no side effects from the selection (e.g., supplier charges) should be applied, requiring compensation for any tentative reservations
-   - C) Non-selected responses are automatically compensated
-   - D) The broker handles selection atomicity
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

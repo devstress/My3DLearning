@@ -99,6 +99,8 @@ The translator publishes the translated envelope to the target topic **before** 
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial15/Lab.cs`](../tests/TutorialLabs/Tutorial15/Lab.cs)
+
 **Objective:** Build field mappings for cross-system data transformation, analyze how the Message Translator pattern preserves message **atomicity** through immutable transformations, and design a multi-format translation strategy.
 
 ### Step 1: Build a Field Mapping Configuration
@@ -141,23 +143,9 @@ How does the **Canonical Data Model** (Tutorial 17 — Normalizer) relate to the
 
 ## Exam
 
-1. Why does the Message Translator create a **new envelope** rather than modifying the original?
-   - A) .NET records are always immutable
-   - B) Immutable transformation preserves the original for retry, DLQ routing, and audit — if translation fails, the untouched original maintains atomicity of the processing pipeline
-   - C) The broker rejects modified messages
-   - D) Creating new envelopes uses less memory
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial15/Exam.cs`](../tests/TutorialLabs/Tutorial15/Exam.cs)
 
-2. When would you use `FuncPayloadTransform` (code-based) vs. `JsonFieldMappingTransform` (configuration-based)?
-   - A) They are interchangeable
-   - B) `JsonFieldMappingTransform` for simple field renaming/mapping that non-developers can configure; `FuncPayloadTransform` for complex logic like format conversion, calculations, or API enrichment that requires code
-   - C) `FuncPayloadTransform` is faster in all cases
-   - D) `JsonFieldMappingTransform` only works with XML
-
-3. How does the Canonical Data Model concept support **integration scalability**?
-   - A) It reduces message size for faster transport
-   - B) All message sources translate to one canonical format — adding a new source system requires only one new translator, not N translators for N downstream consumers
-   - C) Canonical models encrypt data for security
-   - D) It eliminates the need for a message broker
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

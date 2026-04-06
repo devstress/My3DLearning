@@ -147,6 +147,8 @@ Sanitization runs **before the message is Acked**. Callers can use `IsClean` to 
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial33/Lab.cs`](../tests/TutorialLabs/Tutorial33/Lab.cs)
+
 **Objective:** Trace the input sanitization pipeline, analyze how defense-in-depth protects **message atomicity** from injection attacks, and evaluate secret management for **scalable** multi-environment deployments.
 
 ### Step 1: Trace XSS Sanitization
@@ -185,23 +187,9 @@ When would you use `CachedSecretProvider` wrapping `AzureKeyVaultSecretProvider`
 
 ## Exam
 
-1. Why does the platform sanitize payloads **before** routing or processing?
-   - A) Sanitization improves message routing speed
-   - B) Unsanitized payloads could contain injection attacks (XSS, SQL injection) that execute when consumed by downstream systems — sanitizing at ingress prevents malicious content from propagating through the entire pipeline
-   - C) The broker requires sanitized payloads
-   - D) Sanitization is only needed for XML messages
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial33/Exam.cs`](../tests/TutorialLabs/Tutorial33/Exam.cs)
 
-2. Why does the `IPayloadSizeGuard` run before `IInputSanitizer`?
-   - A) Size checking is always done first by convention
-   - B) Rejecting oversized payloads before sanitization avoids expensive parsing of potentially malicious large payloads — this is a defense-in-depth principle that protects against denial-of-service via payload size
-   - C) The sanitizer cannot handle large payloads
-   - D) Size checking requires less memory
-
-3. How does secret caching with `CachedSecretProvider` improve **operational scalability**?
-   - A) Caching stores more secrets than the vault
-   - B) Frequently accessed secrets are served from memory instead of making network calls to the vault — this reduces latency and eliminates the vault as a bottleneck when many services need secrets simultaneously
-   - C) Caching eliminates the need for secret rotation
-   - D) The vault requires caching for correctness
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

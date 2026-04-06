@@ -192,6 +192,8 @@ they provide the reliability guarantees that enterprise integrations demand.
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial50/Lab.cs`](../tests/TutorialLabs/Tutorial50/Lab.cs)
+
 **Objective:** Design a complete integration using multiple EIP patterns, apply the production checklist, and analyze anti-patterns that undermine **scalability** and **atomicity**.
 
 ### Step 1: Design a Multi-Pattern Integration
@@ -243,22 +245,10 @@ Have you encountered any of these in your own projects?
 
 ## Exam
 
-1. Why is the EIP pattern catalog organized around **message-centric** architecture?
-   - A) Messages are the fastest way to communicate
-   - B) By making the message the unit of work — carrying its own identity, context, and routing information — each processing component can be independently developed, scaled, and recovered without coupling to others
-   - C) The EIP book was written before microservices
-   - D) Messages are the only communication mechanism in .NET
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial50/Exam.cs`](../tests/TutorialLabs/Tutorial50/Exam.cs)
 
-2. What is the most dangerous anti-pattern for **production atomicity**?
-   - A) Using too many patterns
-   - B) Silent message drops — when a message fails and is neither routed to the DLQ nor explicitly discarded, it disappears from the system without trace; this violates the zero-message-loss guarantee and makes debugging impossible
-   - C) Having too many processing stages
-   - D) Using JSON instead of XML
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
-3. How does the production checklist approach support **team scalability**?
-   - A) Checklists are faster than documentation
-   - B) A shared checklist ensures every team member and every integration applies the same quality standards — new integrations don't miss critical concerns like DLQ routing, throttling, or compensation, regardless of who builds them
-   - C) Checklists replace code review
-   - D) Each team member creates their own checklist
+---
 
 **Previous: [← Tutorial 49](49-testing-integrations.md)** | **[Back to Course Overview →](README.md)**

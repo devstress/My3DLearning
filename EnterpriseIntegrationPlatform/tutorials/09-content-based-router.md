@@ -99,6 +99,8 @@ The router publishes to the selected topic via the broker producer **before** ac
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial09/Lab.cs`](../tests/TutorialLabs/Tutorial09/Lab.cs)
+
 **Objective:** Configure routing rules with priorities, trace how the Content-Based Router dispatches messages, and analyze routing **scalability** under high-throughput conditions.
 
 ### Step 1: Configure a Multi-Rule Routing Table
@@ -132,23 +134,9 @@ Consider a Content-Based Router processing 50,000 messages/second with 200 routi
 
 ## Exam
 
-1. You have routing rules with priorities 10, 5, and 1. A message matches rules at priorities 5 and 1. Which topic receives the message?
-   - A) Both topics receive the message (fan-out)
-   - B) Priority 1 — the router selects the lowest priority number (highest precedence) among matches
-   - C) Priority 10 — the router always uses the first rule defined
-   - D) Priority 5 — the router stops at the first match in definition order
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial09/Exam.cs`](../tests/TutorialLabs/Tutorial09/Exam.cs)
 
-2. How does the Content-Based Router pattern support **atomic message routing**?
-   - A) It copies the message to all matching topics simultaneously
-   - B) Each message is routed to exactly one output topic — the routing decision is deterministic and idempotent, so replaying the same message always produces the same routing outcome
-   - C) It wraps the routing decision in a database transaction
-   - D) The router buffers messages until a batch is complete
-
-3. Why is pre-compiling regex patterns critical for **routing scalability** at high throughput?
-   - A) Pre-compilation reduces memory allocation per evaluation — without it, each message creates and discards regex objects, causing GC pressure that degrades throughput under load
-   - B) Pre-compilation is required by the .NET regex API
-   - C) Pre-compilation allows patterns to match across multiple lines
-   - D) Pre-compilation enables case-insensitive matching
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

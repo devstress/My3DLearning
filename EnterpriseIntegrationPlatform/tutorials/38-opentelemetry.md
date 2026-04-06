@@ -190,6 +190,8 @@ Telemetry is a **best-effort side channel** — if the collector is down, messag
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial38/Lab.cs`](../tests/TutorialLabs/Tutorial38/Lab.cs)
+
 **Objective:** Trace distributed spans across the integration pipeline, analyze how observability enables **scalable** operations, and design graceful degradation when telemetry infrastructure is unavailable.
 
 ### Step 1: Draw a Trace Span Hierarchy
@@ -229,23 +231,9 @@ How does end-to-end tracing support **operational scalability** — what happens
 
 ## Exam
 
-1. Why does the platform propagate `traceparent` through envelope metadata rather than broker headers?
-   - A) Broker headers are not supported by NATS
-   - B) Envelope metadata survives all processing stages — including broker bridges, transformations, and splits — while broker headers may be lost or incompatible across different broker implementations
-   - C) Metadata is faster to read than headers
-   - D) W3C `traceparent` is too long for broker headers
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial38/Exam.cs`](../tests/TutorialLabs/Tutorial38/Exam.cs)
 
-2. What should happen to message processing when the telemetry collector is unreachable?
-   - A) Processing stops until telemetry is restored
-   - B) Processing continues uninterrupted — telemetry is exported on a best-effort basis; observability must never block business message processing, as that would make the monitoring system a single point of failure
-   - C) Messages are queued until telemetry is available
-   - D) The platform switches to a backup collector
-
-3. How does distributed tracing support **scalable** operations for an integration platform?
-   - A) Tracing speeds up message processing
-   - B) End-to-end traces allow operators to pinpoint the exact stage and service where a message failed — without tracing, debugging failures across dozens of processing stages in a distributed system would be nearly impossible at scale
-   - C) Tracing reduces the number of processing stages
-   - D) The broker automatically generates traces
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

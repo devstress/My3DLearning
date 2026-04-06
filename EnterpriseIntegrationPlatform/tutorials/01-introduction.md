@@ -154,6 +154,8 @@ By the end of this course, you'll understand how to:
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial01/Lab.cs`](../tests/TutorialLabs/Tutorial01/Lab.cs)
+
 **Objective:** Map EIP pattern categories to concrete platform components and trace how the Pipes and Filters architecture enables scalable message processing.
 
 ### Step 1: Map Patterns to Projects
@@ -178,23 +180,9 @@ Identify three places in the architecture where **horizontal scaling** is possib
 
 ## Exam
 
-1. Which integration style does the EIP book recommend for loosely coupled, asynchronous communication between systems?
-   - A) File Transfer
-   - B) Shared Database
-   - C) Messaging
-   - D) Remote Procedure Invocation
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial01/Exam.cs`](../tests/TutorialLabs/Tutorial01/Exam.cs)
 
-2. In the Pipes and Filters pattern, what property must each filter maintain to allow independent scaling?
-   - A) Global mutable state shared across filters
-   - B) Stateless processing with all context carried in the message envelope
-   - C) Direct method calls to the next filter in the chain
-   - D) A persistent database connection for every filter
-
-3. How does the platform guarantee **zero message loss** when a processing step fails mid-pipeline?
-   - A) Messages are stored in memory and retried indefinitely
-   - B) Temporal workflows provide durable execution with saga compensation — either all steps complete or compensating actions roll back committed work
-   - C) The broker automatically resends messages every 5 seconds
-   - D) Failed messages are silently discarded to avoid blocking the pipeline
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

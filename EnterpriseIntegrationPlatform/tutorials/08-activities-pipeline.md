@@ -298,6 +298,8 @@ public class PersistenceActivityTests
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial08/Lab.cs`](../tests/TutorialLabs/Tutorial08/Lab.cs)
+
 **Objective:** Design an activity pipeline for a real integration scenario, analyze failure modes, and identify where the Pipes and Filters pattern enables **independent scaling** of each stage.
 
 ### Step 1: Design a Pipeline for XML Invoice Processing
@@ -337,23 +339,9 @@ The Pipes and Filters pattern allows each activity to scale independently. For y
 
 ## Exam
 
-1. In the Pipes and Filters pattern, what property must each filter (activity) maintain to allow **independent scaling**?
-   - A) All filters must share a single database connection
-   - B) Each filter processes the message using only the data in the envelope — no shared mutable state between filters — so multiple instances can run in parallel
-   - C) Filters must execute in a single thread to ensure ordering
-   - D) Each filter must cache results for the next filter
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial08/Exam.cs`](../tests/TutorialLabs/Tutorial08/Exam.cs)
 
-2. Why does the platform split processing into separate activities (Validate, Transform, Route, Deliver) rather than a single monolithic handler?
-   - A) .NET requires separate classes for each async operation
-   - B) Separate activities enable independent retry policies, individual scaling, and granular saga compensation — a failure in Transform doesn't require re-running Validate
-   - C) Temporal cannot execute more than one method per workflow
-   - D) Separate activities reduce the total number of code lines
-
-3. What happens when an activity fails with a permanent error (e.g., invalid schema) in this platform?
-   - A) The workflow retries indefinitely until the message becomes valid
-   - B) The message is routed to the Dead Letter Queue with the failure reason, a Nack notification is sent to the originating system, and the workflow terminates cleanly
-   - C) The activity silently drops the message
-   - D) The Temporal worker crashes and restarts
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

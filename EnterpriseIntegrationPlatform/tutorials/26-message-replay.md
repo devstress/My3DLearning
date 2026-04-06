@@ -109,6 +109,8 @@ Replay re-publishes messages to the **same ingress topic** they originally enter
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial26/Lab.cs`](../tests/TutorialLabs/Tutorial26/Lab.cs)
+
 **Objective:** Design a message replay operation for a production incident, analyze how the `ReplayId` header prevents duplicate processing, and evaluate replay store **scalability** requirements.
 
 ### Step 1: Design a Time-Window Replay
@@ -153,23 +155,9 @@ What storage technology would you recommend? (hint: time-series databases, objec
 
 ## Exam
 
-1. Why does the platform inject a `ReplayId` header instead of re-publishing the original message unchanged?
-   - A) `ReplayId` improves serialization performance
-   - B) Without `ReplayId`, downstream consumers cannot distinguish replayed messages from new ones — leading to duplicate side effects like double billing; the header enables idempotent replay processing
-   - C) The broker requires unique headers for each publish
-   - D) `ReplayId` replaces the original `MessageId`
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial26/Exam.cs`](../tests/TutorialLabs/Tutorial26/Exam.cs)
 
-2. What **atomicity** guarantee must a replay operation provide?
-   - A) All replayed messages must succeed or the entire replay is rolled back
-   - B) Each replayed message is independently atomic — if message 500 of 1000 fails, the first 499 are committed and 500+ can be retried; the `ReplayId` prevents duplicates from the successful ones
-   - C) Replay operations are fire-and-forget with no guarantees
-   - D) The entire replay must complete within a single database transaction
-
-3. How does time-range filtering in replay operations support **operational scalability**?
-   - A) Time filtering is faster than content filtering
-   - B) Operators can target a precise incident window instead of replaying all messages — this minimizes unnecessary reprocessing and downstream load during recovery
-   - C) Time ranges are required by the message broker
-   - D) Filtering has no impact on replay performance
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

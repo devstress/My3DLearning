@@ -125,6 +125,8 @@ The web UI provides **eventual consistency** — it shows the latest state from 
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial41/Lab.cs`](../tests/TutorialLabs/Tutorial41/Lab.cs)
+
 **Objective:** Trace the operational query flow through OpenClaw's inspection APIs, design a "Where is my message?" workflow, and analyze why the UI delegates to Aspire for **scalable** observability.
 
 ### Step 1: Trace an Operational Query
@@ -173,23 +175,9 @@ How does this resilience architecture support **operational scalability** — th
 
 ## Exam
 
-1. Why does OpenClaw embed links to the Aspire dashboard rather than reimplementing trace visualization?
-   - A) Aspire's visualization is faster
-   - B) Aspire already provides rich distributed trace, metrics, and log visualization — reimplementing this in OpenClaw would duplicate functionality, increase maintenance burden, and diverge from the platform's standard observability stack
-   - C) The Aspire dashboard is required by .NET
-   - D) OpenClaw cannot display visual data
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial41/Exam.cs`](../tests/TutorialLabs/Tutorial41/Exam.cs)
 
-2. How does the multi-source resilience pattern in OpenClaw support **operational scalability**?
-   - A) It makes the UI faster
-   - B) When backend services are degraded, the UI shows graceful fallbacks rather than crashing — operators can still search messages and access partial functionality, maintaining operational capability during infrastructure incidents
-   - C) Querying multiple sources reduces network traffic
-   - D) The broker provides resilience automatically
-
-3. Why does the "Where is my message?" feature query multiple data sources?
-   - A) One data source is always sufficient
-   - B) No single system contains the complete picture — the lifecycle store tracks stage transitions, the DLQ contains failure details, and OpenTelemetry provides timing; combining them gives operators a complete and **actionable** view of any message's journey
-   - C) Multiple queries improve response time
-   - D) Each data source requires a separate API call
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

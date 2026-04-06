@@ -93,6 +93,8 @@ Messages are **Acked only after successful release** to the downstream topic. If
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial27/Lab.cs`](../tests/TutorialLabs/Tutorial27/Lab.cs)
+
 **Objective:** Trace the Resequencer's buffering and release logic, analyze ordering guarantees for **atomic** batch processing, and design for partition-aware scaling.
 
 ### Step 1: Trace Out-of-Order Arrival
@@ -127,23 +129,9 @@ All messages for a `CorrelationId` must be routed to the same resequencer instan
 
 ## Exam
 
-1. Why must all messages for a `CorrelationId` be routed to the **same** resequencer instance?
-   - A) Any instance can resequence any `CorrelationId`
-   - B) The resequencer maintains an ordered buffer per `CorrelationId` — if messages are split across instances, no single instance has the complete picture to determine correct ordering
-   - C) The broker automatically routes messages to the correct instance
-   - D) Resequencing doesn't require instance affinity
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial27/Exam.cs`](../tests/TutorialLabs/Tutorial27/Exam.cs)
 
-2. How does the `ReleaseTimeout` prevent unbounded resource consumption?
-   - A) It deletes messages older than the timeout
-   - B) Without a timeout, a missing sequence number would cause all subsequent messages to buffer indefinitely — the timeout releases buffered messages with gap markers, preventing memory growth proportional to undelivered messages
-   - C) Timeouts are only needed in development
-   - D) The timeout reduces message processing latency
-
-3. How does partition-key routing enable **scalable** resequencing?
-   - A) All messages go to a single instance for global ordering
-   - B) Each resequencer instance handles a subset of `CorrelationId`s — adding instances distributes the load linearly, with no cross-instance coordination needed for ordering within each group
-   - C) Partition keys are only used for Kafka
-   - D) Routing is handled by the resequencer itself
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 

@@ -112,6 +112,8 @@ The source message is **Acked only after SMTP confirmation**. If the SMTP server
 
 ## Lab
 
+> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial36/Lab.cs`](../tests/TutorialLabs/Tutorial36/Lab.cs)
+
 **Objective:** Design email delivery with throttling integration, trace the connector's notification pipeline, and analyze **atomic** delivery confirmation for email-based integrations.
 
 ### Step 1: Write a Body Builder for Order Confirmation
@@ -155,23 +157,9 @@ Why is email the most challenging connector for **atomicity**? How does the plat
 
 ## Exam
 
-1. Why does the email connector use `Func<T, string>` body builders rather than a template engine?
-   - A) Template engines are not supported in .NET
-   - B) Lambdas are compiled code — they're type-safe, refactorable, and don't require a separate template syntax; for an integration platform where emails are programmatic notifications, code-based builders are simpler and more maintainable
-   - C) Templates are slower than string interpolation
-   - D) The SMTP protocol requires plain strings
+> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial36/Exam.cs`](../tests/TutorialLabs/Tutorial36/Exam.cs)
 
-2. Why is throttle integration essential for email connector **scalability**?
-   - A) Throttling reduces email content size
-   - B) SMTP servers enforce rate limits — exceeding them causes connection rejection and delivery failure for all consumers; throttling ensures the platform respects server limits while queuing excess messages for later delivery
-   - C) Email delivery doesn't benefit from throttling
-   - D) Throttling is only needed for premium tenants
-
-3. What makes email delivery uniquely challenging for **processing atomicity**?
-   - A) Email is always delivered successfully
-   - B) Email delivery is one-way and non-reversible — once the SMTP server accepts the message, it cannot be recalled; the platform can only confirm SMTP acceptance, not final delivery to the recipient's inbox
-   - C) SMTP supports two-phase commit
-   - D) Email is synchronous and always returns a delivery receipt
+Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
 
 ---
 
