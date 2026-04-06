@@ -92,7 +92,7 @@ The test suite includes:
 | ContractTests | Contract verification between services |
 | WorkflowTests | Temporal workflow behavior tests |
 | IntegrationTests | Testcontainers-based tests with real infrastructure |
-| PlaywrightTests | End-to-end browser tests for OpenClaw UI |
+| PlaywrightTests | End-to-end browser tests for Admin dashboard & OpenClaw UI |
 | LoadTests | Performance and throughput benchmarks |
 
 > **Note:** IntegrationTests and PlaywrightTests require Docker to be running.

@@ -182,7 +182,7 @@ EnterpriseIntegrationPlatform/
 │   ├── ContractTests/           # Contract verification tests (29 tests)
 │   ├── WorkflowTests/           # Temporal workflow tests (24 tests)
 │   ├── IntegrationTests/        # Testcontainers-based integration tests (17 tests)
-│   ├── PlaywrightTests/         # End-to-end browser tests for OpenClaw UI (13 tests)
+│   ├── PlaywrightTests/         # End-to-end browser tests for Admin dashboard & OpenClaw UI (24 tests)
 │   └── LoadTests/               # Performance and load tests (5 tests)
 ├── docs/                        # Architecture and design documentation
 └── rules/                       # Development standards and milestones
