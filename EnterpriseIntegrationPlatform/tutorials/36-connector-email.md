@@ -1,39 +1,8 @@
 # Tutorial 36 — Email Connector
 
-## What You'll Learn
+Send messages as emails via SMTP with template-based body and attachment support.
 
-- The EIP Channel Adapter pattern applied to email delivery
-- How `IEmailConnector` sends integration messages as email notifications
-- SMTP and SMTPS (TLS) transport configuration
-- `Func<T, string>` body builders for dynamic email content
-- Single and multiple recipient overloads
-
----
-
-## EIP Pattern: Channel Adapter (Email)
-
-> *"An Email Channel Adapter translates integration messages into email notifications, delivering them via SMTP to one or more recipients."*
-
-```
-  ┌──────────────┐     ┌──────────────────┐     ┌──────────────┐
-  │  Pipeline    │────▶│  Email Connector  │────▶│  SMTP Server │
-  │  (envelope)  │     │  (build body +   │     │              │
-  └──────────────┘     │   send)          │     └──────┬───────┘
-                       └──────────────────┘            │
-                                                       ▼
-                                                 ┌─────────────┐
-                                                 │ Recipients  │
-                                                 │ (inbox)     │
-                                                 └─────────────┘
-```
-
-Email is a common notification channel in enterprise integration. The connector bridges the messaging pipeline and email delivery, using `Func<T, string>` body builders to generate human-readable messages from structured data.
-
----
-
-## Platform Implementation
-
-### IEmailConnector
+## Key Types
 
 ```csharp
 // src/Connector.Email/IEmailConnector.cs
@@ -55,10 +24,6 @@ public interface IEmailConnector
 }
 ```
 
-Both overloads are generic over `T` and return `Task` (not `ConnectorResult`). When `subject` is `null`, the configured `DefaultSubjectTemplate` is used. The `bodyBuilder` function converts the envelope payload into the email body string.
-
-### EmailConnectorOptions
-
 ```csharp
 // src/Connector.Email/EmailConnectorOptions.cs
 public sealed class EmailConnectorOptions
@@ -73,93 +38,115 @@ public sealed class EmailConnectorOptions
 }
 ```
 
-### Body Builders
+## Exercises
 
-Instead of a template engine, the connector uses `Func<T, string>` body builders that the caller provides. This gives full control over how the payload is rendered into an email body:
+### 1. EmailConnectorOptions — Defaults
 
 ```csharp
-// Example: build an order confirmation email body
-Func<OrderPayload, string> bodyBuilder = order =>
-    $"<h2>Order Confirmation</h2>" +
-    $"<p>Order ID: {order.OrderId}</p>" +
-    $"<p>Total: {order.Total:C}</p>";
+var opts = new EmailConnectorOptions();
 
-await emailConnector.SendAsync(envelope, "ops@example.com", null, bodyBuilder, ct);
+Assert.That(opts.SmtpHost, Is.EqualTo(string.Empty));
+Assert.That(opts.SmtpPort, Is.EqualTo(587));
+Assert.That(opts.UseTls, Is.True);
+Assert.That(opts.Username, Is.EqualTo(string.Empty));
+Assert.That(opts.Password, Is.EqualTo(string.Empty));
+Assert.That(opts.DefaultFrom, Is.EqualTo(string.Empty));
+Assert.That(opts.DefaultSubjectTemplate, Is.EqualTo("{MessageType} notification"));
 ```
 
-### Recipient Routing
+### 2. EmailConnectorOptions — CustomValues
 
-The connector supports two delivery patterns via its overloads:
+```csharp
+var opts = new EmailConnectorOptions
+{
+    SmtpHost = "mail.example.com",
+    SmtpPort = 465,
+    UseTls = false,
+    Username = "user@example.com",
+    Password = "secret",
+    DefaultFrom = "noreply@example.com",
+    DefaultSubjectTemplate = "Alert: {MessageType}",
+};
 
-| Strategy | Method Overload | Use Case |
-|----------|----------------|----------|
-| Single recipient | `SendAsync<T>(..., string toAddress, ...)` | Direct notification to a specific user |
-| Multiple recipients | `SendAsync<T>(..., IReadOnlyList<string> toAddresses, ...)` | Team-wide alerts |
+Assert.That(opts.SmtpHost, Is.EqualTo("mail.example.com"));
+Assert.That(opts.SmtpPort, Is.EqualTo(465));
+Assert.That(opts.UseTls, Is.False);
+Assert.That(opts.Username, Is.EqualTo("user@example.com"));
+Assert.That(opts.Password, Is.EqualTo("secret"));
+Assert.That(opts.DefaultFrom, Is.EqualTo("noreply@example.com"));
+Assert.That(opts.DefaultSubjectTemplate, Is.EqualTo("Alert: {MessageType}"));
+```
 
----
+### 3. ISmtpClientWrapper — InterfaceShape HasExpectedMembers
 
-## Scalability Dimension
+```csharp
+var type = typeof(ISmtpClientWrapper);
 
-Email sending is **I/O-bound** and relatively slow compared to broker-based delivery. The connector uses connection pooling to reuse SMTP connections across messages. For high-volume email scenarios, consider a dedicated email queue with its own consumer group to isolate email latency from the main pipeline. Rate limiting (Tutorial 29) should be applied to avoid SMTP server throttling.
+Assert.That(type.GetMethod("ConnectAsync"), Is.Not.Null);
+Assert.That(type.GetMethod("AuthenticateAsync"), Is.Not.Null);
+Assert.That(type.GetMethod("SendAsync"), Is.Not.Null);
+Assert.That(type.GetMethod("DisconnectAsync"), Is.Not.Null);
+Assert.That(type.GetProperty("IsConnected"), Is.Not.Null);
+```
 
----
+### 4. EmailConnector — Send DelegatesToSmtpWrapper
 
-## Atomicity Dimension
+```csharp
+var smtpClient = Substitute.For<ISmtpClientWrapper>();
+smtpClient.IsConnected.Returns(false);
 
-The source message is **Acked only after SMTP confirmation**. If the SMTP server rejects the email (invalid recipient, authentication failure), the `SendAsync` method throws and the message is retried or dead-lettered. Body builder failures are caught before sending — a failing builder results in an immediate Nack with a clear error message.
+var opts = Options.Create(new EmailConnectorOptions
+{
+    SmtpHost = "smtp.test.com",
+    SmtpPort = 587,
+    UseTls = true,
+    Username = "user",
+    Password = "pass",
+    DefaultFrom = "test@test.com",
+});
 
----
+var connector = new EmailConnector(smtpClient, opts, NullLogger<EmailConnector>.Instance);
+
+var envelope = IntegrationEnvelope<string>.Create("Hello", "Svc", "order.placed");
+
+await connector.SendAsync(
+    envelope, "dest@test.com", "Test Subject", p => p, CancellationToken.None);
+
+await smtpClient.Received(1).ConnectAsync(
+    Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+await smtpClient.Received(1).SendAsync(
+    Arg.Any<MimeKit.MimeMessage>(), Arg.Any<CancellationToken>());
+await smtpClient.Received(1).DisconnectAsync(
+    Arg.Any<bool>(), Arg.Any<CancellationToken>());
+```
+
+### 5. EmailConnector — Constructor AcceptsAllDependencies
+
+```csharp
+var smtpClient = Substitute.For<ISmtpClientWrapper>();
+var opts = Options.Create(new EmailConnectorOptions());
+var logger = NullLogger<EmailConnector>.Instance;
+
+var connector = new EmailConnector(smtpClient, opts, logger);
+
+Assert.That(connector, Is.Not.Null);
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial36/Lab.cs`](../tests/TutorialLabs/Tutorial36/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial36/Lab.cs`](../tests/TutorialLabs/Tutorial36/Lab.cs)
 
-**Objective:** Design email delivery with throttling integration, trace the connector's notification pipeline, and analyze **atomic** delivery confirmation for email-based integrations.
-
-### Step 1: Write a Body Builder for Order Confirmation
-
-Write a `Func<OrderPayload, string>` body builder that creates an HTML email:
-
-```csharp
-Func<OrderPayload, string> bodyBuilder = order =>
-    $"""
-    <h1>Order Confirmation</h1>
-    <p>Order ID: {order.OrderId}</p>
-    <p>Total: ${order.Total:F2}</p>
-    <p>Thank you for your purchase!</p>
-    """;
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial36.Lab"
 ```
-
-Open `src/Connector.Email/EmailConnector.cs` and trace: How does the connector use this builder? Why does it use `Func<T, string>` rather than a template engine?
-
-### Step 2: Integrate Throttling for SMTP Rate Limits
-
-An SMTP server limits sending to 100 emails per minute. Design the integration with the Throttle from Tutorial 29:
-
-```
-Message arrives → Throttle (100/min, per-tenant) → Email Connector → SMTP Send → Ack/Nack
-```
-
-What happens when the 101st email arrives within the minute? Does it queue, reject, or backpressure? How does this prevent the SMTP server from rejecting connections — a **scalability** concern for high-volume notification systems?
-
-### Step 3: Analyze Delivery Atomicity
-
-Email delivery is inherently non-atomic — you can't "uncommit" a sent email. Design a strategy:
-
-| Scenario | Connector Response | Pipeline Action |
-|----------|-------------------|----------------|
-| SMTP accepts message | Ack | Mark as delivered |
-| SMTP rejects (invalid address) | Nack | Route to DLQ |
-| SMTP timeout | Retry | Exponential backoff |
-| Email sent but recipient bounce | ? | How do you detect this? |
-
-Why is email the most challenging connector for **atomicity**? How does the platform handle "fire-and-forget" delivery?
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial36/Exam.cs`](../tests/TutorialLabs/Tutorial36/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial36/Exam.cs`](../tests/TutorialLabs/Tutorial36/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial36.Exam"
+```
 
 ---
 

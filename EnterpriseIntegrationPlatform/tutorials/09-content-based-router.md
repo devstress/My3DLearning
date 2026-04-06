@@ -1,36 +1,10 @@
 # Tutorial 09 — Content-Based Router
 
-## What You'll Learn
-
-- The EIP Content-Based Router pattern and when to apply it
-- How `IContentBasedRouter` evaluates routing rules by priority
-- The `RoutingRule` model with Field / Operator / Value / TargetTopic / Priority
-- The `RoutingOperator` enum and pre-compiled regex support
-- Why a stateless router scales horizontally without coordination
+Priority-ordered routing rules with `IContentBasedRouter`, `RoutingRule`, `RoutingOperator`, and `RoutingDecision`.
 
 ---
 
-## EIP Pattern: Content-Based Router
-
-> *"Use a Content-Based Router to route each message to the correct recipient based on message content."*
-> — Gregor Hohpe & Bobby Woolf, *Enterprise Integration Patterns*
-
-```
-              ┌──────────────┐
-              │ Content-Based│
- ──Message──▶ │    Router     │──▶ Topic A  (rule 1 matched)
-              │              │──▶ Topic B  (rule 2 matched)
-              │              │──▶ Default  (no rule matched)
-              └──────────────┘
-```
-
-The router inspects a field inside the message (header, metadata key, or JSON payload path) and selects the output topic by evaluating rules in priority order. The first rule that matches wins.
-
----
-
-## Platform Implementation
-
-### IContentBasedRouter
+## Key Types
 
 ```csharp
 // src/Processing.Routing/IContentBasedRouter.cs
@@ -42,22 +16,18 @@ public interface IContentBasedRouter
 }
 ```
 
-### RoutingRule
-
 ```csharp
 // src/Processing.Routing/RoutingRule.cs
 public sealed record RoutingRule
 {
     public required int Priority { get; init; }
-    public required string FieldName { get; init; }   // e.g. "MessageType", "Payload.order.region"
+    public required string FieldName { get; init; }
     public required RoutingOperator Operator { get; init; }
     public required string Value { get; init; }
     public required string TargetTopic { get; init; }
     public string? Name { get; init; }
 }
 ```
-
-### RoutingOperator
 
 ```csharp
 // src/Processing.Routing/RoutingOperator.cs
@@ -70,73 +40,208 @@ public enum RoutingOperator
 }
 ```
 
-Rules are sorted by ascending `Priority`. Regex patterns are compiled once at startup (`RegexOptions.Compiled`) and cached in a dictionary keyed by rule, avoiding per-message compilation overhead.
-
-### RoutingDecision
-
 ```csharp
+// src/Processing.Routing/RoutingDecision.cs
 public sealed record RoutingDecision(
     string TargetTopic,
     RoutingRule? MatchedRule,
     bool IsDefault);
 ```
 
-When no rule matches and a default topic is configured, `IsDefault = true`. When no rule matches and no default exists, the router throws `InvalidOperationException`.
-
 ---
 
-## Scalability Dimension
+## Exercises
 
-The `ContentBasedRouter` is **stateless** — it holds no per-message state between invocations. Routing rules are loaded once from configuration and shared read-only across all requests. This means you can run N replicas behind a competing-consumer group and every replica makes identical routing decisions. Horizontal scaling is limited only by broker throughput, not by router coordination.
+### 1. Route by MessageType with Equals operator
 
----
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
 
-## Atomicity Dimension
+var options = Options.Create(new RouterOptions
+{
+    Rules =
+    [
+        new RoutingRule
+        {
+            Priority = 1, FieldName = "MessageType",
+            Operator = RoutingOperator.Equals,
+            Value = "order.created", TargetTopic = "orders-topic",
+            Name = "OrderCreated",
+        },
+        new RoutingRule
+        {
+            Priority = 2, FieldName = "MessageType",
+            Operator = RoutingOperator.Equals,
+            Value = "payment.received", TargetTopic = "payments-topic",
+            Name = "PaymentReceived",
+        },
+    ],
+    DefaultTopic = "unmatched-topic",
+});
 
-The router publishes to the selected topic via the broker producer **before** acknowledging the source message. If the publish fails, the source message is Nacked and the broker redelivers it. If the process crashes after publish but before Ack, the message may be routed twice — downstream consumers must be idempotent (the `IntegrationEnvelope.MessageId` enables deduplication). Combined with Temporal workflow orchestration, the platform guarantees **zero message loss**.
+var router = new ContentBasedRouter(producer, options, NullLogger<ContentBasedRouter>.Instance);
+
+var envelope = IntegrationEnvelope<string>.Create(
+    "order-data", "OrderService", "order.created");
+
+var decision = await router.RouteAsync(envelope);
+
+Assert.That(decision.TargetTopic, Is.EqualTo("orders-topic"));
+Assert.That(decision.IsDefault, Is.False);
+Assert.That(decision.MatchedRule, Is.Not.Null);
+Assert.That(decision.MatchedRule!.Name, Is.EqualTo("OrderCreated"));
+```
+
+### 2. Route by Metadata field with Contains operator
+
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+
+var options = Options.Create(new RouterOptions
+{
+    Rules =
+    [
+        new RoutingRule
+        {
+            Priority = 1, FieldName = "Metadata.region",
+            Operator = RoutingOperator.Contains,
+            Value = "europe", TargetTopic = "eu-topic",
+            Name = "EuropeRegion",
+        },
+    ],
+    DefaultTopic = "global-topic",
+});
+
+var router = new ContentBasedRouter(producer, options, NullLogger<ContentBasedRouter>.Instance);
+
+var envelope = IntegrationEnvelope<string>.Create(
+    "eu-data", "RegionalService", "data.regional") with
+{
+    Metadata = new Dictionary<string, string> { ["region"] = "western-europe-1" },
+};
+
+var decision = await router.RouteAsync(envelope);
+
+Assert.That(decision.TargetTopic, Is.EqualTo("eu-topic"));
+Assert.That(decision.IsDefault, Is.False);
+Assert.That(decision.MatchedRule!.Name, Is.EqualTo("EuropeRegion"));
+```
+
+### 3. Route by MessageType with Regex operator
+
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+
+var options = Options.Create(new RouterOptions
+{
+    Rules =
+    [
+        new RoutingRule
+        {
+            Priority = 1, FieldName = "MessageType",
+            Operator = RoutingOperator.Regex,
+            Value = @"^order\..+", TargetTopic = "order-events",
+            Name = "AllOrderEvents",
+        },
+    ],
+    DefaultTopic = "other-events",
+});
+
+var router = new ContentBasedRouter(producer, options, NullLogger<ContentBasedRouter>.Instance);
+
+var envelope = IntegrationEnvelope<string>.Create(
+    "shipped-data", "OrderService", "order.shipped");
+
+var decision = await router.RouteAsync(envelope);
+
+Assert.That(decision.TargetTopic, Is.EqualTo("order-events"));
+Assert.That(decision.MatchedRule!.Name, Is.EqualTo("AllOrderEvents"));
+```
+
+### 4. No rule matches — falls back to default topic
+
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+
+var options = Options.Create(new RouterOptions
+{
+    Rules =
+    [
+        new RoutingRule
+        {
+            Priority = 1, FieldName = "MessageType",
+            Operator = RoutingOperator.Equals,
+            Value = "order.created", TargetTopic = "orders-topic",
+        },
+    ],
+    DefaultTopic = "catch-all-topic",
+});
+
+var router = new ContentBasedRouter(producer, options, NullLogger<ContentBasedRouter>.Instance);
+
+var envelope = IntegrationEnvelope<string>.Create(
+    "unknown-data", "UnknownService", "unknown.event");
+
+var decision = await router.RouteAsync(envelope);
+
+Assert.That(decision.TargetTopic, Is.EqualTo("catch-all-topic"));
+Assert.That(decision.IsDefault, Is.True);
+Assert.That(decision.MatchedRule, Is.Null);
+```
+
+### 5. RoutingDecision exposes full matched rule details
+
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+
+var options = Options.Create(new RouterOptions
+{
+    Rules =
+    [
+        new RoutingRule
+        {
+            Priority = 10, FieldName = "Source",
+            Operator = RoutingOperator.Equals,
+            Value = "CriticalService", TargetTopic = "critical-topic",
+            Name = "CriticalSource",
+        },
+    ],
+    DefaultTopic = "default-topic",
+});
+
+var router = new ContentBasedRouter(producer, options, NullLogger<ContentBasedRouter>.Instance);
+
+var envelope = IntegrationEnvelope<string>.Create(
+    "critical-payload", "CriticalService", "alert.triggered");
+
+var decision = await router.RouteAsync(envelope);
+
+Assert.That(decision.MatchedRule, Is.Not.Null);
+Assert.That(decision.MatchedRule!.Priority, Is.EqualTo(10));
+Assert.That(decision.MatchedRule.FieldName, Is.EqualTo("Source"));
+Assert.That(decision.MatchedRule.Operator, Is.EqualTo(RoutingOperator.Equals));
+Assert.That(decision.MatchedRule.Value, Is.EqualTo("CriticalService"));
+Assert.That(decision.MatchedRule.TargetTopic, Is.EqualTo("critical-topic"));
+Assert.That(decision.MatchedRule.Name, Is.EqualTo("CriticalSource"));
+```
 
 ---
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial09/Lab.cs`](../tests/TutorialLabs/Tutorial09/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial09/Lab.cs`](../tests/TutorialLabs/Tutorial09/Lab.cs)
 
-**Objective:** Configure routing rules with priorities, trace how the Content-Based Router dispatches messages, and analyze routing **scalability** under high-throughput conditions.
-
-### Step 1: Configure a Multi-Rule Routing Table
-
-Open `src/Processing.Routing/ContentBasedRouter.cs`. Create a routing configuration for an e-commerce platform:
-
-| Priority | Field | Operator | Value | Output Topic |
-|----------|-------|----------|-------|-------------|
-| 1 | `Payload.customer.tier` | Equals | `"platinum"` | `priority-processing` |
-| 5 | `MessageType` | Equals | `"OrderCreated"` | `orders.standard` |
-| 10 | `MessageType` | Regex | `"Return.*"` | `returns.processing` |
-| 100 | (default) | — | — | `general.inbox` |
-
-A message arrives with `MessageType = "OrderCreated"` and `Payload.customer.tier = "platinum"`. Which topic does it route to? Explain how priority ordering ensures deterministic routing.
-
-### Step 2: Trace the Routing Decision Path
-
-Using the `RoutingDecision` record, trace the router's decision path for a message that matches rules at priorities 1 and 5. Open the router implementation and identify:
-
-- How does the router evaluate rules? (sequential scan vs. sorted by priority?)
-- Does evaluation stop at the first match, or are all rules evaluated?
-- What `RoutingDecision` is returned — does it include the matched rule for auditing?
-
-### Step 3: Design for Routing Scalability
-
-Consider a Content-Based Router processing 50,000 messages/second with 200 routing rules:
-
-- What is the computational cost per message? (hint: O(n) for n rules)
-- How does pre-compiling regex patterns (`RoutingOperator.Regex`) improve throughput?
-- If you need to route to different brokers (Kafka for audit, NATS for real-time), how would the router's output topic abstraction enable this without code changes?
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial09.Lab"
+```
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial09/Exam.cs`](../tests/TutorialLabs/Tutorial09/Exam.cs)
+> 💻 [`tests/TutorialLabs/Tutorial09/Exam.cs`](../tests/TutorialLabs/Tutorial09/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial09.Exam"
+```
 
 ---
 

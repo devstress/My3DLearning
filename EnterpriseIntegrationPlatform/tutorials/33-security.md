@@ -1,40 +1,8 @@
 # Tutorial 33 — Security
 
-## What You'll Learn
+Sanitize input, encrypt payloads, and validate messages against security threats.
 
-- How `IInputSanitizer` strips dangerous content from message payloads
-- `IPayloadSizeGuard` enforces maximum payload size limits
-- Script tag removal, SQL injection pattern detection, and HTML entity sanitization
-- `PayloadTooLargeException` for oversized payloads
-- `JwtOptions` for configuring JWT authentication and validation
-- `Security.Secrets` for integrating with Azure Key Vault and HashiCorp Vault via `ISecretProvider`
-
----
-
-## EIP Pattern: Message Filter (Security)
-
-> *"A security-focused Message Filter removes or rejects messages that contain dangerous content before they reach the processing pipeline."*
-
-```
-  ┌──────────────┐     ┌──────────────────┐     ┌──────────────┐
-  │  Ingress     │────▶│  Input Sanitizer  │────▶│  Payload     │
-  │  (raw)       │     │  (strip scripts,  │     │  Size Guard  │
-  └──────────────┘     │   SQL, HTML)      │     └──────┬───────┘
-                       └──────────────────┘            │
-                                                       ▼
-                                              ┌──────────────────┐
-                                              │  Pipeline        │
-                                              │  (safe payload)  │
-                                              └──────────────────┘
-```
-
-The sanitizer and size guard act as a security gateway. They run before any business logic, ensuring that only clean, appropriately-sized payloads enter the pipeline.
-
----
-
-## Platform Implementation
-
-### IInputSanitizer
+## Key Types
 
 ```csharp
 // src/Security/IInputSanitizer.cs
@@ -45,16 +13,6 @@ public interface IInputSanitizer
 }
 ```
 
-`Sanitize` returns a cleaned copy of the input with dangerous content removed. `IsClean` returns `true` if the input contains no dangerous patterns (i.e., `Sanitize` would not modify it). Both methods are synchronous.
-
-The sanitizer detects and removes:
-- **Script tags**: `<script>...</script>`, inline event handlers (`onclick`, `onerror`)
-- **SQL injection patterns**: `'; DROP TABLE`, `OR 1=1`, `UNION SELECT`, comment sequences
-- **HTML entities**: encoded characters used to bypass text-based filters (`&#60;`, `&lt;`)
-- **Control characters**: null bytes, Unicode direction overrides
-
-### IPayloadSizeGuard
-
 ```csharp
 // src/Security/IPayloadSizeGuard.cs
 public interface IPayloadSizeGuard
@@ -64,8 +22,6 @@ public interface IPayloadSizeGuard
 }
 ```
 
-### PayloadTooLargeException
-
 ```csharp
 // src/Security/PayloadTooLargeException.cs
 public sealed class PayloadTooLargeException : Exception
@@ -74,10 +30,6 @@ public sealed class PayloadTooLargeException : Exception
     public int MaxBytes { get; }
 }
 ```
-
-When the payload exceeds the configured limit, the guard throws `PayloadTooLargeException`. This is a non-retryable error — the message is dead-lettered with `DeadLetterReason.ValidationFailed`.
-
-### JwtOptions
 
 ```csharp
 // src/Security/JwtOptions.cs
@@ -92,104 +44,78 @@ public sealed class JwtOptions
 }
 ```
 
-JWT authentication is used at the Gateway API layer. Tokens carry tenant identity (Tutorial 32) and scopes. The `JwtOptions` configure validation parameters and are bound from the `"Jwt"` configuration section via `SectionName`. The `ClockSkew` property controls how much clock drift is tolerated when validating token expiration.
+## Exercises
 
-### Security.Secrets
+### 1. InputSanitizer — Sanitize RemovesScriptTags
 
 ```csharp
-// src/Security.Secrets/ISecretProvider.cs
-public interface ISecretProvider
-{
-    Task<SecretEntry?> GetSecretAsync(
-        string key, string? version = null, CancellationToken ct = default);
-    Task<SecretEntry> SetSecretAsync(
-        string key, string value,
-        IReadOnlyDictionary<string, string>? metadata = null,
-        CancellationToken ct = default);
-    Task<bool> DeleteSecretAsync(string key, CancellationToken ct = default);
-    Task<IReadOnlyList<string>> ListSecretKeysAsync(
-        string? prefix = null, CancellationToken ct = default);
-}
+var input = "Hello <script>alert('xss')</script> World";
 
-public sealed record SecretEntry(
-    string Key,
-    string Value,
-    string Version,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset? ExpiresAt = null,
-    IReadOnlyDictionary<string, string>? Metadata = null)
-{
-    public bool IsExpired => ExpiresAt.HasValue && ExpiresAt.Value <= DateTimeOffset.UtcNow;
-}
+var result = _sanitizer.Sanitize(input);
+
+Assert.That(result, Does.Not.Contain("<script>"));
+Assert.That(result, Does.Not.Contain("alert"));
+Assert.That(result, Does.Contain("Hello"));
+Assert.That(result, Does.Contain("World"));
 ```
 
-`GetSecretAsync` returns a `SecretEntry?` containing the value along with version, creation timestamp, and metadata — or `null` if the key does not exist. The optional `version` parameter allows retrieving a specific version of a secret. `SetSecretAsync` returns the newly created `SecretEntry` (with version and timestamp) and accepts optional metadata. `DeleteSecretAsync` returns `true` if the key was deleted, `false` if it did not exist. `ListSecretKeysAsync` returns all known key names, optionally filtered by prefix.
+### 2. InputSanitizer — IsClean ReturnsFalseForXss
 
-Two implementations are provided:
-- `AzureKeyVaultSecretProvider` — integrates with Azure Key Vault using managed identity
-- `VaultSecretProvider` — integrates with HashiCorp Vault using AppRole or token auth
+```csharp
+var dirty = "<script>alert('xss')</script>";
 
-Secrets are never stored in configuration files or environment variables in production. The `ISecretProvider` abstraction allows swapping providers without code changes.
+Assert.That(_sanitizer.IsClean(dirty), Is.False);
+```
 
----
+### 3. InputSanitizer — IsClean ReturnsTrueForClean
 
-## Scalability Dimension
+```csharp
+var clean = "Hello, this is perfectly safe text.";
 
-The sanitizer and size guard are **stateless and CPU-bound** — they inspect each payload independently. They run as early pipeline stages, rejecting bad messages before expensive processing occurs. This protects downstream systems from wasted work. In high-throughput deployments, sanitization can be the bottleneck; profiling guides replica count.
+Assert.That(_sanitizer.IsClean(clean), Is.True);
+```
 
----
+### 4. PayloadSizeGuard — Enforce PassesForSmallPayload
 
-## Atomicity Dimension
+```csharp
+var guard = new PayloadSizeGuard(
+    Options.Create(new PayloadSizeOptions { MaxPayloadBytes = 1024 }));
 
-Sanitization runs **before the message is Acked**. Callers can use `IsClean` to check whether the input would be modified, and `Sanitize` to obtain the cleaned payload. If the size guard rejects a message, it is Nacked and dead-lettered in a single atomic operation — the original message is never lost, just quarantined for inspection.
+var smallPayload = new string('x', 100);
 
----
+Assert.DoesNotThrow(() => guard.Enforce(smallPayload));
+```
+
+### 5. PayloadSizeGuard — Enforce ThrowsPayloadTooLargeException
+
+```csharp
+var guard = new PayloadSizeGuard(
+    Options.Create(new PayloadSizeOptions { MaxPayloadBytes = 50 }));
+
+var oversized = new string('x', 200);
+
+var ex = Assert.Throws<PayloadTooLargeException>(
+    () => guard.Enforce(oversized));
+
+Assert.That(ex!.MaxBytes, Is.EqualTo(50));
+Assert.That(ex.ActualBytes, Is.GreaterThan(50));
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial33/Lab.cs`](../tests/TutorialLabs/Tutorial33/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial33/Lab.cs`](../tests/TutorialLabs/Tutorial33/Lab.cs)
 
-**Objective:** Trace the input sanitization pipeline, analyze how defense-in-depth protects **message atomicity** from injection attacks, and evaluate secret management for **scalable** multi-environment deployments.
-
-### Step 1: Trace XSS Sanitization
-
-A payload contains `<script>alert('xss')</script>` embedded in a JSON string value. Open `src/Security/InputSanitizer.cs` and trace:
-
-1. How does the sanitizer detect the `<script>` tag within a JSON value?
-2. Is the malicious content removed, escaped, or rejected?
-3. Is the rest of the valid JSON preserved?
-4. What happens to the envelope's `MessageId` and `CorrelationId` — are they affected?
-
-Why is sanitization critical for **pipeline atomicity**? (hint: unsanitized payloads could execute scripts in downstream web UIs or corrupt database queries)
-
-### Step 2: Analyze Payload Size Guard
-
-Why does the platform use a separate `IPayloadSizeGuard` instead of checking size inside `IInputSanitizer`?
-
-| Concern | Responsibility | Why Separate? |
-|---------|---------------|---------------|
-| Size validation | `IPayloadSizeGuard` | Cheap check — reject oversized payloads before expensive sanitization |
-| Content sanitization | `IInputSanitizer` | Complex parsing — only runs on right-sized payloads |
-| Schema validation | Activity pipeline | Business logic — runs after sanitization |
-
-How does this layered approach improve **throughput scalability**? (hint: fast rejection of invalid messages at each layer)
-
-### Step 3: Compare Secret Providers for Multi-Environment Deployment
-
-| Provider | Best For | Rotation | Caching |
-|----------|---------|----------|---------|
-| `InMemorySecretProvider` | Development and testing | Manual | No |
-| `CachedSecretProvider` | Production (wraps any provider) | Automatic TTL | Yes |
-| `AzureKeyVaultSecretProvider` | Azure deployments | Azure-managed | Via wrapper |
-| `VaultSecretProvider` | Multi-cloud with HashiCorp Vault | Vault-managed | Via wrapper |
-
-When would you use `CachedSecretProvider` wrapping `AzureKeyVaultSecretProvider`? What is the **scalability** benefit of caching secrets locally?
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial33.Lab"
+```
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial33/Exam.cs`](../tests/TutorialLabs/Tutorial33/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial33/Exam.cs`](../tests/TutorialLabs/Tutorial33/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial33.Exam"
+```
 
 ---
 

@@ -1,183 +1,155 @@
 # Tutorial 41 — OpenClaw Web UI
 
-## What You'll Learn
+Search and trace messages through the OpenClaw web UI powered by Blazor Server.
 
-- The purpose of `OpenClaw.Web` — the "Where is my message?" web interface
-- Natural language search powered by the RAG API (Tutorial 40)
-- Message state inspection from the lifecycle store (Tutorial 39)
-- Integration with the RAG knowledge API for contextual answers
-- Aspire dashboard integration for monitoring and diagnostics
+## Exercises
 
----
-
-## Architecture: OpenClaw Web
-
-> *"Every integration platform needs a single pane of glass where operators can search for messages, inspect their state, and understand why something went wrong — in plain English."*
-
-```
-  ┌──────────────────────────────────────────────────┐
-  │                OpenClaw.Web                      │
-  │  ┌────────────┐  ┌──────────┐  ┌─────────────┐  │
-  │  │ Search Bar │  │ Message  │  │ RAG Chat    │  │
-  │  │ (natural   │  │ Detail   │  │ (ask about  │  │
-  │  │  language)  │  │ View     │  │  messages)  │  │
-  │  └─────┬──────┘  └────┬─────┘  └──────┬──────┘  │
-  └────────┼──────────────┼───────────────┼──────────┘
-           │              │               │
-           ▼              ▼               ▼
-  ┌──────────────┐ ┌─────────────┐ ┌─────────────┐
-  │ Message      │ │ State Store │ │ RAG API     │
-  │ State Store  │ │ (lifecycle) │ │ (AI.RagFlow)│
-  └──────────────┘ └─────────────┘ └─────────────┘
-           │
-           ▼
-  ┌──────────────┐
-  │ Aspire       │
-  │ Dashboard    │
-  └──────────────┘
-```
-
-OpenClaw.Web is a Blazor Server application that aggregates data from the message state store, the RAG knowledge API, and the Aspire dashboard into a unified operator experience.
-
----
-
-## Platform Implementation
-
-### DemoDataSeeder
-
-OpenClaw.Web uses a `DemoDataSeeder` (a `BackgroundService`) to populate the `IObservabilityEventLog` with sample message lifecycle events so operators can test "where is my message?" queries before the Kafka ingestion pipeline is running. It seeds three scenarios:
-
-- **order-02** — Successfully delivered (`Pending → InFlight → Delivered`)
-- **shipment-123** — Currently in-flight (`Pending → InFlight`)
-- **invoice-001** — Failed with retry (`Pending → InFlight → Failed → Retrying`)
-
-The `/api/health/seeder` endpoint exposes `DemoDataSeeder.IsSeeded` so Playwright tests can poll for readiness.
-
-### Service Registration (Program.cs)
-
-The web app registers services directly through DI — there are no `IMessageSearchService`, `IMessageInspector`, or `IRagChatService` abstractions. Instead, `Program.cs` wires up the concrete services:
+### 1. InspectionResult — RecordShape HasExpectedProperties
 
 ```csharp
-// Register Ollama AI service
-builder.Services.AddOllamaService(ollamaBaseAddress, ollamaModel);
+var result = new InspectionResult
+{
+    Query = "ORD-123",
+    Found = true,
+    Summary = "Message delivered",
+    OllamaAvailable = false,
+    Events = new List<MessageEvent>(),
+    LatestStage = "Delivery",
+    LatestStatus = DeliveryStatus.Delivered,
+};
 
-// Register platform observability (Loki-backed IObservabilityEventLog)
-builder.Services.AddPlatformObservability(lokiBaseAddress);
-
-// Register RagFlow RAG service
-builder.Services.AddRagFlowService(builder.Configuration);
-
-// Seed demo data
-builder.Services.AddHostedService<DemoDataSeeder>();
+Assert.That(result.Query, Is.EqualTo("ORD-123"));
+Assert.That(result.Found, Is.True);
+Assert.That(result.Summary, Is.EqualTo("Message delivered"));
+Assert.That(result.OllamaAvailable, Is.False);
+Assert.That(result.Events, Is.Empty);
+Assert.That(result.LatestStage, Is.EqualTo("Delivery"));
+Assert.That(result.LatestStatus, Is.EqualTo(DeliveryStatus.Delivered));
 ```
 
-### API Endpoints
-
-The `/api/inspect` group provides message search and inspection via `MessageStateInspector`, which queries the `IObservabilityEventLog` and calls `IOllamaService` for AI-powered trace analysis:
+### 2. MessageStateInspector — WhereIsByCorrelationAsync ReturnsResult
 
 ```csharp
-// Query by business key (e.g. "order-02")
-GET /api/inspect/business/{businessKey}
+var correlationId = Guid.NewGuid();
+var events = new List<MessageEvent>
+{
+    new()
+    {
+        MessageId = Guid.NewGuid(),
+        CorrelationId = correlationId,
+        MessageType = "Order",
+        Source = "Gateway",
+        Stage = "Ingestion",
+        Status = DeliveryStatus.Pending,
+    },
+};
 
-// Query by correlation ID
-GET /api/inspect/correlation/{correlationId:guid}
+var log = Substitute.For<IObservabilityEventLog>();
+log.GetByCorrelationIdAsync(correlationId, Arg.Any<CancellationToken>())
+    .Returns(events);
 
-// Free-form natural language query
-POST /api/inspect/ask  { "query": "..." }
+var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
+traceAnalyzer.WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+    .Returns("Message is at Ingestion stage");
+
+var inspector = new MessageStateInspector(
+    log, traceAnalyzer, NullLogger<MessageStateInspector>.Instance);
+
+var result = await inspector.WhereIsByCorrelationAsync(correlationId);
+
+Assert.That(result.Found, Is.True);
+Assert.That(result.Events, Has.Count.EqualTo(1));
+Assert.That(result.LatestStage, Is.EqualTo("Ingestion"));
 ```
 
-The `/api/generate` group provides RAG-powered context retrieval via `IRagFlowService`:
+### 3. MessageStateInspector — WhereIsAsync ReturnsResult
 
 ```csharp
-// Retrieve context for integration generation
-POST /api/generate/integration
+var correlationId = Guid.NewGuid();
+var events = new List<MessageEvent>
+{
+    new()
+    {
+        MessageId = Guid.NewGuid(),
+        CorrelationId = correlationId,
+        MessageType = "Shipment",
+        Source = "Warehouse",
+        Stage = "Routing",
+        Status = DeliveryStatus.InFlight,
+        BusinessKey = "SHIP-456",
+    },
+};
 
-// Chat completion (retrieval + generation)
-POST /api/generate/chat
+var log = Substitute.For<IObservabilityEventLog>();
+log.GetByBusinessKeyAsync("SHIP-456", Arg.Any<CancellationToken>())
+    .Returns(events);
 
-// List available RagFlow datasets
-GET  /api/generate/datasets
+var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
+traceAnalyzer.WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+    .Returns("Message is being routed");
+
+var inspector = new MessageStateInspector(
+    log, traceAnalyzer, NullLogger<MessageStateInspector>.Instance);
+
+var result = await inspector.WhereIsAsync("SHIP-456");
+
+Assert.That(result.Found, Is.True);
+Assert.That(result.Query, Is.EqualTo("SHIP-456"));
+Assert.That(result.LatestStage, Is.EqualTo("Routing"));
 ```
 
-Health endpoints check `IOllamaService.IsHealthyAsync()` and `IRagFlowService.IsHealthyAsync()`.
+### 4. MessageStateInspector — CreateSnapshot CreatesValidSnapshot
 
-### Embedded Web UI
+```csharp
+var log = Substitute.For<IObservabilityEventLog>();
+var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
 
-OpenClaw.Web serves a single-page Blazor Server UI at `/` with:
-- A search box for business key or natural-language queries
-- A timeline visualization of message lifecycle events with status badges (`Pending`, `InFlight`, `Delivered`, `Failed`, `Retrying`, `DeadLettered`)
-- Ollama health status indicator
-- Links to the Aspire dashboard for deeper diagnostics
+var inspector = new MessageStateInspector(
+    log, traceAnalyzer, NullLogger<MessageStateInspector>.Instance);
 
----
+var envelope = IntegrationEnvelope<string>.Create("payload", "TestSvc", "order.created");
 
-## Scalability Dimension
+var snapshot = inspector.CreateSnapshot(envelope, "Ingestion", DeliveryStatus.Pending);
 
-OpenClaw.Web is a **read-only UI** — it queries the `IObservabilityEventLog` and AI services without modifying pipeline state. Blazor Server maintains a SignalR connection per user, so the number of concurrent operators determines resource needs. For large teams, deploy multiple web instances behind a load balancer with sticky sessions. Search performance depends on the observability event log's indexing (Tutorial 39).
+Assert.That(snapshot.MessageId, Is.EqualTo(envelope.MessageId));
+Assert.That(snapshot.CorrelationId, Is.EqualTo(envelope.CorrelationId));
+Assert.That(snapshot.CurrentStage, Is.EqualTo("Ingestion"));
+Assert.That(snapshot.DeliveryStatus, Is.EqualTo(DeliveryStatus.Pending));
+Assert.That(snapshot.Source, Is.EqualTo("TestSvc"));
+Assert.That(snapshot.MessageType, Is.EqualTo("order.created"));
+```
 
----
+### 5. Mock — ITraceAnalyzer WhereIsMessageAsync ReturnsAnalysis
 
-## Atomicity Dimension
+```csharp
+var analyzer = Substitute.For<ITraceAnalyzer>();
+var correlationId = Guid.NewGuid();
 
-The web UI provides **eventual consistency** — it shows the latest state from the observability event log, which may be a few seconds behind real-time processing. The lifecycle view uses `IObservabilityEventLog.GetByBusinessKeyAsync` for a consistent snapshot of a single message's history. The AI-powered trace analysis is advisory — its answers are generated by `IOllamaService`, not authoritative. Operators should verify critical decisions against the raw lifecycle data.
+analyzer.WhereIsMessageAsync(correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+    .Returns("Message is in the dead-letter queue after 3 retries");
 
----
+var analysis = await analyzer.WhereIsMessageAsync(correlationId, "{}");
+
+Assert.That(analysis, Does.Contain("dead-letter"));
+await analyzer.Received(1).WhereIsMessageAsync(
+    correlationId, Arg.Any<string>(), Arg.Any<CancellationToken>());
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial41/Lab.cs`](../tests/TutorialLabs/Tutorial41/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial41/Lab.cs`](../tests/TutorialLabs/Tutorial41/Lab.cs)
 
-**Objective:** Trace the operational query flow through OpenClaw's inspection APIs, design a "Where is my message?" workflow, and analyze why the UI delegates to Aspire for **scalable** observability.
-
-### Step 1: Trace an Operational Query
-
-An operator searches for "failed orders from PartnerX last week." Trace the query flow:
-
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial41.Lab"
 ```
-1. Operator enters query in OpenClaw chat → POST /api/inspect/ask
-2. MessageStateInspector parses: source="PartnerX", status="Failed", timeRange=7d
-3. Query observability event log for matching messages
-4. Return: list of failed messages with failure reasons, stages, and timestamps
-```
-
-Open `src/OpenClaw.Web/` and trace: How does the `/api/inspect/ask` endpoint delegate to `MessageStateInspector`? What data sources does it query?
-
-### Step 2: Design the "Where Is My Message?" Feature
-
-Design the complete UI flow:
-
-| Input | Source | Purpose |
-|-------|--------|---------|
-| Message ID or Correlation ID | Operator | Identify the message |
-| (optional) Time range | Operator | Narrow the search |
-
-| Output Display | Data Source |
-|---------------|-------------|
-| Current lifecycle stage | Message state store |
-| Processing timeline | Lifecycle events |
-| Error details (if failed) | DLQ entry |
-| Distributed trace link | OpenTelemetry trace ID |
-
-Why does the platform show a **link** to the Aspire dashboard trace rather than embedding trace visualization directly? (hint: Aspire already provides rich trace visualization — reimplementing it would be a maintenance burden)
-
-### Step 3: Analyze UI Architecture for Operational Scalability
-
-The OpenClaw Web UI queries data directly from multiple backend services (Loki, Ollama, RagFlow). Design the resilience strategy:
-
-| Scenario | Behavior |
-|----------|----------|
-| All services healthy | Full functionality — lifecycle search, AI analysis, RAG knowledge |
-| Loki (observability store) down | In-memory event log fallback; DemoDataSeeder data still available |
-| Ollama unreachable | AI-powered trace analysis disabled; basic search still works |
-| RagFlow unreachable | RAG knowledge queries unavailable; inspection endpoints unaffected |
-
-How does this resilience architecture support **operational scalability** — the UI must remain useful even during partial infrastructure failures?
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial41/Exam.cs`](../tests/TutorialLabs/Tutorial41/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial41/Exam.cs`](../tests/TutorialLabs/Tutorial41/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial41.Exam"
+```
 
 ---
 

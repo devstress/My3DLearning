@@ -1,35 +1,8 @@
 # Tutorial 47 — Saga Compensation
 
-## What You'll Learn
+Compensate partial failures in distributed workflows using saga rollback activities.
 
-- Deep dive on `AtomicPipelineWorkflow` and saga compensation
-- Step tracking and completion state management
-- Nack-triggered reverse-order compensation via `SagaCompensationActivities`
-- Handling partial compensation scenarios
-- The difference between `IntegrationPipelineWorkflow` and `AtomicPipelineWorkflow`
-- Real-world saga example: inventory → payment → shipping → failure → undo
-
-## Two Pipeline Workflows Compared
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  IntegrationPipelineWorkflow (No Compensation)                       │
-│                                                                      │
-│  Step 1 ──▶ Step 2 ──▶ Step 3 ──▶ Step 4                           │
-│  If Step 3 fails: retry (Temporal policy) or fail the workflow       │
-│  No undo of Step 1 or Step 2.                                        │
-└──────────────────────────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────────────────────────┐
-│  AtomicPipelineWorkflow (Full Saga Compensation)                     │
-│                                                                      │
-│  Step 1 ──▶ Step 2 ──▶ Step 3 ──▶ Step 4                           │
-│  If Step 3 fails: Nack + compensate Step 2 ──▶ compensate Step 1    │
-│  Reverse-order undo of all completed steps.                          │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-## AtomicPipelineWorkflow Structure
+## Key Types
 
 ```csharp
 // src/Workflow.Temporal/Workflows/AtomicPipelineWorkflow.cs (simplified)
@@ -89,114 +62,6 @@ public class AtomicPipelineWorkflow
 }
 ```
 
-## Step Tracking
-
-Each successfully completed activity is recorded in a `List<string>`. If a later step fails, the workflow knows exactly which steps need compensation:
-
-```csharp
-var completedSteps = new List<string>();
-
-// After each activity completes successfully:
-await Workflow.ExecuteActivityAsync(
-    (PipelineActivities act) => act.PersistMessageAsync(input),
-    PipelineActivityOptions);
-completedSteps.Add("PersistMessage");   // Track it
-
-await Workflow.ExecuteActivityAsync(
-    (PipelineActivities act) =>
-        act.LogStageAsync(input.MessageId, input.MessageType, "Received"),
-    PipelineActivityOptions);
-completedSteps.Add("LogReceived");      // Track it
-```
-
-```
-Completed Steps List (reversed for compensation):
-┌─────────────────┐
-│ 2. LogReceived  │ ← compensate first
-├─────────────────┤
-│ 1. PersistMessage│ ← compensate second
-└─────────────────┘
-```
-
-## Reverse-Order Compensation
-
-`HandleNackWithRollbackAsync` compensates steps in reverse order via `SagaCompensationActivities`:
-
-```csharp
-// src/Workflow.Temporal/Workflows/AtomicPipelineWorkflow.cs (simplified)
-private async Task<AtomicPipelineResult> HandleNackWithRollbackAsync(
-    IntegrationPipelineInput input,
-    List<string> completedSteps,
-    string failureReason)
-{
-    var compensatedSteps = new List<string>();
-
-    // Compensate in reverse order (last committed step first)
-    foreach (var step in Enumerable.Reverse(completedSteps))
-    {
-        try
-        {
-            var success = await Workflow.ExecuteActivityAsync(
-                (SagaCompensationActivities act) =>
-                    act.CompensateStepAsync(input.CorrelationId, step),
-                CompensationActivityOptions);
-
-            if (success)
-                compensatedSteps.Add(step);
-        }
-        catch (Exception)
-        {
-            // Log but continue — partial compensation is better than none
-        }
-    }
-
-    // Save fault, update status to Failed, publish Nack...
-    return new AtomicPipelineResult(
-        input.MessageId, false, failureReason,
-        compensatedSteps.AsReadOnly());
-}
-```
-
-```
-  Forward execution:           Compensation (on failure):
-
-  PersistMessage ──────▶       ◀────── CompensateStepAsync("PersistMessage")
-  LogReceived ─────────▶       ◀────── CompensateStepAsync("LogReceived")
-  Validate ────────✗ FAIL      (not completed, skip)
-```
-
-## Partial Compensation
-
-If compensation itself fails, the workflow catches the exception and continues with remaining steps:
-
-```csharp
-catch (Exception)
-{
-    // Log but continue — partial compensation is better than none.
-    // The step is NOT added to compensatedSteps, so the result
-    // tracks exactly which steps were successfully rolled back.
-}
-```
-
-Uncompensated steps are visible in the `AtomicPipelineResult.CompensatedSteps` list — operators can compare it with the original `completedSteps` to identify gaps requiring manual review via Admin.Api.
-
-## Real-World Example: E-Commerce Order
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                 Order Processing Saga                     │
-│                                                          │
-│  Step 1: Reserve Inventory   ──▶ 10 Widgets reserved    │
-│  Step 2: Charge Payment      ──▶ $99.99 charged         │
-│  Step 3: Ship Order          ──✗ FAILURE (out of stock   │
-│                                   at warehouse)          │
-│                                                          │
-│  Compensation (reverse order):                           │
-│  Undo Step 2: Refund Payment ──▶ $99.99 refunded        │
-│  Undo Step 1: Release Inv.   ──▶ 10 Widgets released    │
-└──────────────────────────────────────────────────────────┘
-```
-
 ```csharp
 // src/Workflow.Temporal/Activities/SagaCompensationActivities.cs
 public sealed class SagaCompensationActivities
@@ -218,90 +83,79 @@ public sealed class SagaCompensationActivities
 }
 ```
 
-## Nack-Triggered Compensation
+## Exercises
 
-When `NotificationsEnabled = true`, the failure publishes a Nack before
-compensation begins:
+### 1. CompensateAsync — ReturnsTrue
 
-```
-  Activity Failure
-       │
-       ├──▶ Publish Nack ──▶ NATS notification subject
-       │        │
-       │        ▼
-       │    <Nack>not ok because of {ErrorMessage}</Nack>
-       │
-       └──▶ Begin compensation (reverse-order)
+```csharp
+var svc = new DefaultCompensationActivityService(
+    NullLogger<DefaultCompensationActivityService>.Instance);
+
+var result = await svc.CompensateAsync(Guid.NewGuid(), "validate");
+
+Assert.That(result, Is.True);
 ```
 
-## Scalability Dimension
+### 2. ICompensationActivityService — InterfaceShape
 
-Saga compensation is orchestrated by Temporal, which distributes compensation
-activities across the worker pool. Long-running compensations (e.g., refund
-processing) do not block other workflows — Temporal's task queue ensures
-parallel execution across workers.
+```csharp
+var type = typeof(ICompensationActivityService);
 
-## Atomicity Dimension
+Assert.That(type.IsInterface, Is.True);
+Assert.That(type.GetMethod("CompensateAsync"), Is.Not.Null);
+```
 
-The saga pattern provides **semantic atomicity** — while not a database
-transaction, it guarantees that either all steps complete successfully or all
-completed steps are compensated. This is the strongest consistency guarantee
-available in a distributed system without two-phase commit.
+### 3. SagaCompensationActivities — ClassExists
+
+```csharp
+var assembly = typeof(EnterpriseIntegrationPlatform.Workflow.Temporal.TemporalOptions).Assembly;
+var type = assembly.GetTypes()
+    .FirstOrDefault(t => t.Name == "SagaCompensationActivities");
+
+Assert.That(type, Is.Not.Null);
+```
+
+### 4. SagaCompensationWorkflow — ClassExists
+
+```csharp
+var assembly = typeof(EnterpriseIntegrationPlatform.Workflow.Temporal.TemporalOptions).Assembly;
+var type = assembly.GetTypes()
+    .FirstOrDefault(t => t.Name == "SagaCompensationWorkflow");
+
+Assert.That(type, Is.Not.Null);
+```
+
+### 5. CompensateAsync — MultipleSteps AllReturnTrue
+
+```csharp
+var svc = new DefaultCompensationActivityService(
+    NullLogger<DefaultCompensationActivityService>.Instance);
+
+var corrId = Guid.NewGuid();
+var r1 = await svc.CompensateAsync(corrId, "persist");
+var r2 = await svc.CompensateAsync(corrId, "notify");
+var r3 = await svc.CompensateAsync(corrId, "route");
+
+Assert.That(r1, Is.True);
+Assert.That(r2, Is.True);
+Assert.That(r3, Is.True);
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial47/Lab.cs`](../tests/TutorialLabs/Tutorial47/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial47/Lab.cs`](../tests/TutorialLabs/Tutorial47/Lab.cs)
 
-**Objective:** Design saga compensation for multi-step workflows, analyze compensation failure strategies, and compare workflow types for **throughput vs. consistency** trade-offs.
-
-### Step 1: Design Compensation for Non-Reversible Actions
-
-Add a fourth step "SendConfirmation" (email) to the saga:
-
-| Step | Action | Compensation | Reversible? |
-|------|--------|-------------|-------------|
-| 1. ValidateOrder | Schema validation | No-op (read-only) | N/A |
-| 2. ChargePayment | Debit customer account | Refund credit | Yes |
-| 3. ReserveInventory | Decrement stock | Increment stock | Yes |
-| 4. SendConfirmation | Email customer | ??? | **No** |
-
-Email is non-reversible. Design a compensating action:
-- Send a "cancellation notice" email? (creates customer confusion)
-- Log the non-reversible action for manual review? (operationally safer)
-- Accept that some actions cannot be compensated? (pragmatic)
-
-How does this challenge the **theoretical atomicity** of saga compensation?
-
-### Step 2: Handle Compensation Failures
-
-`CompensateStepAsync` for Step 2 (Refund) fails with a network timeout. Design a retry policy:
-
-| Concern | Policy |
-|---------|--------|
-| Urgency | Customer expects refund quickly |
-| Safety | Must not issue double refund |
-| Idempotency | Refund API must be idempotent (check by `CorrelationId`) |
-| Retry limit | 5 attempts with exponential backoff |
-| Escalation | After 5 failures → alert operations team for manual refund |
-
-Open `src/Workflow.Temporal/Activities/SagaCompensationActivities.cs` and check: How does the platform handle compensation activity failures?
-
-### Step 3: Compare Workflow Types
-
-| Aspect | IntegrationPipelineWorkflow | AtomicPipelineWorkflow |
-|--------|---------------------------|----------------------|
-| Compensation | None (fire-and-forget) | Full saga compensation |
-| Throughput | Higher (no compensation overhead) | Lower (tracks compensation state) |
-| Consistency guarantee | Best-effort delivery | All-or-nothing |
-| Best for | Non-critical notifications | Financial transactions, order processing |
-
-When would you choose `IntegrationPipelineWorkflow` over `AtomicPipelineWorkflow`?
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial47.Lab"
+```
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial47/Exam.cs`](../tests/TutorialLabs/Tutorial47/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial47/Exam.cs`](../tests/TutorialLabs/Tutorial47/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial47.Exam"
+```
 
 ---
 

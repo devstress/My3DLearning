@@ -1,33 +1,8 @@
 # Tutorial 35 — SFTP Connector
 
-## What You'll Learn
+Deliver messages as files to remote SFTP servers with connection pooling.
 
-- The EIP Channel Adapter pattern applied to SFTP file transfer
-- How `ISftpConnector` provides generic `UploadAsync<T>`, `DownloadAsync`, and `ListFilesAsync` operations
-- Password authentication for SFTP connections
-- Configurable root path and timeout settings
-
----
-
-## EIP Pattern: Channel Adapter (SFTP)
-
-> *"A Channel Adapter connects the messaging system to a file-based integration endpoint. SFTP adapters translate integration messages into file operations on a remote server."*
-> — Gregor Hohpe & Bobby Woolf, *Enterprise Integration Patterns*
-
-```
-  ┌──────────────┐     ┌──────────────────┐     ┌──────────────┐
-  │  Pipeline    │────▶│  SFTP Connector   │────▶│  Remote SFTP │
-  │  (envelope)  │     │  (upload/download)│     │  Server      │
-  └──────────────┘     └──────────────────┘     └──────────────┘
-```
-
-Many enterprise integrations still rely on file-based exchange via SFTP. The connector bridges the messaging pipeline and the file system, handling authentication and file transfer.
-
----
-
-## Platform Implementation
-
-### ISftpConnector
+## Key Types
 
 ```csharp
 // src/Connector.Sftp/ISftpConnector.cs
@@ -45,10 +20,6 @@ public interface ISftpConnector
 }
 ```
 
-`UploadAsync<T>` accepts a generic envelope and a `Func<T, byte[]>` serializer that converts the payload to bytes. It returns the full remote path of the uploaded file. `DownloadAsync` returns raw bytes, and `ListFilesAsync` returns a list of full remote file paths.
-
-### SftpConnectorOptions
-
 ```csharp
 // src/Connector.Sftp/SftpConnectorOptions.cs
 public sealed class SftpConnectorOptions
@@ -62,79 +33,119 @@ public sealed class SftpConnectorOptions
 }
 ```
 
-| Option | Purpose |
-|--------|---------|
-| `Host` | SFTP server hostname or IP address |
-| `Port` | SFTP server port (default 22) |
-| `Username` | SFTP authentication username |
-| `Password` | SFTP authentication password |
-| `RootPath` | Root path on the remote server (default `/`) |
-| `TimeoutMs` | Connection timeout in milliseconds (default 10000) |
+## Exercises
 
----
+### 1. SftpConnectorOptions — Defaults
 
-## Scalability Dimension
+```csharp
+var opts = new SftpConnectorOptions();
 
-SFTP connections are **expensive** — each connection requires a TCP handshake and SSH negotiation. The connector pools connections per host and reuses them across requests. Multiple consumer replicas can upload concurrently, but the remote server's connection limit must be respected. Using unique filenames (e.g. based on `MessageId`) avoids filename collisions across replicas.
+Assert.That(opts.Host, Is.EqualTo(string.Empty));
+Assert.That(opts.Port, Is.EqualTo(22));
+Assert.That(opts.Username, Is.EqualTo(string.Empty));
+Assert.That(opts.Password, Is.EqualTo(string.Empty));
+Assert.That(opts.RootPath, Is.EqualTo("/"));
+Assert.That(opts.TimeoutMs, Is.EqualTo(10000));
+Assert.That(opts.MaxConnectionsPerHost, Is.EqualTo(5));
+```
 
----
+### 2. SftpConnectorOptions — CustomValues
 
-## Atomicity Dimension
+```csharp
+var opts = new SftpConnectorOptions
+{
+    Host = "sftp.example.com",
+    Port = 2222,
+    Username = "deploy",
+    Password = "p@ss",
+    RootPath = "/uploads",
+    TimeoutMs = 5000,
+    MaxConnectionsPerHost = 10,
+};
 
-The `UploadAsync` method ensures **all-or-nothing delivery**. If the upload fails, no file is left on the server and the source message is redelivered. The source message is Acked only after the upload succeeds and the full remote path is returned. On failure, the connector returns an error and the message is retried or dead-lettered.
+Assert.That(opts.Host, Is.EqualTo("sftp.example.com"));
+Assert.That(opts.Port, Is.EqualTo(2222));
+Assert.That(opts.Username, Is.EqualTo("deploy"));
+Assert.That(opts.Password, Is.EqualTo("p@ss"));
+Assert.That(opts.RootPath, Is.EqualTo("/uploads"));
+Assert.That(opts.TimeoutMs, Is.EqualTo(5000));
+Assert.That(opts.MaxConnectionsPerHost, Is.EqualTo(10));
+```
 
----
+### 3. ISftpClient — InterfaceShape HasExpectedMethods
+
+```csharp
+var type = typeof(ISftpClient);
+
+Assert.That(type.GetMethod("Connect"), Is.Not.Null);
+Assert.That(type.GetMethod("Disconnect"), Is.Not.Null);
+Assert.That(type.GetMethod("UploadFile"), Is.Not.Null);
+Assert.That(type.GetMethod("DownloadFile"), Is.Not.Null);
+Assert.That(type.GetMethod("ListFiles"), Is.Not.Null);
+Assert.That(type.GetMethod("DeleteFile"), Is.Not.Null);
+Assert.That(type.GetProperty("IsConnected"), Is.Not.Null);
+```
+
+### 4. SftpConnectionPool — AcquireAndRelease
+
+```csharp
+var mockClient = Substitute.For<ISftpClient>();
+mockClient.IsConnected.Returns(true);
+
+var pool = new SftpConnectionPool(
+    () => mockClient,
+    Options.Create(new SftpConnectorOptions { MaxConnectionsPerHost = 2 }),
+    NullLogger<SftpConnectionPool>.Instance);
+
+var client = await pool.AcquireAsync();
+Assert.That(client, Is.Not.Null);
+
+mockClient.Received(1).Connect();
+
+pool.Release(client);
+
+await pool.DisposeAsync();
+```
+
+### 5. SftpConnector — Upload DelegatesToPool
+
+```csharp
+var mockClient = Substitute.For<ISftpClient>();
+mockClient.IsConnected.Returns(true);
+
+var mockPool = Substitute.For<ISftpConnectionPool>();
+mockPool.AcquireAsync(Arg.Any<CancellationToken>()).Returns(mockClient);
+
+var connector = new SftpConnector(
+    mockPool,
+    Options.Create(new SftpConnectorOptions { RootPath = "/data" }),
+    NullLogger<SftpConnector>.Instance);
+
+var envelope = IntegrationEnvelope<string>.Create("payload", "Svc", "file.upload");
+
+var remotePath = await connector.UploadAsync(
+    envelope, "test.json", s => System.Text.Encoding.UTF8.GetBytes(s), CancellationToken.None);
+
+Assert.That(remotePath, Is.EqualTo("/data/test.json"));
+mockClient.Received(2).UploadFile(Arg.Any<Stream>(), Arg.Any<string>()); // data + meta
+mockPool.Received(1).Release(mockClient);
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial35/Lab.cs`](../tests/TutorialLabs/Tutorial35/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial35/Lab.cs`](../tests/TutorialLabs/Tutorial35/Lab.cs)
 
-**Objective:** Design connection pooling for SFTP under high consumer concurrency, trace the upload lifecycle, and analyze **atomic** file delivery guarantees.
-
-### Step 1: Design Connection Pooling
-
-An SFTP server has a 10-connection limit. You have 20 consumer replicas uploading files:
-
-| Without Pooling | With Pooling |
-|-----------------|-------------|
-| 20 connections attempted | Pool of 10 shared connections |
-| 10 fail with connection refused | Consumers wait for available connection |
-| No retry coordination | Queue + semaphore manages access |
-
-Open `src/Connector.Sftp/SftpConnector.cs` and check: How does the platform pool SFTP connections? What happens when all pool slots are busy?
-
-### Step 2: Trace the Upload Lifecycle
-
-`UploadAsync<T>` accepts a `Func<T, byte[]>` serializer. Write a serializer for a JSON payload:
-
-```csharp
-var remotePath = await sftpConnector.UploadAsync(
-    envelope,
-    fileName: "order-42.json",
-    serializer: payload => System.Text.Encoding.UTF8.GetBytes(
-        System.Text.Json.JsonSerializer.Serialize(payload)),
-    cancellationToken: ct);
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial35.Lab"
 ```
-
-Why does the connector return the full remote path rather than a `ConnectorResult`? How does the caller confirm **atomic** delivery — is the file visible to the receiver immediately or after a rename?
-
-### Step 3: Design Atomic File Delivery
-
-SFTP uploads are not atomic — a partial file can be read by the receiver mid-upload. Design a safe strategy:
-
-```
-1. Upload to temporary path: /incoming/orders/.tmp-{guid}
-2. Rename to final path: /incoming/orders/order-42.json
-3. Return the final path in ConnectorResult
-```
-
-If the upload fails after 50%, the temp file is cleaned up. If the rename fails, the temp file exists but is invisible to the receiver. How does this pattern guarantee **atomic** file visibility?
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial35/Exam.cs`](../tests/TutorialLabs/Tutorial35/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial35/Exam.cs`](../tests/TutorialLabs/Tutorial35/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial35.Exam"
+```
 
 ---
 

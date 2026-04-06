@@ -1,38 +1,8 @@
 # Tutorial 30 — Rule Engine
 
-## What You'll Learn
+Evaluate business rules with AND/OR condition logic against message fields.
 
-- How `IRuleEngine` evaluates business rules against integration messages
-- `BusinessRuleEngine` with priority-ordered evaluation
-- `IRuleStore` for persisting and querying rules at runtime
-- `BusinessRule` with conditions (AND/OR) and actions (Route, Transform, Reject, DeadLetter)
-- `RuleConditionOperator` enum for flexible condition matching
-- `RuleEvaluationResult` and `InMemoryRuleStore`
-
----
-
-## EIP Pattern: Message Router (Rule-Based)
-
-> *"A Message Router inspects an incoming message, determines what channel to send it to, and forwards it to that channel. A rule-based router externalizes routing logic into a set of configurable rules."*
-
-```
-  ┌──────────────┐     ┌───────────────┐
-  │  Incoming    │────▶│  Rule Engine   │
-  │  Message     │     │               │
-  └──────────────┘     │  Rule 1 (P=1) │──▶ Route to Topic A
-                       │  Rule 2 (P=2) │──▶ Transform
-                       │  Rule 3 (P=3) │──▶ Reject
-                       │  Default      │──▶ DeadLetter
-                       └───────────────┘
-```
-
-Rules are evaluated in priority order. The first match determines the action, decoupling business logic from code.
-
----
-
-## Platform Implementation
-
-### IRuleEngine
+## Key Types
 
 ```csharp
 // src/RuleEngine/IRuleEngine.cs
@@ -43,8 +13,6 @@ public interface IRuleEngine
         CancellationToken cancellationToken = default);
 }
 ```
-
-### BusinessRule
 
 ```csharp
 // src/RuleEngine/BusinessRule.cs
@@ -62,8 +30,6 @@ public sealed record BusinessRule
 public enum RuleLogicOperator { And, Or }
 ```
 
-### RuleCondition and RuleConditionOperator
-
 ```csharp
 // src/RuleEngine/RuleCondition.cs
 public sealed record RuleCondition
@@ -78,8 +44,6 @@ public enum RuleConditionOperator
     Equals, Contains, Regex, In, GreaterThan
 }
 ```
-
-### RuleAction
 
 ```csharp
 // src/RuleEngine/RuleAction.cs
@@ -100,99 +64,131 @@ public enum RuleActionType
 }
 ```
 
-### RuleEvaluationResult
+## Exercises
+
+### 1. Evaluate — SingleEqualsRule MatchesByMessageType
 
 ```csharp
-// src/RuleEngine/RuleEvaluationResult.cs
-public sealed record RuleEvaluationResult(
-    IReadOnlyList<BusinessRule> MatchedRules,
-    IReadOnlyList<RuleAction> Actions,
-    bool HasMatch,
-    int RulesEvaluated);
-```
-
-### IRuleStore
-
-```csharp
-// src/RuleEngine/IRuleStore.cs
-public interface IRuleStore
+await _store.AddOrUpdateAsync(new BusinessRule
 {
-    Task<IReadOnlyList<BusinessRule>> GetAllAsync(CancellationToken ct = default);
-    Task<BusinessRule?> GetByNameAsync(string name, CancellationToken ct = default);
-    Task AddOrUpdateAsync(BusinessRule rule, CancellationToken ct = default);
-    Task<bool> RemoveAsync(string name, CancellationToken ct = default);
-    Task<int> CountAsync(CancellationToken ct = default);
-}
+    Name = "RouteOrders",
+    Priority = 1,
+    Conditions = [new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "order.created" }],
+    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "orders-topic" },
+});
+
+var envelope = IntegrationEnvelope<string>.Create("data", "OrderService", "order.created");
+var result = await _engine.EvaluateAsync(envelope);
+
+Assert.That(result.HasMatch, Is.True);
+Assert.That(result.MatchedRules, Has.Count.EqualTo(1));
+Assert.That(result.Actions[0].TargetTopic, Is.EqualTo("orders-topic"));
 ```
 
-`InMemoryRuleStore` holds rules in a `ConcurrentDictionary` sorted by `Priority`, suitable for development and tutorials.
+### 2. Evaluate — NoMatchingRule ReturnsNoMatch
 
----
+```csharp
+await _store.AddOrUpdateAsync(new BusinessRule
+{
+    Name = "RouteOrders",
+    Priority = 1,
+    Conditions = [new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "order.created" }],
+    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "orders-topic" },
+});
 
-## Scalability Dimension
+var envelope = IntegrationEnvelope<string>.Create("data", "PaymentService", "payment.received");
+var result = await _engine.EvaluateAsync(envelope);
 
-The rule engine is **stateless** — it loads rules from the store and evaluates each message independently. Rules are cached in memory and refreshed periodically. Horizontal scaling is straightforward: add more consumer replicas sharing the same cached rule set.
+Assert.That(result.HasMatch, Is.False);
+Assert.That(result.MatchedRules, Is.Empty);
+Assert.That(result.Actions, Is.Empty);
+```
 
----
+### 3. Evaluate — ContainsOperator MatchesSubstring
 
-## Atomicity Dimension
+```csharp
+await _store.AddOrUpdateAsync(new BusinessRule
+{
+    Name = "AllOrders",
+    Priority = 1,
+    Conditions = [new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Contains, Value = "order" }],
+    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "all-orders" },
+});
 
-Rule evaluation happens **within the pipeline transaction**. If the selected action fails, the message is Nacked and retried. Rules are versioned — updating a rule does not affect in-flight messages. The `RulesEvaluated` counter provides observability into evaluation depth.
+var envelope = IntegrationEnvelope<string>.Create("data", "Service", "order.shipped");
+var result = await _engine.EvaluateAsync(envelope);
 
----
+Assert.That(result.HasMatch, Is.True);
+Assert.That(result.Actions[0].TargetTopic, Is.EqualTo("all-orders"));
+```
+
+### 4. Evaluate — AndLogic AllConditionsMustMatch
+
+```csharp
+await _store.AddOrUpdateAsync(new BusinessRule
+{
+    Name = "HighPriorityOrders",
+    Priority = 1,
+    LogicOperator = RuleLogicOperator.And,
+    Conditions =
+    [
+        new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "order.created" },
+        new RuleCondition { FieldName = "Source", Operator = RuleConditionOperator.Equals, Value = "PremiumService" },
+    ],
+    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "premium-orders" },
+});
+
+// Only MessageType matches, Source doesn't → no match.
+var envelope1 = IntegrationEnvelope<string>.Create("data", "BasicService", "order.created");
+var result1 = await _engine.EvaluateAsync(envelope1);
+Assert.That(result1.HasMatch, Is.False);
+
+// Both match → match.
+var envelope2 = IntegrationEnvelope<string>.Create("data", "PremiumService", "order.created");
+var result2 = await _engine.EvaluateAsync(envelope2);
+Assert.That(result2.HasMatch, Is.True);
+```
+
+### 5. Evaluate — OrLogic AnyConditionMatches
+
+```csharp
+await _store.AddOrUpdateAsync(new BusinessRule
+{
+    Name = "OrderOrPayment",
+    Priority = 1,
+    LogicOperator = RuleLogicOperator.Or,
+    Conditions =
+    [
+        new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "order.created" },
+        new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "payment.received" },
+    ],
+    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "finance" },
+});
+
+var orderEnvelope = IntegrationEnvelope<string>.Create("data", "Service", "order.created");
+var orderResult = await _engine.EvaluateAsync(orderEnvelope);
+Assert.That(orderResult.HasMatch, Is.True);
+
+var paymentEnvelope = IntegrationEnvelope<string>.Create("data", "Service", "payment.received");
+var paymentResult = await _engine.EvaluateAsync(paymentEnvelope);
+Assert.That(paymentResult.HasMatch, Is.True);
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial30/Lab.cs`](../tests/TutorialLabs/Tutorial30/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial30/Lab.cs`](../tests/TutorialLabs/Tutorial30/Lab.cs)
 
-**Objective:** Write business rules with conditions and logic operators, trace priority-based evaluation, and analyze rule caching for **scalable** high-throughput routing decisions.
-
-### Step 1: Write a Priority-Based Business Rule
-
-Write a `BusinessRule` that routes all messages from source `"PartnerX"` with `MessageType` containing `"order"` to topic `"orders-priority"`:
-
-```csharp
-var rule = new BusinessRule
-{
-    Name = "PartnerX-Orders",
-    Priority = 1,
-    LogicOperator = RuleLogicOperator.And,
-    Conditions = [
-        new RuleCondition { FieldName = "Source", Operator = RuleConditionOperator.Equals, Value = "PartnerX" },
-        new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Contains, Value = "order" }
-    ],
-    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "orders-priority" }
-};
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial30.Lab"
 ```
-
-Open `src/RuleEngine/BusinessRuleEngine.cs` and trace: How does `And` vs. `Or` logic change the evaluation?
-
-### Step 2: Trace Priority-Based Evaluation
-
-Rules are evaluated in priority order (lowest number = highest priority):
-
-| Priority | Rule | Conditions |
-|----------|------|-----------|
-| 1 | Premium orders | Source = "PartnerX" AND Type contains "order" |
-| 5 | All orders | Type contains "order" |
-| 10 | Default | Always matches |
-
-A message from `PartnerX` with type `"order.created"` matches rules at priorities 1 and 5. Which rule wins? Why does the engine stop at the first match? (hint: deterministic routing for **atomicity**)
-
-### Step 3: Design Rule Caching for Scalability
-
-At 50,000 messages/second with 100 rules, each message evaluates up to 100 conditions. Design a caching strategy:
-
-- Rules change infrequently (hourly) but messages arrive constantly
-- How does the platform cache compiled rules? (Open `src/RuleEngine/` to check)
-- What is the cache invalidation strategy when rules are updated?
-- What is the performance difference between cached vs. uncached rule evaluation?
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial30/Exam.cs`](../tests/TutorialLabs/Tutorial30/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial30/Exam.cs`](../tests/TutorialLabs/Tutorial30/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial30.Exam"
+```
 
 ---
 

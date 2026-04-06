@@ -1,39 +1,10 @@
 # Tutorial 08 — Activities and the Pipeline
 
-## What You'll Learn
-
-- How activities are the building blocks of integration pipelines
-- The activity service interfaces (persistence, validation, notification)
-- How the Demo.Pipeline orchestrates end-to-end message flow
-- The relationship between activities, workflows, and brokers
+Activity service interfaces, the Pipes-and-Filters pipeline, and end-to-end message orchestration via Temporal.
 
 ---
 
-## What Are Activities?
-
-In the EIP world, **Pipes and Filters** is a fundamental pattern — messages flow through a series of processing steps, each step doing one thing. In this platform, each "filter" is a Temporal **activity**.
-
-```
-                         Pipes and Filters
-┌────────┐    ┌──────────┐    ┌───────────┐    ┌─────────┐    ┌─────────┐
-│ Ingest │───▶│ Validate │───▶│ Transform │───▶│  Route  │───▶│ Deliver │
-└────────┘    └──────────┘    └───────────┘    └─────────┘    └─────────┘
-   Activity      Activity       Activity        Activity       Activity
-```
-
-Each activity:
-- Receives an `IntegrationEnvelope<T>` (or input derived from it)
-- Performs one operation
-- Returns a result
-- Is orchestrated by a Temporal workflow
-
----
-
-## Activity Service Interfaces
-
-Activities delegate to **service interfaces** defined in `src/Activities/`. This separation keeps activities thin and services independently testable.
-
-### IPersistenceActivityService
+## Key Types
 
 ```csharp
 // src/Activities/IPersistenceActivityService.cs
@@ -44,34 +15,23 @@ public interface IPersistenceActivityService
         CancellationToken cancellationToken = default);
 
     Task UpdateDeliveryStatusAsync(
-        Guid messageId,
-        Guid correlationId,
-        DateTimeOffset recordedAt,
-        string status,
+        Guid messageId, Guid correlationId,
+        DateTimeOffset recordedAt, string status,
         CancellationToken cancellationToken = default);
 
     Task SaveFaultAsync(
-        Guid messageId,
-        Guid correlationId,
-        string messageType,
-        string faultedBy,
-        string reason,
-        int retryCount,
+        Guid messageId, Guid correlationId,
+        string messageType, string faultedBy, string reason, int retryCount,
         CancellationToken cancellationToken = default);
 }
 ```
-
-**Purpose:** Save messages to Cassandra with delivery status tracking. Every message is persisted on entry (status: `Pending`), updated as it progresses (`InFlight`, `Delivered`, `Failed`).
-
-### IMessageValidationService
 
 ```csharp
 // src/Activities/IMessageValidationService.cs
 public interface IMessageValidationService
 {
     Task<MessageValidationResult> ValidateAsync(
-        string messageType,
-        string payloadJson);
+        string messageType, string payloadJson);
 }
 
 public record MessageValidationResult(bool IsValid, string? Reason = null)
@@ -81,267 +41,172 @@ public record MessageValidationResult(bool IsValid, string? Reason = null)
 }
 ```
 
-**Purpose:** Validate message content — schema validation, required fields, business rules. Returns a `MessageValidationResult` indicating success or the reason for failure.
-
-### INotificationActivityService
-
 ```csharp
 // src/Activities/INotificationActivityService.cs
 public interface INotificationActivityService
 {
     Task PublishAckAsync(
-        Guid messageId,
-        Guid correlationId,
-        string topic,
+        Guid messageId, Guid correlationId, string topic,
         CancellationToken cancellationToken = default);
 
     Task PublishNackAsync(
-        Guid messageId,
-        Guid correlationId,
-        string reason,
-        string topic,
+        Guid messageId, Guid correlationId, string reason, string topic,
         CancellationToken cancellationToken = default);
 }
 ```
-
-**Purpose:** Publish Ack/Nack notifications. On success, publish Ack so downstream systems know the message was processed. On failure, publish Nack with a reason so they can react.
-
-### ICompensationActivityService
 
 ```csharp
 // src/Activities/ICompensationActivityService.cs
 public interface ICompensationActivityService
 {
-    Task<bool> CompensateAsync(
-        Guid correlationId,
-        string stepName);
+    Task<bool> CompensateAsync(Guid correlationId, string stepName);
 }
 ```
-
-**Purpose:** Undo the effects of a completed step during saga compensation. Returns `true` on success, `false` on failure.
-
----
-
-## The Demo Pipeline
-
-The `src/Demo.Pipeline/` project shows a complete end-to-end integration pipeline:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Demo.Pipeline                            │
-│                                                             │
-│  ┌─────────────────────┐                                    │
-│  │ IntegrationPipeline │   BackgroundService that           │
-│  │ Worker              │   subscribes to broker topic       │
-│  └──────────┬──────────┘                                    │
-│             │                                               │
-│             ▼                                               │
-│  ┌─────────────────────┐                                    │
-│  │ PipelineOrchestrator│   Coordinates message flow         │
-│  └──────────┬──────────┘                                    │
-│             │                                               │
-│             ▼                                               │
-│  ┌─────────────────────┐                                    │
-│  │ TemporalWorkflow    │   Dispatches to Temporal           │
-│  │ Dispatcher          │   workflow execution               │
-│  └──────────┬──────────┘                                    │
-│             │                                               │
-│             ▼                                               │
-│  ┌─────────────────────┐                                    │
-│  │ Temporal Workflow    │   Orchestrates activities:         │
-│  │                     │   Persist → Validate → Route →    │
-│  │                     │   Deliver → Ack/Nack              │
-│  └─────────────────────┘                                    │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### IntegrationPipelineWorker
-
-The worker is a .NET `BackgroundService` that continuously listens for messages:
 
 ```csharp
-// Simplified from src/Demo.Pipeline/IntegrationPipelineWorker.cs
-public class IntegrationPipelineWorker : BackgroundService
-{
-    protected override async Task ExecuteAsync(CancellationToken ct)
-    {
-        await _consumer.SubscribeAsync<JsonElement>(
-            topic: _options.InboundSubject,
-            consumerGroup: _options.ConsumerGroup,
-            handler: async envelope =>
-            {
-                // Dispatch to pipeline orchestrator
-                await _orchestrator.ProcessAsync(envelope, ct);
-            },
-            cancellationToken: ct);
-    }
-}
-```
-
-### PipelineOrchestrator
-
-The orchestrator wraps the message in pipeline input and dispatches to Temporal:
-
-```csharp
-// Simplified from src/Demo.Pipeline/PipelineOrchestrator.cs
-public sealed class PipelineOrchestrator : IPipelineOrchestrator
-{
-    public async Task ProcessAsync(
-        IntegrationEnvelope<JsonElement> envelope,
-        CancellationToken cancellationToken = default)
-    {
-        var input = new IntegrationPipelineInput
-        {
-            MessageId = envelope.MessageId,
-            CorrelationId = envelope.CorrelationId,
-            // ... map from envelope to workflow input
-        };
-
-        await _dispatcher.DispatchAsync(input, cancellationToken);
-    }
-}
+// src/Contracts/IntegrationPipelineInput.cs
+public sealed record IntegrationPipelineInput(
+    Guid MessageId, Guid CorrelationId, Guid? CausationId,
+    DateTimeOffset Timestamp, string Source, string MessageType,
+    string SchemaVersion, int Priority, string PayloadJson,
+    string? MetadataJson, string AckSubject, string NackSubject);
 ```
 
 ---
 
-## End-to-End Message Flow
+## Exercises
 
-Here's the complete journey of a message through the platform:
-
-```
-1. EXTERNAL SYSTEM
-   └─ Sends HTTP POST to Gateway.Api
-   
-2. GATEWAY.API (Messaging Gateway pattern)
-   ├─ Validates the request
-   ├─ Wraps payload in IntegrationEnvelope
-   └─ Publishes to broker topic "eip.inbound.orders"
-
-3. BROKER (NATS JetStream / Kafka / Pulsar)
-   └─ Durably stores the message
-
-4. INTEGRATION PIPELINE WORKER (Demo.Pipeline)
-   ├─ Subscribes to "eip.inbound.orders"
-   ├─ Picks up the message
-   └─ Dispatches to Temporal
-
-5. TEMPORAL WORKFLOW
-   ├─ Activity 1: Persist message (Cassandra, status: Pending)
-   ├─ Activity 2: Validate message (schema + business rules)
-   ├─ Activity 3: Update status (InFlight)
-   ├─ Activity 4: Transform payload (if needed)
-   ├─ Activity 5: Route to destination
-   ├─ Activity 6: Deliver via connector (HTTP/SFTP/Email/File)
-   ├─ Activity 7: Update status (Delivered)
-   └─ Activity 8: Publish Ack
-
-6. ACK/NACK NOTIFICATION
-   └─ Published to "notifications.ack.orders"
-   
-7. OBSERVABILITY
-   └─ OpenTelemetry traces, logs, and metrics recorded at every step
-```
-
----
-
-## Pipeline Configuration
-
-The pipeline is configured via `PipelineOptions`:
+### 1. Verify activity classes exist with expected methods
 
 ```csharp
-public class PipelineOptions
-{
-    public string NatsUrl { get; set; }             // NATS server URL
-    public string InboundSubject { get; set; }      // Where to listen
-    public string AckSubject { get; set; }          // Ack notification subject
-    public string NackSubject { get; set; }         // Nack notification subject
-    public string ConsumerGroup { get; set; }       // Consumer group name
-    public string TemporalServerAddress { get; set; } // Temporal gRPC address
-    public string TemporalNamespace { get; set; }   // Temporal namespace
-    public string TemporalTaskQueue { get; set; }   // Temporal task queue
-    public TimeSpan WorkflowTimeout { get; set; }   // Workflow timeout
-}
+var assembly = typeof(TemporalOptions).Assembly;
+
+var integrationActivities = assembly.GetTypes()
+    .FirstOrDefault(t => t.Name == "IntegrationActivities");
+Assert.That(integrationActivities, Is.Not.Null);
+Assert.That(integrationActivities!.GetMethod("ValidateMessageAsync"), Is.Not.Null);
+Assert.That(integrationActivities.GetMethod("LogProcessingStageAsync"), Is.Not.Null);
+
+var pipelineActivities = assembly.GetTypes()
+    .FirstOrDefault(t => t.Name == "PipelineActivities");
+Assert.That(pipelineActivities, Is.Not.Null);
+
+var methodNames = pipelineActivities!
+    .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+    .Select(m => m.Name).ToList();
+
+Assert.That(methodNames, Does.Contain("PersistMessageAsync"));
+Assert.That(methodNames, Does.Contain("UpdateDeliveryStatusAsync"));
+Assert.That(methodNames, Does.Contain("SaveFaultAsync"));
+Assert.That(methodNames, Does.Contain("PublishAckAsync"));
+Assert.That(methodNames, Does.Contain("PublishNackAsync"));
+Assert.That(methodNames, Does.Contain("LogStageAsync"));
+
+var sagaActivities = assembly.GetTypes()
+    .FirstOrDefault(t => t.Name == "SagaCompensationActivities");
+Assert.That(sagaActivities, Is.Not.Null);
+Assert.That(sagaActivities!.GetMethod("CompensateStepAsync"), Is.Not.Null);
 ```
 
----
-
-## Testing Activities
-
-Activities are tested in isolation with mocked dependencies:
+### 2. Pipeline: Create → Validate → Transform → Route
 
 ```csharp
-[TestFixture]
-public class PersistenceActivityTests
+var validationService = Substitute.For<IMessageValidationService>();
+var loggingService = Substitute.For<IMessageLoggingService>();
+var producer = Substitute.For<IMessageBrokerProducer>();
+
+const string messageType = "order.created";
+const string payloadJson = "{\"orderId\": \"ORD-500\"}";
+
+// Step 1: Create envelope
+var envelope = IntegrationEnvelope<string>.Create(
+    payloadJson, "OrderService", messageType) with
 {
-    private IPersistenceActivityService _persistence;
+    Intent = MessageIntent.Command,
+};
+Assert.That(envelope.MessageId, Is.Not.EqualTo(Guid.Empty));
 
-    [SetUp]
-    public void SetUp()
+// Step 2: Validate
+validationService.ValidateAsync(messageType, payloadJson)
+    .Returns(MessageValidationResult.Success);
+var validationResult = await validationService.ValidateAsync(messageType, payloadJson);
+Assert.That(validationResult.IsValid, Is.True);
+
+// Step 3: Transform — enrich metadata
+envelope = envelope with
+{
+    Metadata = new Dictionary<string, string>(envelope.Metadata)
     {
-        _persistence = Substitute.For<IPersistenceActivityService>();
-    }
+        ["region"] = "us-east",
+        ["validated"] = "true",
+    },
+};
+Assert.That(envelope.Metadata["region"], Is.EqualTo("us-east"));
 
-    [Test]
-    public async Task SaveMessage_StoresWithPendingStatus()
-    {
-        var input = CreateTestPipelineInput();
+// Step 4: Route — publish to destination
+await producer.PublishAsync(envelope, "orders.us-east");
 
-        await _persistence.SaveMessageAsync(input);
+await producer.Received(1).PublishAsync(
+    Arg.Is<IntegrationEnvelope<string>>(
+        e => e.Metadata.ContainsKey("region") && e.Metadata["region"] == "us-east"),
+    Arg.Is("orders.us-east"),
+    Arg.Any<CancellationToken>());
+```
 
-        await _persistence.Received(1).SaveMessageAsync(
-            input, Arg.Any<CancellationToken>());
-    }
-}
+### 3. Chained activities: Persist → Log → Validate → Log
+
+```csharp
+var persistenceService = Substitute.For<IPersistenceActivityService>();
+var loggingService = Substitute.For<IMessageLoggingService>();
+var validationService = Substitute.For<IMessageValidationService>();
+
+var input = new IntegrationPipelineInput(
+    MessageId: Guid.NewGuid(), CorrelationId: Guid.NewGuid(),
+    CausationId: null, Timestamp: DateTimeOffset.UtcNow,
+    Source: "Lab08", MessageType: "lab.pipeline",
+    SchemaVersion: "1.0", Priority: 1,
+    PayloadJson: "{\"item\": \"widget\"}", MetadataJson: null,
+    AckSubject: "ack.lab08", NackSubject: "nack.lab08");
+
+persistenceService.SaveMessageAsync(input, Arg.Any<CancellationToken>())
+    .Returns(Task.CompletedTask);
+loggingService.LogAsync(input.MessageId, input.MessageType, Arg.Any<string>())
+    .Returns(Task.CompletedTask);
+validationService.ValidateAsync(input.MessageType, input.PayloadJson)
+    .Returns(MessageValidationResult.Success);
+
+await persistenceService.SaveMessageAsync(input);
+await loggingService.LogAsync(input.MessageId, input.MessageType, "Received");
+var result = await validationService.ValidateAsync(input.MessageType, input.PayloadJson);
+await loggingService.LogAsync(input.MessageId, input.MessageType,
+    result.IsValid ? "Validated" : "ValidationFailed");
+
+Received.InOrder(() =>
+{
+    persistenceService.SaveMessageAsync(input, Arg.Any<CancellationToken>());
+    loggingService.LogAsync(input.MessageId, input.MessageType, "Received");
+    validationService.ValidateAsync(input.MessageType, input.PayloadJson);
+    loggingService.LogAsync(input.MessageId, input.MessageType, "Validated");
+});
 ```
 
 ---
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial08/Lab.cs`](../tests/TutorialLabs/Tutorial08/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial08/Lab.cs`](../tests/TutorialLabs/Tutorial08/Lab.cs)
 
-**Objective:** Design an activity pipeline for a real integration scenario, analyze failure modes, and identify where the Pipes and Filters pattern enables **independent scaling** of each stage.
-
-### Step 1: Design a Pipeline for XML Invoice Processing
-
-You receive XML invoices via SFTP. Design the complete activity sequence using the platform's activity classes:
-
-| Step | Activity | Class | Purpose |
-|------|----------|-------|---------|
-| 1 | Validate | `IntegrationActivities.ValidateMessageAsync` | Schema + payload checks |
-| 2 | ? | ? | Sanitize input (XSS, SQL injection) |
-| 3 | ? | ? | Transform XML → canonical JSON |
-| 4 | ? | ? | Enrich with customer data from CRM |
-| 5 | ? | ? | Route to correct downstream system |
-| 6 | ? | ? | Deliver via HTTP connector |
-| 7 | ? | ? | Persist to Cassandra |
-| 8 | ? | ? | Send Ack/Nack notification |
-
-Open `src/Activities/` and `src/Workflow.Temporal/Activities/` to find the actual activity classes.
-
-### Step 2: Analyze Failure Modes and Atomicity
-
-For your pipeline above, analyze what happens at each failure point:
-
-- Step 3 fails with a **transient** error (network timeout) — what retry policy applies?
-- Step 3 fails with a **permanent** error (invalid XML schema) — where does the message go?
-- Step 6 fails after Step 7 already persisted — what compensation is needed?
-
-Explain how the Ack/Nack pattern at Step 8 ensures the originating system knows the final outcome, preserving **end-to-end atomicity**.
-
-### Step 3: Evaluate Per-Stage Scalability
-
-The Pipes and Filters pattern allows each activity to scale independently. For your pipeline:
-
-- Which step is likely the bottleneck under high load? (hint: external API calls)
-- How would you scale Step 4 (CRM enrichment) without affecting Steps 1-3?
-- What is the advantage of Temporal's activity-level retry over retrying the entire pipeline?
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial08.Lab"
+```
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial08/Exam.cs`](../tests/TutorialLabs/Tutorial08/Exam.cs)
+> 💻 [`tests/TutorialLabs/Tutorial08/Exam.cs`](../tests/TutorialLabs/Tutorial08/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial08.Exam"
+```
 
 ---
 

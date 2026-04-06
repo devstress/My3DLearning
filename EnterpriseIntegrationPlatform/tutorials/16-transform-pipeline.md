@@ -1,37 +1,10 @@
 # Tutorial 16 — Transform Pipeline
 
-## What You'll Learn
-
-- The EIP Pipes and Filters pattern applied to payload transformation
-- How `ITransformPipeline` chains `ITransformStep` instances in order
-- Built-in steps: `JsonToXmlStep`, `XmlToJsonStep`, `RegexReplaceStep`, `JsonPathFilterStep`
-- How `TransformContext` carries payload + content type + metadata through the pipeline
-- The `TransformResult` returned after all steps complete
+Chain ordered `ITransformStep` instances through an `ITransformPipeline` to transform payloads in sequence.
 
 ---
 
-## EIP Pattern: Pipes and Filters (Transformation)
-
-> *"Use Pipes and Filters to divide a larger processing task into a sequence of smaller, independent processing steps (Filters) that are connected by channels (Pipes)."*
-> — Gregor Hohpe & Bobby Woolf, *Enterprise Integration Patterns*
-
-```
-  ┌────────────┐    ┌────────────┐    ┌──────────────┐    ┌──────────────┐
-  │ JsonToXml  │───▶│ RegexReplace│───▶│ XmlToJson    │───▶│ JsonPathFilter│
-  │   Step     │    │   Step      │    │   Step       │    │   Step        │
-  └────────────┘    └────────────┘    └──────────────┘    └──────────────┘
-       ▲                                                          │
-       │                TransformContext flows through             │
-       └──────────────────────────────────────────────────────────┘
-```
-
-Each step receives a `TransformContext`, performs one transformation, and returns an updated context. Steps are composed sequentially — the output of one step is the input to the next.
-
----
-
-## Platform Implementation
-
-### ITransformPipeline
+## Key Types
 
 ```csharp
 // src/Processing.Transform/ITransformPipeline.cs
@@ -44,8 +17,6 @@ public interface ITransformPipeline
 }
 ```
 
-### ITransformStep
-
 ```csharp
 // src/Processing.Transform/ITransformStep.cs
 public interface ITransformStep
@@ -56,8 +27,6 @@ public interface ITransformStep
         CancellationToken cancellationToken = default);
 }
 ```
-
-### TransformContext
 
 ```csharp
 // src/Processing.Transform/TransformContext.cs
@@ -72,19 +41,6 @@ public sealed class TransformContext
 }
 ```
 
-The context is **immutable per step** — each step creates a new context via `WithPayload`, preserving metadata across the pipeline.
-
-### Built-in Steps
-
-| Step | Description |
-|------|-------------|
-| `JsonToXmlStep` | Converts JSON payload to XML, updates `ContentType` to `application/xml` |
-| `XmlToJsonStep` | Converts XML payload to JSON, updates `ContentType` to `application/json` |
-| `RegexReplaceStep` | Applies a regex find-and-replace on the raw payload string |
-| `JsonPathFilterStep` | Filters a JSON payload to keep only specified JSONPath expressions |
-
-### TransformResult
-
 ```csharp
 // src/Processing.Transform/TransformResult.cs
 public sealed record TransformResult(
@@ -96,15 +52,106 @@ public sealed record TransformResult(
 
 ---
 
-## Scalability Dimension
+## Exercises
 
-The pipeline runs entirely **in-process** — all steps execute sequentially within a single service instance. To scale, run multiple replicas of the service; each replica processes different messages through its own pipeline instance. Steps are stateless, so there is no coordination between replicas. For CPU-intensive pipelines (large XML conversions), vertical scaling (more CPU per replica) complements horizontal scaling.
+### Exercise 1: Single step transforms payload
 
----
+```csharp
+var step = Substitute.For<ITransformStep>();
+step.Name.Returns("Upper");
+step.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
+    .Returns(ci =>
+    {
+        var ctx = ci.Arg<TransformContext>();
+        return ctx.WithPayload(ctx.Payload.ToUpperInvariant());
+    });
 
-## Atomicity Dimension
+var options = Options.Create(new TransformOptions());
+var pipeline = new TransformPipeline(
+    new[] { step }, options, NullLogger<TransformPipeline>.Instance);
 
-The pipeline is **all-or-nothing** within a single invocation. If any step throws, the entire pipeline fails and the calling code can Nack the source message. Partial results are not published. The `StepsApplied` count in `TransformResult` tells you exactly how far the pipeline progressed before completion (or failure during diagnostics).
+var result = await pipeline.ExecuteAsync("hello", "text/plain");
+
+Assert.That(result.Payload, Is.EqualTo("HELLO"));
+Assert.That(result.StepsApplied, Is.EqualTo(1));
+Assert.That(result.ContentType, Is.EqualTo("text/plain"));
+```
+
+### Exercise 2: Multiple steps applied in order
+
+```csharp
+var step1 = Substitute.For<ITransformStep>();
+step1.Name.Returns("Append-A");
+step1.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
+    .Returns(ci => ci.Arg<TransformContext>().WithPayload(ci.Arg<TransformContext>().Payload + "A"));
+
+var step2 = Substitute.For<ITransformStep>();
+step2.Name.Returns("Append-B");
+step2.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
+    .Returns(ci => ci.Arg<TransformContext>().WithPayload(ci.Arg<TransformContext>().Payload + "B"));
+
+var options = Options.Create(new TransformOptions());
+var pipeline = new TransformPipeline(
+    new[] { step1, step2 }, options, NullLogger<TransformPipeline>.Instance);
+
+var result = await pipeline.ExecuteAsync("X", "text/plain");
+
+Assert.That(result.Payload, Is.EqualTo("XAB"));
+Assert.That(result.StepsApplied, Is.EqualTo(2));
+```
+
+### Exercise 3: Disabled pipeline returns input unchanged
+
+```csharp
+var step = Substitute.For<ITransformStep>();
+
+var options = Options.Create(new TransformOptions { Enabled = false });
+var pipeline = new TransformPipeline(
+    new[] { step }, options, NullLogger<TransformPipeline>.Instance);
+
+var result = await pipeline.ExecuteAsync("{\"id\":1}", "application/json");
+
+Assert.That(result.Payload, Is.EqualTo("{\"id\":1}"));
+Assert.That(result.StepsApplied, Is.EqualTo(0));
+await step.DidNotReceive()
+    .ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>());
+```
+
+### Exercise 4: Payload exceeding max size throws
+
+```csharp
+var options = Options.Create(new TransformOptions { MaxPayloadSizeBytes = 10 });
+var pipeline = new TransformPipeline(
+    Array.Empty<ITransformStep>(), options, NullLogger<TransformPipeline>.Instance);
+
+var largePayload = new string('x', 50);
+
+Assert.ThrowsAsync<InvalidOperationException>(
+    () => pipeline.ExecuteAsync(largePayload, "text/plain"));
+```
+
+### Exercise 5: Step failure with StopOnStepFailure = false continues
+
+```csharp
+var failingStep = Substitute.For<ITransformStep>();
+failingStep.Name.Returns("Failing");
+failingStep.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
+    .ThrowsAsync(new InvalidOperationException("step error"));
+
+var goodStep = Substitute.For<ITransformStep>();
+goodStep.Name.Returns("Good");
+goodStep.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
+    .Returns(ci => ci.Arg<TransformContext>().WithPayload("done"));
+
+var options = Options.Create(new TransformOptions { StopOnStepFailure = false });
+var pipeline = new TransformPipeline(
+    new[] { failingStep, goodStep }, options, NullLogger<TransformPipeline>.Instance);
+
+var result = await pipeline.ExecuteAsync("input", "text/plain");
+
+Assert.That(result.Payload, Is.EqualTo("done"));
+Assert.That(result.StepsApplied, Is.EqualTo(1));
+```
 
 ---
 
@@ -112,43 +159,17 @@ The pipeline is **all-or-nothing** within a single invocation. If any step throw
 
 > 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial16/Lab.cs`](../tests/TutorialLabs/Tutorial16/Lab.cs)
 
-**Objective:** Design a multi-step transform pipeline, trace how immutable `TransformContext` preserves **atomicity** through each stage, and analyze pipeline **scalability** under failure conditions.
-
-### Step 1: Design a Transform Pipeline
-
-Design a 3-step pipeline for PCI-compliant order processing:
-
-| Step | Transform | Class | Purpose |
-|------|-----------|-------|---------|
-| 1 | XML → JSON | `XmlToJsonStep` | Convert partner XML to canonical JSON |
-| 2 | Redact PII | `RegexReplaceStep` | Mask email addresses with `***@***` |
-| 3 | Filter fields | `JsonPathFilterStep` | Keep only `$.order.id` and `$.order.total` |
-
-Open `src/Processing.Transform/` and verify each step class exists. Write the `TransformOptions` configuration for this pipeline.
-
-### Step 2: Trace Failure Recovery with StepsApplied
-
-After step 2 of 4, the pipeline fails (e.g., `JsonPathFilterStep` encounters malformed JSON):
-
-1. What is `TransformPipelineResult.StepsApplied`? (answer: 2)
-2. Is the original source message modified? (hint: `TransformContext.WithPayload` creates copies)
-3. How does the pipeline decide whether to retry vs. route to DLQ?
-
-Explain why `TransformContext` uses `WithPayload` (immutable updates) instead of mutable setters — what **concurrency** benefit does this provide when multiple messages are being transformed in parallel?
-
-### Step 3: Evaluate Pipeline Scalability
-
-A pipeline processes 10,000 messages/second. Step 2 (regex redaction) is 5x slower than the other steps:
-
-- Can you scale Step 2 independently? (hint: in Temporal, each step is an activity)
-- What happens to pipeline throughput if you add a 4th step?
-- How does the Pipes and Filters architecture prevent a slow step from blocking the entire system?
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial16.Lab"
+```
 
 ## Exam
 
 > 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial16/Exam.cs`](../tests/TutorialLabs/Tutorial16/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial16.Exam"
+```
 
 ---
 

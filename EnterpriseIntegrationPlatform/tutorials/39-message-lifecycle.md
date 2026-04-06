@@ -1,42 +1,8 @@
 # Tutorial 39 — Message Lifecycle
 
-## What You'll Learn
+Track messages through their complete lifecycle from ingestion to delivery.
 
-- How `IMessageStateStore` tracks every state transition of a message
-- The `MessageEvent` record for capturing lifecycle events
-- `MessageLifecycleRecorder` for recording transitions as messages flow through the pipeline
-- `InMemoryMessageStateStore` for development and testing
-- Querying lifecycle by `CorrelationId`, `BusinessKey`, or `MessageId`
-- `ITraceAnalyzer` and `TraceAnalyzer` for diagnosing slow or stuck messages
-- `IObservabilityEventLog` and `LokiObservabilityEventLog` for centralized event logging
-
----
-
-## EIP Pattern: Message History
-
-> *"Attach a Message History to a message to record all components it has passed through. The lifecycle store extends this concept to persist the full state machine of each message."*
-
-```
-  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
-  │ Pending  │──▶│ InFlight │──▶│Delivered │   │  Failed  │
-  └──────────┘   └──────────┘   └──────────┘   └──────────┘
-       │              │              │              │
-       ▼              ▼              ▼              ▼
-  ┌──────────────────────────────────────────────────────┐
-  │              Message State Store                     │
-  │  (queryable by CorrelationId / BusinessKey / MsgId)  │
-  └──────────────────────────────────────────────────────┘
-```
-
-`DeliveryStatus` enum: `Pending`, `InFlight`, `Delivered`, `Failed`, `Retrying`, `DeadLettered`.
-
-Every pipeline stage records a `MessageEvent` when a message transitions between states. The full lifecycle is queryable for operational visibility, debugging, and compliance.
-
----
-
-## Platform Implementation
-
-### MessageEvent
+## Key Types
 
 ```csharp
 // src/Observability/MessageEvent.cs
@@ -56,10 +22,6 @@ public sealed record MessageEvent
     public string? SpanId { get; init; }
 }
 ```
-
-IDs are `Guid`, not `string`. `Stage` names the processing step (e.g. "Ingestion", "Routing", "Delivery"). `Status` is a `DeliveryStatus` enum value (`Pending`, `InFlight`, `Delivered`, `Failed`, `Retrying`, `DeadLettered`). `TraceId` and `SpanId` link each event to the corresponding OpenTelemetry span (Tutorial 38).
-
-### IMessageStateStore
 
 ```csharp
 // src/Observability/IMessageStateStore.cs
@@ -81,14 +43,6 @@ public interface IMessageStateStore
 }
 ```
 
-All ID parameters are `Guid`. `GetLatestByCorrelationIdAsync` returns the most recent event, representing the current known state of a message.
-
-### MessageLifecycleRecorder
-
-The `MessageLifecycleRecorder` records events to **both** the production `IMessageStateStore` and the isolated `IObservabilityEventLog`, and emits OpenTelemetry traces and metrics. It provides convenience methods — `RecordReceivedAsync`, `RecordProcessingAsync`, `RecordDeliveredAsync`, `RecordFailedAsync`, `RecordRetryAsync`, `RecordDeadLetteredAsync` — that create `MessageEvent` records with the correct `Stage` and `DeliveryStatus` values. Each method captures the envelope's identity, the pipeline stage name, and optional details (e.g. delivery duration, dead-letter reason).
-
-### ITraceAnalyzer and TraceAnalyzer
-
 ```csharp
 // src/Observability/ITraceAnalyzer.cs
 public interface ITraceAnalyzer
@@ -100,10 +54,6 @@ public interface ITraceAnalyzer
         Guid correlationId, string knownState, CancellationToken cancellationToken = default);
 }
 ```
-
-Both methods return AI-generated natural-language strings (not structured records). `AnalyseTraceAsync` accepts a JSON trace snapshot and returns a diagnostic summary. `WhereIsMessageAsync` answers "where is my message?" given a correlation ID and known state payload. The `TraceAnalyzer` implementation delegates to `IOllamaService` (Tutorial 40) for LLM-powered analysis.
-
-### IObservabilityEventLog and LokiObservabilityEventLog
 
 ```csharp
 // src/Observability/IObservabilityEventLog.cs
@@ -119,71 +69,99 @@ public interface IObservabilityEventLog
 }
 ```
 
-`IObservabilityEventLog` is **separate** from `IMessageStateStore` — it provides isolated observability storage backed by Grafana Loki. The method is `RecordAsync` (not `WriteAsync`). `GetByCorrelationIdAsync` accepts a `Guid`. Combined with OpenTelemetry traces (Tutorial 38), this provides full observability across the platform.
+## Exercises
 
----
+### 1. SmartProxy — TrackRequest IncrementsOutstandingCount
 
-## Scalability Dimension
+```csharp
+var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
 
-The state store is **write-heavy** — every pipeline stage writes an event per message. Production deployments should use a time-series or append-optimized store (Loki, ClickHouse). `InMemoryMessageStateStore` uses a `ConcurrentDictionary<Guid, List<MessageEvent>>` with secondary indexes on `CorrelationId` and `BusinessKey`.
+var envelope = CreateEnvelopeWithReplyTo("request", "Svc", "cmd.query", "reply-queue-1");
 
----
+var tracked = proxy.TrackRequest(envelope);
 
-## Atomicity Dimension
+Assert.That(tracked, Is.True);
+Assert.That(proxy.OutstandingCount, Is.EqualTo(1));
+```
 
-Lifecycle recording is a **best-effort side effect** — it must not block or fail the main pipeline. If the state store is unavailable, the message continues processing and the gap is logged. However, the `RecordDeadLetteredAsync` event is critical for audit compliance and should use a local fallback buffer when the store is unreachable.
+### 2. SmartProxy — CorrelateReply ReturnsCorrelation
 
----
+```csharp
+var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
+
+var request = CreateEnvelopeWithReplyTo("request", "Svc", "cmd.query", "reply-queue");
+proxy.TrackRequest(request);
+
+// Create a reply with the same CorrelationId
+var reply = IntegrationEnvelope<string>.Create(
+    "response", "ReplySvc", "cmd.response",
+    correlationId: request.CorrelationId);
+
+var correlation = proxy.CorrelateReply(reply);
+
+Assert.That(correlation, Is.Not.Null);
+Assert.That(correlation!.CorrelationId, Is.EqualTo(request.CorrelationId));
+Assert.That(correlation.OriginalReplyTo, Is.EqualTo("reply-queue"));
+Assert.That(correlation.RequestMessageId, Is.EqualTo(request.MessageId));
+Assert.That(proxy.OutstandingCount, Is.EqualTo(0));
+```
+
+### 3. SmartProxy — CorrelateReply ReturnsNull ForUnknownReply
+
+```csharp
+var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
+
+var unknownReply = IntegrationEnvelope<string>.Create("data", "Svc", "unknown.reply");
+
+var correlation = proxy.CorrelateReply(unknownReply);
+
+Assert.That(correlation, Is.Null);
+```
+
+### 4. TestMessageGenerator — PublishesToTargetTopic
+
+```csharp
+var producer = Substitute.For<IMessageBrokerProducer>();
+var generator = new TestMessageGenerator(
+    producer, NullLogger<TestMessageGenerator>.Instance);
+
+var result = await generator.GenerateAsync("test-topic", CancellationToken.None);
+
+Assert.That(result.Succeeded, Is.True);
+Assert.That(result.TargetTopic, Is.EqualTo("test-topic"));
+Assert.That(result.MessageId, Is.Not.EqualTo(Guid.Empty));
+
+await producer.Received(1).PublishAsync(
+    Arg.Any<IntegrationEnvelope<string>>(),
+    "test-topic",
+    Arg.Any<CancellationToken>());
+```
+
+### 5. ControlBusOptions — Shape
+
+```csharp
+var opts = new ControlBusOptions();
+
+Assert.That(opts.ControlTopic, Is.EqualTo("eip.control-bus"));
+Assert.That(opts.ConsumerGroup, Is.EqualTo("control-bus-consumers"));
+Assert.That(opts.Source, Is.EqualTo("ControlBus"));
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial39/Lab.cs`](../tests/TutorialLabs/Tutorial39/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial39/Lab.cs`](../tests/TutorialLabs/Tutorial39/Lab.cs)
 
-**Objective:** Use the message lifecycle tracking system to diagnose stuck messages, design retention policies for **scalable** storage, and compare lifecycle tracking with OpenTelemetry tracing.
-
-### Step 1: Diagnose a Stuck Message
-
-A message was received 30 minutes ago but never reached "Delivered" status. Use `ITraceAnalyzer.WhereIsMessageAsync` to investigate:
-
-```csharp
-var location = await traceAnalyzer.WhereIsMessageAsync(
-    correlationId: messageCorrelationId,
-    knownState: """{"lastSeen":"Transform","status":"InProgress"}""");
-// Returns: a natural-language description of the message's current location
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial39.Lab"
 ```
-
-Open `src/Observability/TraceAnalyzer.cs` and trace: How does the analyzer query the message state store? What lifecycle states are tracked (Received, Routing, Transforming, Delivering, Delivered, Failed)?
-
-Design an alerting rule: any message in "InProgress" for > 5 minutes should trigger an alert. How does this support **operational scalability**?
-
-### Step 2: Design a Retention Policy
-
-Design a retention strategy for the message state store handling 10 million messages/day:
-
-| Retention Tier | Data | Duration | Storage |
-|---------------|------|----------|---------|
-| Hot (detailed) | All lifecycle events, full envelope | 7 days | ~140GB |
-| Warm (summary) | Stage transitions, message ID, status | 90 days | ~27GB |
-| Cold (archive) | Message ID, final status, timestamp | 1 year | ~3.6GB |
-
-How does tiered retention balance **operational visibility** with **storage scalability**?
-
-### Step 3: Compare Lifecycle Tracking vs. OpenTelemetry
-
-| Aspect | Message Lifecycle | OpenTelemetry Tracing |
-|--------|------------------|----------------------|
-| Purpose | Business-level message tracking | Technical span timing |
-| Query model | "Where is message X?" | "Show me the trace for request Y" |
-| Retention | Days to months | Hours to days |
-| Audience | Operations team | Developers |
-
-Why does the platform maintain both systems? What does each provide that the other cannot?
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial39/Exam.cs`](../tests/TutorialLabs/Tutorial39/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial39/Exam.cs`](../tests/TutorialLabs/Tutorial39/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial39.Exam"
+```
 
 ---
 

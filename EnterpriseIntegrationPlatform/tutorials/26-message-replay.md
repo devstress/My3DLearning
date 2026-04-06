@@ -1,43 +1,8 @@
 # Tutorial 26 — Message Replay
 
-## What You'll Learn
+Replay previously processed messages from the replay store with filtering and deduplication.
 
-- How `IMessageReplayer` enables selective re-processing of historical messages
-- How `IMessageReplayStore` persists replay-eligible messages for audit and reprocessing
-- The `ReplayFilter` value object for targeting messages by timestamp range, CorrelationId, or MessageType
-- The `ReplayResult` record with replayed, skipped, and failed counts
-- The `ReplayId` header added to every replayed message for audit-trail separation
-
----
-
-## EIP Pattern: Message Replay
-
-> *"Replay allows an operator to re-inject previously processed messages into the pipeline — essential for disaster recovery, reprocessing after bug fixes, and audit verification."*
-
-```
-  ┌────────────────┐       ┌──────────────────┐
-  │ Replay Store   │◀──────│  Original        │
-  │ (persisted     │       │  Processing      │
-  │  messages)     │       └──────────────────┘
-  └───────┬────────┘
-          │  ReplayFilter
-          ▼
-  ┌────────────────┐       ┌──────────────────┐
-  │ Message        │──────▶│  Pipeline        │
-  │ Replayer       │       │  (re-ingested)   │
-  └────────────────┘       └──────────────────┘
-          │
-          ▼
-   ReplayId header injected
-```
-
-Messages are stored as they flow through the pipeline. When a replay is requested, the `ReplayFilter` selects a subset, and each message is re-published with a unique `ReplayId` header so downstream consumers can distinguish replayed messages from originals.
-
----
-
-## Platform Implementation
-
-### IMessageReplayer
+## Key Types
 
 ```csharp
 // src/Processing.Replay/IMessageReplayer.cs
@@ -47,8 +12,6 @@ public interface IMessageReplayer
 }
 ```
 
-### IMessageReplayStore
-
 ```csharp
 // src/Processing.Replay/IMessageReplayStore.cs
 public interface IMessageReplayStore
@@ -57,8 +20,6 @@ public interface IMessageReplayStore
     IAsyncEnumerable<IntegrationEnvelope<object>> GetMessagesForReplayAsync(string topic, ReplayFilter filter, int maxMessages, CancellationToken ct);
 }
 ```
-
-### ReplayFilter
 
 ```csharp
 // src/Processing.Replay/ReplayFilter.cs
@@ -70,14 +31,6 @@ public record ReplayFilter
     public DateTimeOffset? ToTimestamp { get; init; }
 }
 ```
-
-| Filter Property | Usage |
-|-----------------|-------|
-| `FromTimestamp` / `ToTimestamp` | Date-range replay — e.g. replay all messages from the last hour |
-| `CorrelationId` | Replay a single business transaction (typed as `Guid?`) |
-| `MessageType` | Replay all messages of a specific type after a schema fix |
-
-### ReplayResult
 
 ```csharp
 // src/Processing.Replay/ReplayResult.cs
@@ -91,73 +44,165 @@ public record ReplayResult
 }
 ```
 
-Every replayed message receives a `ReplayId` header (a GUID) linking it back to the replay operation. This separates replayed traffic from live traffic in dashboards and audit logs.
+## Exercises
 
----
+### 1. Replay — AllMessagesReplayed CountsAreCorrect
 
-## Scalability Dimension
+```csharp
+var store = new InMemoryMessageReplayStore();
+var producer = Substitute.For<IMessageBrokerProducer>();
 
-The replay store is **read-heavy** — writes happen once per message, but replays can query millions of records. Production stores should support indexed queries on `CorrelationId`, `MessageType`, and `CreatedAt`. The replayer itself is stateless: it reads from the store, publishes to the broker, and records the `ReplayResult`. Multiple replay operations can run concurrently because each gets a unique `ReplayId`.
+var options = Options.Create(new ReplayOptions
+{
+    SourceTopic = "orders",
+    TargetTopic = "orders-replay",
+    MaxMessages = 100,
+});
 
----
+var replayer = new MessageReplayer(
+    store, producer, options, NullLogger<MessageReplayer>.Instance);
 
-## Atomicity Dimension
+var env1 = IntegrationEnvelope<string>.Create("p1", "Svc", "order.created");
+var env2 = IntegrationEnvelope<string>.Create("p2", "Svc", "order.created");
+await store.StoreForReplayAsync(env1, "orders", CancellationToken.None);
+await store.StoreForReplayAsync(env2, "orders", CancellationToken.None);
 
-Replay re-publishes messages to the **same ingress topic** they originally entered. This means all validation, routing, and transformation rules apply again — the message is not injected halfway through the pipeline. If a replay fails mid-batch, `ReplayResult.ReplayedCount`, `SkippedCount`, and `FailedCount` together account for every message matched by the filter. The `ReplayId` header ensures idempotent consumers can detect and deduplicate replayed messages.
+var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
----
+Assert.That(result.ReplayedCount, Is.EqualTo(2));
+Assert.That(result.SkippedCount, Is.EqualTo(0));
+Assert.That(result.FailedCount, Is.EqualTo(0));
+```
+
+### 2. Replay — PublishesToConfiguredTargetTopic
+
+```csharp
+var store = new InMemoryMessageReplayStore();
+var producer = Substitute.For<IMessageBrokerProducer>();
+
+var options = Options.Create(new ReplayOptions
+{
+    SourceTopic = "events",
+    TargetTopic = "events-replay",
+    MaxMessages = 10,
+});
+
+var replayer = new MessageReplayer(
+    store, producer, options, NullLogger<MessageReplayer>.Instance);
+
+var env = IntegrationEnvelope<string>.Create("data", "Svc", "event.fired");
+await store.StoreForReplayAsync(env, "events", CancellationToken.None);
+
+await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
+
+await producer.Received(1).PublishAsync(
+    Arg.Any<IntegrationEnvelope<object>>(),
+    "events-replay",
+    Arg.Any<CancellationToken>());
+```
+
+### 3. Replay — FilterByMessageType OnlyMatchingMessagesReplayed
+
+```csharp
+var store = new InMemoryMessageReplayStore();
+var producer = Substitute.For<IMessageBrokerProducer>();
+
+var options = Options.Create(new ReplayOptions
+{
+    SourceTopic = "topic",
+    TargetTopic = "topic-replay",
+    MaxMessages = 100,
+});
+
+var replayer = new MessageReplayer(
+    store, producer, options, NullLogger<MessageReplayer>.Instance);
+
+var match = IntegrationEnvelope<string>.Create("m", "Svc", "order.created");
+var noMatch = IntegrationEnvelope<string>.Create("n", "Svc", "invoice.created");
+await store.StoreForReplayAsync(match, "topic", CancellationToken.None);
+await store.StoreForReplayAsync(noMatch, "topic", CancellationToken.None);
+
+var filter = new ReplayFilter { MessageType = "order.created" };
+var result = await replayer.ReplayAsync(filter, CancellationToken.None);
+
+Assert.That(result.ReplayedCount, Is.EqualTo(1));
+```
+
+### 4. Replay — SkipAlreadyReplayed SkipsMessagesWithReplayIdHeader
+
+```csharp
+var store = new InMemoryMessageReplayStore();
+var producer = Substitute.For<IMessageBrokerProducer>();
+
+var options = Options.Create(new ReplayOptions
+{
+    SourceTopic = "src",
+    TargetTopic = "tgt",
+    MaxMessages = 100,
+    SkipAlreadyReplayed = true,
+});
+
+var replayer = new MessageReplayer(
+    store, producer, options, NullLogger<MessageReplayer>.Instance);
+
+var alreadyReplayed = new IntegrationEnvelope<string>
+{
+    MessageId = Guid.NewGuid(),
+    CorrelationId = Guid.NewGuid(),
+    Timestamp = DateTimeOffset.UtcNow,
+    Source = "Svc",
+    MessageType = "type",
+    Payload = "data",
+    Metadata = new Dictionary<string, string>
+    {
+        [MessageHeaders.ReplayId] = Guid.NewGuid().ToString(),
+    },
+};
+var fresh = IntegrationEnvelope<string>.Create("fresh", "Svc", "type");
+
+await store.StoreForReplayAsync(alreadyReplayed, "src", CancellationToken.None);
+await store.StoreForReplayAsync(fresh, "src", CancellationToken.None);
+
+var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
+
+Assert.That(result.ReplayedCount, Is.EqualTo(1));
+Assert.That(result.SkippedCount, Is.EqualTo(1));
+```
+
+### 5. Replay — EmptySourceTopic ThrowsInvalidOperationException
+
+```csharp
+var store = new InMemoryMessageReplayStore();
+var producer = Substitute.For<IMessageBrokerProducer>();
+
+var options = Options.Create(new ReplayOptions
+{
+    SourceTopic = "",
+    TargetTopic = "tgt",
+});
+
+var replayer = new MessageReplayer(
+    store, producer, options, NullLogger<MessageReplayer>.Instance);
+
+Assert.ThrowsAsync<InvalidOperationException>(
+    () => replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None));
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial26/Lab.cs`](../tests/TutorialLabs/Tutorial26/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial26/Lab.cs`](../tests/TutorialLabs/Tutorial26/Lab.cs)
 
-**Objective:** Design a message replay operation for a production incident, analyze how the `ReplayId` header prevents duplicate processing, and evaluate replay store **scalability** requirements.
-
-### Step 1: Design a Time-Window Replay
-
-An operator discovers a bug in the content enricher that corrupted messages between 09:00 and 09:30 UTC on January 15th. Write the `ReplayFilter`:
-
-```csharp
-var filter = new ReplayFilter
-{
-    FromTimestamp = DateTimeOffset.Parse("2024-01-15T09:00:00Z"),
-    ToTimestamp = DateTimeOffset.Parse("2024-01-15T09:30:00Z")
-};
-// Topic is passed as a separate parameter to the replay store:
-// await replayStore.GetMessagesForReplayAsync("eip.orders.enriched", filter, ...);
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial26.Lab"
 ```
-
-Open `src/Processing.Replay/MessageReplayer.cs` and trace: How does the replayer iterate over stored messages? What happens to messages that don't match the filter?
-
-### Step 2: Analyze the ReplayId Header for Atomicity
-
-The platform injects a `ReplayId` header into replayed messages. Explain why:
-
-1. Without `ReplayId` — downstream consumers process the message as if it's new → **duplicate side effects** (e.g., double billing)
-2. With `ReplayId` — consumers can detect replays and apply **idempotent** processing
-3. How does `ReplayId` interact with `MessageId`? (the original `MessageId` is preserved for correlation)
-
-Design a consumer that checks for `ReplayId` and skips already-processed messages using a deduplication store.
-
-### Step 3: Evaluate Replay Store Scalability
-
-A production system processes 10 million messages/day. Design the replay store requirements:
-
-| Requirement | Value | Justification |
-|------------|-------|---------------|
-| Storage per message | ~2KB (envelope) | Full envelope for accurate replay |
-| Daily storage | ~20GB | 10M × 2KB |
-| Retention period | 30 days | Regulatory and operational needs |
-| Total storage | ~600GB | 30 × 20GB |
-| Query performance | < 100ms for time-range | Fast incident response |
-
-What storage technology would you recommend? (hint: time-series databases, object storage with indexing)
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial26/Exam.cs`](../tests/TutorialLabs/Tutorial26/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial26/Exam.cs`](../tests/TutorialLabs/Tutorial26/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial26.Exam"
+```
 
 ---
 

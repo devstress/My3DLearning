@@ -1,271 +1,100 @@
 # Tutorial 43 — Kubernetes Deployment
 
-## What You'll Learn
+Deploy the platform to Kubernetes with Helm charts and Kustomize overlays.
 
-- How to deploy the EIP platform on Kubernetes
-- Helm chart structure and configuration via `deploy/helm/eip/`
-- Kustomize overlays for dev, staging, and production environments
-- Container image management with GitHub Container Registry (GHCR)
-- Horizontal Pod Autoscaler configuration for elastic scaling
-- Transitioning from .NET Aspire local development to Kubernetes production
+## Exercises
 
-## From .NET Aspire to Kubernetes
+### 1. TemporalOptions — PropertiesAssignable
 
-During development, .NET Aspire orchestrates services locally. For production, we
-transition to Kubernetes for resilience, scaling, and infrastructure-as-code.
+```csharp
+var opts = new TemporalOptions
+{
+    ServerAddress = "temporal.prod:7233",
+    Namespace = "production",
+    TaskQueue = "order-workflows",
+};
 
-```
-┌─────────────────────────────────────────────────────┐
-│               Development (.NET Aspire)             │
-│  AppHost → orchestrates Gateway, Workers, Infra     │
-└──────────────────────┬──────────────────────────────┘
-                       │  Transition
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│              Production (Kubernetes)                 │
-│  Helm/Kustomize → K8s manifests → eip namespace     │
-│  GHCR images → Pods → Services → Ingress            │
-└─────────────────────────────────────────────────────┘
+Assert.That(opts.ServerAddress, Is.EqualTo("temporal.prod:7233"));
+Assert.That(opts.Namespace, Is.EqualTo("production"));
+Assert.That(opts.TaskQueue, Is.EqualTo("order-workflows"));
 ```
 
-## Helm Chart Structure
+### 2. PipelineOptions — PropertiesAssignable
 
-The Helm chart lives at `deploy/helm/eip/`:
+```csharp
+var opts = new PipelineOptions
+{
+    AckSubject = "pipeline.ack",
+    NackSubject = "pipeline.nack",
+    InboundSubject = "pipeline.inbound",
+    NatsUrl = "nats://nats-server:4222",
+    ConsumerGroup = "my-group",
+};
 
-```
-deploy/helm/eip/
-├── Chart.yaml          # Chart metadata and version
-├── values.yaml         # Default configuration values
-└── templates/
-    ├── _helpers.tpl
-    ├── admin-api.yaml
-    ├── configmap.yaml
-    ├── demo-pipeline.yaml
-    ├── grafana-dashboards-configmap.yaml
-    ├── hpa.yaml
-    ├── ingestion-kafka.yaml
-    ├── namespace.yaml
-    ├── networkpolicy.yaml
-    ├── openclaw-web.yaml
-    ├── serviceaccount.yaml
-    └── workflow-temporal.yaml
+Assert.That(opts.AckSubject, Is.EqualTo("pipeline.ack"));
+Assert.That(opts.NackSubject, Is.EqualTo("pipeline.nack"));
+Assert.That(opts.InboundSubject, Is.EqualTo("pipeline.inbound"));
+Assert.That(opts.NatsUrl, Is.EqualTo("nats://nats-server:4222"));
+Assert.That(opts.ConsumerGroup, Is.EqualTo("my-group"));
 ```
 
-**Chart.yaml** declares the chart:
+### 3. JwtOptions — Defaults ValidateLifetimeAndClockSkew
 
-```yaml
-apiVersion: v2
-name: eip
-description: Enterprise Integration Platform
-version: 1.0.0
-appVersion: "1.0.0"
+```csharp
+var opts = new JwtOptions();
+
+Assert.That(opts.ValidateLifetime, Is.True);
+Assert.That(opts.ClockSkew, Is.EqualTo(TimeSpan.FromMinutes(5)));
+Assert.That(opts.Issuer, Is.EqualTo(string.Empty));
+Assert.That(opts.Audience, Is.EqualTo(string.Empty));
+Assert.That(opts.SigningKey, Is.EqualTo(string.Empty));
 ```
 
-**values.yaml** provides defaults:
+### 4. DisasterRecoveryOptions — Defaults
 
-```yaml
-replicaCount: 2
-image:
-  repository: ghcr.io/your-org/eip-gateway
-  tag: latest
-  pullPolicy: IfNotPresent
-namespace: eip
-resources:
-  requests:
-    cpu: 250m
-    memory: 256Mi
-  limits:
-    cpu: 1000m
-    memory: 1Gi
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
+```csharp
+var opts = new DisasterRecoveryOptions();
+
+Assert.That(opts.MaxDrillHistorySize, Is.EqualTo(100));
+Assert.That(opts.MaxReplicationLag, Is.EqualTo(TimeSpan.FromSeconds(30)));
+Assert.That(opts.HealthCheckInterval, Is.EqualTo(TimeSpan.FromSeconds(10)));
+Assert.That(opts.OfflineThreshold, Is.EqualTo(3));
+Assert.That(opts.PerItemReplicationTime, Is.EqualTo(TimeSpan.FromMilliseconds(1)));
 ```
 
-## Kustomize Overlays
+### 5. OptionsCreate — TemporalOptions WorksCorrectly
 
-Kustomize overlays at `deploy/kustomize/` customize per environment:
+```csharp
+var temporal = new TemporalOptions
+{
+    ServerAddress = "localhost:7233",
+    Namespace = "test-ns",
+    TaskQueue = "test-queue",
+};
 
+var wrapped = Options.Create(temporal);
+
+Assert.That(wrapped, Is.Not.Null);
+Assert.That(wrapped.Value.ServerAddress, Is.EqualTo("localhost:7233"));
+Assert.That(wrapped.Value.Namespace, Is.EqualTo("test-ns"));
+Assert.That(wrapped.Value.TaskQueue, Is.EqualTo("test-queue"));
 ```
-deploy/kustomize/
-├── base/
-│   ├── kustomization.yaml
-│   ├── namespace.yaml
-│   ├── admin-api/
-│   │   ├── deployment.yaml
-│   │   └── service.yaml
-│   └── openclaw-web/
-│       ├── deployment.yaml
-│       └── service.yaml
-├── overlays/
-│   ├── dev/
-│   │   └── kustomization.yaml        # 1 replica, debug logging
-│   ├── staging/
-│   │   └── kustomization.yaml        # 2 replicas, info logging
-│   └── prod/
-│       ├── kustomization.yaml        # 3+ replicas, warn logging
-│       ├── pdb-admin-api.yaml        # PodDisruptionBudget
-│       └── pdb-openclaw-web.yaml     # PodDisruptionBudget
-```
-
-Apply an overlay:
-
-```bash
-kubectl apply -k deploy/kustomize/overlays/prod/
-```
-
-## Namespace and Image Registry
-
-All resources deploy into the `eip` namespace:
-
-```bash
-kubectl create namespace eip
-kubectl config set-context --current --namespace=eip
-```
-
-Images are pushed to GHCR during CI:
-
-```bash
-docker build -t ghcr.io/your-org/eip-gateway:v1.0.0 .
-docker push ghcr.io/your-org/eip-gateway:v1.0.0
-```
-
-## Horizontal Pod Autoscaler
-
-The HPA scales pods based on CPU utilization:
-
-```
-          ┌──────────┐
-          │   HPA    │  target: 70% CPU
-          └────┬─────┘
-               │ scales
-     ┌─────────┼──────────┐
-     ▼         ▼          ▼
- ┌───────┐ ┌───────┐ ┌───────┐
- │ Pod 1 │ │ Pod 2 │ │ Pod N │   min: 2, max: 10
- └───────┘ └───────┘ └───────┘
-```
-
-```yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: gateway-api-hpa
-  namespace: eip
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: gateway-api
-  minReplicas: 2
-  maxReplicas: 10
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
-```
-
-## Deployment Validation
-
-Run `deploy/validate.sh` to verify deployments:
-
-```bash
-#!/bin/bash
-set -e
-echo "Validating EIP deployment..."
-kubectl get pods -n eip -o wide
-kubectl rollout status deployment/gateway-api -n eip --timeout=120s
-kubectl rollout status deployment/pipeline-worker -n eip --timeout=120s
-echo "All deployments healthy."
-```
-
-## Scalability Dimension
-
-Kubernetes provides **horizontal scaling** through the HPA, adding or removing
-pod replicas based on CPU and memory metrics. Combined with Competing Consumers
-on the broker side, this enables elastic throughput that matches demand.
-
-## Atomicity Dimension
-
-Rolling deployments ensure **zero-downtime releases**. Kubernetes maintains the
-old pods until new ones pass readiness probes, preserving message processing
-continuity. Liveness probes automatically restart unhealthy pods.
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial43/Lab.cs`](../tests/TutorialLabs/Tutorial43/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial43/Lab.cs`](../tests/TutorialLabs/Tutorial43/Lab.cs)
 
-**Objective:** Configure Kubernetes HPA for auto-scaling integration workers, analyze graceful shutdown for **atomic** in-flight message handling, and design Kustomize overlays for multi-environment deployment.
-
-### Step 1: Configure HPA with Multi-Metric Scaling
-
-Modify the HPA to scale on both CPU and memory utilization:
-
-```yaml
-spec:
-  minReplicas: 2
-  maxReplicas: 20
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 80
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial43.Lab"
 ```
-
-Why set memory threshold higher than CPU? (hint: pipeline workers are more likely CPU-bound from JSON processing; memory scaling catches enrichment cache growth)
-
-### Step 2: Analyze Graceful Shutdown Atomicity
-
-During a rolling update, a pod is terminated while processing a message. Trace the shutdown sequence:
-
-```
-1. Kubernetes sends SIGTERM → pod enters termination grace period
-2. Worker stops accepting new messages (unsubscribes from broker)
-3. In-flight messages complete processing (up to terminationGracePeriodSeconds)
-4. Worker sends Ack for completed messages, Nack for incomplete ones
-5. Pod terminates → broker redelivers Nack'd messages to other consumers
-```
-
-What happens if `terminationGracePeriodSeconds` is too short? How does this affect **message atomicity**?
-
-### Step 3: Design Kustomize Overlays
-
-Create a Kustomize patch that overrides the image tag for staging:
-
-```yaml
-# overlays/staging/kustomization.yaml
-resources:
-  - ../../base
-patches:
-  - target:
-      kind: Deployment
-      name: pipeline-worker
-    patch: |
-      - op: replace
-        path: /spec/template/spec/containers/0/image
-        value: registry.example.com/eip/worker:staging-latest
-```
-
-How does Kustomize differ from Helm for multi-environment deployment? Which is more **scalable** for a platform with 10+ microservices across 3 environments?
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial43/Exam.cs`](../tests/TutorialLabs/Tutorial43/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial43/Exam.cs`](../tests/TutorialLabs/Tutorial43/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial43.Exam"
+```
 
 ---
 
