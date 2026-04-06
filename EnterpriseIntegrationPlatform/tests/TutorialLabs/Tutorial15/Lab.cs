@@ -1,204 +1,151 @@
 // ============================================================================
 // Tutorial 15 – Message Translator (Lab)
 // ============================================================================
-// This lab exercises the MessageTranslator — the pattern that converts a
-// message from one format to another. You will test payload transformation,
-// envelope field preservation (CorrelationId, Priority, CausationId chain),
-// and verify that the translated envelope is published to the target topic.
+// EIP Pattern: Message Translator
+// E2E: Wire real MessageTranslator with NSubstitute IPayloadTransform and
+// MockEndpoint, verify payload transformation and envelope publishing.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Translator;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial15;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Basic Translation — String to String ────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("translator-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task Translate_StringToString_ProducesTranslatedEnvelope()
+    public async Task Translate_TransformsPayload_PublishesToTarget()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var transform = new FuncPayloadTransform<string, string>(s => s.ToUpperInvariant());
+        var transform = Substitute.For<IPayloadTransform<string, string>>();
+        transform.Transform("hello").Returns("HELLO");
 
-        var options = Options.Create(new TranslatorOptions
-        {
-            TargetTopic = "translated-topic",
-        });
+        var translator = CreateTranslator(transform, "translated-topic");
+        var envelope = IntegrationEnvelope<string>.Create(
+            "hello", "SourceSvc", "input.type");
 
-        var translator = new MessageTranslator<string, string>(
-            transform, producer, options,
-            NullLogger<MessageTranslator<string, string>>.Instance);
+        var result = await translator.TranslateAsync(envelope);
 
-        var source = IntegrationEnvelope<string>.Create(
-            "hello world", "SourceService", "greeting.event");
-
-        var result = await translator.TranslateAsync(source);
-
-        Assert.That(result.TranslatedEnvelope.Payload, Is.EqualTo("HELLO WORLD"));
+        Assert.That(result.TranslatedEnvelope.Payload, Is.EqualTo("HELLO"));
         Assert.That(result.TargetTopic, Is.EqualTo("translated-topic"));
-        Assert.That(result.SourceMessageId, Is.EqualTo(source.MessageId));
+        Assert.That(result.SourceMessageId, Is.EqualTo(envelope.MessageId));
+        _output.AssertReceivedOnTopic("translated-topic", 1);
     }
-
-    // ── CorrelationId Is Preserved ──────────────────────────────────────────
 
     [Test]
     public async Task Translate_PreservesCorrelationId()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var transform = new FuncPayloadTransform<string, string>(s => s);
+        var transform = Substitute.For<IPayloadTransform<string, string>>();
+        transform.Transform(Arg.Any<string>()).Returns("out");
 
-        var options = Options.Create(new TranslatorOptions
-        {
-            TargetTopic = "output-topic",
-        });
+        var translator = CreateTranslator(transform, "target");
+        var envelope = IntegrationEnvelope<string>.Create("in", "Svc", "type");
 
-        var translator = new MessageTranslator<string, string>(
-            transform, producer, options,
-            NullLogger<MessageTranslator<string, string>>.Instance);
+        var result = await translator.TranslateAsync(envelope);
 
-        var source = IntegrationEnvelope<string>.Create(
-            "data", "Service", "event.type");
-
-        var result = await translator.TranslateAsync(source);
-
-        Assert.That(result.TranslatedEnvelope.CorrelationId, Is.EqualTo(source.CorrelationId));
+        Assert.That(result.TranslatedEnvelope.CorrelationId,
+            Is.EqualTo(envelope.CorrelationId));
     }
 
-    // ── CausationId Set to Source MessageId ──────────────────────────────────
-
     [Test]
-    public async Task Translate_CausationId_SetToSourceMessageId()
+    public async Task Translate_SetsCausationIdToSourceMessageId()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var transform = new FuncPayloadTransform<string, string>(s => s);
+        var transform = Substitute.For<IPayloadTransform<string, string>>();
+        transform.Transform(Arg.Any<string>()).Returns("out");
 
-        var options = Options.Create(new TranslatorOptions
-        {
-            TargetTopic = "output-topic",
-        });
+        var translator = CreateTranslator(transform, "target");
+        var envelope = IntegrationEnvelope<string>.Create("in", "Svc", "type");
 
-        var translator = new MessageTranslator<string, string>(
-            transform, producer, options,
-            NullLogger<MessageTranslator<string, string>>.Instance);
+        var result = await translator.TranslateAsync(envelope);
 
-        var source = IntegrationEnvelope<string>.Create(
-            "data", "Service", "event.type");
-
-        var result = await translator.TranslateAsync(source);
-
-        Assert.That(result.TranslatedEnvelope.CausationId, Is.EqualTo(source.MessageId));
-        Assert.That(result.TranslatedEnvelope.MessageId, Is.Not.EqualTo(source.MessageId));
+        Assert.That(result.TranslatedEnvelope.CausationId,
+            Is.EqualTo(envelope.MessageId));
     }
 
-    // ── TargetMessageType Override ──────────────────────────────────────────
-
     [Test]
-    public async Task Translate_TargetMessageTypeOverride_ChangesMessageType()
+    public async Task Translate_OverridesSourceAndMessageType()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var transform = new FuncPayloadTransform<string, string>(s => s);
+        var transform = Substitute.For<IPayloadTransform<string, string>>();
+        transform.Transform(Arg.Any<string>()).Returns("out");
 
         var options = Options.Create(new TranslatorOptions
         {
-            TargetTopic = "output-topic",
-            TargetMessageType = "translated.event",
+            TargetTopic = "target",
+            TargetSource = "NewSource",
+            TargetMessageType = "new.type",
         });
-
         var translator = new MessageTranslator<string, string>(
-            transform, producer, options,
+            transform, _output, options,
             NullLogger<MessageTranslator<string, string>>.Instance);
 
-        var source = IntegrationEnvelope<string>.Create(
-            "data", "Service", "original.event");
+        var envelope = IntegrationEnvelope<string>.Create("in", "OldSource", "old.type");
+        var result = await translator.TranslateAsync(envelope);
 
-        var result = await translator.TranslateAsync(source);
-
-        Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("translated.event"));
+        Assert.That(result.TranslatedEnvelope.Source, Is.EqualTo("NewSource"));
+        Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("new.type"));
+        _output.AssertReceivedOnTopic("target", 1);
     }
 
-    // ── TargetSource Override ───────────────────────────────────────────────
-
     [Test]
-    public async Task Translate_TargetSourceOverride_ChangesSource()
+    public async Task Translate_PreservesMetadata()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var transform = new FuncPayloadTransform<string, string>(s => s);
+        var transform = Substitute.For<IPayloadTransform<string, string>>();
+        transform.Transform(Arg.Any<string>()).Returns("out");
 
-        var options = Options.Create(new TranslatorOptions
+        var translator = CreateTranslator(transform, "target");
+        var envelope = IntegrationEnvelope<string>.Create("in", "Svc", "type") with
         {
-            TargetTopic = "output-topic",
-            TargetSource = "TranslatorService",
-        });
+            Metadata = new Dictionary<string, string>
+            {
+                ["region"] = "us-east",
+                ["tenant"] = "acme",
+            },
+        };
 
-        var translator = new MessageTranslator<string, string>(
-            transform, producer, options,
-            NullLogger<MessageTranslator<string, string>>.Instance);
+        var result = await translator.TranslateAsync(envelope);
 
-        var source = IntegrationEnvelope<string>.Create(
-            "data", "OriginalService", "event.type");
-
-        var result = await translator.TranslateAsync(source);
-
-        Assert.That(result.TranslatedEnvelope.Source, Is.EqualTo("TranslatorService"));
+        Assert.That(result.TranslatedEnvelope.Metadata["region"], Is.EqualTo("us-east"));
+        Assert.That(result.TranslatedEnvelope.Metadata["tenant"], Is.EqualTo("acme"));
     }
 
-    // ── No TargetTopic Configured — Throws ──────────────────────────────────
-
     [Test]
-    public void Translate_NoTargetTopic_ThrowsInvalidOperationException()
+    public async Task Translate_NoTargetTopic_ThrowsInvalidOperation()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var transform = new FuncPayloadTransform<string, string>(s => s);
-
-        var options = Options.Create(new TranslatorOptions
-        {
-            TargetTopic = "", // Empty — not configured.
-        });
-
+        var transform = Substitute.For<IPayloadTransform<string, string>>();
+        var options = Options.Create(new TranslatorOptions { TargetTopic = "" });
         var translator = new MessageTranslator<string, string>(
-            transform, producer, options,
+            transform, _output, options,
             NullLogger<MessageTranslator<string, string>>.Instance);
 
-        var source = IntegrationEnvelope<string>.Create(
-            "data", "Service", "event.type");
+        var envelope = IntegrationEnvelope<string>.Create("in", "Svc", "type");
 
         Assert.ThrowsAsync<InvalidOperationException>(
-            () => translator.TranslateAsync(source));
+            async () => await translator.TranslateAsync(envelope));
+        _output.AssertNoneReceived();
     }
 
-    // ── Verify Producer PublishAsync Called ──────────────────────────────────
-
-    [Test]
-    public async Task Translate_PublishesToTargetTopic()
+    private MessageTranslator<string, string> CreateTranslator(
+        IPayloadTransform<string, string> transform, string targetTopic)
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var transform = new FuncPayloadTransform<string, string>(s => s);
-
         var options = Options.Create(new TranslatorOptions
         {
-            TargetTopic = "translated-topic",
+            TargetTopic = targetTopic,
         });
-
-        var translator = new MessageTranslator<string, string>(
-            transform, producer, options,
+        return new MessageTranslator<string, string>(
+            transform, _output, options,
             NullLogger<MessageTranslator<string, string>>.Instance);
-
-        var source = IntegrationEnvelope<string>.Create(
-            "data", "Service", "event.type");
-
-        await translator.TranslateAsync(source);
-
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Is("translated-topic"),
-            Arg.Any<CancellationToken>());
     }
 }

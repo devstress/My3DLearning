@@ -1,155 +1,116 @@
 // ============================================================================
 // Tutorial 15 – Message Translator (Exam)
 // ============================================================================
-// Coding challenges: build a type-converting translator, verify metadata
-// preservation, and implement a multi-field transformation pipeline.
+// E2E challenges: type-converting translator, metadata preservation chain,
+// and multi-field transformation verification via MockEndpoint.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Translator;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial15;
-
-// Simple DTOs used for type-conversion translation tests.
-file sealed record OrderDto(string OrderId, decimal Amount, string Currency);
-file sealed record OrderSummary(string Reference, string Total);
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Type-Converting Translator ─────────────────────────────
-
     [Test]
-    public async Task Challenge1_TypeConversion_OrderDtoToOrderSummary()
+    public async Task Challenge1_TypeConversion_StringToInt()
     {
-        // Translate an OrderDto payload into an OrderSummary payload.
-        // The translator should:
-        //   - Map OrderId → Reference
-        //   - Format Amount + Currency → Total (e.g. "100.50 USD")
-        //   - Preserve CorrelationId and set CausationId
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var transform = new FuncPayloadTransform<OrderDto, OrderSummary>(order =>
-            new OrderSummary(
-                Reference: order.OrderId,
-                Total: $"{order.Amount} {order.Currency}"));
+        await using var output = new MockEndpoint("type-convert");
+        var transform = Substitute.For<IPayloadTransform<string, int>>();
+        transform.Transform("42").Returns(42);
 
         var options = Options.Create(new TranslatorOptions
         {
-            TargetTopic = "order-summaries",
-            TargetMessageType = "order.summary",
+            TargetTopic = "int-topic",
+            TargetMessageType = "number.parsed",
         });
-
-        var translator = new MessageTranslator<OrderDto, OrderSummary>(
-            transform, producer, options,
-            NullLogger<MessageTranslator<OrderDto, OrderSummary>>.Instance);
-
-        var source = IntegrationEnvelope<OrderDto>.Create(
-            new OrderDto("ORD-1", 250.75m, "EUR"),
-            "OrderService",
-            "order.created");
-
-        var result = await translator.TranslateAsync(source);
-
-        Assert.That(result.TranslatedEnvelope.Payload.Reference, Is.EqualTo("ORD-1"));
-        Assert.That(result.TranslatedEnvelope.Payload.Total, Is.EqualTo("250.75 EUR"));
-        Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("order.summary"));
-        Assert.That(result.TranslatedEnvelope.CorrelationId, Is.EqualTo(source.CorrelationId));
-        Assert.That(result.TranslatedEnvelope.CausationId, Is.EqualTo(source.MessageId));
-        Assert.That(result.TargetTopic, Is.EqualTo("order-summaries"));
-    }
-
-    // ── Challenge 2: Metadata Preservation ──────────────────────────────────
-
-    [Test]
-    public async Task Challenge2_MetadataPreservation_AllMetadataCopied()
-    {
-        // Verify that the translator copies ALL metadata from the source envelope
-        // to the translated envelope, including custom keys.
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var transform = new FuncPayloadTransform<string, string>(s => $"translated:{s}");
-
-        var options = Options.Create(new TranslatorOptions
-        {
-            TargetTopic = "output-topic",
-        });
-
-        var translator = new MessageTranslator<string, string>(
-            transform, producer, options,
-            NullLogger<MessageTranslator<string, string>>.Instance);
-
-        var source = IntegrationEnvelope<string>.Create(
-            "data", "Service", "event.type") with
-        {
-            Priority = MessagePriority.High,
-            SchemaVersion = "3.0",
-            Metadata = new Dictionary<string, string>
-            {
-                ["tenant"] = "acme-corp",
-                ["region"] = "eu-west",
-                ["trace-id"] = "abc-123",
-            },
-        };
-
-        var result = await translator.TranslateAsync(source);
-
-        // Payload is transformed.
-        Assert.That(result.TranslatedEnvelope.Payload, Is.EqualTo("translated:data"));
-
-        // Metadata is preserved.
-        Assert.That(result.TranslatedEnvelope.Metadata["tenant"], Is.EqualTo("acme-corp"));
-        Assert.That(result.TranslatedEnvelope.Metadata["region"], Is.EqualTo("eu-west"));
-        Assert.That(result.TranslatedEnvelope.Metadata["trace-id"], Is.EqualTo("abc-123"));
-
-        // Priority and SchemaVersion are preserved.
-        Assert.That(result.TranslatedEnvelope.Priority, Is.EqualTo(MessagePriority.High));
-        Assert.That(result.TranslatedEnvelope.SchemaVersion, Is.EqualTo("3.0"));
-    }
-
-    // ── Challenge 3: FuncPayloadTransform Convenience ───────────────────────
-
-    [Test]
-    public async Task Challenge3_FuncPayloadTransform_SupportsComplexTransformations()
-    {
-        // Use FuncPayloadTransform to implement a transformation that:
-        //   - Splits a comma-separated string into the count of elements
-        //   - Returns the count as a string (e.g. "a,b,c" → "3")
-        // Demonstrates that FuncPayloadTransform can wrap arbitrary logic.
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var transform = new FuncPayloadTransform<string, int>(csv =>
-            csv.Split(',', StringSplitOptions.RemoveEmptyEntries).Length);
-
-        var options = Options.Create(new TranslatorOptions
-        {
-            TargetTopic = "counts-topic",
-            TargetMessageType = "item.count",
-            TargetSource = "CounterService",
-        });
-
         var translator = new MessageTranslator<string, int>(
-            transform, producer, options,
+            transform, output, options,
             NullLogger<MessageTranslator<string, int>>.Instance);
 
-        var source = IntegrationEnvelope<string>.Create(
-            "apple,banana,cherry,date", "InventoryService", "inventory.list");
+        var envelope = IntegrationEnvelope<string>.Create(
+            "42", "parser-svc", "string.input");
+        var result = await translator.TranslateAsync(envelope);
 
-        var result = await translator.TranslateAsync(source);
+        Assert.That(result.TranslatedEnvelope.Payload, Is.EqualTo(42));
+        Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("number.parsed"));
+        Assert.That(result.TranslatedEnvelope.CausationId, Is.EqualTo(envelope.MessageId));
+        output.AssertReceivedOnTopic("int-topic", 1);
+    }
 
-        Assert.That(result.TranslatedEnvelope.Payload, Is.EqualTo(4));
-        Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("item.count"));
-        Assert.That(result.TranslatedEnvelope.Source, Is.EqualTo("CounterService"));
-        Assert.That(result.TargetTopic, Is.EqualTo("counts-topic"));
+    [Test]
+    public async Task Challenge2_MetadataPreservationChain_TwoTranslations()
+    {
+        await using var output1 = new MockEndpoint("stage1");
+        await using var output2 = new MockEndpoint("stage2");
 
-        // Verify publish.
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<int>>(),
-            Arg.Is("counts-topic"),
-            Arg.Any<CancellationToken>());
+        var transform1 = Substitute.For<IPayloadTransform<string, string>>();
+        transform1.Transform(Arg.Any<string>()).Returns(x => ((string)x[0]).ToUpperInvariant());
+
+        var transform2 = Substitute.For<IPayloadTransform<string, string>>();
+        transform2.Transform(Arg.Any<string>()).Returns(x => $"[{x[0]}]");
+
+        var translator1 = new MessageTranslator<string, string>(
+            transform1, output1, Options.Create(new TranslatorOptions { TargetTopic = "stage1-topic" }),
+            NullLogger<MessageTranslator<string, string>>.Instance);
+
+        var translator2 = new MessageTranslator<string, string>(
+            transform2, output2, Options.Create(new TranslatorOptions { TargetTopic = "stage2-topic" }),
+            NullLogger<MessageTranslator<string, string>>.Instance);
+
+        var original = IntegrationEnvelope<string>.Create(
+            "hello", "origin", "raw.text") with
+        {
+            Metadata = new Dictionary<string, string> { ["trace"] = "abc123" },
+        };
+
+        var r1 = await translator1.TranslateAsync(original);
+        var r2 = await translator2.TranslateAsync(r1.TranslatedEnvelope);
+
+        Assert.That(r2.TranslatedEnvelope.Payload, Is.EqualTo("[HELLO]"));
+        Assert.That(r2.TranslatedEnvelope.Metadata["trace"], Is.EqualTo("abc123"));
+        Assert.That(r2.TranslatedEnvelope.CorrelationId, Is.EqualTo(original.CorrelationId));
+        Assert.That(r1.TranslatedEnvelope.CausationId, Is.EqualTo(original.MessageId));
+        Assert.That(r2.TranslatedEnvelope.CausationId, Is.EqualTo(r1.TranslatedEnvelope.MessageId));
+
+        output1.AssertReceivedOnTopic("stage1-topic", 1);
+        output2.AssertReceivedOnTopic("stage2-topic", 1);
+    }
+
+    [Test]
+    public async Task Challenge3_PreservesSourceWhenNoOverride()
+    {
+        await using var output = new MockEndpoint("preserve");
+        var transform = Substitute.For<IPayloadTransform<string, string>>();
+        transform.Transform(Arg.Any<string>()).Returns("out");
+
+        var options = Options.Create(new TranslatorOptions
+        {
+            TargetTopic = "dest-topic",
+        });
+        var translator = new MessageTranslator<string, string>(
+            transform, output, options,
+            NullLogger<MessageTranslator<string, string>>.Instance);
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "data", "OriginalSource", "original.type") with
+        {
+            Priority = MessagePriority.High,
+            SchemaVersion = "2.0",
+        };
+
+        var result = await translator.TranslateAsync(envelope);
+
+        Assert.That(result.TranslatedEnvelope.Source, Is.EqualTo("OriginalSource"));
+        Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("original.type"));
+        Assert.That(result.TranslatedEnvelope.Priority, Is.EqualTo(MessagePriority.High));
+        Assert.That(result.TranslatedEnvelope.SchemaVersion, Is.EqualTo("2.0"));
+        output.AssertReceivedOnTopic("dest-topic", 1);
     }
 }

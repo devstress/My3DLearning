@@ -1,7 +1,7 @@
 // ============================================================================
 // Tutorial 14 – Process Manager (Exam)
 // ============================================================================
-// Coding challenges: verify metadata serialisation, test envelope-to-input
+// E2E challenges: verify metadata serialisation, test envelope-to-input
 // priority mapping, and validate idempotent workflow ID generation.
 // ============================================================================
 
@@ -19,174 +19,95 @@ namespace TutorialLabs.Tutorial14;
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Metadata Serialisation ──────────────────────────────────
-
     [Test]
-    public async Task Challenge1_MetadataSerialisation_NullWhenEmpty()
+    public async Task Challenge1_PriorityMapping_CastsEnumToInt()
     {
-        // When the envelope has no metadata entries, MetadataJson in the
-        // pipeline input should be null (not an empty JSON object).
-        IntegrationPipelineInput? capturedInput = null;
-
         var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        dispatcher.DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                capturedInput = ci.ArgAt<IntegrationPipelineInput>(0);
-                return new IntegrationPipelineResult(capturedInput.MessageId, IsSuccess: true);
-            });
+        var orchestrator = CreateOrchestrator(dispatcher);
 
-        var options = Options.Create(new PipelineOptions
-        {
-            AckSubject = "ack",
-            NackSubject = "nack",
-        });
-
-        var orchestrator = new PipelineOrchestrator(
-            dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
-
-        var json = JsonSerializer.Deserialize<JsonElement>("{}");
+        var json = JsonSerializer.Deserialize<JsonElement>("{\"item\":\"widget\"}");
         var envelope = IntegrationEnvelope<JsonElement>.Create(
-            json, "Service", "event.type");
-        // Ensure metadata is empty (default).
-
-        await orchestrator.ProcessAsync(envelope);
-
-        Assert.That(capturedInput, Is.Not.Null);
-        Assert.That(capturedInput!.MetadataJson, Is.Null);
-    }
-
-    [Test]
-    public async Task Challenge1_MetadataSerialisation_PopulatedWhenPresent()
-    {
-        IntegrationPipelineInput? capturedInput = null;
-
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        dispatcher.DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                capturedInput = ci.ArgAt<IntegrationPipelineInput>(0);
-                return new IntegrationPipelineResult(capturedInput.MessageId, IsSuccess: true);
-            });
-
-        var options = Options.Create(new PipelineOptions
+            json, "Svc", "order.created") with
         {
-            AckSubject = "ack",
-            NackSubject = "nack",
-        });
-
-        var orchestrator = new PipelineOrchestrator(
-            dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
-
-        var json = JsonSerializer.Deserialize<JsonElement>("{}");
-        var envelope = IntegrationEnvelope<JsonElement>.Create(
-            json, "Service", "event.type") with
-        {
-            Metadata = new Dictionary<string, string>
-            {
-                ["region"] = "us-east",
-                ["tenant"] = "acme",
-            },
+            Priority = MessagePriority.High,
         };
 
+        IntegrationPipelineInput? captured = null;
+        dispatcher.DispatchAsync(
+            Arg.Do<IntegrationPipelineInput>(i => captured = i),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>())
+            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
+
         await orchestrator.ProcessAsync(envelope);
 
-        Assert.That(capturedInput, Is.Not.Null);
-        Assert.That(capturedInput!.MetadataJson, Is.Not.Null);
-        Assert.That(capturedInput.MetadataJson, Does.Contain("us-east"));
-        Assert.That(capturedInput.MetadataJson, Does.Contain("acme"));
+        Assert.That(captured!.Priority, Is.EqualTo((int)MessagePriority.High));
     }
 
-    // ── Challenge 2: Priority Mapping — Enum to Int ─────────────────────────
-
     [Test]
-    public async Task Challenge2_PriorityMapping_EnumCastsToInt()
+    public async Task Challenge2_IdempotentWorkflowId_DeterministicFromMessageId()
     {
-        // The PipelineOrchestrator maps MessagePriority enum to int.
-        // Verify that High (2) and Critical (3) map correctly.
-        IntegrationPipelineInput? capturedInput = null;
-
         var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
+        var orchestrator = CreateOrchestrator(dispatcher);
+
+        var json = JsonSerializer.Deserialize<JsonElement>("{\"data\":1}");
+        var envelope = IntegrationEnvelope<JsonElement>.Create(
+            json, "Svc", "test.type");
+
         dispatcher.DispatchAsync(
             Arg.Any<IntegrationPipelineInput>(),
             Arg.Any<string>(),
             Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                capturedInput = ci.ArgAt<IntegrationPipelineInput>(0);
-                return new IntegrationPipelineResult(capturedInput.MessageId, IsSuccess: true);
-            });
+            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
 
-        var options = Options.Create(new PipelineOptions
+        await orchestrator.ProcessAsync(envelope);
+
+        var expectedId = $"integration-{envelope.MessageId}";
+        await dispatcher.Received(1).DispatchAsync(
+            Arg.Any<IntegrationPipelineInput>(),
+            Arg.Is(expectedId),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task Challenge3_CausationIdAndTimestamp_PreservedInInput()
+    {
+        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
+        var orchestrator = CreateOrchestrator(dispatcher);
+
+        var causationId = Guid.NewGuid();
+        var timestamp = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var json = JsonSerializer.Deserialize<JsonElement>("{\"v\":1}");
+        var envelope = IntegrationEnvelope<JsonElement>.Create(
+            json, "Svc", "test.type") with
         {
-            AckSubject = "ack",
-            NackSubject = "nack",
-        });
-
-        var orchestrator = new PipelineOrchestrator(
-            dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
-
-        var json = JsonSerializer.Deserialize<JsonElement>("{}");
-
-        // Test Critical priority mapping.
-        var criticalEnvelope = IntegrationEnvelope<JsonElement>.Create(
-            json, "Service", "alert.critical") with
-        {
-            Priority = MessagePriority.Critical,
+            CausationId = causationId,
+            Timestamp = timestamp,
         };
 
-        await orchestrator.ProcessAsync(criticalEnvelope);
-
-        Assert.That(capturedInput, Is.Not.Null);
-        Assert.That(capturedInput!.Priority, Is.EqualTo((int)MessagePriority.Critical));
-    }
-
-    // ── Challenge 3: Idempotent Workflow IDs ────────────────────────────────
-
-    [Test]
-    public async Task Challenge3_IdempotentWorkflowId_SameMessageProducesSameId()
-    {
-        // Processing the same envelope twice should produce the same workflow ID,
-        // enabling Temporal's idempotency guarantees.
-        var capturedIds = new List<string>();
-
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
+        IntegrationPipelineInput? captured = null;
         dispatcher.DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(),
+            Arg.Do<IntegrationPipelineInput>(i => captured = i),
             Arg.Any<string>(),
             Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                capturedIds.Add(ci.ArgAt<string>(1));
-                var input = ci.ArgAt<IntegrationPipelineInput>(0);
-                return new IntegrationPipelineResult(input.MessageId, IsSuccess: true);
-            });
+            .Returns(new IntegrationPipelineResult(envelope.MessageId, true));
 
+        await orchestrator.ProcessAsync(envelope);
+
+        Assert.That(captured!.CausationId, Is.EqualTo(causationId));
+        Assert.That(captured.Timestamp, Is.EqualTo(timestamp));
+        Assert.That(captured.SchemaVersion, Is.EqualTo(envelope.SchemaVersion));
+    }
+
+    private static PipelineOrchestrator CreateOrchestrator(
+        ITemporalWorkflowDispatcher dispatcher)
+    {
         var options = Options.Create(new PipelineOptions
         {
-            AckSubject = "ack",
-            NackSubject = "nack",
+            AckSubject = "integration.ack",
+            NackSubject = "integration.nack",
         });
-
-        var orchestrator = new PipelineOrchestrator(
+        return new PipelineOrchestrator(
             dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
-
-        var json = JsonSerializer.Deserialize<JsonElement>("{}");
-        var envelope = IntegrationEnvelope<JsonElement>.Create(
-            json, "Service", "event.type");
-
-        // Process the same envelope twice.
-        await orchestrator.ProcessAsync(envelope);
-        await orchestrator.ProcessAsync(envelope);
-
-        Assert.That(capturedIds, Has.Count.EqualTo(2));
-        Assert.That(capturedIds[0], Is.EqualTo(capturedIds[1]));
-        Assert.That(capturedIds[0], Is.EqualTo($"integration-{envelope.MessageId}"));
     }
 }

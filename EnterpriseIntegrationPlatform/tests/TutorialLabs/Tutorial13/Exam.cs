@@ -1,172 +1,149 @@
 // ============================================================================
 // Tutorial 13 – Routing Slip (Exam)
 // ============================================================================
-// Coding challenges: build a multi-step processing pipeline, handle partial
-// failure mid-slip, and verify step-by-step forwarding to destination topics.
+// E2E challenges: multi-step pipeline execution, partial failure mid-slip,
+// and step-by-step forwarding verification via MockEndpoint.
 // ============================================================================
 
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Routing;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial13;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Three-Step Pipeline — Validate → Transform → Deliver ───
-
     [Test]
-    public async Task Challenge1_ThreeStepPipeline_ExecutesFirstStepAndAdvances()
+    public async Task Challenge1_FullPipeline_ExecutesAllStepsSequentially()
     {
-        // Build a routing slip with three steps: Validate → Transform → Deliver.
-        // Execute the first step (Validate), verify it succeeds, and confirm
-        // the remaining slip has two steps.
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var validateHandler = Substitute.For<IRoutingSlipStepHandler>();
-        validateHandler.StepName.Returns("Validate");
-        validateHandler.HandleAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Any<IReadOnlyDictionary<string, string>?>(),
-            Arg.Any<CancellationToken>())
-            .Returns(true);
-
-        var transformHandler = Substitute.For<IRoutingSlipStepHandler>();
-        transformHandler.StepName.Returns("Transform");
-
-        var deliverHandler = Substitute.For<IRoutingSlipStepHandler>();
-        deliverHandler.StepName.Returns("Deliver");
-
-        var router = new RoutingSlipRouter(
-            [validateHandler, transformHandler, deliverHandler],
-            producer,
-            NullLogger<RoutingSlipRouter>.Instance);
-
-        var slip = new RoutingSlip([
-            new RoutingSlipStep("Validate"),
-            new RoutingSlipStep("Transform", "transform-topic"),
-            new RoutingSlipStep("Deliver", "delivery-topic"),
-        ]);
-
-        var envelope = IntegrationEnvelope<string>.Create(
-            "order-data", "OrderService", "order.created") with
+        await using var output = new MockEndpoint("pipeline");
+        var handlers = new IRoutingSlipStepHandler[]
         {
-            Metadata = new Dictionary<string, string>
-            {
-                [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
-            },
+            new TrackingHandler("Validate"),
+            new TrackingHandler("Transform"),
+            new TrackingHandler("Deliver"),
         };
+        var router = new RoutingSlipRouter(
+            handlers, output, NullLogger<RoutingSlipRouter>.Instance);
 
-        var result = await router.ExecuteCurrentStepAsync(envelope);
+        var envelope = CreateEnvelopeWithSlip(
+            new RoutingSlipStep("Validate", "step1-out"),
+            new RoutingSlipStep("Transform", "step2-out"),
+            new RoutingSlipStep("Deliver", "step3-out"));
 
-        Assert.That(result.StepName, Is.EqualTo("Validate"));
-        Assert.That(result.Succeeded, Is.True);
-        Assert.That(result.RemainingSlip.Steps, Has.Count.EqualTo(2));
-        Assert.That(result.RemainingSlip.CurrentStep!.StepName, Is.EqualTo("Transform"));
+        var r1 = await router.ExecuteCurrentStepAsync(envelope);
+        Assert.That(r1.Succeeded, Is.True);
+        Assert.That(r1.StepName, Is.EqualTo("Validate"));
+        Assert.That(r1.RemainingSlip.Steps, Has.Count.EqualTo(2));
+
+        var r2 = await router.ExecuteCurrentStepAsync(envelope);
+        Assert.That(r2.Succeeded, Is.True);
+        Assert.That(r2.StepName, Is.EqualTo("Transform"));
+        Assert.That(r2.RemainingSlip.Steps, Has.Count.EqualTo(1));
+
+        var r3 = await router.ExecuteCurrentStepAsync(envelope);
+        Assert.That(r3.Succeeded, Is.True);
+        Assert.That(r3.StepName, Is.EqualTo("Deliver"));
+        Assert.That(r3.RemainingSlip.IsComplete, Is.True);
+
+        output.AssertReceivedCount(3);
+        output.AssertReceivedOnTopic("step1-out", 1);
+        output.AssertReceivedOnTopic("step2-out", 1);
+        output.AssertReceivedOnTopic("step3-out", 1);
     }
 
-    // ── Challenge 2: Mid-Pipeline Failure Halts Processing ──────────────────
-
     [Test]
-    public async Task Challenge2_MidPipelineFailure_HaltsAtFailedStep()
+    public async Task Challenge2_PartialFailure_StopsAtFailedStep()
     {
-        // In a two-step slip (Validate → Enrich), if Validate fails, the
-        // remaining slip should still contain both steps (no advancement).
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var validateHandler = Substitute.For<IRoutingSlipStepHandler>();
-        validateHandler.StepName.Returns("Validate");
-        validateHandler.HandleAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Any<IReadOnlyDictionary<string, string>?>(),
-            Arg.Any<CancellationToken>())
-            .Returns(false); // Validation fails.
-
-        var enrichHandler = Substitute.For<IRoutingSlipStepHandler>();
-        enrichHandler.StepName.Returns("Enrich");
-
-        var router = new RoutingSlipRouter(
-            [validateHandler, enrichHandler],
-            producer,
-            NullLogger<RoutingSlipRouter>.Instance);
-
-        var slip = new RoutingSlip([
-            new RoutingSlipStep("Validate"),
-            new RoutingSlipStep("Enrich", "enrich-topic"),
-        ]);
-
-        var envelope = IntegrationEnvelope<string>.Create(
-            "bad-data", "Service", "event.type") with
+        await using var output = new MockEndpoint("partial-fail");
+        var handlers = new IRoutingSlipStepHandler[]
         {
-            Metadata = new Dictionary<string, string>
-            {
-                [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
-            },
+            new TrackingHandler("Validate"),
+            new FailingHandler("Transform"),
+            new TrackingHandler("Deliver"),
         };
+        var router = new RoutingSlipRouter(
+            handlers, output, NullLogger<RoutingSlipRouter>.Instance);
 
-        var result = await router.ExecuteCurrentStepAsync(envelope);
+        var envelope = CreateEnvelopeWithSlip(
+            new RoutingSlipStep("Validate", "step1-out"),
+            new RoutingSlipStep("Transform", "step2-out"),
+            new RoutingSlipStep("Deliver", "step3-out"));
 
-        Assert.That(result.Succeeded, Is.False);
-        Assert.That(result.StepName, Is.EqualTo("Validate"));
-        // Slip was NOT advanced — both steps remain.
-        Assert.That(result.RemainingSlip.Steps, Has.Count.EqualTo(2));
-        Assert.That(result.ForwardedToTopic, Is.Null);
+        var r1 = await router.ExecuteCurrentStepAsync(envelope);
+        Assert.That(r1.Succeeded, Is.True);
+        output.AssertReceivedOnTopic("step1-out", 1);
 
-        // Producer was NOT called — no forwarding on failure.
-        await producer.DidNotReceive().PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>());
+        var r2 = await router.ExecuteCurrentStepAsync(envelope);
+        Assert.That(r2.Succeeded, Is.False);
+        Assert.That(r2.StepName, Is.EqualTo("Transform"));
+        Assert.That(r2.FailureReason, Is.Not.Null);
+
+        // Only step1 was forwarded; Transform failed so step2/step3 not reached
+        output.AssertReceivedCount(1);
     }
 
-    // ── Challenge 3: Step with Destination Topic Forwards Message ────────────
-
     [Test]
-    public async Task Challenge3_StepForwarding_PublishesToDestinationTopic()
+    public async Task Challenge3_MissingSlip_ThrowsInvalidOperation()
     {
-        // When a step has a DestinationTopic and succeeds, the router should
-        // publish the envelope to that topic.
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var handler = Substitute.For<IRoutingSlipStepHandler>();
-        handler.StepName.Returns("Deliver");
-        handler.HandleAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Any<IReadOnlyDictionary<string, string>?>(),
-            Arg.Any<CancellationToken>())
-            .Returns(true);
-
+        await using var output = new MockEndpoint("no-slip");
         var router = new RoutingSlipRouter(
-            [handler], producer, NullLogger<RoutingSlipRouter>.Instance);
-
-        var slip = new RoutingSlip([
-            new RoutingSlipStep("Deliver", "final-destination-topic"),
-        ]);
+            Array.Empty<IRoutingSlipStepHandler>(),
+            output, NullLogger<RoutingSlipRouter>.Instance);
 
         var envelope = IntegrationEnvelope<string>.Create(
-            "payload", "Service", "event.type") with
+            "data", "svc", "test.event");
+
+        Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await router.ExecuteCurrentStepAsync(envelope));
+        output.AssertNoneReceived();
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────
+
+    private static IntegrationEnvelope<string> CreateEnvelopeWithSlip(
+        params RoutingSlipStep[] steps)
+    {
+        var slip = new RoutingSlip(steps.ToList().AsReadOnly());
+        var slipJson = JsonSerializer.Serialize(slip.Steps, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        });
+
+        return IntegrationEnvelope<string>.Create("test-payload", "TestSvc", "test.event") with
         {
             Metadata = new Dictionary<string, string>
             {
-                [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
+                [RoutingSlip.MetadataKey] = slipJson,
             },
         };
+    }
 
-        var result = await router.ExecuteCurrentStepAsync(envelope);
+    private sealed class TrackingHandler : IRoutingSlipStepHandler
+    {
+        public TrackingHandler(string stepName) => StepName = stepName;
+        public string StepName { get; }
 
-        Assert.That(result.Succeeded, Is.True);
-        Assert.That(result.ForwardedToTopic, Is.EqualTo("final-destination-topic"));
-        Assert.That(result.RemainingSlip.IsComplete, Is.True);
+        public Task<bool> HandleAsync<T>(
+            IntegrationEnvelope<T> envelope,
+            IReadOnlyDictionary<string, string>? parameters,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
+    }
 
-        // Verify the producer published to the correct topic.
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Is("final-destination-topic"),
-            Arg.Any<CancellationToken>());
+    private sealed class FailingHandler : IRoutingSlipStepHandler
+    {
+        public FailingHandler(string stepName) => StepName = stepName;
+        public string StepName { get; }
+
+        public Task<bool> HandleAsync<T>(
+            IntegrationEnvelope<T> envelope,
+            IReadOnlyDictionary<string, string>? parameters,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
     }
 }

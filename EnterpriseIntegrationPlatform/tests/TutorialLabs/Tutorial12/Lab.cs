@@ -1,282 +1,205 @@
 // ============================================================================
 // Tutorial 12 – Recipient List (Lab)
 // ============================================================================
-// This lab exercises the RecipientListRouter — a pattern that fans out a single
-// message to multiple destinations based on matching rules and metadata-based
-// recipient resolution. You will configure rules, verify deduplication, and
-// confirm that all resolved recipients receive the message.
+// EIP Pattern: Recipient List
+// E2E: Wire real RecipientListRouter with MockEndpoint as producer, configure
+// fan-out rules, send messages, verify delivery to multiple destinations.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Routing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial12;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Single Rule Matches — Fan-out to Multiple Destinations ──────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("recipient-list-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task Route_SingleRuleMatches_PublishesToAllDestinations()
+    public async Task Route_SingleRuleMatch_FansOutToAllDestinations()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var options = Options.Create(new RecipientListOptions
+        var router = CreateRouter(new RecipientListRule
         {
-            Rules =
-            [
-                new RecipientListRule
-                {
-                    FieldName = "MessageType",
-                    Operator = RoutingOperator.Equals,
-                    Value = "order.created",
-                    Destinations = ["audit-topic", "analytics-topic", "fulfilment-topic"],
-                    Name = "OrderFanOut",
-                },
-            ],
+            Name = "OrderEvents",
+            FieldName = "MessageType",
+            Operator = RoutingOperator.Equals,
+            Value = "order.created",
+            Destinations = ["orders-topic", "audit-topic", "analytics-topic"],
         });
-
-        var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
 
         var envelope = IntegrationEnvelope<string>.Create(
             "order-data", "OrderService", "order.created");
-
         var result = await router.RouteAsync(envelope);
 
         Assert.That(result.ResolvedCount, Is.EqualTo(3));
-        Assert.That(result.Destinations, Contains.Item("audit-topic"));
-        Assert.That(result.Destinations, Contains.Item("analytics-topic"));
-        Assert.That(result.Destinations, Contains.Item("fulfilment-topic"));
+        Assert.That(result.Destinations, Has.Count.EqualTo(3));
+        Assert.That(result.DuplicatesRemoved, Is.EqualTo(0));
+        _output.AssertReceivedCount(3);
+        _output.AssertReceivedOnTopic("orders-topic", 1);
+        _output.AssertReceivedOnTopic("audit-topic", 1);
+        _output.AssertReceivedOnTopic("analytics-topic", 1);
     }
 
-    // ── Multiple Rules Match — Destinations Are Merged ──────────────────────
-
     [Test]
-    public async Task Route_MultipleRulesMatch_MergesAllDestinations()
+    public async Task Route_NoRuleMatch_ReturnsEmptyResult()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var options = Options.Create(new RecipientListOptions
+        var router = CreateRouter(new RecipientListRule
         {
-            Rules =
-            [
-                new RecipientListRule
-                {
-                    FieldName = "MessageType",
-                    Operator = RoutingOperator.Contains,
-                    Value = "order",
-                    Destinations = ["audit-topic"],
-                    Name = "AuditAll",
-                },
-                new RecipientListRule
-                {
-                    FieldName = "Source",
-                    Operator = RoutingOperator.Equals,
-                    Value = "OrderService",
-                    Destinations = ["order-analytics"],
-                    Name = "OrderAnalytics",
-                },
-            ],
+            Name = "OrderEvents",
+            FieldName = "MessageType",
+            Operator = RoutingOperator.Equals,
+            Value = "order.created",
+            Destinations = ["orders-topic"],
         });
 
-        var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
-
         var envelope = IntegrationEnvelope<string>.Create(
-            "order-data", "OrderService", "order.created");
-
-        var result = await router.RouteAsync(envelope);
-
-        // Both rules match → destinations are merged.
-        Assert.That(result.ResolvedCount, Is.EqualTo(2));
-        Assert.That(result.Destinations, Contains.Item("audit-topic"));
-        Assert.That(result.Destinations, Contains.Item("order-analytics"));
-    }
-
-    // ── Duplicate Destinations Are Removed ──────────────────────────────────
-
-    [Test]
-    public async Task Route_DuplicateDestinations_AreDeduplicated()
-    {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var options = Options.Create(new RecipientListOptions
-        {
-            Rules =
-            [
-                new RecipientListRule
-                {
-                    FieldName = "MessageType",
-                    Operator = RoutingOperator.Contains,
-                    Value = "order",
-                    Destinations = ["audit-topic", "analytics-topic"],
-                },
-                new RecipientListRule
-                {
-                    FieldName = "Source",
-                    Operator = RoutingOperator.Equals,
-                    Value = "OrderService",
-                    Destinations = ["audit-topic", "fulfilment-topic"],
-                },
-            ],
-        });
-
-        var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
-
-        var envelope = IntegrationEnvelope<string>.Create(
-            "order-data", "OrderService", "order.created");
-
-        var result = await router.RouteAsync(envelope);
-
-        // "audit-topic" appears in both rules but should be deduplicated.
-        Assert.That(result.ResolvedCount, Is.EqualTo(3));
-        Assert.That(result.DuplicatesRemoved, Is.EqualTo(1));
-        Assert.That(result.Destinations, Contains.Item("audit-topic"));
-        Assert.That(result.Destinations, Contains.Item("analytics-topic"));
-        Assert.That(result.Destinations, Contains.Item("fulfilment-topic"));
-    }
-
-    // ── No Rule Matches — Empty Result ──────────────────────────────────────
-
-    [Test]
-    public async Task Route_NoRuleMatches_ReturnsEmptyDestinations()
-    {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var options = Options.Create(new RecipientListOptions
-        {
-            Rules =
-            [
-                new RecipientListRule
-                {
-                    FieldName = "MessageType",
-                    Operator = RoutingOperator.Equals,
-                    Value = "order.created",
-                    Destinations = ["orders-topic"],
-                },
-            ],
-        });
-
-        var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
-
-        // This message type doesn't match any rule.
-        var envelope = IntegrationEnvelope<string>.Create(
-            "payment-data", "PaymentService", "payment.received");
-
+            "data", "Svc", "payment.received");
         var result = await router.RouteAsync(envelope);
 
         Assert.That(result.ResolvedCount, Is.EqualTo(0));
         Assert.That(result.Destinations, Is.Empty);
+        _output.AssertNoneReceived();
     }
 
-    // ── Metadata-Based Recipient Resolution ─────────────────────────────────
+    [Test]
+    public async Task Route_MultipleRulesMatch_CombinesDestinations()
+    {
+        var options = Options.Create(new RecipientListOptions
+        {
+            Rules =
+            [
+                new RecipientListRule
+                {
+                    Name = "TypeRule",
+                    FieldName = "MessageType",
+                    Operator = RoutingOperator.StartsWith,
+                    Value = "order",
+                    Destinations = ["orders-topic"],
+                },
+                new RecipientListRule
+                {
+                    Name = "SourceRule",
+                    FieldName = "Source",
+                    Operator = RoutingOperator.Contains,
+                    Value = "Critical",
+                    Destinations = ["alert-topic"],
+                },
+            ],
+        });
+        var router = new RecipientListRouter(
+            _output, options, NullLogger<RecipientListRouter>.Instance);
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "data", "CriticalOrderService", "order.created");
+        var result = await router.RouteAsync(envelope);
+
+        Assert.That(result.ResolvedCount, Is.EqualTo(2));
+        _output.AssertReceivedOnTopic("orders-topic", 1);
+        _output.AssertReceivedOnTopic("alert-topic", 1);
+    }
 
     [Test]
-    public async Task Route_MetadataRecipients_AddsExtraDestinations()
+    public async Task Route_DuplicateDestinations_AreDeduplicated()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        var options = Options.Create(new RecipientListOptions
+        {
+            Rules =
+            [
+                new RecipientListRule
+                {
+                    Name = "Rule1",
+                    FieldName = "MessageType",
+                    Operator = RoutingOperator.StartsWith,
+                    Value = "order",
+                    Destinations = ["shared-topic", "orders-topic"],
+                },
+                new RecipientListRule
+                {
+                    Name = "Rule2",
+                    FieldName = "Source",
+                    Operator = RoutingOperator.Contains,
+                    Value = "Service",
+                    Destinations = ["shared-topic", "audit-topic"],
+                },
+            ],
+        });
+        var router = new RecipientListRouter(
+            _output, options, NullLogger<RecipientListRouter>.Instance);
 
+        var envelope = IntegrationEnvelope<string>.Create(
+            "data", "OrderService", "order.created");
+        var result = await router.RouteAsync(envelope);
+
+        Assert.That(result.DuplicatesRemoved, Is.GreaterThan(0));
+        Assert.That(result.ResolvedCount, Is.EqualTo(3));
+        _output.AssertReceivedCount(3);
+    }
+
+    [Test]
+    public async Task Route_MetadataRecipients_AddsDestinations()
+    {
         var options = Options.Create(new RecipientListOptions
         {
             Rules = [],
             MetadataRecipientsKey = "recipients",
         });
+        var router = new RecipientListRouter(
+            _output, options, NullLogger<RecipientListRouter>.Instance);
 
-        var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
-
-        // Destinations specified in the envelope metadata.
         var envelope = IntegrationEnvelope<string>.Create(
-            "data", "Service", "event.occurred") with
+            "data", "Svc", "event.fired") with
         {
             Metadata = new Dictionary<string, string>
             {
                 ["recipients"] = "topic-a,topic-b,topic-c",
             },
         };
-
         var result = await router.RouteAsync(envelope);
 
         Assert.That(result.ResolvedCount, Is.EqualTo(3));
-        Assert.That(result.Destinations, Contains.Item("topic-a"));
-        Assert.That(result.Destinations, Contains.Item("topic-b"));
-        Assert.That(result.Destinations, Contains.Item("topic-c"));
+        _output.AssertReceivedOnTopic("topic-a", 1);
+        _output.AssertReceivedOnTopic("topic-b", 1);
+        _output.AssertReceivedOnTopic("topic-c", 1);
     }
 
-    // ── StartsWith Operator ─────────────────────────────────────────────────
-
     [Test]
-    public async Task Route_StartsWithOperator_MatchesPrefixes()
+    public async Task Route_RegexRule_MatchesPattern()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var options = Options.Create(new RecipientListOptions
+        var router = CreateRouter(new RecipientListRule
         {
-            Rules =
-            [
-                new RecipientListRule
-                {
-                    FieldName = "MessageType",
-                    Operator = RoutingOperator.StartsWith,
-                    Value = "order.",
-                    Destinations = ["order-events-topic"],
-                    Name = "AllOrderEvents",
-                },
-            ],
+            Name = "AllOrders",
+            FieldName = "MessageType",
+            Operator = RoutingOperator.Regex,
+            Value = @"^order\..+",
+            Destinations = ["order-events"],
         });
 
-        var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
-
         var envelope = IntegrationEnvelope<string>.Create(
-            "data", "OrderService", "order.shipped");
-
+            "shipped", "Svc", "order.shipped");
         var result = await router.RouteAsync(envelope);
 
         Assert.That(result.ResolvedCount, Is.EqualTo(1));
-        Assert.That(result.Destinations, Contains.Item("order-events-topic"));
+        _output.AssertReceivedOnTopic("order-events", 1);
     }
 
-    // ── Verify Producer Receives All Publish Calls ──────────────────────────
-
-    [Test]
-    public async Task Route_PublishCalledForEachDestination()
+    private RecipientListRouter CreateRouter(RecipientListRule rule)
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
         var options = Options.Create(new RecipientListOptions
         {
-            Rules =
-            [
-                new RecipientListRule
-                {
-                    FieldName = "MessageType",
-                    Operator = RoutingOperator.Equals,
-                    Value = "order.created",
-                    Destinations = ["topic-a", "topic-b"],
-                },
-            ],
+            Rules = [rule],
         });
-
-        var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
-
-        var envelope = IntegrationEnvelope<string>.Create(
-            "data", "OrderService", "order.created");
-
-        await router.RouteAsync(envelope);
-
-        // Verify publish was called for each destination.
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Is("topic-a"),
-            Arg.Any<CancellationToken>());
-
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Is("topic-b"),
-            Arg.Any<CancellationToken>());
+        return new RecipientListRouter(
+            _output, options, NullLogger<RecipientListRouter>.Instance);
     }
 }
