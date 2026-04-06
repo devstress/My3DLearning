@@ -129,35 +129,54 @@ Install these extensions:
 ```
 EnterpriseIntegrationPlatform/
 ├── src/
-│   ├── AppHost/                 # .NET Aspire orchestrator
-│   ├── ServiceDefaults/         # Shared service configuration (OpenTelemetry, health checks)
-│   ├── Contracts/               # Shared message contracts and interfaces
-│   ├── Ingestion/               # Broker abstraction (IMessageBrokerProducer/Consumer)
-│   ├── Ingestion.Kafka/         # Kafka streaming provider
-│   ├── Ingestion.Nats/          # NATS JetStream provider (default)
-│   ├── Ingestion.Pulsar/        # Apache Pulsar Key_Shared provider
-│   ├── Workflow.Temporal/       # Temporal workflow worker
-│   ├── Activities/              # Workflow activity implementations
-│   ├── Processing.Routing/      # Content-based routing logic
-│   ├── Processing.Translator/   # Message transformation logic
-│   ├── Processing.Splitter/     # Message splitter
-│   ├── Processing.Aggregator/   # Message aggregator
-│   ├── Processing.DeadLetter/   # Dead letter queue management
-│   ├── Processing.Retry/        # Retry framework
-│   ├── Processing.Replay/       # Replay framework
-│   ├── Connector.Http/          # HTTP connector
-│   ├── Connector.Sftp/          # SFTP connector
-│   ├── Connector.Email/         # Email connector
-│   ├── Connector.File/          # File connector
-│   ├── Storage.Cassandra/       # Cassandra data access layer
-│   ├── Security/                # Input sanitization, payload guards, encryption
-│   ├── MultiTenancy/            # Tenant resolution and isolation
-│   ├── AI.Ollama/               # Ollama AI integration
-│   ├── AI.RagFlow/              # RagFlow RAG client
-│   ├── Observability/           # OpenTelemetry configuration
-│   ├── OpenClaw.Web/            # "Where is my message?" web UI & RAG knowledge API
-│   ├── Admin.Api/               # Administration REST API
-│   └── Demo.Pipeline/           # End-to-end demo pipeline
+│   ├── AppHost/                     # .NET Aspire orchestrator
+│   ├── ServiceDefaults/             # Shared service configuration (OpenTelemetry, health checks)
+│   ├── Contracts/                   # Shared message contracts and interfaces
+│   ├── Ingestion/                   # Broker abstraction (IMessageBrokerProducer/Consumer)
+│   ├── Ingestion.Kafka/             # Kafka streaming provider
+│   ├── Ingestion.Nats/              # NATS JetStream provider (default)
+│   ├── Ingestion.Pulsar/            # Apache Pulsar Key_Shared provider
+│   ├── Workflow.Temporal/           # Temporal workflow worker
+│   ├── Activities/                  # Workflow activity implementations
+│   ├── Processing.Routing/          # Content-based routing logic
+│   ├── Processing.Translator/       # Message transformation logic
+│   ├── Processing.Transform/        # Payload pipeline — JSON↔XML, regex, JSONPath
+│   ├── Processing.Splitter/         # Message splitter
+│   ├── Processing.Aggregator/       # Message aggregator
+│   ├── Processing.ScatterGather/    # Scatter-Gather pattern
+│   ├── Processing.CompetingConsumers/ # Competing Consumers with autoscaling
+│   ├── Processing.DeadLetter/       # Dead letter queue management
+│   ├── Processing.Retry/            # Retry framework
+│   ├── Processing.Replay/           # Replay framework
+│   ├── Processing.Throttle/         # Token-bucket throttle
+│   ├── Processing.Dispatcher/       # Message Dispatcher & Service Activator
+│   ├── Processing.RequestReply/     # Request-Reply correlator
+│   ├── Processing.Resequencer/      # Resequencer — reorder out-of-sequence messages
+│   ├── RuleEngine/                  # Business rule evaluation
+│   ├── EventSourcing/               # Event store, snapshots, projection engine
+│   ├── Connector.Http/              # HTTP connector
+│   ├── Connector.Sftp/              # SFTP connector
+│   ├── Connector.Email/             # Email connector
+│   ├── Connector.File/              # File connector
+│   ├── Connectors/                  # Unified connector registry & factory
+│   ├── Storage.Cassandra/           # Cassandra data access layer
+│   ├── Configuration/               # Dynamic config store, feature flags
+│   ├── Security/                    # Input sanitization, payload guards, encryption
+│   ├── Security.Secrets/            # Secret providers (Azure KV, Vault), rotation
+│   ├── MultiTenancy/                # Tenant resolution and isolation
+│   ├── MultiTenancy.Onboarding/     # Self-service tenant provisioning & quotas
+│   ├── DisasterRecovery/            # Failover, replication, RPO/RTO, DR drills
+│   ├── Performance.Profiling/       # CPU/memory profiling, GC tuning, benchmarks
+│   ├── Observability/               # Lifecycle recording, Loki storage, OpenClaw API
+│   ├── AI.Ollama/                   # Ollama AI integration
+│   ├── AI.RagFlow/                  # RagFlow RAG client
+│   ├── AI.RagKnowledge/             # RAG knowledge base parser & query matcher
+│   ├── SystemManagement/            # Control Bus, Message Store, Smart Proxy, Test Message
+│   ├── OpenClaw.Web/                # "Where is my message?" web UI & RAG knowledge API
+│   ├── Admin.Web/                   # Vue 3 admin dashboard (proxies to Admin.Api)
+│   ├── Gateway.Api/                 # API gateway (Messaging Gateway)
+│   ├── Admin.Api/                   # Administration REST API
+│   └── Demo.Pipeline/               # End-to-end demo pipeline
 ├── tests/
 │   ├── UnitTests/               # Fast, isolated unit tests (402 tests)
 │   ├── ContractTests/           # Contract verification tests (29 tests)
