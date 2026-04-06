@@ -1,44 +1,8 @@
 # Tutorial 32 — Multi-Tenancy
 
-## What You'll Learn
+Isolate message processing per tenant with tenant resolution and context propagation.
 
-- How `ITenantResolver` identifies the current tenant from message metadata or HTTP headers
-- `ITenantIsolationGuard` enforces cross-tenant data boundaries
-- `TenantContext` carries tenant identity through the pipeline
-- `TenantIsolationException` when a message crosses tenant boundaries
-- Anonymous tenant handling for unauthenticated or system messages
-- `MultiTenancy.Onboarding` for self-service tenant provisioning
-
----
-
-## EIP Pattern: Message Metadata (Tenant Header)
-
-> *"Attach tenant identity as message metadata so every component in the pipeline can enforce data isolation without coupling to the resolution mechanism."*
-
-```
-  ┌──────────────┐     ┌──────────────────┐
-  │  Ingress     │────▶│  Tenant Resolver  │
-  │  (header or  │     │  (metadata /      │
-  │   metadata)  │     │   header lookup)  │
-  └──────────────┘     └───────┬──────────┘
-                               │
-                     TenantContext flows
-                     through pipeline
-                               │
-                    ┌──────────▼──────────┐
-                    │  Isolation Guard    │
-                    │  (cross-tenant      │
-                    │   boundary check)   │
-                    └─────────────────────┘
-```
-
-Every message entering the platform passes through tenant resolution. The resolved `TenantContext` propagates through all pipeline stages, and the isolation guard rejects any operation that would cross tenant boundaries.
-
----
-
-## Platform Implementation
-
-### ITenantResolver
+## Key Types
 
 ```csharp
 // src/MultiTenancy/ITenantResolver.cs
@@ -48,10 +12,6 @@ public interface ITenantResolver
     TenantContext Resolve(string? tenantId);
 }
 ```
-
-Both `Resolve` overloads are synchronous. The metadata overload checks (in order): the `X-Tenant-Id` header, the `TenantId` metadata key, and the authenticated identity's tenant claim. The string overload resolves directly from a tenant ID. If no tenant is found, either overload returns the **anonymous tenant context** (`TenantContext.Anonymous`).
-
-### TenantContext
 
 ```csharp
 // src/MultiTenancy/TenantContext.cs
@@ -69,8 +29,6 @@ public sealed class TenantContext
 }
 ```
 
-### ITenantIsolationGuard
-
 ```csharp
 // src/MultiTenancy/ITenantIsolationGuard.cs
 public interface ITenantIsolationGuard
@@ -78,8 +36,6 @@ public interface ITenantIsolationGuard
     void Enforce<T>(IntegrationEnvelope<T> envelope, string expectedTenantId);
 }
 ```
-
-### TenantIsolationException
 
 ```csharp
 // src/MultiTenancy/TenantIsolationException.cs
@@ -91,95 +47,91 @@ public sealed class TenantIsolationException : Exception
 }
 ```
 
-When a message's actual tenant does not match the expected tenant, the guard throws `TenantIsolationException` with the `MessageId`, `ActualTenantId`, and `ExpectedTenantId`. This is **non-retryable** — the message goes directly to the DLQ.
+## Exercises
 
-### MultiTenancy.Onboarding
+### 1. Resolve — FromMetadata WithTenantIdKey
 
 ```csharp
-// src/MultiTenancy.Onboarding/ITenantOnboardingService.cs
-public interface ITenantOnboardingService
+var metadata = new Dictionary<string, string>
 {
-    Task<TenantOnboardingResult> ProvisionAsync(
-        TenantOnboardingRequest request,
-        CancellationToken cancellationToken = default);
+    [TenantResolver.TenantMetadataKey] = "tenant-abc",
+};
 
-    Task<TenantOnboardingResult> DeprovisionAsync(
-        string tenantId,
-        CancellationToken cancellationToken = default);
+var context = _resolver.Resolve(metadata);
 
-    Task<TenantOnboardingResult?> GetStatusAsync(
-        string tenantId,
-        CancellationToken cancellationToken = default);
-}
-
-public sealed record TenantOnboardingRequest(
-    string TenantId,
-    string TenantName,
-    TenantPlan Plan,
-    string AdminEmail,
-    IReadOnlyDictionary<string, string>? Metadata = null);
+Assert.That(context.TenantId, Is.EqualTo("tenant-abc"));
+Assert.That(context.IsResolved, Is.True);
 ```
 
-Onboarding provisions: tenant-specific broker topics, throttle policies (Tutorial 29), configuration namespaces, and an admin user. Deprovisioning archives data and removes access.
+### 2. Resolve — MissingTenantId ReturnsAnonymous
 
----
+```csharp
+var metadata = new Dictionary<string, string>();
 
-## Scalability Dimension
+var context = _resolver.Resolve(metadata);
 
-Tenant isolation enables **horizontal scaling by tenant**. High-volume tenants can be assigned dedicated consumer groups and broker partitions while small tenants share resources. The `TenantContext.TenantId` and `TenantName` identify each tenant, while `IsResolved` distinguishes resolved tenants from anonymous ones. Per-tenant quotas and feature flags can be managed through external configuration, enabling per-tenant scaling decisions in the competing consumers orchestrator (Tutorial 28).
+Assert.That(context.IsResolved, Is.False);
+Assert.That(context, Is.SameAs(TenantContext.Anonymous));
+```
 
----
+### 3. Resolve — String WithExplicitTenantId
 
-## Atomicity Dimension
+```csharp
+var context = _resolver.Resolve("my-tenant");
 
-The isolation guard runs **before any processing** — a cross-tenant message is rejected atomically before it can corrupt another tenant's data. The `TenantContext` is resolved once at ingress and propagated immutably through the pipeline. This ensures that every component sees the same tenant identity, preventing time-of-check/time-of-use races.
+Assert.That(context.TenantId, Is.EqualTo("my-tenant"));
+Assert.That(context.IsResolved, Is.True);
+```
 
----
+### 4. IsolationGuard — Enforce PassesWhenTenantMatches
+
+```csharp
+var guard = new TenantIsolationGuard(_resolver);
+var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
+{
+    Metadata = new Dictionary<string, string>
+    {
+        [TenantResolver.TenantMetadataKey] = "tenant-x",
+    },
+};
+
+Assert.DoesNotThrow(() => guard.Enforce(envelope, "tenant-x"));
+```
+
+### 5. IsolationGuard — Enforce ThrowsOnMismatch
+
+```csharp
+var guard = new TenantIsolationGuard(_resolver);
+var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
+{
+    Metadata = new Dictionary<string, string>
+    {
+        [TenantResolver.TenantMetadataKey] = "tenant-a",
+    },
+};
+
+var ex = Assert.Throws<TenantIsolationException>(
+    () => guard.Enforce(envelope, "tenant-b"));
+
+Assert.That(ex!.ActualTenantId, Is.EqualTo("tenant-a"));
+Assert.That(ex.ExpectedTenantId, Is.EqualTo("tenant-b"));
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial32/Lab.cs`](../tests/TutorialLabs/Tutorial32/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial32/Lab.cs`](../tests/TutorialLabs/Tutorial32/Lab.cs)
 
-**Objective:** Trace tenant resolution and isolation enforcement, design the onboarding resource provisioning pipeline, and analyze why tenant isolation is non-negotiable for **multi-tenant scalability**.
-
-### Step 1: Resolve a Tenant Identity Conflict
-
-A message arrives with `X-Tenant-Id: tenant-a` but the JWT claim says `tenant-b`. Open `src/MultiTenancy/` and trace:
-
-1. How does the tenant resolver prioritize these conflicting signals?
-2. Should the resolver trust the header or the JWT? (hint: JWT is cryptographically signed)
-3. What exception is thrown for the conflict? Is it retryable?
-
-Design a resolution policy: When is a conflict legitimate (e.g., admin impersonation) vs. a security violation?
-
-### Step 2: Design the Onboarding Pipeline
-
-When a new tenant onboards, trace the self-service provisioning flow:
-
-| Step | Resource | Class | Atomic? |
-|------|----------|-------|---------|
-| 1 | Create tenant record | `InMemoryTenantOnboardingService` | Yes |
-| 2 | Provision broker namespace | `InMemoryBrokerNamespaceProvisioner` | Yes |
-| 3 | Set quota limits | `InMemoryTenantQuotaManager` | Yes |
-| 4 | Initialize configuration | ConfigurationStore | Yes |
-
-If Step 3 fails, what compensation is needed for Steps 1-2? How does this relate to the Saga pattern?
-
-### Step 3: Analyze Tenant Isolation for Scalability
-
-| Without Isolation | With Isolation |
-|------------------|----------------|
-| Tenant A's traffic spike affects Tenant B | Each tenant has dedicated queues and quotas |
-| One tenant's DLQ overflow blocks all tenants | Isolated DLQ per tenant |
-| Security breach in one tenant exposes all | `TenantIsolationGuard` prevents cross-tenant access |
-
-Why is `TenantIsolationException` non-retryable? Under what circumstances could a cross-tenant message be legitimate?
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial32.Lab"
+```
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial32/Exam.cs`](../tests/TutorialLabs/Tutorial32/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial32/Exam.cs`](../tests/TutorialLabs/Tutorial32/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial32.Exam"
+```
 
 ---
 

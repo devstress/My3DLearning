@@ -1,41 +1,8 @@
 # Tutorial 37 — File Connector
 
-## What You'll Learn
+Write messages to local or network file system paths with naming conventions.
 
-- The EIP Channel Adapter pattern for local and network file system integration
-- How `IFileConnector` provides generic `WriteAsync<T>`, `ReadAsync`, and `ListFilesAsync` operations
-- Configurable encoding for multi-language payload support
-- Pattern matching for selective file discovery
-- Directory auto-creation and overwrite control
-
----
-
-## EIP Pattern: Channel Adapter (File)
-
-> *"A File Channel Adapter bridges the messaging system and a file system, reading messages from files or writing messages to files."*
-> — Gregor Hohpe & Bobby Woolf, *Enterprise Integration Patterns*
-
-```
-  Write path:
-  ┌──────────────┐     ┌──────────────────┐     ┌──────────────┐
-  │  Pipeline    │────▶│  File Connector   │────▶│  File System │
-  │  (envelope)  │     │  (write)          │     │  (local/NFS) │
-  └──────────────┘     └──────────────────┘     └──────────────┘
-
-  Read path:
-  ┌──────────────┐     ┌──────────────────┐     ┌──────────────┐
-  │  File System │────▶│  File Connector   │────▶│  Pipeline    │
-  │  (polled)    │     │  (read + ingest)  │     │  (envelope)  │
-  └──────────────┘     └──────────────────┘     └──────────────┘
-```
-
-File-based integration is common in batch processing, legacy system interop, and regulated industries that require file-based audit trails.
-
----
-
-## Platform Implementation
-
-### IFileConnector
+## Key Types
 
 ```csharp
 // src/Connector.File/IFileConnector.cs
@@ -55,10 +22,6 @@ public interface IFileConnector
 }
 ```
 
-`WriteAsync<T>` accepts a generic envelope and a `Func<T, byte[]>` serializer, returning the full path of the written file. `ReadAsync` returns raw bytes. `ListFilesAsync` searches the `RootDirectory` (or an optional subdirectory) for files matching the given pattern.
-
-### FileConnectorOptions
-
 ```csharp
 // src/Connector.File/FileConnectorOptions.cs
 public sealed class FileConnectorOptions
@@ -71,78 +34,112 @@ public sealed class FileConnectorOptions
 }
 ```
 
-| Option | Purpose |
-|--------|---------|
-| `RootDirectory` | Base directory for all file operations |
-| `Encoding` | Character encoding name for text files (default `utf-8`) |
-| `CreateDirectoryIfNotExists` | Automatically create the directory tree if it does not exist (default `true`) |
-| `OverwriteExisting` | When `false`, throws if a file with the same name exists (default `false`) |
-| `FilenamePattern` | Template for generated filenames with `{MessageId}`, `{MessageType}`, `{CorrelationId}`, `{Timestamp}` tokens |
+## Exercises
 
-`ListFilesAsync` supports standard search patterns (`*.json`, `order_*.xml`, `2024-01-*`) for selective file discovery.
+### 1. FileConnectorOptions — Defaults
 
----
+```csharp
+var opts = new FileConnectorOptions();
 
-## Scalability Dimension
+Assert.That(opts.RootDirectory, Is.EqualTo(string.Empty));
+Assert.That(opts.Encoding, Is.EqualTo("utf-8"));
+Assert.That(opts.CreateDirectoryIfNotExists, Is.True);
+Assert.That(opts.OverwriteExisting, Is.False);
+Assert.That(opts.FilenamePattern, Is.EqualTo("{MessageId}-{MessageType}.json"));
+```
 
-File I/O is bound by disk throughput and network filesystem latency (for NFS/SMB mounts). The connector supports concurrent writes from multiple replicas because `{MessageId}` in the `FilenamePattern` ensures uniqueness. For read-side polling, use a single consumer to prevent duplicate ingestion, or implement a distributed lock if multiple readers are needed.
+### 2. FileConnectorOptions — CustomValues
 
----
+```csharp
+var opts = new FileConnectorOptions
+{
+    RootDirectory = "/data/exports",
+    Encoding = "ascii",
+    CreateDirectoryIfNotExists = false,
+    OverwriteExisting = true,
+    FilenamePattern = "{CorrelationId}.xml",
+};
 
-## Atomicity Dimension
+Assert.That(opts.RootDirectory, Is.EqualTo("/data/exports"));
+Assert.That(opts.Encoding, Is.EqualTo("ascii"));
+Assert.That(opts.CreateDirectoryIfNotExists, Is.False);
+Assert.That(opts.OverwriteExisting, Is.True);
+Assert.That(opts.FilenamePattern, Is.EqualTo("{CorrelationId}.xml"));
+```
 
-`WriteAsync` ensures **all-or-nothing file delivery**. If `OverwriteExisting` is `false` and the target file exists, an `InvalidOperationException` is thrown and the source message is redelivered. The source message is Acked only after the write succeeds and the full path is returned. `CreateDirectoryIfNotExists` prevents failures due to missing directory trees.
+### 3. IFileSystem — InterfaceShape HasExpectedMembers
 
----
+```csharp
+var type = typeof(IFileSystem);
+
+Assert.That(type.GetMethod("WriteAllBytesAsync"), Is.Not.Null);
+Assert.That(type.GetMethod("ReadAllBytesAsync"), Is.Not.Null);
+Assert.That(type.GetMethod("GetFiles"), Is.Not.Null);
+Assert.That(type.GetMethod("FileExists"), Is.Not.Null);
+Assert.That(type.GetMethod("CreateDirectory"), Is.Not.Null);
+```
+
+### 4. FileConnector — Write DelegatesToFileSystem
+
+```csharp
+var fs = Substitute.For<IFileSystem>();
+
+var opts = Options.Create(new FileConnectorOptions
+{
+    RootDirectory = "/output",
+    CreateDirectoryIfNotExists = true,
+});
+
+var connector = new FileConnector(fs, opts, NullLogger<FileConnector>.Instance);
+
+var envelope = IntegrationEnvelope<string>.Create("payload", "Svc", "order.placed");
+
+await connector.WriteAsync(
+    envelope,
+    s => System.Text.Encoding.UTF8.GetBytes(s),
+    CancellationToken.None);
+
+// Verify directory creation was called
+fs.Received(1).CreateDirectory(Arg.Any<string>());
+
+// Verify file write was called (data + metadata sidecar)
+await fs.Received(2).WriteAllBytesAsync(
+    Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>());
+```
+
+### 5. FileConnector — Read DelegatesToFileSystem
+
+```csharp
+var fs = Substitute.For<IFileSystem>();
+var expected = System.Text.Encoding.UTF8.GetBytes("file-content");
+fs.ReadAllBytesAsync("/output/test.json", Arg.Any<CancellationToken>())
+    .Returns(expected);
+
+var connector = new FileConnector(
+    fs,
+    Options.Create(new FileConnectorOptions { RootDirectory = "/output" }),
+    NullLogger<FileConnector>.Instance);
+
+var result = await connector.ReadAsync("/output/test.json", CancellationToken.None);
+
+Assert.That(result, Is.EqualTo(expected));
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial37/Lab.cs`](../tests/TutorialLabs/Tutorial37/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial37/Lab.cs`](../tests/TutorialLabs/Tutorial37/Lab.cs)
 
-**Objective:** Configure file-based delivery for batch processing, analyze concurrent write safety, and trace how `{MessageId}` filenames prevent conflicts in **scaled** consumer deployments.
-
-### Step 1: Configure a File Connector
-
-Design a `FileConnectorOptions` for a batch process that writes UTF-16 encoded XML files:
-
-```csharp
-var options = new FileConnectorOptions
-{
-    RootDirectory = "/mnt/nfs/outbound/orders",
-    FilenamePattern = "order-{MessageId}.xml",
-    Encoding = "utf-16",
-    OverwriteExisting = true,
-    CreateDirectoryIfNotExists = true
-};
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial37.Lab"
 ```
-
-Open `src/Connector.File/FileConnector.cs` and trace: How does the connector resolve `{MessageId}` in the filename? What other placeholders are available?
-
-### Step 2: Analyze Concurrent Write Safety
-
-Two consumer replicas write to the same `RootDirectory`. With `{MessageId}` in the pattern:
-
-| Replica | Message | Filename |
-|---------|---------|----------|
-| A | `msg-abc-123` | `order-abc-123.xml` |
-| B | `msg-def-456` | `order-def-456.xml` |
-| A | `msg-abc-123` (redelivery) | `order-abc-123.xml` (overwrite) |
-
-How does `{MessageId}` prevent filename collisions between different messages? How does `OverwriteExisting` handle idempotent redelivery of the same message?
-
-### Step 3: Evaluate File Connector Atomicity
-
-The file connector uses `Func<T, byte[]>` for serialization rather than accepting raw strings. Explain:
-
-- Why `byte[]` instead of `string`? (hint: binary formats like Avro, Protocol Buffers)
-- How does the connector ensure **atomic** file creation? (hint: write to temp file, then rename)
-- What happens if the process crashes after writing but before renaming?
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial37/Exam.cs`](../tests/TutorialLabs/Tutorial37/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial37/Exam.cs`](../tests/TutorialLabs/Tutorial37/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial37.Exam"
+```
 
 ---
 

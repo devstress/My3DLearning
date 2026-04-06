@@ -1,44 +1,8 @@
 # Tutorial 28 — Competing Consumers
 
-## What You'll Learn
+Scale message processing horizontally with competing consumer instances.
 
-- The EIP Competing Consumers pattern for parallel message processing
-- How `CompetingConsumerOrchestrator` (a `BackgroundService`) manages consumer lifecycles
-- `IConsumerLagMonitor` for measuring how far behind consumers are
-- `IConsumerScaler` for adding or removing consumer instances
-- `IBackpressureSignal` for communicating overload upstream
-- Auto-scaling based on consumer lag with cooldown to prevent flapping
-- Why this is the **Scalability pillar centerpiece** of the platform
-
----
-
-## EIP Pattern: Competing Consumers
-
-> *"Create multiple consumers on a single Point-to-Point Channel so that the consumers can process multiple messages concurrently."*
-> — Gregor Hohpe & Bobby Woolf, *Enterprise Integration Patterns*
-
-```
-                          ┌──────────────┐
-                     ┌───▶│  Consumer 1  │
-  ┌──────────┐      │    └──────────────┘
-  │  Broker  │──────┤    ┌──────────────┐
-  │  Topic   │      ├───▶│  Consumer 2  │
-  └──────────┘      │    └──────────────┘
-                    │    ┌──────────────┐
-                    └───▶│  Consumer N  │
-                          └──────────────┘
-                                │
-                    Orchestrator scales N
-                    based on lag + backpressure
-```
-
-Multiple consumers read from the same topic. The broker ensures each message is delivered to exactly one consumer in the group. The orchestrator monitors lag and adjusts the consumer count dynamically.
-
----
-
-## Platform Implementation
-
-### CompetingConsumerOrchestrator
+## Key Types
 
 ```csharp
 // src/Processing.CompetingConsumers/CompetingConsumerOrchestrator.cs
@@ -109,14 +73,6 @@ public sealed class CompetingConsumerOrchestrator : BackgroundService
 }
 ```
 
-The orchestrator runs as a hosted `BackgroundService`. On each evaluation cycle it reads the consumer lag via `GetLagAsync`, compares against thresholds, and calls `ScaleAsync` with the desired consumer count. Key features:
-
-- **Backpressure signaling** — when at max capacity, signals backpressure to upstream producers
-- **Cooldown guard** — prevents scaling flapping with a configurable cooldown period
-- **Backpressure-aware scale-down** — won't scale down while backpressure is active
-
-### IConsumerLagMonitor
-
 ```csharp
 // src/Processing.CompetingConsumers/IConsumerLagMonitor.cs
 public interface IConsumerLagMonitor
@@ -134,10 +90,6 @@ public record ConsumerLagInfo(
     DateTimeOffset Timestamp);
 ```
 
-> **Note:** `ConsumerLagInfo` tracks lag per consumer group and topic. The active consumer count is available separately via `IConsumerScaler.CurrentCount`.
-
-### IConsumerScaler
-
 ```csharp
 // src/Processing.CompetingConsumers/IConsumerScaler.cs
 public interface IConsumerScaler
@@ -146,8 +98,6 @@ public interface IConsumerScaler
     Task ScaleAsync(int desiredCount, CancellationToken ct = default);
 }
 ```
-
-### IBackpressureSignal
 
 ```csharp
 // src/Processing.CompetingConsumers/IBackpressureSignal.cs
@@ -159,87 +109,106 @@ public interface IBackpressureSignal
 }
 ```
 
-When `IsBackpressured` is true, the orchestrator pauses scale-down and can signal upstream producers (via broker flow control or HTTP 429) to slow ingestion.
+## Exercises
 
-### CompetingConsumerOptions
+### 1. BackpressureSignal — SignalAndRelease TogglesCorrectly
 
 ```csharp
-// src/Processing.CompetingConsumers/CompetingConsumerOptions.cs
-public sealed class CompetingConsumerOptions
-{
-    public int MinConsumers { get; set; } = 1;
-    public int MaxConsumers { get; set; } = 10;
-    public long ScaleUpThreshold { get; set; } = 1000;
-    public long ScaleDownThreshold { get; set; } = 100;
-    public int CooldownMs { get; set; } = 30_000;
-    public string TargetTopic { get; set; } = string.Empty;
-    public string ConsumerGroup { get; set; } = string.Empty;
-}
+var bp = new BackpressureSignal();
+
+Assert.That(bp.IsBackpressured, Is.False);
+
+bp.Signal();
+Assert.That(bp.IsBackpressured, Is.True);
+
+bp.Release();
+Assert.That(bp.IsBackpressured, Is.False);
 ```
 
-The `CooldownMs` prevents flapping — after a scale event, no further scaling occurs until the cooldown expires. This avoids rapid oscillation when lag hovers near a threshold.
+### 2. InMemoryConsumerScaler — ScaleUp IncreasesCount
 
----
+```csharp
+var scaler = new InMemoryConsumerScaler(
+    NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 1);
 
-## Scalability Dimension
+Assert.That(scaler.CurrentCount, Is.EqualTo(1));
 
-This is the **Scalability pillar centerpiece**. Competing consumers turn a single-threaded message pipeline into a horizontally scalable processing tier. The broker partitions the topic; each consumer claims one or more partitions. Adding consumers increases throughput linearly — up to the partition count. The lag monitor provides the feedback loop, and the scaler adjusts capacity without human intervention.
+await scaler.ScaleAsync(3, CancellationToken.None);
 
----
+Assert.That(scaler.CurrentCount, Is.EqualTo(3));
+```
 
-## Atomicity Dimension
+### 3. ConsumerLagInfo — RecordProperties AreCorrect
 
-Each consumer processes messages independently and Acks them individually. If a consumer crashes, its partitions are rebalanced to surviving consumers, and unacked messages are redelivered. The orchestrator only adjusts the consumer count — it never touches message processing itself. This separation ensures that scaling events cannot corrupt in-flight message handling.
+```csharp
+var now = DateTimeOffset.UtcNow;
+var info = new ConsumerLagInfo("group-1", "orders", 500, now);
 
----
+Assert.That(info.ConsumerGroup, Is.EqualTo("group-1"));
+Assert.That(info.Topic, Is.EqualTo("orders"));
+Assert.That(info.CurrentLag, Is.EqualTo(500));
+Assert.That(info.Timestamp, Is.EqualTo(now));
+```
+
+### 4. InMemoryLagMonitor — ReportAndGet ReturnsReportedLag
+
+```csharp
+var monitor = new InMemoryConsumerLagMonitor();
+var lag = new ConsumerLagInfo("grp", "topic", 1234, DateTimeOffset.UtcNow);
+
+await monitor.ReportLagAsync(lag);
+var retrieved = await monitor.GetLagAsync("topic", "grp", CancellationToken.None);
+
+Assert.That(retrieved.CurrentLag, Is.EqualTo(1234));
+```
+
+### 5. EvaluateAndScale — HighLag ScalesUp
+
+```csharp
+var lagMonitor = Substitute.For<IConsumerLagMonitor>();
+var scaler = Substitute.For<IConsumerScaler>();
+var backpressure = new BackpressureSignal();
+var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+
+scaler.CurrentCount.Returns(1);
+lagMonitor.GetLagAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+    .Returns(new ConsumerLagInfo("grp", "topic", 5000, DateTimeOffset.UtcNow));
+
+var options = Options.Create(new CompetingConsumerOptions
+{
+    MinConsumers = 1,
+    MaxConsumers = 10,
+    ScaleUpThreshold = 1000,
+    ScaleDownThreshold = 100,
+    CooldownMs = 1000,
+    TargetTopic = "topic",
+    ConsumerGroup = "grp",
+});
+
+var orchestrator = new CompetingConsumerOrchestrator(
+    lagMonitor, scaler, backpressure, options,
+    NullLogger<CompetingConsumerOrchestrator>.Instance, timeProvider);
+
+await orchestrator.EvaluateAndScaleAsync(CancellationToken.None);
+
+await scaler.Received(1).ScaleAsync(2, Arg.Any<CancellationToken>());
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial28/Lab.cs`](../tests/TutorialLabs/Tutorial28/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial28/Lab.cs`](../tests/TutorialLabs/Tutorial28/Lab.cs)
 
-**Objective:** Trace the auto-scaling orchestrator with backpressure signaling, analyze cooldown to prevent scaling flap, and design a production backpressure integration.
-
-### Step 1: Trace the Scaling Decision Path
-
-A topic has 8 partitions, `MaxConsumers = 12`, and current consumer lag is 5,000. Open `src/Processing.CompetingConsumers/CompetingConsumerOrchestrator.cs` and trace `EvaluateAndScaleAsync`:
-
-1. Lag exceeds `ScaleUpThreshold` → what happens if current consumers = 8?
-2. Lag exceeds threshold but `currentCount >= MaxConsumers` → what signal is emitted?
-3. After scaling up, what prevents another scale-up in the next cycle? (hint: cooldown)
-
-Now: with `MaxConsumers = 12` and 8 Kafka partitions, what happens when the orchestrator scales to 9 consumers? (hint: one consumer will be idle — Kafka can't assign more consumers than partitions)
-
-### Step 2: Analyze Cooldown for Scaling Stability
-
-Consumer lag oscillates between 900 and 1100 with `ScaleUpThreshold = 1000`. Without cooldown:
-
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial28.Lab"
 ```
-Cycle 1: lag=1100 → scale up (3→4)
-Cycle 2: lag=900 → scale down (4→3)
-Cycle 3: lag=1100 → scale up (3→4)
-... flapping forever
-```
-
-How does `CooldownMs` break this cycle? What is the relationship between cooldown duration and scaling stability? What value would you set for a production system?
-
-### Step 3: Design a Backpressure Integration
-
-When the consumer pool is at maximum capacity and lag keeps growing, the orchestrator signals backpressure. Design a system-wide response:
-
-| Component | Backpressure Action |
-|-----------|-------------------|
-| Gateway API | Return HTTP 429 to upstream senders |
-| Ingestion producers | Pause or slow message publishing |
-| Dashboard (OpenClaw) | Show backpressure warning to operators |
-| Monitoring (OpenTelemetry) | Emit backpressure metrics and alerts |
-
-How does backpressure prevent **cascade failures** in a scalable system? What happens without it?
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial28/Exam.cs`](../tests/TutorialLabs/Tutorial28/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial28/Exam.cs`](../tests/TutorialLabs/Tutorial28/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial28.Exam"
+```
 
 ---
 

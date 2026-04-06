@@ -1,42 +1,8 @@
 # Tutorial 42 — Configuration
 
-## What You'll Learn
+Manage platform configuration with environment overrides, feature flags, and hot reload.
 
-- How `IConfigurationStore` provides versioned, runtime-updatable configuration
-- `IFeatureFlagService` for toggling features with variants, rollout, and tenant targeting
-- `InMemoryConfigurationStore` with versioning for development and testing
-- `FeatureFlag` with multi-variant support and gradual rollout
-- `ConfigurationChangeNotifier` for broadcasting updates to running services via `IObservable<T>`
-- `EnvironmentOverrideProvider` and `NotificationFeatureFlags` for notification toggle
-
----
-
-## EIP Pattern: Control Bus
-
-> *"Use a Control Bus to manage an enterprise integration system. The Control Bus uses the same messaging mechanism used by the application data, but uses separate channels to transmit configuration and control data."*
-> — Gregor Hohpe & Bobby Woolf, *Enterprise Integration Patterns*
-
-```
-  ┌──────────────────┐     ┌──────────────────┐
-  │  Admin API       │────▶│  Configuration   │
-  │  (update config) │     │  Store           │
-  └──────────────────┘     └───────┬──────────┘
-                                   │ notify
-                    ┌──────────────┼──────────────┐
-                    ▼              ▼              ▼
-              ┌──────────┐  ┌──────────┐  ┌──────────┐
-              │ Service  │  │ Service  │  │ Service  │
-              │ A        │  │ B        │  │ C        │
-              └──────────┘  └──────────┘  └──────────┘
-```
-
-Configuration changes flow through the store and notifier to all running services. No restart is required — services react to change notifications in real time.
-
----
-
-## Platform Implementation
-
-### IConfigurationStore
+## Key Types
 
 ```csharp
 // src/Configuration/IConfigurationStore.cs
@@ -55,10 +21,6 @@ public sealed record ConfigurationEntry(
     string? ModifiedBy = null);
 ```
 
-Every `SetAsync` increments the `Version` and preserves the previous value. `InMemoryConfigurationStore` uses a `ConcurrentDictionary` for version tracking. `WatchAsync` returns an `IObservable<ConfigurationChange>` that broadcasts changes as they occur.
-
-### IFeatureFlagService
-
 ```csharp
 // src/Configuration/IFeatureFlagService.cs
 public interface IFeatureFlagService
@@ -71,8 +33,6 @@ public interface IFeatureFlagService
     Task<IReadOnlyList<FeatureFlag>> ListAsync(CancellationToken ct = default);
 }
 ```
-
-### FeatureFlag
 
 ```csharp
 // src/Configuration/FeatureFlag.cs
@@ -87,15 +47,6 @@ public sealed record FeatureFlag(
     public List<string> TargetTenants { get; init; } = TargetTenants ?? [];
 }
 ```
-
-| Property | Purpose |
-|----------|---------|
-| `IsEnabled` | Master toggle — `false` disables for everyone |
-| `Variants` | Named variant keys mapped to values for A/B testing |
-| `RolloutPercentage` | Gradual rollout — 25 means 25% of traffic |
-| `TargetTenants` | Tenant IDs that always get the feature |
-
-### ConfigurationChangeNotifier
 
 ```csharp
 // src/Configuration/ConfigurationChangeNotifier.cs
@@ -114,96 +65,100 @@ public sealed record ConfigurationChange(
 public enum ConfigurationChangeType { Created, Updated, Deleted }
 ```
 
-Services subscribe via `Subscribe` at startup, receiving an `IDisposable` to unsubscribe later. When a configuration value is updated, the notifier broadcasts the change via `Publish` so services can reload without restarting.
+## Exercises
 
-### EnvironmentOverrideProvider
-
-The `EnvironmentOverrideProvider` reads environment variables using the convention `EIP__Key__SubKey` (double underscore as separator). Environment variables take precedence over store values, supporting per-environment overrides without modifying the store.
-
-### NotificationFeatureFlags
+### 1. ConfigurationEntry — Defaults EnvironmentAndVersion
 
 ```csharp
-// src/Activities/NotificationFeatureFlags.cs
-public static class NotificationFeatureFlags
-{
-    public const string NotificationsEnabled = "Notifications.Enabled";
-}
+var entry = new ConfigurationEntry("Database:Host", "localhost");
+
+Assert.That(entry.Key, Is.EqualTo("Database:Host"));
+Assert.That(entry.Value, Is.EqualTo("localhost"));
+Assert.That(entry.Environment, Is.EqualTo("default"));
+Assert.That(entry.Version, Is.EqualTo(1));
+Assert.That(entry.ModifiedBy, Is.Null);
+Assert.That(entry.LastModified, Is.Not.EqualTo(default(DateTimeOffset)));
 ```
 
-This flag controls whether the platform sends notifications. Toggleable per tenant via `TargetTenants`.
+### 2. InMemoryConfigurationStore — SetAndGet Roundtrip
 
----
+```csharp
+using var notifier = new ConfigurationChangeNotifier();
+var store = new InMemoryConfigurationStore(notifier);
 
-## Scalability Dimension
+var entry = new ConfigurationEntry("App:Name", "MyApp");
+await store.SetAsync(entry);
 
-The configuration store is **read-heavy** — services read on startup and on change notifications. The `ConfigurationChangeNotifier` uses pub/sub so all replicas receive updates simultaneously, preventing configuration drift. Production uses a distributed store (Redis, database) with local caching.
+var retrieved = await store.GetAsync("App:Name");
 
----
+Assert.That(retrieved, Is.Not.Null);
+Assert.That(retrieved!.Value, Is.EqualTo("MyApp"));
+Assert.That(retrieved.Version, Is.EqualTo(1));
+```
 
-## Atomicity Dimension
+### 3. InMemoryConfigurationStore — SetDeleteGet ReturnsNull
 
-Configuration updates are **versioned** — each `SetAsync` is atomic and creates a new version. The version history supports **rollback** by re-setting to a previous value. Feature flags use `RolloutPercentage` with deterministic hashing to ensure consistent behavior per entity.
+```csharp
+using var notifier = new ConfigurationChangeNotifier();
+var store = new InMemoryConfigurationStore(notifier);
 
----
+await store.SetAsync(new ConfigurationEntry("Temp:Key", "value"));
+var deleted = await store.DeleteAsync("Temp:Key");
+var retrieved = await store.GetAsync("Temp:Key");
 
-## Lab
+Assert.That(deleted, Is.True);
+Assert.That(retrieved, Is.Null);
+```
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial42/Lab.cs`](../tests/TutorialLabs/Tutorial42/Lab.cs)
+### 4. InMemoryConfigurationStore — List ReturnsAllEntries
 
-**Objective:** Design feature flags with percentage rollouts, trace configuration change propagation, and analyze how environment overrides support **scalable** multi-environment deployments.
+```csharp
+using var notifier = new ConfigurationChangeNotifier();
+var store = new InMemoryConfigurationStore(notifier);
 
-### Step 1: Design a Feature Flag with Gradual Rollout
+await store.SetAsync(new ConfigurationEntry("Key1", "Val1", "dev"));
+await store.SetAsync(new ConfigurationEntry("Key2", "Val2", "dev"));
+await store.SetAsync(new ConfigurationEntry("Key3", "Val3", "prod"));
 
-Design a feature flag for a new routing algorithm:
+var allEntries = await store.ListAsync();
+Assert.That(allEntries, Has.Count.EqualTo(3));
+
+var devEntries = await store.ListAsync("dev");
+Assert.That(devEntries, Has.Count.EqualTo(2));
+```
+
+### 5. FeatureFlag — RecordShape
 
 ```csharp
 var flag = new FeatureFlag(
-    Name: "new-routing-algorithm",
+    Name: "NewCheckout",
     IsEnabled: true,
-    RolloutPercentage: 10)
-{
-    Variants = new Dictionary<string, string>
-    {
-        ["control"] = "v1",
-        ["treatment"] = "v2"
-    },
-    TargetTenants = ["tenant-beta"]   // Always enabled for beta testers
-};
+    Variants: new Dictionary<string, string> { ["control"] = "v1", ["treatment"] = "v2" },
+    RolloutPercentage: 50,
+    TargetTenants: new List<string> { "tenant-a", "tenant-b" });
+
+Assert.That(flag.Name, Is.EqualTo("NewCheckout"));
+Assert.That(flag.IsEnabled, Is.True);
+Assert.That(flag.Variants, Has.Count.EqualTo(2));
+Assert.That(flag.RolloutPercentage, Is.EqualTo(50));
+Assert.That(flag.TargetTenants, Has.Count.EqualTo(2));
 ```
 
-Open `src/Configuration/` and trace: How does the platform evaluate which variant to apply? How does percentage-based rollout work — is it random per message or deterministic per tenant?
+## Lab
 
-### Step 2: Trace Configuration Change Propagation
+Run the full lab: [`tests/TutorialLabs/Tutorial42/Lab.cs`](../tests/TutorialLabs/Tutorial42/Lab.cs)
 
-A configuration change updates the retry count from 3 to 5. Trace the flow:
-
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial42.Lab"
 ```
-1. Operator updates config → IConfigurationStore.SetAsync("retry.maxAttempts", "5")
-2. ConfigurationChangeNotifier detects the change
-3. All subscribed components receive the notification
-4. ExponentialBackoffRetryPolicy reloads the new value
-5. Next message uses MaxAttempts = 5
-```
-
-What is the propagation delay? What happens to messages already being retried with the old value? Is this an **atomicity** concern?
-
-### Step 3: Analyze Environment Override Scalability
-
-Why does the platform use `EnvironmentOverrideProvider` with the `EIP__` prefix convention?
-
-| Environment | Override Example | Use Case |
-|------------|-----------------|----------|
-| Development | `EIP__Broker__Type=InMemory` | Use in-memory broker for local dev |
-| Staging | `EIP__Retry__MaxAttempts=10` | More aggressive retry for testing |
-| Production | `EIP__Throttle__Rate=1000` | Production rate limits |
-
-How does this enable **scalable** multi-environment deployments without changing code or configuration files?
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial42/Exam.cs`](../tests/TutorialLabs/Tutorial42/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial42/Exam.cs`](../tests/TutorialLabs/Tutorial42/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial42.Exam"
+```
 
 ---
 

@@ -1,42 +1,8 @@
 # Tutorial 38 — OpenTelemetry
 
-## What You'll Learn
+Instrument message processing with OpenTelemetry traces, metrics, and spans.
 
-- The EIP Wire Tap pattern applied to distributed tracing
-- OpenTelemetry integration for traces, metrics, and logs
-- `PlatformActivitySource` for creating spans across pipeline stages
-- `PlatformMeters` for throughput, latency, and error counters
-- `DiagnosticsConfig`, `CorrelationPropagator`, and `TraceEnricher`
-- Distributed traces from ingress to delivery
-
----
-
-## EIP Pattern: Wire Tap
-
-> *"Insert a simple Recipient List into the channel that publishes each incoming message to both the main channel and a secondary channel — the Wire Tap captures a copy for diagnostics without altering the flow."*
-> — Gregor Hohpe & Bobby Woolf, *Enterprise Integration Patterns*
-
-```
-  ┌──────────────┐     ┌──────────────────┐     ┌──────────────┐
-  │  Ingress     │────▶│  Pipeline Stage   │────▶│  Delivery    │
-  └──────────────┘     └────────┬─────────┘     └──────────────┘
-                                │ (Wire Tap)
-                                ▼
-                       ┌──────────────────┐
-                       │  OpenTelemetry   │
-                       │  Collector       │
-                       │  (traces/metrics/│
-                       │   logs)          │
-                       └──────────────────┘
-```
-
-Every pipeline stage emits telemetry as a side effect. The Wire Tap pattern ensures observability data flows to the collector without affecting message processing.
-
----
-
-## Platform Implementation
-
-### PlatformActivitySource
+## Key Types
 
 ```csharp
 // src/Observability/PlatformActivitySource.cs
@@ -72,16 +38,6 @@ public static class PlatformActivitySource
     }
 }
 ```
-
-`PlatformActivitySource` does **not** directly expose an `ActivitySource` property. Instead it delegates to `DiagnosticsConfig.ActivitySource` internally and provides two factory methods. The generic overload automatically enriches the span with envelope metadata via `TraceEnricher`.
-
-Each pipeline stage starts an `Activity` (OpenTelemetry span):
-- `eip.ingress.receive` — message received at Gateway API
-- `eip.router.evaluate` — routing decision
-- `eip.transform.execute` — transformation applied
-- `eip.connector.send` — outbound delivery
-
-### PlatformMeters
 
 ```csharp
 // src/Observability/PlatformMeters.cs
@@ -124,10 +80,6 @@ public static class PlatformMeters
 }
 ```
 
-All instruments are created from `DiagnosticsConfig.Meter`. The static helper methods ensure consistent tagging (e.g. `eip.message.type`, `eip.message.source`) and manage the `MessagesInFlight` gauge automatically.
-
-### DiagnosticsConfig
-
 ```csharp
 // src/Observability/DiagnosticsConfig.cs
 public static class DiagnosticsConfig
@@ -138,8 +90,6 @@ public static class DiagnosticsConfig
     public static readonly Meter Meter = new(ServiceName, ServiceVersion);
 }
 ```
-
-### CorrelationPropagator
 
 ```csharp
 // src/Observability/CorrelationPropagator.cs
@@ -168,72 +118,160 @@ public static class CorrelationPropagator
 }
 ```
 
-`CorrelationPropagator` is a **static** class. `InjectTraceContext<T>` captures the current `Activity`'s trace and span IDs into envelope metadata and returns the same envelope. `ExtractAndStart<T>` reads those headers back, creates a parent `ActivityContext`, and starts a new `Activity` linked to the upstream trace. When a message crosses service boundaries (broker → consumer), this preserves the distributed trace chain.
+## Exercises
 
-### TraceEnricher
+### 1. MessageEvent — RecordShape AllPropertiesAccessible
 
-The `TraceEnricher` adds business context tags to spans: `eip.message.id`, `eip.correlation.id`, `eip.source`, `eip.message.type`, and `eip.tenant.id`. These tags enable filtering traces by business context in Jaeger, Zipkin, or the Aspire dashboard.
+```csharp
+var evt = new MessageEvent
+{
+    EventId = Guid.NewGuid(),
+    MessageId = Guid.NewGuid(),
+    CorrelationId = Guid.NewGuid(),
+    MessageType = "order.placed",
+    Source = "OrderSvc",
+    Stage = "Ingestion",
+    Status = DeliveryStatus.Pending,
+    RecordedAt = DateTimeOffset.UtcNow,
+    Details = "Received at gateway",
+    BusinessKey = "ORD-123",
+    TraceId = "abc123",
+    SpanId = "def456",
+};
 
----
+Assert.That(evt.EventId, Is.Not.EqualTo(Guid.Empty));
+Assert.That(evt.MessageId, Is.Not.EqualTo(Guid.Empty));
+Assert.That(evt.CorrelationId, Is.Not.EqualTo(Guid.Empty));
+Assert.That(evt.MessageType, Is.EqualTo("order.placed"));
+Assert.That(evt.Source, Is.EqualTo("OrderSvc"));
+Assert.That(evt.Stage, Is.EqualTo("Ingestion"));
+Assert.That(evt.Status, Is.EqualTo(DeliveryStatus.Pending));
+Assert.That(evt.Details, Is.EqualTo("Received at gateway"));
+Assert.That(evt.BusinessKey, Is.EqualTo("ORD-123"));
+Assert.That(evt.TraceId, Is.EqualTo("abc123"));
+Assert.That(evt.SpanId, Is.EqualTo("def456"));
+```
 
-## Scalability Dimension
+### 2. InMemoryMessageStateStore — RecordAndRetrieveByCorrelationId
 
-OpenTelemetry adds **minimal overhead** — spans are sampled at the configured rate, and metrics use lightweight counters. The OTLP exporter sends data asynchronously in batches. In high-throughput deployments, reduce `SamplingRate` to control collector load.
+```csharp
+var store = new InMemoryMessageStateStore();
+var correlationId = Guid.NewGuid();
 
----
+var evt = new MessageEvent
+{
+    EventId = Guid.NewGuid(),
+    MessageId = Guid.NewGuid(),
+    CorrelationId = correlationId,
+    MessageType = "order.placed",
+    Source = "OrderSvc",
+    Stage = "Routing",
+    Status = DeliveryStatus.InFlight,
+    RecordedAt = DateTimeOffset.UtcNow,
+};
 
-## Atomicity Dimension
+await store.RecordAsync(evt);
 
-Telemetry is a **best-effort side channel** — if the collector is down, message processing continues. The `CorrelationPropagator` ensures trace context travels with the message, providing end-to-end visibility from ingress to delivery.
+var results = await store.GetByCorrelationIdAsync(correlationId);
 
----
+Assert.That(results, Has.Count.EqualTo(1));
+Assert.That(results[0].CorrelationId, Is.EqualTo(correlationId));
+```
+
+### 3. InMemoryMessageStateStore — RecordAndRetrieveByBusinessKey
+
+```csharp
+var store = new InMemoryMessageStateStore();
+
+var evt = new MessageEvent
+{
+    EventId = Guid.NewGuid(),
+    MessageId = Guid.NewGuid(),
+    CorrelationId = Guid.NewGuid(),
+    MessageType = "invoice.paid",
+    Source = "BillingSvc",
+    Stage = "Processing",
+    Status = DeliveryStatus.Delivered,
+    RecordedAt = DateTimeOffset.UtcNow,
+    BusinessKey = "INV-2024-001",
+};
+
+await store.RecordAsync(evt);
+
+var results = await store.GetByBusinessKeyAsync("INV-2024-001");
+
+Assert.That(results, Has.Count.EqualTo(1));
+Assert.That(results[0].BusinessKey, Is.EqualTo("INV-2024-001"));
+```
+
+### 4. InspectionResult — RecordShape
+
+```csharp
+var result = new InspectionResult
+{
+    Query = "ORD-123",
+    Found = true,
+    Summary = "Message delivered successfully",
+    Events = new List<MessageEvent>(),
+    LatestStage = "Delivery",
+    LatestStatus = DeliveryStatus.Delivered,
+};
+
+Assert.That(result.Query, Is.EqualTo("ORD-123"));
+Assert.That(result.Found, Is.True);
+Assert.That(result.Summary, Is.EqualTo("Message delivered successfully"));
+Assert.That(result.Events, Is.Not.Null);
+Assert.That(result.LatestStage, Is.EqualTo("Delivery"));
+Assert.That(result.LatestStatus, Is.EqualTo(DeliveryStatus.Delivered));
+```
+
+### 5. MessageStateSnapshot — RecordShape
+
+```csharp
+var snapshot = new MessageStateSnapshot
+{
+    MessageId = Guid.NewGuid(),
+    CorrelationId = Guid.NewGuid(),
+    CausationId = Guid.NewGuid(),
+    MessageType = "order.shipped",
+    Source = "ShippingSvc",
+    Priority = MessagePriority.High,
+    Timestamp = DateTimeOffset.UtcNow,
+    CurrentStage = "Delivery",
+    DeliveryStatus = DeliveryStatus.Delivered,
+    TraceId = "trace-abc",
+    SpanId = "span-xyz",
+    RetryCount = 0,
+};
+
+Assert.That(snapshot.MessageId, Is.Not.EqualTo(Guid.Empty));
+Assert.That(snapshot.CorrelationId, Is.Not.EqualTo(Guid.Empty));
+Assert.That(snapshot.CausationId, Is.Not.Null);
+Assert.That(snapshot.MessageType, Is.EqualTo("order.shipped"));
+Assert.That(snapshot.Source, Is.EqualTo("ShippingSvc"));
+Assert.That(snapshot.Priority, Is.EqualTo(MessagePriority.High));
+Assert.That(snapshot.CurrentStage, Is.EqualTo("Delivery"));
+Assert.That(snapshot.DeliveryStatus, Is.EqualTo(DeliveryStatus.Delivered));
+Assert.That(snapshot.TraceId, Is.EqualTo("trace-abc"));
+Assert.That(snapshot.SpanId, Is.EqualTo("span-xyz"));
+Assert.That(snapshot.RetryCount, Is.EqualTo(0));
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial38/Lab.cs`](../tests/TutorialLabs/Tutorial38/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial38/Lab.cs`](../tests/TutorialLabs/Tutorial38/Lab.cs)
 
-**Objective:** Trace distributed spans across the integration pipeline, analyze how observability enables **scalable** operations, and design graceful degradation when telemetry infrastructure is unavailable.
-
-### Step 1: Draw a Trace Span Hierarchy
-
-A message flows through: ingress → router → transformer → HTTP connector. Draw the expected span hierarchy:
-
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial38.Lab"
 ```
-[Root Span: Gateway.Receive]
-  └─ [Span: ContentBasedRouter.RouteAsync]
-       └─ [Span: MessageTranslator.TranslateAsync]
-            └─ [Span: HttpConnector.SendAsync]
-                 └─ [Span: HTTP POST api.partner.com/orders]
-```
-
-Open `src/Observability/` and identify: How does the platform create parent-child span relationships? How is the W3C `traceparent` propagated through envelope metadata?
-
-### Step 2: Analyze Observability Resilience
-
-The OTLP collector is unreachable (network partition). Trace what happens:
-
-1. Does message processing stop? (No — observability must never block business logic)
-2. What telemetry is lost? (spans and metrics for the outage period)
-3. How does the platform implement this resilience? (hint: fire-and-forget telemetry export)
-
-Why is observability resilience critical for **integration platform scalability**? A telemetry outage must not cascade into a processing outage.
-
-### Step 3: Design Observability for Scalable Troubleshooting
-
-Explain why the platform propagates `traceparent` through envelope metadata rather than relying on broker-level header propagation:
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| Broker headers | Automatic, no code changes | Broker-specific, lost during bridge/transform |
-| Envelope metadata | Survives all processing stages | Requires explicit propagation |
-
-How does end-to-end tracing support **operational scalability** — what happens when an operator needs to debug a failure across 10 processing stages in a system handling 50,000 messages/second?
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial38/Exam.cs`](../tests/TutorialLabs/Tutorial38/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial38/Exam.cs`](../tests/TutorialLabs/Tutorial38/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial38.Exam"
+```
 
 ---
 

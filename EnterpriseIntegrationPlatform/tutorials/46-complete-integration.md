@@ -1,77 +1,8 @@
 # Tutorial 46 — Complete End-to-End Integration
 
-## What You'll Learn
+Wire together multiple EIP patterns into a complete end-to-end integration pipeline.
 
-- How every layer of the EIP platform works together in a single message flow
-- The full journey: HTTP POST → Gateway → broker → Temporal workflow → process → deliver → notify
-- Each processing stage: validate, transform, route, deliver, acknowledge
-- How EIP patterns (Normalizer, Content-Based Router, Channel Adapter) combine
-- Connection to UC2 from the notification framework
-
-## The Complete Message Flow
-
-```
- Client                Gateway.Api          Broker           Temporal
-   │                      │                   │                 │
-   │  POST /api/message   │                   │                 │
-   ├─────────────────────▶│                   │                 │
-   │                      │  Publish          │                 │
-   │                      ├──────────────────▶│                 │
-   │  202 Accepted        │                   │  Consume        │
-   │◀─────────────────────┤                   ├────────────────▶│
-   │                      │                   │                 │
-   │                      │                   │    ┌────────────┤
-   │                      │                   │    │ Workflow    │
-   │                      │                   │    │ Activities: │
-   │                      │                   │    │ 1. Validate │
-   │                      │                   │    │ 2. Transform│
-   │                      │                   │    │ 3. Route    │
-   │                      │                   │    │ 4. Deliver  │
-   │                      │                   │    │ 5. Notify   │
-   │                      │                   │    └────────────┤
-   │                      │                   │                 │
-```
-
-## Step 1: HTTP POST to Gateway.Api
-
-The client sends an integration message:
-
-```bash
-curl -X POST https://localhost:5001/api/message \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "OrderSystem",
-    "destination": "InventoryService",
-    "payload": "<Order><Item>Widget</Item><Qty>10</Qty></Order>",
-    "contentType": "application/xml",
-    "notificationsEnabled": true
-  }'
-```
-
-Gateway.Api wraps this in an `IntegrationEnvelope` and publishes to the broker.
-
-## Step 2: Broker Receives and Queues
-
-The message enters the configured broker (Kafka, NATS JetStream, or Pulsar):
-
-```
-┌─────────────────────────────────────────┐
-│              Message Broker             │
-│  ┌───────────────────────────────────┐  │
-│  │  integration.inbound  topic/queue │  │
-│  │  ┌─────┐ ┌─────┐ ┌─────┐        │  │
-│  │  │msg 1│ │msg 2│ │msg 3│ ...     │  │
-│  │  └─────┘ └─────┘ └─────┘        │  │
-│  └───────────────────────────────────┘  │
-└─────────────────────────────────────────┘
-```
-
-Competing Consumers (pipeline workers) pick up messages for processing.
-
-## Step 3: Temporal Workflow Orchestration
-
-The worker starts an `IntegrationPipelineWorkflow` (or `AtomicPipelineWorkflow`
-for saga compensation). Temporal manages retries and state.
+## Key Types
 
 ```csharp
 // src/Workflow.Temporal/Workflows/IntegrationPipelineWorkflow.cs (simplified)
@@ -125,47 +56,6 @@ public class IntegrationPipelineWorkflow
 }
 ```
 
-> **Note:** The workflow orchestrates three activity classes: `IntegrationActivities` (validation), `PipelineActivities` (persistence and notifications), and `SagaCompensationActivities` (rollback — see Tutorial 47). Transform and routing are handled by separate pipeline consumers, not by individual workflow activities.
-
-## Step 4: Validate
-
-The validation activity checks schema compliance, required fields, and
-content-type consistency. Invalid messages are rejected with a Nack.
-
-## Step 5: Transform (Normalizer Pattern)
-
-The **Normalizer** (EIP pattern) converts the payload to a canonical format.
-Here, XML is transformed to JSON:
-
-```
-┌──────────────┐     ┌────────────┐     ┌──────────────┐
-│  XML Input   │────▶│ Normalizer │────▶│ JSON Output  │
-│  <Order>     │     │ XML → JSON │     │ {"item":     │
-│  <Item>...   │     │            │     │  "Widget"..} │
-└──────────────┘     └────────────┘     └──────────────┘
-```
-
-## Step 6: Route (Content-Based Router)
-
-The **Content-Based Router** examines the message content and routes to the
-correct destination channel:
-
-```
-                     ┌─────────────────────┐
-                     │ Content-Based Router │
-                     └──────────┬──────────┘
-                    ┌───────────┼───────────┐
-                    ▼           ▼           ▼
-             ┌──────────┐ ┌──────────┐ ┌──────────┐
-             │ Inventory│ │ Shipping │ │ Billing  │
-             │ Channel  │ │ Channel  │ │ Channel  │
-             └──────────┘ └──────────┘ └──────────┘
-```
-
-## Step 7: Deliver (Channel Adapter)
-
-The **Channel Adapter** delivers the message to the external system via the connector:
-
 ```csharp
 // src/Connector.Http/HttpConnectorAdapter.cs
 public sealed class HttpConnectorAdapter : IConnector
@@ -181,103 +71,97 @@ public sealed class HttpConnectorAdapter : IConnector
 }
 ```
 
-## Step 8: Ack Notification (UC2)
+## Exercises
 
-With `NotificationsEnabled = true` and a successful delivery, this matches **UC2**
-from the notification framework (see [Tutorial 48](48-notification-use-cases.md)):
+### 1. PipelineOptions — PropertiesAssignable
 
-```
-  Delivery Success
-       │
-       ▼
-  Publish Ack ──▶ NATS notification subject
-       │
-       ▼
-  XmlNotificationMapper
-       │
-       ▼
-  <Ack>ok</Ack>
+```csharp
+var opts = new PipelineOptions
+{
+    AckSubject = "ack-topic",
+    NackSubject = "nack-topic",
+};
+
+Assert.That(opts.AckSubject, Is.EqualTo("ack-topic"));
+Assert.That(opts.NackSubject, Is.EqualTo("nack-topic"));
 ```
 
-## All Layers Working Together
+### 2. IntegrationPipelineInput — RecordShape
 
-```
-┌─────────┐  ┌───────────┐  ┌────────┐  ┌──────────┐  ┌──────────────┐
-│  Client  │─▶│ Gateway   │─▶│ Broker │─▶│ Temporal │─▶│ Activities   │
-│  (HTTP)  │  │   .Api    │  │        │  │ Workflow │  │ V→T→R→D→N   │
-└─────────┘  └───────────┘  └────────┘  └──────────┘  └──────┬───────┘
-                                                              │
-              ┌───────────────────────────────────────────────┘
-              ▼
-     ┌─────────────────┐     ┌──────────────────┐
-     │ Channel Adapter  │────▶│ External System  │
-     │ (HTTP delivery)  │     │ (InventoryService)│
-     └─────────────────┘     └──────────────────┘
+```csharp
+var input = new IntegrationPipelineInput(
+    Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow,
+    "OrderService", "order.created", "1.0", 1, "{}", null, "ack", "nack");
+
+Assert.That(input.MessageId, Is.Not.EqualTo(Guid.Empty));
+Assert.That(input.Source, Is.EqualTo("OrderService"));
+Assert.That(input.AckSubject, Is.EqualTo("ack"));
 ```
 
-## Scalability Dimension
+### 3. IntegrationPipelineResult — RecordShape
 
-Each stage can scale independently: Gateway pods handle HTTP ingress, broker
-partitions distribute load, multiple Temporal workers run activities in parallel.
-The Content-Based Router fans out to destination-specific channels, each with its
-own consumer pool.
+```csharp
+var result = new IntegrationPipelineResult(Guid.NewGuid(), true);
 
-## Atomicity Dimension
+Assert.That(result.IsSuccess, Is.True);
+Assert.That(result.FailureReason, Is.Null);
+```
 
-The Temporal workflow provides durable execution — if any activity fails, the
-workflow retries or (with `AtomicPipelineWorkflow`) triggers saga compensation.
-Ack/Nack notifications close the feedback loop, ensuring the sender knows the
-outcome.
+### 4. PipelineOrchestrator — ProcessAsync DispatchesToWorkflow
+
+```csharp
+var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
+dispatcher.DispatchAsync(
+    Arg.Any<IntegrationPipelineInput>(),
+    Arg.Any<string>(),
+    Arg.Any<CancellationToken>())
+    .Returns(new IntegrationPipelineResult(Guid.NewGuid(), true));
+
+var options = Options.Create(new PipelineOptions
+{
+    AckSubject = "ack",
+    NackSubject = "nack",
+});
+
+var orchestrator = new PipelineOrchestrator(
+    dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
+
+var envelope = IntegrationEnvelope<JsonElement>.Create(
+    JsonSerializer.Deserialize<JsonElement>("{}"),
+    "TestService", "test.event");
+
+await orchestrator.ProcessAsync(envelope);
+
+await dispatcher.Received(1).DispatchAsync(
+    Arg.Any<IntegrationPipelineInput>(),
+    Arg.Any<string>(),
+    Arg.Any<CancellationToken>());
+```
+
+### 5. IPipelineOrchestrator — InterfaceShape
+
+```csharp
+var type = typeof(IPipelineOrchestrator);
+
+Assert.That(type.IsInterface, Is.True);
+Assert.That(type.GetMethod("ProcessAsync"), Is.Not.Null);
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial46/Lab.cs`](../tests/TutorialLabs/Tutorial46/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial46/Lab.cs`](../tests/TutorialLabs/Tutorial46/Lab.cs)
 
-**Objective:** Trace a complete message through all 8 processing stages, analyze how each stage contributes to **end-to-end atomicity**, and design a pipeline extension.
-
-### Step 1: Trace a Message Through All 8 Stages
-
-Follow a single message from ingestion to delivery:
-
-| Stage | EIP Pattern | Platform Component | Adds to Envelope |
-|-------|------------|-------------------|------------------|
-| 1. Receive | Messaging Gateway | Gateway.Api | `MessageId`, `Timestamp` |
-| 2. Validate | ? | IntegrationActivities | ? |
-| 3. Sanitize | ? | InputSanitizer | ? |
-| 4. Transform | Message Translator | MessageTranslator | `CausationId` |
-| 5. Route | Content-Based Router | ContentBasedRouter | Routing decision |
-| 6. Deliver | Channel Adapter | HttpConnector/SftpConnector | Delivery status |
-| 7. Persist | Message Store | CassandraMessageStore | ? |
-| 8. Notify | Ack/Nack | NotificationPublisher | Notification payload |
-
-Fill in the `?` cells by tracing through the actual source code.
-
-### Step 2: Analyze Failure at Each Stage
-
-For each stage, identify: What happens if it fails? Where does the message go? Is the failure retryable?
-
-| Stage Failure | Retryable? | Recovery Action | Atomicity Impact |
-|--------------|-----------|-----------------|-----------------|
-| Stage 4 (Transform) fails | Yes (transient) / No (schema) | Retry or DLQ | Stages 1-3 results preserved |
-| Stage 6 (Deliver) fails after Stage 7 (Persist) succeeds | ? | ? | ? |
-
-What is the worst-case scenario for **atomicity** — which combination of stage success/failure creates the hardest recovery?
-
-### Step 3: Design a Pipeline Extension
-
-Add a sixth step: "Audit Logging" that writes every message to a compliance store. Where in the pipeline would you insert it?
-
-- Before routing (Stage 4.5)? — captures the canonical message before routing decisions
-- After delivery (Stage 6.5)? — captures the delivery outcome
-- As a parallel branch from Stage 2? — captures even messages that fail validation
-
-Justify your choice based on **atomicity** and **compliance** requirements.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial46.Lab"
+```
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial46/Exam.cs`](../tests/TutorialLabs/Tutorial46/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial46/Exam.cs`](../tests/TutorialLabs/Tutorial46/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial46.Exam"
+```
 
 ---
 

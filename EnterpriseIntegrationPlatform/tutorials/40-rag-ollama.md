@@ -1,44 +1,8 @@
 # Tutorial 40 — RAG with Ollama
 
-## What You'll Learn
+Query platform knowledge using Retrieval-Augmented Generation with Ollama embeddings.
 
-- How `AI.Ollama` provides self-hosted embeddings for the integration platform
-- How `AI.RagFlow` implements retrieval-augmented generation over platform documentation and message history
-- Aspire container orchestration for Ollama and vector store services
-- How developers connect their own AI provider to the RAG API
-- Why all data stays on-premises — no external API calls for AI features
-
----
-
-## Architecture: Self-Hosted RAG
-
-> *"Retrieval-Augmented Generation (RAG) grounds AI responses in your own data. By self-hosting the embedding model and vector store, sensitive integration data never leaves your infrastructure."*
-
-```
-  ┌──────────────┐     ┌──────────────────┐     ┌──────────────┐
-  │  Developer   │────▶│  RAG API         │────▶│  Vector      │
-  │  (question)  │     │  (AI.RagFlow)    │     │  Store       │
-  └──────────────┘     └────────┬─────────┘     └──────────────┘
-                                │
-                       ┌────────▼─────────┐
-                       │  Ollama          │
-                       │  (embeddings +   │
-                       │   generation)    │
-                       └──────────────────┘
-                                │
-                       ┌────────▼─────────┐
-                       │  Aspire          │
-                       │  (orchestration) │
-                       └──────────────────┘
-```
-
-The RAG pipeline: (1) embed the question, (2) retrieve relevant documents from the vector store, (3) pass the question + retrieved context to the language model, (4) return a grounded answer.
-
----
-
-## Platform Implementation
-
-### AI.Ollama — Self-Hosted LLM Service
+## Key Types
 
 ```csharp
 // src/AI.Ollama/IOllamaService.cs
@@ -64,10 +28,6 @@ public sealed class OllamaSettings
     public string Model { get; set; } = "llama3.2";
 }
 ```
-
-Ollama runs as a container managed by Aspire, serving generation endpoints over a local HTTP API. `GenerateAsync` sends a prompt and returns the generated text. `AnalyseAsync` accepts a system prompt plus structured context (e.g. JSON trace data) for diagnostic analysis. `OllamaSettings` is bound from the `Ollama` configuration section.
-
-### AI.RagFlow — Retrieval-Augmented Generation
 
 ```csharp
 // src/AI.RagFlow/IRagFlowService.cs
@@ -106,10 +66,6 @@ public sealed record RagFlowDataset(
     int DocumentCount);
 ```
 
-`RetrieveAsync` returns relevant context chunks as a plain string. `ChatAsync` combines retrieval and LLM generation in a single call, returning a `RagFlowChatResponse` with the answer, a conversation ID for multi-turn chat, and source references.
-
-### RagFlowOptions
-
 ```csharp
 // src/AI.RagFlow/RagFlowOptions.cs
 public sealed class RagFlowOptions
@@ -122,82 +78,99 @@ public sealed class RagFlowOptions
 }
 ```
 
-| Option | Purpose |
-|--------|---------|
-| `BaseAddress` | RagFlow API base URL |
-| `ApiKey` | API key for authentication |
-| `AssistantId` | RagFlow assistant ID for chat completion |
+## Exercises
 
-### Aspire Orchestration
+### 1. IOllamaService — InterfaceShape HasExpectedMethods
 
-The platform uses .NET Aspire to manage the Ollama container and the RagFlow service. Services are registered via extension methods (`AddOllamaService`, `AddRagFlowService`) that read base addresses and configuration from Aspire's environment variables or `appsettings.json`.
+```csharp
+var type = typeof(IOllamaService);
 
----
+Assert.That(type.GetMethod("GenerateAsync"), Is.Not.Null);
+Assert.That(type.GetMethod("AnalyseAsync"), Is.Not.Null);
+Assert.That(type.GetMethod("IsHealthyAsync"), Is.Not.Null);
+```
 
-## Scalability Dimension
+### 2. IRagFlowService — InterfaceShape HasExpectedMethods
 
-Ollama runs on GPU-enabled nodes for fast inference. The RagFlow service manages chunking, indexing, and retrieval internally. `RetrieveAsync` supports scoping queries by dataset IDs to reduce search space. The RAG API is stateless and replicable behind a load balancer.
+```csharp
+var type = typeof(IRagFlowService);
 
----
+Assert.That(type.GetMethod("RetrieveAsync"), Is.Not.Null);
+Assert.That(type.GetMethod("ChatAsync"), Is.Not.Null);
+Assert.That(type.GetMethod("ListDatasetsAsync"), Is.Not.Null);
+Assert.That(type.GetMethod("IsHealthyAsync"), Is.Not.Null);
+```
 
-## Atomicity Dimension
+### 3. Mock — IOllamaService GenerateAsync ReturnsExpected
 
-RAG is a **read-only, advisory feature** — it does not modify messages or pipeline state. Index updates are eventually consistent. The `RagFlowReference.Score` helps consumers assess source relevance. All data stays on-premises — no message content is sent to external AI providers unless the developer explicitly configures a cloud provider.
+```csharp
+var ollama = Substitute.For<IOllamaService>();
+ollama.GenerateAsync(
+        "What is EIP?",
+        Arg.Any<string>(),
+        Arg.Any<CancellationToken>())
+    .Returns("Enterprise Integration Patterns");
 
----
+var result = await ollama.GenerateAsync("What is EIP?");
+
+Assert.That(result, Is.EqualTo("Enterprise Integration Patterns"));
+```
+
+### 4. Mock — IRagFlowService ChatAsync ReturnsChatResponse
+
+```csharp
+var ragFlow = Substitute.For<IRagFlowService>();
+var expectedResponse = new RagFlowChatResponse(
+    Answer: "The answer is 42",
+    ConversationId: "conv-123",
+    References: new List<RagFlowReference>
+    {
+        new("Relevant passage", "doc.pdf", 0.95),
+    });
+
+ragFlow.ChatAsync("What is the answer?", null, Arg.Any<CancellationToken>())
+    .Returns(expectedResponse);
+
+var result = await ragFlow.ChatAsync("What is the answer?");
+
+Assert.That(result.Answer, Is.EqualTo("The answer is 42"));
+Assert.That(result.ConversationId, Is.EqualTo("conv-123"));
+Assert.That(result.References, Has.Count.EqualTo(1));
+```
+
+### 5. RagFlowChatResponse — RecordShape
+
+```csharp
+var refs = new List<RagFlowReference>
+{
+    new("passage 1", "file1.pdf", 0.9),
+    new("passage 2", "file2.pdf", 0.8),
+};
+
+var response = new RagFlowChatResponse("Answer text", "conv-1", refs);
+
+Assert.That(response.Answer, Is.EqualTo("Answer text"));
+Assert.That(response.ConversationId, Is.EqualTo("conv-1"));
+Assert.That(response.References, Has.Count.EqualTo(2));
+Assert.That(response.References[0].DocumentName, Is.EqualTo("file1.pdf"));
+Assert.That(response.References[1].Score, Is.EqualTo(0.8));
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial40/Lab.cs`](../tests/TutorialLabs/Tutorial40/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial40/Lab.cs`](../tests/TutorialLabs/Tutorial40/Lab.cs)
 
-**Objective:** Design a RAG query flow for operational troubleshooting, analyze graceful degradation when AI infrastructure is unavailable, and evaluate self-hosted vs. cloud AI for **scalable** integration platform operations.
-
-### Step 1: Design a RAG Troubleshooting Flow
-
-A developer asks: "Why did order 12345 fail?" Design the complete RAG flow:
-
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial40.Lab"
 ```
-1. EMBED query → vector representation
-2. RETRIEVE relevant context:
-   - DLQ entry for order 12345 (error details, reason)
-   - Lifecycle events (which stage failed)
-   - Recent similar failures (pattern detection)
-3. GENERATE response using LLM with retrieved context
-4. RETURN: "Order 12345 failed at the Transform stage due to missing 'currency' field.
-   This is a recurring issue — 15 similar failures in the last hour from PartnerX.
-   Recommended action: check PartnerX's schema version."
-```
-
-Open `src/AI.RagFlow/`, `src/AI.Ollama/`, and `src/AI.RagKnowledge/` and trace: How does the platform embed and retrieve context? What data sources are indexed?
-
-### Step 2: Design Graceful Degradation
-
-The Ollama container runs out of GPU memory. Design the degradation strategy:
-
-| Component | Normal Mode | Degraded Mode |
-|-----------|------------|---------------|
-| RAG API | Full LLM responses | Return raw retrieved context without AI summary |
-| Chat interface | AI-powered answers | "AI unavailable — showing raw data" |
-| Message processing | Unaffected | Unaffected (AI is never in the critical path) |
-
-Why must the RAG/AI system **never** be in the critical message processing path? How does this architectural decision support **pipeline atomicity**?
-
-### Step 3: Evaluate Self-Hosted vs. Cloud AI
-
-| Factor | Self-Hosted (Ollama) | Cloud (OpenAI/Azure) |
-|--------|---------------------|---------------------|
-| Data privacy | Payloads never leave your infrastructure | Data sent to external API |
-| Latency | Local network (~50ms) | Internet round-trip (~500ms) |
-| Cost at scale | Fixed (GPU hardware) | Variable (per-token pricing) |
-| Availability | You manage uptime | Provider manages uptime |
-
-Why does the platform default to self-hosted Ollama? Consider: enterprise integration platforms process sensitive business data from multiple tenants.
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial40/Exam.cs`](../tests/TutorialLabs/Tutorial40/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial40/Exam.cs`](../tests/TutorialLabs/Tutorial40/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial40.Exam"
+```
 
 ---
 

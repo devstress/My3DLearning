@@ -1,44 +1,8 @@
 # Tutorial 31 — Event Sourcing
 
-## What You'll Learn
+Store domain events as an append-only log and rebuild state by replaying them.
 
-- How `IEventStore` provides an append-only log of domain events
-- `ISnapshotStore<TState>` for periodic snapshots to speed up replay
-- `IEventProjection<TState>` and `EventProjectionEngine` for building read-side views
-- `EventEnvelope` as the standard wrapper for stored events
-- Optimistic concurrency via `OptimisticConcurrencyException`
-- `TemporalQuery` for point-in-time replay and `InMemoryEventStore`
-
----
-
-## EIP Pattern: Event-Driven Consumer (Event Sourcing)
-
-> *"Instead of storing just the current state, store the full history of state-changing events. Reconstruct current state by replaying events."*
-
-```
-  Command ──▶ ┌──────────────┐     ┌─────────────────┐
-              │  Aggregate   │────▶│  Event Store     │
-              │  (validate)  │     │  (append-only)   │
-              └──────────────┘     └────────┬─────────┘
-                                            │
-                    ┌───────────────────────┤
-                    ▼                       ▼
-           ┌───────────────┐     ┌───────────────────┐
-           │  Snapshot     │     │  Projection       │
-           │  Store        │     │  Engine           │
-           └───────────────┘     └───────────────────┘
-                                            │
-                                            ▼
-                                   Read-side views
-```
-
-The event store is the source of truth. Projections build queryable read models. Snapshots cache state at known positions.
-
----
-
-## Platform Implementation
-
-### IEventStore
+## Key Types
 
 ```csharp
 // src/EventSourcing/IEventStore.cs
@@ -64,8 +28,6 @@ public interface IEventStore
 }
 ```
 
-### EventEnvelope
-
 ```csharp
 // src/EventSourcing/EventEnvelope.cs
 public sealed record EventEnvelope(
@@ -78,8 +40,6 @@ public sealed record EventEnvelope(
     Dictionary<string, string> Metadata);
 ```
 
-### Optimistic Concurrency
-
 ```csharp
 // src/EventSourcing/OptimisticConcurrencyException.cs
 public sealed class OptimisticConcurrencyException : InvalidOperationException
@@ -89,12 +49,6 @@ public sealed class OptimisticConcurrencyException : InvalidOperationException
     public long ActualVersion { get; }
 }
 ```
-
-When `AppendAsync` is called with an `expectedVersion` that does not match the stream's current version, the store throws `OptimisticConcurrencyException`. On success, `AppendAsync` returns the new stream version as a `long`. The caller must reload the stream, re-apply the command, and retry on conflict. This prevents lost updates without pessimistic locks.
-
-### TemporalQuery
-
-`TemporalQuery` is a static helper class that replays a stream's events up to a specific point in time, producing the projected state at that moment:
 
 ```csharp
 // src/EventSourcing/TemporalQuery.cs
@@ -111,88 +65,106 @@ public static class TemporalQuery
 }
 ```
 
-### ISnapshotStore
+## Exercises
+
+### 1. AppendAsync — AndReadStreamAsync Roundtrip
 
 ```csharp
-// src/EventSourcing/ISnapshotStore.cs
-public interface ISnapshotStore<TState>
-{
-    Task SaveAsync(string streamId, TState state, long version, CancellationToken cancellationToken = default);
-    Task<(TState? State, long Version)> LoadAsync(string streamId, CancellationToken cancellationToken = default);
-}
+var envelope = new EventEnvelope(
+    Guid.NewGuid(), "stream-1", "OrderCreated",
+    """{"total":42}""", 0, DateTimeOffset.UtcNow, []);
+
+await _store.AppendAsync("stream-1", [envelope], expectedVersion: 0);
+
+var events = await _store.ReadStreamAsync("stream-1", fromVersion: 1, count: 100);
+
+Assert.That(events, Has.Count.EqualTo(1));
+Assert.That(events[0].StreamId, Is.EqualTo("stream-1"));
+Assert.That(events[0].EventType, Is.EqualTo("OrderCreated"));
+Assert.That(events[0].Version, Is.EqualTo(1));
 ```
 
-### IEventProjection and EventProjectionEngine
+### 2. AppendMultiple — ReadAllBack InOrder
 
 ```csharp
-// src/EventSourcing/IEventProjection.cs
-public interface IEventProjection<TState>
-{
-    Task<TState> ProjectAsync(TState state, EventEnvelope envelope, CancellationToken cancellationToken = default);
-}
+var e1 = new EventEnvelope(Guid.NewGuid(), "s", "A", "d1", 0, DateTimeOffset.UtcNow, []);
+var e2 = new EventEnvelope(Guid.NewGuid(), "s", "B", "d2", 0, DateTimeOffset.UtcNow, []);
+var e3 = new EventEnvelope(Guid.NewGuid(), "s", "C", "d3", 0, DateTimeOffset.UtcNow, []);
+
+await _store.AppendAsync("s", [e1], expectedVersion: 0);
+await _store.AppendAsync("s", [e2], expectedVersion: 1);
+await _store.AppendAsync("s", [e3], expectedVersion: 2);
+
+var events = await _store.ReadStreamAsync("s", fromVersion: 1, count: 100);
+
+Assert.That(events, Has.Count.EqualTo(3));
+Assert.That(events[0].Version, Is.EqualTo(1));
+Assert.That(events[1].Version, Is.EqualTo(2));
+Assert.That(events[2].Version, Is.EqualTo(3));
+Assert.That(events[0].EventType, Is.EqualTo("A"));
+Assert.That(events[2].EventType, Is.EqualTo("C"));
 ```
 
-`IEventProjection<TState>` is an async function: given a current state and an event, it returns the new state. The `EventProjectionEngine` reads new events from the store, applies each to the appropriate `IEventProjection<TState>` implementation, and tracks the last processed version per projection. `InMemoryEventStore` implements `IEventStore` using a `ConcurrentDictionary` with full optimistic concurrency support.
+### 3. AppendAsync — VersionConflict ThrowsOptimisticConcurrencyException
 
----
+```csharp
+var e = new EventEnvelope(Guid.NewGuid(), "s", "E", "d", 0, DateTimeOffset.UtcNow, []);
+await _store.AppendAsync("s", [e], expectedVersion: 0);
 
-## Scalability Dimension
+var e2 = new EventEnvelope(Guid.NewGuid(), "s", "E2", "d2", 0, DateTimeOffset.UtcNow, []);
 
-The event store is **append-only** — writes never conflict with reads. Multiple projections run in parallel, each maintaining its own checkpoint. Snapshots reduce replay time from O(n) to O(1). The store can be partitioned by `StreamId`.
+var ex = Assert.ThrowsAsync<OptimisticConcurrencyException>(
+    () => _store.AppendAsync("s", [e2], expectedVersion: 0));
 
----
+Assert.That(ex!.StreamId, Is.EqualTo("s"));
+Assert.That(ex.ExpectedVersion, Is.EqualTo(0));
+Assert.That(ex.ActualVersion, Is.EqualTo(1));
+```
 
-## Atomicity Dimension
+### 4. ReadStreamBackwardAsync — ReturnsReversedOrder
 
-Optimistic concurrency ensures **consistency without locks**. The `expectedVersion` acts as a compare-and-swap: if two writers race, one succeeds and the other gets `OptimisticConcurrencyException`. Events are immutable once appended — never modified or deleted — providing a tamper-evident audit trail.
+```csharp
+var e1 = new EventEnvelope(Guid.NewGuid(), "s", "A", "d1", 0, DateTimeOffset.UtcNow, []);
+var e2 = new EventEnvelope(Guid.NewGuid(), "s", "B", "d2", 0, DateTimeOffset.UtcNow, []);
+var e3 = new EventEnvelope(Guid.NewGuid(), "s", "C", "d3", 0, DateTimeOffset.UtcNow, []);
 
----
+await _store.AppendAsync("s", [e1, e2, e3], expectedVersion: 0);
+
+var events = await _store.ReadStreamBackwardAsync("s", fromVersion: 3, count: 100);
+
+Assert.That(events, Has.Count.EqualTo(3));
+Assert.That(events[0].Version, Is.EqualTo(3));
+Assert.That(events[1].Version, Is.EqualTo(2));
+Assert.That(events[2].Version, Is.EqualTo(1));
+```
+
+### 5. SnapshotStore — SaveAndLoad Roundtrip
+
+```csharp
+var snapshots = new InMemorySnapshotStore<int>();
+
+await snapshots.SaveAsync("stream-1", 42, 5);
+var (state, version) = await snapshots.LoadAsync("stream-1");
+
+Assert.That(state, Is.EqualTo(42));
+Assert.That(version, Is.EqualTo(5));
+```
 
 ## Lab
 
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial31/Lab.cs`](../tests/TutorialLabs/Tutorial31/Lab.cs)
+Run the full lab: [`tests/TutorialLabs/Tutorial31/Lab.cs`](../tests/TutorialLabs/Tutorial31/Lab.cs)
 
-**Objective:** Analyze event sourcing's append-only model for **audit-complete atomicity**, trace optimistic concurrency conflict resolution, and design snapshot strategies for **scalable** aggregate reconstruction.
-
-### Step 1: Calculate Aggregate Reconstruction Cost
-
-An aggregate has 10,000 events. Compare reconstruction approaches:
-
-| Approach | Events Replayed | Cost | Time (est.) |
-|----------|----------------|------|-------------|
-| Full replay (no snapshots) | 10,000 | High CPU + memory | ~100ms |
-| Snapshot at version 9,900 | 100 | Low | ~1ms |
-| Snapshot at version 9,999 | 1 | Minimal | ~0.1ms |
-
-Open `src/EventSourcing/` and trace: How does the event store load a snapshot, then replay only subsequent events? What is the **scalability** trade-off between snapshot frequency and storage cost?
-
-### Step 2: Trace Optimistic Concurrency Conflict
-
-Two commands arrive simultaneously for the same stream at version 5. Both expect version 5:
-
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial31.Lab"
 ```
-Command A: Append event at version 5 → succeeds (stream now at version 6)
-Command B: Append event at version 5 → CONFLICT (expected 5, actual 6)
-```
-
-Trace the conflict resolution:
-1. What exception is thrown?
-2. Does Command B retry? With what strategy?
-3. How does optimistic concurrency ensure **atomic** state transitions without distributed locks?
-
-### Step 3: Design a Temporal Query for Audit
-
-Use `TemporalQuery.ReplayToPointInTimeAsync` to reconstruct an order aggregate's state as of yesterday at noon:
-
-- What parameters do you supply? (stream ID, point-in-time)
-- How does this differ from loading current state?
-- Why is this capability essential for **regulatory compliance** and audit trails?
 
 ## Exam
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial31/Exam.cs`](../tests/TutorialLabs/Tutorial31/Exam.cs)
+Coding challenges: [`tests/TutorialLabs/Tutorial31/Exam.cs`](../tests/TutorialLabs/Tutorial31/Exam.cs)
 
-Complete the coding challenges in the exam file. Each challenge is a failing test — make it pass by writing the correct implementation inline.
+```bash
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial31.Exam"
+```
 
 ---
 
