@@ -34,9 +34,9 @@ public interface IMessageBrokerConsumer : IAsyncDisposable
     Task SubscribeAsync<T>(string topic, Func<IntegrationEnvelope<T>, Task> handler, CancellationToken ct = default);
 }
 
-// Real channels that wrap the broker interfaces
-// src/Ingestion/Channels/PointToPointChannel.cs — queue semantics, one consumer per message
-// src/Ingestion/Channels/PublishSubscribeChannel.cs — fan-out, every subscriber gets every message
+// Real channels that wrap the broker interfaces:
+// PointToPointChannel — queue semantics, one consumer per message
+// PublishSubscribeChannel — fan-out, every subscriber gets every message
 ```
 
 ## Exercises

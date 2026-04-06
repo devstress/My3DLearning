@@ -14,6 +14,7 @@ using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Ingestion.Channels;
 using EnterpriseIntegrationPlatform.Processing.Dispatcher;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace TutorialLabs.Tutorial02;
 
@@ -211,10 +212,10 @@ public sealed class Lab
         // Two independent pipelines using named endpoints
         var orderChannel = new PointToPointChannel(
             ordersBroker, ordersBroker,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<PointToPointChannel>.Instance);
+            NullLogger<PointToPointChannel>.Instance);
         var paymentChannel = new PointToPointChannel(
             paymentsBroker, paymentsBroker,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<PointToPointChannel>.Instance);
+            NullLogger<PointToPointChannel>.Instance);
 
         var orderMsg = IntegrationEnvelope<string>.Create(
             "NewOrder:ORD-200", "WebStore", "order.created");
