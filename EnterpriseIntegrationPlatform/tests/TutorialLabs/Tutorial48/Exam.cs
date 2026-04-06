@@ -20,8 +20,7 @@ public sealed class Exam
     [Test]
     public async Task Challenge1_FullNotificationFlow_ValidateLogNotify()
     {
-        var validator = new DefaultMessageValidationService(
-            NullLogger<DefaultMessageValidationService>.Instance);
+        var validator = new DefaultMessageValidationService();
         var logger = new DefaultMessageLoggingService(
             NullLogger<DefaultMessageLoggingService>.Instance);
         var notifier = Substitute.For<INotificationActivityService>();

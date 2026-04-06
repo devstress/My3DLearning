@@ -21,8 +21,7 @@ public sealed class Lab
     [Test]
     public async Task ValidateAsync_ValidMessage_ReturnsSuccess()
     {
-        var svc = new DefaultMessageValidationService(
-            NullLogger<DefaultMessageValidationService>.Instance);
+        var svc = new DefaultMessageValidationService();
 
         var result = await svc.ValidateAsync("order.created", "{\"id\": 1}");
 

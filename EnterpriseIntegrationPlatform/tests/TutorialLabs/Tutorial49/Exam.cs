@@ -72,13 +72,13 @@ public sealed class Exam
     {
         var steps = new List<RoutingSlipStep>
         {
-            new() { StepName = "validate", DestinationTopic = "t1" },
-            new() { StepName = "enrich", DestinationTopic = "t2" },
-            new() { StepName = "transform", DestinationTopic = "t3" },
-            new() { StepName = "route", DestinationTopic = "t4" },
+            new("validate", "t1"),
+            new("enrich", "t2"),
+            new("transform", "t3"),
+            new("route", "t4"),
         };
 
-        var slip = new RoutingSlip { Steps = steps };
+        var slip = new RoutingSlip(steps);
         var visited = new List<string>();
 
         while (!slip.IsComplete)

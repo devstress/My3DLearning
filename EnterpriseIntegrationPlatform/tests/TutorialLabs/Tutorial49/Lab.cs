@@ -92,15 +92,12 @@ public sealed class Lab
     [Test]
     public void RoutingSlip_Advance_MovesToNextStep()
     {
-        var slip = new RoutingSlip
-        {
-            Steps =
-            [
-                new RoutingSlipStep { StepName = "validate", DestinationTopic = "validate-topic" },
-                new RoutingSlipStep { StepName = "transform", DestinationTopic = "transform-topic" },
-                new RoutingSlipStep { StepName = "route", DestinationTopic = "route-topic" },
-            ],
-        };
+        var slip = new RoutingSlip(
+        [
+            new RoutingSlipStep("validate", "validate-topic"),
+            new RoutingSlipStep("transform", "transform-topic"),
+            new RoutingSlipStep("route", "route-topic"),
+        ]);
 
         Assert.That(slip.CurrentStep!.StepName, Is.EqualTo("validate"));
         Assert.That(slip.IsComplete, Is.False);
@@ -120,7 +117,7 @@ public sealed class Lab
     [Test]
     public void RoutingSlip_EmptySteps_IsComplete()
     {
-        var slip = new RoutingSlip { Steps = [] };
+        var slip = new RoutingSlip([]);
 
         Assert.That(slip.IsComplete, Is.True);
         Assert.That(slip.CurrentStep, Is.Null);
