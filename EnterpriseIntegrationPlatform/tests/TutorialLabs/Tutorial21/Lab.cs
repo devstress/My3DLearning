@@ -1,153 +1,54 @@
 // ============================================================================
 // Tutorial 21 – Aggregator (Lab)
 // ============================================================================
-// This lab exercises the MessageAggregator with InMemoryMessageAggregateStore,
-// CountCompletionStrategy, and mock IAggregationStrategy.  You will verify
-// accumulation behaviour, completion conditions, and aggregate publishing.
+// EIP Pattern: Aggregator.
+// E2E: Wire real MessageAggregator with InMemoryMessageAggregateStore,
+// CountCompletionStrategy, NSubstitute IAggregationStrategy, and MockEndpoint.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Aggregator;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial21;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── InMemoryMessageAggregateStore Basics ─────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("agg-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task Store_AddAsync_ReturnsSingleItemGroup()
+    public async Task Aggregate_SingleMessage_GroupNotComplete()
     {
-        var store = new InMemoryMessageAggregateStore<string>();
-
-        var envelope = IntegrationEnvelope<string>.Create(
-            "item-1", "TestService", "order.line");
-
-        var group = await store.AddAsync(envelope);
-
-        Assert.That(group.Count, Is.EqualTo(1));
-        Assert.That(group[0].Payload, Is.EqualTo("item-1"));
-    }
-
-    [Test]
-    public async Task Store_AddAsync_GroupsBySameCorrelationId()
-    {
-        var store = new InMemoryMessageAggregateStore<string>();
-        var correlationId = Guid.NewGuid();
-
-        var e1 = IntegrationEnvelope<string>.Create(
-            "item-1", "Svc", "line", correlationId: correlationId);
-        var e2 = IntegrationEnvelope<string>.Create(
-            "item-2", "Svc", "line", correlationId: correlationId);
-
-        await store.AddAsync(e1);
-        var group = await store.AddAsync(e2);
-
-        Assert.That(group.Count, Is.EqualTo(2));
-        Assert.That(group[0].Payload, Is.EqualTo("item-1"));
-        Assert.That(group[1].Payload, Is.EqualTo("item-2"));
-    }
-
-    // ── CountCompletionStrategy ─────────────────────────────────────────────
-
-    [Test]
-    public void CountCompletion_NotComplete_WhenBelowExpected()
-    {
-        var strategy = new CountCompletionStrategy<string>(3);
-        var envelopes = new[]
-        {
-            IntegrationEnvelope<string>.Create("a", "Svc", "t"),
-            IntegrationEnvelope<string>.Create("b", "Svc", "t"),
-        };
-
-        Assert.That(strategy.IsComplete(envelopes), Is.False);
-    }
-
-    [Test]
-    public void CountCompletion_Complete_WhenCountReached()
-    {
-        var strategy = new CountCompletionStrategy<string>(2);
-        var envelopes = new[]
-        {
-            IntegrationEnvelope<string>.Create("a", "Svc", "t"),
-            IntegrationEnvelope<string>.Create("b", "Svc", "t"),
-        };
-
-        Assert.That(strategy.IsComplete(envelopes), Is.True);
-    }
-
-    // ── MessageAggregator – Incomplete Group ────────────────────────────────
-
-    [Test]
-    public async Task Aggregator_ReturnsIncomplete_WhenGroupNotReady()
-    {
-        var store = new InMemoryMessageAggregateStore<string>();
-        var completion = new CountCompletionStrategy<string>(3);
-        var aggregation = Substitute.For<IAggregationStrategy<string, string>>();
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var options = Options.Create(new AggregatorOptions
-        {
-            TargetTopic = "aggregated-topic",
-            ExpectedCount = 3,
-        });
-
-        var aggregator = new MessageAggregator<string, string>(
-            store, completion, aggregation, producer, options,
-            NullLogger<MessageAggregator<string, string>>.Instance);
-
-        var correlationId = Guid.NewGuid();
-        var envelope = IntegrationEnvelope<string>.Create(
-            "item-1", "Svc", "line", correlationId: correlationId);
+        var aggregator = CreateAggregator(expectedCount: 3);
+        var envelope = IntegrationEnvelope<string>.Create("item1", "svc", "order.line");
 
         var result = await aggregator.AggregateAsync(envelope);
 
         Assert.That(result.IsComplete, Is.False);
-        Assert.That(result.AggregateEnvelope, Is.Null);
         Assert.That(result.ReceivedCount, Is.EqualTo(1));
-        Assert.That(result.CorrelationId, Is.EqualTo(correlationId));
+        Assert.That(result.AggregateEnvelope, Is.Null);
+        _output.AssertNoneReceived();
     }
 
-    // ── MessageAggregator – Complete Group & Publish ─────────────────────────
-
     [Test]
-    public async Task Aggregator_CompletesAndPublishes_WhenCountReached()
+    public async Task Aggregate_ReachesCount_CompletesAndPublishes()
     {
-        var store = new InMemoryMessageAggregateStore<string>();
-        var completion = new CountCompletionStrategy<string>(2);
-        var aggregation = Substitute.For<IAggregationStrategy<string, string>>();
-        aggregation
-            .Aggregate(Arg.Any<IReadOnlyList<string>>())
-            .Returns(ci =>
-            {
-                var items = ci.Arg<IReadOnlyList<string>>();
-                return string.Join(",", items);
-            });
-
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var options = Options.Create(new AggregatorOptions
-        {
-            TargetTopic = "agg-out",
-            TargetMessageType = "order.batch",
-            ExpectedCount = 2,
-        });
-
-        var aggregator = new MessageAggregator<string, string>(
-            store, completion, aggregation, producer, options,
-            NullLogger<MessageAggregator<string, string>>.Instance);
-
         var correlationId = Guid.NewGuid();
-        var e1 = IntegrationEnvelope<string>.Create(
-            "A", "Svc", "line", correlationId: correlationId);
-        var e2 = IntegrationEnvelope<string>.Create(
-            "B", "Svc", "line", correlationId: correlationId);
+        var aggregator = CreateAggregator(expectedCount: 2);
+
+        var e1 = IntegrationEnvelope<string>.Create("a", "svc", "line", correlationId);
+        var e2 = IntegrationEnvelope<string>.Create("b", "svc", "line", correlationId);
 
         await aggregator.AggregateAsync(e1);
         var result = await aggregator.AggregateAsync(e2);
@@ -155,57 +56,126 @@ public sealed class Lab
         Assert.That(result.IsComplete, Is.True);
         Assert.That(result.ReceivedCount, Is.EqualTo(2));
         Assert.That(result.AggregateEnvelope, Is.Not.Null);
-        Assert.That(result.AggregateEnvelope!.Payload, Is.EqualTo("A,B"));
-        Assert.That(result.AggregateEnvelope.MessageType, Is.EqualTo("order.batch"));
-        Assert.That(result.AggregateEnvelope.CorrelationId, Is.EqualTo(correlationId));
-
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            "agg-out",
-            Arg.Any<CancellationToken>());
+        _output.AssertReceivedOnTopic("aggregated-topic", 1);
     }
 
-    // ── MessageAggregator – Metadata Merging ────────────────────────────────
+    [Test]
+    public async Task Aggregate_PreservesCorrelationId()
+    {
+        var correlationId = Guid.NewGuid();
+        var aggregator = CreateAggregator(expectedCount: 2);
+
+        var e1 = IntegrationEnvelope<string>.Create("a", "svc", "line", correlationId);
+        var e2 = IntegrationEnvelope<string>.Create("b", "svc", "line", correlationId);
+
+        await aggregator.AggregateAsync(e1);
+        var result = await aggregator.AggregateAsync(e2);
+
+        Assert.That(result.CorrelationId, Is.EqualTo(correlationId));
+        Assert.That(result.AggregateEnvelope!.CorrelationId, Is.EqualTo(correlationId));
+    }
 
     [Test]
-    public async Task Aggregator_MergesMetadata_FromAllEnvelopes()
+    public async Task Aggregate_DifferentCorrelationIds_FormSeparateGroups()
     {
-        var store = new InMemoryMessageAggregateStore<string>();
-        var completion = new CountCompletionStrategy<string>(2);
-        var aggregation = Substitute.For<IAggregationStrategy<string, string>>();
-        aggregation
-            .Aggregate(Arg.Any<IReadOnlyList<string>>())
-            .Returns("merged");
+        var corr1 = Guid.NewGuid();
+        var corr2 = Guid.NewGuid();
+        var aggregator = CreateAggregator(expectedCount: 2);
 
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        var e1a = IntegrationEnvelope<string>.Create("a1", "svc", "line", corr1);
+        var e2a = IntegrationEnvelope<string>.Create("a2", "svc", "line", corr2);
 
-        var options = Options.Create(new AggregatorOptions
-        {
-            TargetTopic = "merged-topic",
-            ExpectedCount = 2,
-        });
+        var r1 = await aggregator.AggregateAsync(e1a);
+        var r2 = await aggregator.AggregateAsync(e2a);
 
-        var aggregator = new MessageAggregator<string, string>(
-            store, completion, aggregation, producer, options,
-            NullLogger<MessageAggregator<string, string>>.Instance);
+        Assert.That(r1.IsComplete, Is.False);
+        Assert.That(r2.IsComplete, Is.False);
+        Assert.That(r1.ReceivedCount, Is.EqualTo(1));
+        Assert.That(r2.ReceivedCount, Is.EqualTo(1));
+        _output.AssertNoneReceived();
+    }
 
+    [Test]
+    public async Task Aggregate_CountCompletion_ExactThreshold()
+    {
         var correlationId = Guid.NewGuid();
+        var aggregator = CreateAggregator(expectedCount: 3);
 
-        var e1 = IntegrationEnvelope<string>.Create(
-            "A", "Svc", "line", correlationId: correlationId) with
+        var e1 = IntegrationEnvelope<string>.Create("x", "svc", "t", correlationId);
+        var e2 = IntegrationEnvelope<string>.Create("y", "svc", "t", correlationId);
+        var e3 = IntegrationEnvelope<string>.Create("z", "svc", "t", correlationId);
+
+        var r1 = await aggregator.AggregateAsync(e1);
+        var r2 = await aggregator.AggregateAsync(e2);
+        var r3 = await aggregator.AggregateAsync(e3);
+
+        Assert.That(r1.IsComplete, Is.False);
+        Assert.That(r2.IsComplete, Is.False);
+        Assert.That(r3.IsComplete, Is.True);
+        Assert.That(r3.ReceivedCount, Is.EqualTo(3));
+        _output.AssertReceivedOnTopic("aggregated-topic", 1);
+    }
+
+    [Test]
+    public async Task Aggregate_MergesMetadata_FromAllEnvelopes()
+    {
+        var correlationId = Guid.NewGuid();
+        var aggregator = CreateAggregator(expectedCount: 2);
+
+        var e1 = IntegrationEnvelope<string>.Create("a", "svc", "t", correlationId) with
         {
-            Metadata = new Dictionary<string, string> { ["key1"] = "val1" },
+            Metadata = new Dictionary<string, string> { ["region"] = "us-east" },
         };
-        var e2 = IntegrationEnvelope<string>.Create(
-            "B", "Svc", "line", correlationId: correlationId) with
+        var e2 = IntegrationEnvelope<string>.Create("b", "svc", "t", correlationId) with
         {
-            Metadata = new Dictionary<string, string> { ["key2"] = "val2" },
+            Metadata = new Dictionary<string, string> { ["tier"] = "premium" },
         };
 
         await aggregator.AggregateAsync(e1);
         var result = await aggregator.AggregateAsync(e2);
 
-        Assert.That(result.AggregateEnvelope!.Metadata, Contains.Key("key1"));
-        Assert.That(result.AggregateEnvelope.Metadata, Contains.Key("key2"));
+        var meta = result.AggregateEnvelope!.Metadata;
+        Assert.That(meta["region"], Is.EqualTo("us-east"));
+        Assert.That(meta["tier"], Is.EqualTo("premium"));
+    }
+
+    [Test]
+    public async Task Aggregate_UsesHighestPriority()
+    {
+        var correlationId = Guid.NewGuid();
+        var aggregator = CreateAggregator(expectedCount: 2);
+
+        var e1 = IntegrationEnvelope<string>.Create("a", "svc", "t", correlationId) with
+        {
+            Priority = MessagePriority.Low,
+        };
+        var e2 = IntegrationEnvelope<string>.Create("b", "svc", "t", correlationId) with
+        {
+            Priority = MessagePriority.High,
+        };
+
+        await aggregator.AggregateAsync(e1);
+        var result = await aggregator.AggregateAsync(e2);
+
+        Assert.That(result.AggregateEnvelope!.Priority, Is.EqualTo(MessagePriority.High));
+    }
+
+    private MessageAggregator<string, string> CreateAggregator(int expectedCount)
+    {
+        var store = new InMemoryMessageAggregateStore<string>();
+        var completion = new CountCompletionStrategy<string>(expectedCount);
+        var strategy = Substitute.For<IAggregationStrategy<string, string>>();
+        strategy.Aggregate(Arg.Any<IReadOnlyList<string>>())
+            .Returns(ci => string.Join(",", ci.Arg<IReadOnlyList<string>>()));
+
+        var options = Options.Create(new AggregatorOptions
+        {
+            TargetTopic = "aggregated-topic",
+            ExpectedCount = expectedCount,
+        });
+
+        return new MessageAggregator<string, string>(
+            store, completion, strategy, _output, options,
+            NullLogger<MessageAggregator<string, string>>.Instance);
     }
 }

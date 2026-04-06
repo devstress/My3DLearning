@@ -1,105 +1,118 @@
 // ============================================================================
 // Tutorial 24 – Retry Framework (Exam)
 // ============================================================================
-// Coding challenges: verify exactly MaxAttempts invocations, test that a
-// single retry recovery carries the correct attempt count, and validate
-// that the retry policy respects max-attempts = 1 (no retries).
+// E2E challenges: retry with exception chain, cancellation mid-retry,
+// and retry-then-dead-letter flow via MockEndpoint.
 // ============================================================================
 
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Retry;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial24;
 
 [TestFixture]
 public sealed class Exam
 {
-    private static ExponentialBackoffRetryPolicy CreatePolicy(
-        int maxAttempts = 3) =>
-        new(
-            Options.Create(new RetryOptions
-            {
-                MaxAttempts = maxAttempts,
-                InitialDelayMs = 100,
-                MaxDelayMs = 1000,
-                BackoffMultiplier = 2.0,
-                UseJitter = false,
-            }),
-            NullLogger<ExponentialBackoffRetryPolicy>.Instance,
-            delayFunc: (_, _) => Task.CompletedTask);
-
-    // ── Challenge 1: Exactly MaxAttempts Invocations ─────────────────────────
-
     [Test]
-    public async Task Challenge1_OperationCalledExactlyMaxAttemptsTimes()
+    public async Task Challenge1_ExhaustRetries_CapturesLastException()
     {
-        // When every attempt throws, the operation should be invoked exactly
-        // MaxAttempts times — no more, no less.
-        var policy = CreatePolicy(maxAttempts: 4);
-        var callCount = 0;
+        await using var output = new MockEndpoint("exam-retry");
+        var policy = CreatePolicy(maxAttempts: 3);
+        var attempt = 0;
 
-        var result = await policy.ExecuteAsync<string>(
-            _ =>
-            {
-                callCount++;
-                throw new InvalidOperationException("boom");
-            },
-            CancellationToken.None);
+        var result = await policy.ExecuteAsync<string>(_ =>
+        {
+            attempt++;
+            throw new InvalidOperationException($"fail-{attempt}");
+        }, CancellationToken.None);
 
         Assert.That(result.IsSucceeded, Is.False);
-        Assert.That(callCount, Is.EqualTo(4));
-        Assert.That(result.Attempts, Is.EqualTo(4));
+        Assert.That(result.Attempts, Is.EqualTo(3));
+        Assert.That(result.LastException!.Message, Is.EqualTo("fail-3"));
+
+        // Publish failure info to dead-letter via MockEndpoint
+        var envelope = IntegrationEnvelope<string>.Create(
+            result.LastException!.Message, "svc", "retry.exhausted");
+        await output.PublishAsync(envelope, "dlq-topic", CancellationToken.None);
+        output.AssertReceivedOnTopic("dlq-topic", 1);
     }
 
-    // ── Challenge 2: Recover On Second Attempt ──────────────────────────────
+    [Test]
+    public async Task Challenge2_CancellationDuringRetry_ThrowsOperationCanceled()
+    {
+        var policy = CreatePolicy(maxAttempts: 5);
+        using var cts = new CancellationTokenSource();
+        var attempt = 0;
+
+        // Create a policy with a delayFunc that cancels on 2nd attempt
+        var optionsValue = Options.Create(new RetryOptions
+        {
+            MaxAttempts = 5,
+            InitialDelayMs = 100,
+            BackoffMultiplier = 2.0,
+            MaxDelayMs = 5000,
+            UseJitter = false,
+        });
+        var cancellablePolicy = new ExponentialBackoffRetryPolicy(
+            optionsValue,
+            NullLogger<ExponentialBackoffRetryPolicy>.Instance,
+            delayFunc: (_, ct) =>
+            {
+                cts.Cancel();
+                return Task.CompletedTask;
+            });
+
+        Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await cancellablePolicy.ExecuteAsync<string>(_ =>
+            {
+                attempt++;
+                throw new Exception("transient");
+            }, cts.Token));
+    }
 
     [Test]
-    public async Task Challenge2_RecoverOnSecondAttempt_ReportsCorrectAttempts()
+    public async Task Challenge3_RetrySuccessThenPublish_FullPipeline()
     {
-        // The operation fails once, then succeeds. Verify the result records
-        // exactly 2 attempts with the correct return value.
-        var policy = CreatePolicy(maxAttempts: 5);
-        var callCount = 0;
+        await using var output = new MockEndpoint("exam-pipeline");
+        var policy = CreatePolicy(maxAttempts: 4);
+        var attempt = 0;
 
-        var result = await policy.ExecuteAsync<string>(
-            _ =>
-            {
-                callCount++;
-                if (callCount == 1)
-                    throw new TimeoutException("first attempt timeout");
-                return Task.FromResult("recovered");
-            },
-            CancellationToken.None);
+        var result = await policy.ExecuteAsync<string>(_ =>
+        {
+            attempt++;
+            if (attempt < 3) throw new Exception("not yet");
+            return Task.FromResult("final-value");
+        }, CancellationToken.None);
 
         Assert.That(result.IsSucceeded, Is.True);
-        Assert.That(result.Attempts, Is.EqualTo(2));
-        Assert.That(result.Result, Is.EqualTo("recovered"));
-        Assert.That(result.LastException, Is.Null);
+        Assert.That(result.Attempts, Is.EqualTo(3));
+        Assert.That(result.Result, Is.EqualTo("final-value"));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            result.Result!, "pipeline-svc", "order.processed");
+        await output.PublishAsync(envelope, "orders-out", CancellationToken.None);
+        output.AssertReceivedOnTopic("orders-out", 1);
+        output.AssertReceivedCount(1);
     }
 
-    // ── Challenge 3: MaxAttempts = 1 Means No Retries ───────────────────────
-
-    [Test]
-    public async Task Challenge3_MaxAttemptsOne_NoRetryOnFailure()
+    private static ExponentialBackoffRetryPolicy CreatePolicy(int maxAttempts)
     {
-        // With MaxAttempts = 1, a single failure should result in immediate
-        // failure with no retries.
-        var policy = CreatePolicy(maxAttempts: 1);
-        var callCount = 0;
+        var options = Options.Create(new RetryOptions
+        {
+            MaxAttempts = maxAttempts,
+            InitialDelayMs = 100,
+            BackoffMultiplier = 2.0,
+            MaxDelayMs = 5000,
+            UseJitter = false,
+        });
 
-        var result = await policy.ExecuteAsync<int>(
-            _ =>
-            {
-                callCount++;
-                throw new ApplicationException("fatal");
-            },
-            CancellationToken.None);
-
-        Assert.That(result.IsSucceeded, Is.False);
-        Assert.That(callCount, Is.EqualTo(1));
-        Assert.That(result.Attempts, Is.EqualTo(1));
-        Assert.That(result.LastException, Is.TypeOf<ApplicationException>());
+        return new ExponentialBackoffRetryPolicy(
+            options,
+            NullLogger<ExponentialBackoffRetryPolicy>.Instance,
+            delayFunc: (_, _) => Task.CompletedTask);
     }
 }

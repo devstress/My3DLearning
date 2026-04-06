@@ -1,111 +1,97 @@
 // ============================================================================
 // Tutorial 25 – Dead Letter Queue (Exam)
 // ============================================================================
-// Coding challenges: publish with each distinct DeadLetterReason, verify
-// the CausationId link from original to wrapper, and test the
-// mock-based IDeadLetterPublisher contract.
+// E2E challenges: multiple messages to DLQ with different reasons,
+// original envelope integrity, and missing topic configuration.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.DeadLetter;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial25;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Publish With Multiple Reason Codes ──────────────────────
-
     [Test]
-    public async Task Challenge1_PublishWithDifferentReasons_AllSucceed()
+    public async Task Challenge1_MultipleFailures_AllReachDlq()
     {
-        // Publish three messages with different DeadLetterReason values and
-        // verify the producer is called for each one.
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var options = Options.Create(new DeadLetterOptions
-        {
-            DeadLetterTopic = "dlq-multi",
-        });
+        await using var output = new MockEndpoint("exam-dlq");
+        var publisher = CreatePublisher(output);
 
-        var publisher = new DeadLetterPublisher<string>(producer, options);
+        var e1 = IntegrationEnvelope<string>.Create("order-1", "svc", "order.created");
+        var e2 = IntegrationEnvelope<string>.Create("order-2", "svc", "order.created");
+        var e3 = IntegrationEnvelope<string>.Create("order-3", "svc", "order.created");
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "data", "Svc", "msg.type");
+        await publisher.PublishAsync(e1, DeadLetterReason.MaxRetriesExceeded, "Retries exhausted", 3, CancellationToken.None);
+        await publisher.PublishAsync(e2, DeadLetterReason.PoisonMessage, "Corrupt payload", 1, CancellationToken.None);
+        await publisher.PublishAsync(e3, DeadLetterReason.ValidationFailed, "Invalid schema", 1, CancellationToken.None);
 
-        await publisher.PublishAsync(
-            envelope, DeadLetterReason.MaxRetriesExceeded, "retries exhausted", 3, CancellationToken.None);
-        await publisher.PublishAsync(
-            envelope, DeadLetterReason.ProcessingTimeout, "timed out", 1, CancellationToken.None);
-        await publisher.PublishAsync(
-            envelope, DeadLetterReason.PoisonMessage, "corrupt payload", 1, CancellationToken.None);
+        output.AssertReceivedOnTopic("dlq-topic", 3);
 
-        await producer.Received(3).PublishAsync(
-            Arg.Any<IntegrationEnvelope<DeadLetterEnvelope<string>>>(),
-            "dlq-multi",
-            Arg.Any<CancellationToken>());
+        var all = output.GetAllReceived<DeadLetterEnvelope<string>>("dlq-topic");
+        Assert.That(all[0].Payload.Reason, Is.EqualTo(DeadLetterReason.MaxRetriesExceeded));
+        Assert.That(all[1].Payload.Reason, Is.EqualTo(DeadLetterReason.PoisonMessage));
+        Assert.That(all[2].Payload.Reason, Is.EqualTo(DeadLetterReason.ValidationFailed));
     }
 
-    // ── Challenge 2: CausationId Links Original To Wrapper ──────────────────
-
     [Test]
-    public async Task Challenge2_CausationId_IsSetToOriginalMessageId()
+    public async Task Challenge2_OriginalEnvelope_MetadataPreserved()
     {
-        // The wrapper envelope's CausationId should equal the original
-        // envelope's MessageId — establishing a causal chain.
-        IntegrationEnvelope<DeadLetterEnvelope<string>>? captured = null;
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        producer
-            .PublishAsync(
-                Arg.Do<IntegrationEnvelope<DeadLetterEnvelope<string>>>(e => captured = e),
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
+        await using var output = new MockEndpoint("exam-meta");
+        var publisher = CreatePublisher(output);
 
-        var options = Options.Create(new DeadLetterOptions
+        var original = IntegrationEnvelope<string>.Create("sensitive-data", "AuthSvc", "auth.failed") with
         {
-            DeadLetterTopic = "dlq",
-        });
+            Metadata = new Dictionary<string, string>
+            {
+                ["userId"] = "user-42",
+                ["region"] = "eu-west",
+            },
+            Priority = MessagePriority.High,
+        };
 
-        var publisher = new DeadLetterPublisher<string>(producer, options);
+        await publisher.PublishAsync(original, DeadLetterReason.MessageExpired,
+            "TTL exceeded", 1, CancellationToken.None);
 
-        var original = IntegrationEnvelope<string>.Create(
-            "important-data", "CriticalSvc", "order.created");
-
-        await publisher.PublishAsync(
-            original, DeadLetterReason.ValidationFailed, "invalid schema", 1, CancellationToken.None);
-
-        Assert.That(captured, Is.Not.Null);
-        Assert.That(captured!.CausationId, Is.EqualTo(original.MessageId));
+        var received = output.GetReceived<DeadLetterEnvelope<string>>(0);
+        var orig = received.Payload.OriginalEnvelope;
+        Assert.That(orig.Payload, Is.EqualTo("sensitive-data"));
+        Assert.That(orig.Source, Is.EqualTo("AuthSvc"));
+        Assert.That(orig.MessageType, Is.EqualTo("auth.failed"));
+        Assert.That(orig.Metadata["userId"], Is.EqualTo("user-42"));
+        Assert.That(orig.Metadata["region"], Is.EqualTo("eu-west"));
+        Assert.That(orig.Priority, Is.EqualTo(MessagePriority.High));
     }
 
-    // ── Challenge 3: Mock IDeadLetterPublisher Contract ─────────────────────
-
     [Test]
-    public async Task Challenge3_MockPublisher_VerifyCorrectParameters()
+    public async Task Challenge3_MissingDeadLetterTopic_Throws()
     {
-        // Use NSubstitute to mock IDeadLetterPublisher<string> and verify it
-        // is called with the correct reason, error message, and attempt count.
-        var mockPublisher = Substitute.For<IDeadLetterPublisher<string>>();
+        await using var output = new MockEndpoint("exam-notopic");
+        var options = Options.Create(new DeadLetterOptions
+        {
+            DeadLetterTopic = "",
+        });
+        var publisher = new DeadLetterPublisher<string>(output, options);
+        var envelope = IntegrationEnvelope<string>.Create("data", "svc", "type");
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "payload", "SomeService", "event.type");
+        Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await publisher.PublishAsync(envelope, DeadLetterReason.PoisonMessage,
+                "Bad message", 1, CancellationToken.None));
 
-        await mockPublisher.PublishAsync(
-            envelope,
-            DeadLetterReason.MessageExpired,
-            "TTL exceeded",
-            attemptCount: 0,
-            CancellationToken.None);
+        output.AssertNoneReceived();
+    }
 
-        await mockPublisher.Received(1).PublishAsync(
-            Arg.Is<IntegrationEnvelope<string>>(e => e.MessageId == envelope.MessageId),
-            DeadLetterReason.MessageExpired,
-            "TTL exceeded",
-            0,
-            Arg.Any<CancellationToken>());
+    private static DeadLetterPublisher<string> CreatePublisher(MockEndpoint output)
+    {
+        var options = Options.Create(new DeadLetterOptions
+        {
+            DeadLetterTopic = "dlq-topic",
+        });
+
+        return new DeadLetterPublisher<string>(output, options);
     }
 }
