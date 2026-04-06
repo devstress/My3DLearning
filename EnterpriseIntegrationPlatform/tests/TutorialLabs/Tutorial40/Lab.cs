@@ -1,78 +1,60 @@
 // ============================================================================
 // Tutorial 40 – RAG & Ollama / AI (Lab)
 // ============================================================================
-// This lab exercises IOllamaService, IRagFlowService, RagFlowChatResponse,
-// OllamaSettings, and RagFlowOptions via mocks and reflection.
+// EIP Pattern: AI-enriched integration.
+// E2E: Mock IOllamaService and IRagFlowService with MockOllamaService/MockRagFlowService, wire
+// MockEndpoint to simulate AI-enriched message pipelines.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.AI.Ollama;
 using EnterpriseIntegrationPlatform.AI.RagFlow;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Contracts;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial40;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── IOllamaService Interface Shape (Reflection) ─────────────────────────
+    private MockEndpoint _input = null!;
+    private MockEndpoint _output = null!;
 
-    [Test]
-    public void IOllamaService_InterfaceShape_HasExpectedMethods()
+    [SetUp]
+    public void SetUp()
     {
-        var type = typeof(IOllamaService);
-
-        Assert.That(type.GetMethod("GenerateAsync"), Is.Not.Null);
-        Assert.That(type.GetMethod("AnalyseAsync"), Is.Not.Null);
-        Assert.That(type.GetMethod("IsHealthyAsync"), Is.Not.Null);
+        _input = new MockEndpoint("ai-in");
+        _output = new MockEndpoint("ai-out");
     }
 
-    // ── IRagFlowService Interface Shape (Reflection) ────────────────────────
-
-    [Test]
-    public void IRagFlowService_InterfaceShape_HasExpectedMethods()
+    [TearDown]
+    public async Task TearDown()
     {
-        var type = typeof(IRagFlowService);
-
-        Assert.That(type.GetMethod("RetrieveAsync"), Is.Not.Null);
-        Assert.That(type.GetMethod("ChatAsync"), Is.Not.Null);
-        Assert.That(type.GetMethod("ListDatasetsAsync"), Is.Not.Null);
-        Assert.That(type.GetMethod("IsHealthyAsync"), Is.Not.Null);
+        await _input.DisposeAsync();
+        await _output.DisposeAsync();
     }
 
-    // ── Mock IOllamaService.GenerateAsync Returns Expected Response ─────────
-
     [Test]
-    public async Task Mock_IOllamaService_GenerateAsync_ReturnsExpected()
+    public async Task Ollama_GenerateAsync_ReturnsExpected()
     {
-        var ollama = Substitute.For<IOllamaService>();
-        ollama.GenerateAsync(
-                "What is EIP?",
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns("Enterprise Integration Patterns");
+        var ollama = new MockOllamaService()
+            .WithGenerateResponse("What is EIP?", "Enterprise Integration Patterns");
 
         var result = await ollama.GenerateAsync("What is EIP?");
 
         Assert.That(result, Is.EqualTo("Enterprise Integration Patterns"));
     }
 
-    // ── Mock IRagFlowService.ChatAsync Returns RagFlowChatResponse ──────────
-
     [Test]
-    public async Task Mock_IRagFlowService_ChatAsync_ReturnsChatResponse()
+    public async Task RagFlow_ChatAsync_ReturnsChatResponse()
     {
-        var ragFlow = Substitute.For<IRagFlowService>();
-        var expectedResponse = new RagFlowChatResponse(
-            Answer: "The answer is 42",
-            ConversationId: "conv-123",
-            References: new List<RagFlowReference>
-            {
-                new("Relevant passage", "doc.pdf", 0.95),
-            });
+        var expected = new RagFlowChatResponse(
+            "The answer is 42", "conv-123",
+            new List<RagFlowReference> { new("Relevant passage", "doc.pdf", 0.95) });
 
-        ragFlow.ChatAsync("What is the answer?", null, Arg.Any<CancellationToken>())
-            .Returns(expectedResponse);
+        var ragFlow = new MockRagFlowService()
+            .WithChatResponse("What is the answer?", null, expected);
 
         var result = await ragFlow.ChatAsync("What is the answer?");
 
@@ -81,7 +63,21 @@ public sealed class Lab
         Assert.That(result.References, Has.Count.EqualTo(1));
     }
 
-    // ── RagFlowChatResponse Record Shape ────────────────────────────────────
+    [Test]
+    public void OllamaSettings_Defaults()
+    {
+        var settings = new OllamaSettings();
+        Assert.That(settings.Model, Is.EqualTo("llama3.2"));
+    }
+
+    [Test]
+    public void RagFlowOptions_Defaults()
+    {
+        var opts = new RagFlowOptions();
+        Assert.That(opts.BaseAddress, Is.EqualTo("http://localhost:15380"));
+        Assert.That(opts.ApiKey, Is.Null);
+        Assert.That(opts.AssistantId, Is.Null);
+    }
 
     [Test]
     public void RagFlowChatResponse_RecordShape()
@@ -101,25 +97,36 @@ public sealed class Lab
         Assert.That(response.References[1].Score, Is.EqualTo(0.8));
     }
 
-    // ── OllamaSettings Defaults ────────────────────────────────────────────
-
     [Test]
-    public void OllamaSettings_Defaults()
+    public async Task E2E_MockEndpoint_AiEnrichedPipeline()
     {
-        var settings = new OllamaSettings();
+        var ollama = new MockOllamaService()
+            .WithDefaultResponse("Message processed successfully through all stages");
 
-        Assert.That(settings.Model, Is.EqualTo("llama3.2"));
-    }
+        // Subscribe: receive envelope, enrich with AI analysis, publish to output
+        await _input.SubscribeAsync<string>("ai-topic", "ai-group",
+            async envelope =>
+            {
+                var analysis = await ollama.AnalyseAsync(
+                    "Analyse this message", envelope.Payload);
 
-    // ── RagFlowOptions Defaults ─────────────────────────────────────────────
+                var enriched = envelope with
+                {
+                    Metadata = new Dictionary<string, string>(envelope.Metadata)
+                    {
+                        ["ai-analysis"] = analysis,
+                    },
+                };
+                await _output.PublishAsync(enriched, "enriched-topic");
+            });
 
-    [Test]
-    public void RagFlowOptions_Defaults()
-    {
-        var opts = new RagFlowOptions();
+        var env = IntegrationEnvelope<string>.Create(
+            "Order data for analysis", "OrderSvc", "order.placed");
+        await _input.SendAsync(env);
 
-        Assert.That(opts.BaseAddress, Is.EqualTo("http://localhost:15380"));
-        Assert.That(opts.ApiKey, Is.Null);
-        Assert.That(opts.AssistantId, Is.Null);
+        _output.AssertReceivedOnTopic("enriched-topic", 1);
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Metadata["ai-analysis"],
+            Is.EqualTo("Message processed successfully through all stages"));
     }
 }

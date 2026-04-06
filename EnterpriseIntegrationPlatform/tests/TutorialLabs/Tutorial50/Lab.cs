@@ -1,64 +1,70 @@
 // ============================================================================
 // Tutorial 50 – Best Practices (Lab)
 // ============================================================================
-// This lab exercises cross-cutting EIP best practices: envelope expiration,
-// sanitization idempotency, tenant resolution, metadata, schema versioning,
-// and message headers.
+// EIP Pattern: Cross-cutting best practices integration.
+// E2E: Combine envelope expiration, sanitization, tenancy, and metadata
+// with MockEndpoint to demonstrate production-ready message flows.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.MultiTenancy;
 using EnterpriseIntegrationPlatform.Security;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial50;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Envelope IsExpired For Past ExpiresAt ────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("bp-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public void IntegrationEnvelope_IsExpired_TrueForPastDate()
+    public async Task ExpiredMessage_NotPublished()
     {
-        var envelope = IntegrationEnvelope<string>.Create(
-            "data", "Service", "event") with
+        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
         {
             ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-5),
         };
 
+        if (!envelope.IsExpired)
+            await _output.PublishAsync(envelope, "active-messages");
+
         Assert.That(envelope.IsExpired, Is.True);
+        _output.AssertNoneReceived();
     }
 
-    // ── Envelope IsExpired For Future ExpiresAt ─────────────────────────────
-
     [Test]
-    public void IntegrationEnvelope_IsExpired_FalseForFutureDate()
+    public async Task ValidMessage_Published()
     {
-        var envelope = IntegrationEnvelope<string>.Create(
-            "data", "Service", "event") with
+        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
         {
             ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
         };
 
+        if (!envelope.IsExpired)
+            await _output.PublishAsync(envelope, "active-messages");
+
         Assert.That(envelope.IsExpired, Is.False);
+        _output.AssertReceivedOnTopic("active-messages", 1);
     }
 
-    // ── InputSanitizer Idempotent ───────────────────────────────────────────
-
     [Test]
-    public void InputSanitizer_Sanitize_IsIdempotent()
+    public void InputSanitizer_Idempotent()
     {
         var sanitizer = new InputSanitizer();
         var input = "Hello <b>World</b>";
-
         var first = sanitizer.Sanitize(input);
         var second = sanitizer.Sanitize(first);
 
         Assert.That(second, Is.EqualTo(first));
     }
-
-    // ── TenantResolver Handles Null TenantId ────────────────────────────────
 
     [Test]
     public void TenantResolver_NullTenantId_ReturnsAnonymous()
@@ -69,23 +75,16 @@ public sealed class Lab
         Assert.That(context.TenantId, Is.EqualTo(TenantContext.Anonymous.TenantId));
     }
 
-    // ── MessageHeaders.ReplayId Exists ──────────────────────────────────────
-
     [Test]
     public void MessageHeaders_ReplayId_ConstantExists()
     {
-        var replayId = MessageHeaders.ReplayId;
-
-        Assert.That(replayId, Is.Not.Null.And.Not.Empty);
+        Assert.That(MessageHeaders.ReplayId, Is.Not.Null.And.Not.Empty);
     }
 
-    // ── Metadata Round-Trip ─────────────────────────────────────────────────
-
     [Test]
-    public void IntegrationEnvelope_Metadata_RoundTrip()
+    public async Task Metadata_RoundTrip_PublishedWithEnvelope()
     {
-        var envelope = IntegrationEnvelope<string>.Create(
-            "data", "Service", "event") with
+        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
         {
             Metadata = new Dictionary<string, string>
             {
@@ -95,19 +94,18 @@ public sealed class Lab
             },
         };
 
-        Assert.That(envelope.Metadata["tenantId"], Is.EqualTo("tenant-a"));
-        Assert.That(envelope.Metadata["region"], Is.EqualTo("us-east-1"));
-        Assert.That(envelope.Metadata, Has.Count.EqualTo(3));
+        await _output.PublishAsync(envelope, "metadata-test");
+
+        _output.AssertReceivedOnTopic("metadata-test", 1);
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Metadata["tenantId"], Is.EqualTo("tenant-a"));
+        Assert.That(received.Metadata, Has.Count.EqualTo(3));
     }
 
-    // ── SchemaVersion Defaults To 1.0 ───────────────────────────────────────
-
     [Test]
-    public void IntegrationEnvelope_SchemaVersion_DefaultsTo1()
+    public void SchemaVersion_DefaultsTo1()
     {
-        var envelope = IntegrationEnvelope<string>.Create(
-            "data", "Service", "event");
-
+        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event");
         Assert.That(envelope.SchemaVersion, Is.EqualTo("1.0"));
     }
 }

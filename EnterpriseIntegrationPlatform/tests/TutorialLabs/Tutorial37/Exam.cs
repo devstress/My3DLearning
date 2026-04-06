@@ -1,119 +1,97 @@
 // ============================================================================
-// Tutorial 37 – Connector.File (Exam)
+// Tutorial 37 – File Connector (Exam)
 // ============================================================================
-// Coding challenges: write-read roundtrip, custom filename pattern,
-// and directory creation when CreateDirectoryIfNotExists is true.
+// E2E challenges: write-read roundtrip through MockEndpoint, custom filename
+// pattern resolution, and subdirectory listing.
 // ============================================================================
 
+using System.Text;
 using EnterpriseIntegrationPlatform.Connector.FileSystem;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial37;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Write and Read Roundtrip ───────────────────────────────
-
     [Test]
-    public async Task Challenge1_WriteAndReadRoundtrip_WithMockFileSystem()
+    public async Task Challenge1_WriteAndReadRoundtrip_ThroughMockEndpoint()
     {
-        var store = new Dictionary<string, byte[]>();
-        var fs = Substitute.For<IFileSystem>();
+        await using var input = new MockEndpoint("exam-file-in");
 
-        fs.WriteAllBytesAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci => store[ci.ArgAt<string>(0)] = ci.ArgAt<byte[]>(1));
+        var fs = new MockFileSystem();
 
-        fs.ReadAllBytesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(ci => Task.FromResult(store[ci.ArgAt<string>(0)]));
-
-        var opts = Options.Create(new FileConnectorOptions
-        {
-            RootDirectory = "/data",
-            CreateDirectoryIfNotExists = true,
-        });
-
-        var connector = new FileConnector(fs, opts, NullLogger<FileConnector>.Instance);
-
-        var payload = "roundtrip-test-payload";
-        var envelope = IntegrationEnvelope<string>.Create(payload, "Svc", "test.roundtrip");
-
-        var writtenPath = await connector.WriteAsync(
-            envelope,
-            s => System.Text.Encoding.UTF8.GetBytes(s),
-            CancellationToken.None);
-
-        Assert.That(writtenPath, Is.Not.Null.And.Not.Empty);
-        Assert.That(store.ContainsKey(writtenPath), Is.True);
-
-        var readBytes = await connector.ReadAsync(writtenPath, CancellationToken.None);
-        var readPayload = System.Text.Encoding.UTF8.GetString(readBytes);
-
-        Assert.That(readPayload, Is.EqualTo(payload));
-    }
-
-    // ── Challenge 2: Custom Filename Pattern Resolution ─────────────────────
-
-    [Test]
-    public async Task Challenge2_CustomFilenamePatternResolution()
-    {
-        string? capturedPath = null;
-        var fs = Substitute.For<IFileSystem>();
-        fs.WriteAllBytesAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci =>
+        var connector = new FileConnector(fs,
+            Options.Create(new FileConnectorOptions
             {
-                var path = ci.ArgAt<string>(0);
-                if (!path.EndsWith(".meta"))
-                    capturedPath = path;
+                RootDirectory = "/data",
+                CreateDirectoryIfNotExists = true,
+            }),
+            NullLogger<FileConnector>.Instance);
+
+        string? writtenPath = null;
+        await input.SubscribeAsync<string>("file-topic", "file-group",
+            async envelope =>
+            {
+                writtenPath = await connector.WriteAsync(
+                    envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None);
             });
 
-        var opts = Options.Create(new FileConnectorOptions
-        {
-            RootDirectory = "/exports",
-            FilenamePattern = "{MessageType}-{MessageId}.json",
-            CreateDirectoryIfNotExists = false,
-        });
+        var payload = "roundtrip-test-payload";
+        var env = IntegrationEnvelope<string>.Create(payload, "Svc", "test.roundtrip");
+        await input.SendAsync(env);
 
-        var connector = new FileConnector(fs, opts, NullLogger<FileConnector>.Instance);
+        Assert.That(writtenPath, Is.Not.Null.And.Not.Empty);
+        Assert.That(fs.Files.ContainsKey(writtenPath!), Is.True);
+
+        var readBytes = await connector.ReadAsync(writtenPath!, CancellationToken.None);
+        Assert.That(Encoding.UTF8.GetString(readBytes), Is.EqualTo(payload));
+    }
+
+    [Test]
+    public async Task Challenge2_CustomFilenamePattern_ContainsMessageTypeAndId()
+    {
+        var fs = new MockFileSystem();
+
+        var connector = new FileConnector(fs,
+            Options.Create(new FileConnectorOptions
+            {
+                RootDirectory = "/exports",
+                FilenamePattern = "{MessageType}-{MessageId}.json",
+                CreateDirectoryIfNotExists = false,
+            }),
+            NullLogger<FileConnector>.Instance);
+
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "invoice.created");
 
-        await connector.WriteAsync(
-            envelope,
-            s => System.Text.Encoding.UTF8.GetBytes(s),
-            CancellationToken.None);
+        await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None);
 
+        var capturedPath = fs.LastWrittenPath;
         Assert.That(capturedPath, Is.Not.Null);
         Assert.That(capturedPath, Does.Contain("invoice.created"));
         Assert.That(capturedPath, Does.Contain(envelope.MessageId.ToString()));
     }
 
-    // ── Challenge 3: Directory Creation When CreateDirectoryIfNotExists ─────
-
     [Test]
-    public async Task Challenge3_DirectoryCreation_WhenOptionEnabled()
+    public async Task Challenge3_SubdirectoryListing_CombinesRootAndSub()
     {
-        var fs = Substitute.For<IFileSystem>();
+        var fs = new MockFileSystem();
+        fs.Files["/root/sub/file1.json"] = Array.Empty<byte>();
+        fs.Files["/root/sub/file2.json"] = Array.Empty<byte>();
+        fs.Files["/root/sub/file3.json"] = Array.Empty<byte>();
 
-        var opts = Options.Create(new FileConnectorOptions
-        {
-            RootDirectory = "/new-dir/sub",
-            CreateDirectoryIfNotExists = true,
-        });
+        var connector = new FileConnector(fs,
+            Options.Create(new FileConnectorOptions { RootDirectory = "/root" }),
+            NullLogger<FileConnector>.Instance);
 
-        var connector = new FileConnector(fs, opts, NullLogger<FileConnector>.Instance);
-        var envelope = IntegrationEnvelope<string>.Create("content", "Svc", "event.new");
+        var files = await connector.ListFilesAsync("sub", "*.json", CancellationToken.None);
 
-        await connector.WriteAsync(
-            envelope,
-            s => System.Text.Encoding.UTF8.GetBytes(s),
-            CancellationToken.None);
-
-        fs.Received(1).CreateDirectory(Arg.Is<string>(p => p.Contains("/new-dir/sub")));
+        Assert.That(files, Has.Count.EqualTo(3));
+        Assert.That(files[0], Does.Contain("sub"));
     }
 }

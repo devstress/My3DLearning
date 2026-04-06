@@ -1,281 +1,196 @@
 // ============================================================================
 // Tutorial 13 – Routing Slip (Lab)
 // ============================================================================
-// This lab exercises the RoutingSlipRouter — a pattern where each message
-// carries its own processing itinerary. Steps are executed sequentially;
-// after each step the slip is advanced and the message may be forwarded
-// to a destination topic.
+// EIP Pattern: Routing Slip
+// E2E: Wire real RoutingSlipRouter with test step handlers + MockEndpoint,
+// execute steps sequentially, verify forwarding to destination topics.
 // ============================================================================
 
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Routing;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial13;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Execute a Single Step Successfully ───────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("routing-slip-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task Execute_SingleStep_SucceedsAndAdvancesSlip()
+    public async Task ExecuteStep_SingleStep_SucceedsAndForwards()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        // Create a handler that always succeeds.
-        var handler = Substitute.For<IRoutingSlipStepHandler>();
-        handler.StepName.Returns("Validate");
-        handler.HandleAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Any<IReadOnlyDictionary<string, string>?>(),
-            Arg.Any<CancellationToken>())
-            .Returns(true);
-
-        var router = new RoutingSlipRouter(
-            [handler], producer, NullLogger<RoutingSlipRouter>.Instance);
-
-        // Build an envelope with a routing slip in metadata.
-        var slip = new RoutingSlip([new RoutingSlipStep("Validate", "output-topic")]);
-        var envelope = IntegrationEnvelope<string>.Create(
-            "payload", "Service", "event.type") with
-        {
-            Metadata = new Dictionary<string, string>
-            {
-                [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
-            },
-        };
+        var router = CreateRouter(new AlwaysSucceedHandler("Validate"));
+        var envelope = CreateEnvelopeWithSlip(
+            new RoutingSlipStep("Validate", "validated-topic"));
 
         var result = await router.ExecuteCurrentStepAsync(envelope);
 
         Assert.That(result.StepName, Is.EqualTo("Validate"));
         Assert.That(result.Succeeded, Is.True);
         Assert.That(result.FailureReason, Is.Null);
+        Assert.That(result.ForwardedToTopic, Is.EqualTo("validated-topic"));
         Assert.That(result.RemainingSlip.IsComplete, Is.True);
-        Assert.That(result.ForwardedToTopic, Is.EqualTo("output-topic"));
+        _output.AssertReceivedOnTopic("validated-topic", 1);
     }
 
-    // ── Step Fails — Handler Returns False ──────────────────────────────────
-
     [Test]
-    public async Task Execute_StepFails_ResultIndicatesFailure()
+    public async Task ExecuteStep_NoDestination_CompletesInProcess()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var handler = Substitute.For<IRoutingSlipStepHandler>();
-        handler.StepName.Returns("Validate");
-        handler.HandleAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Any<IReadOnlyDictionary<string, string>?>(),
-            Arg.Any<CancellationToken>())
-            .Returns(false);
-
-        var router = new RoutingSlipRouter(
-            [handler], producer, NullLogger<RoutingSlipRouter>.Instance);
-
-        var slip = new RoutingSlip([new RoutingSlipStep("Validate", "output-topic")]);
-        var envelope = IntegrationEnvelope<string>.Create(
-            "payload", "Service", "event.type") with
-        {
-            Metadata = new Dictionary<string, string>
-            {
-                [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
-            },
-        };
+        var router = CreateRouter(new AlwaysSucceedHandler("Enrich"));
+        var envelope = CreateEnvelopeWithSlip(
+            new RoutingSlipStep("Enrich"));
 
         var result = await router.ExecuteCurrentStepAsync(envelope);
 
+        Assert.That(result.Succeeded, Is.True);
+        Assert.That(result.ForwardedToTopic, Is.Null);
+        _output.AssertNoneReceived();
+    }
+
+    [Test]
+    public async Task ExecuteStep_HandlerFails_ReturnsFalseResult()
+    {
+        var router = CreateRouter(new AlwaysFailHandler("Transform"));
+        var envelope = CreateEnvelopeWithSlip(
+            new RoutingSlipStep("Transform", "transformed-topic"));
+
+        var result = await router.ExecuteCurrentStepAsync(envelope);
+
+        Assert.That(result.StepName, Is.EqualTo("Transform"));
         Assert.That(result.Succeeded, Is.False);
         Assert.That(result.FailureReason, Is.Not.Null);
-        Assert.That(result.ForwardedToTopic, Is.Null);
+        _output.AssertNoneReceived();
     }
 
-    // ── No Handler Registered — Step Fails ──────────────────────────────────
-
     [Test]
-    public async Task Execute_NoHandlerForStep_FailsWithReason()
+    public async Task ExecuteStep_NoHandlerRegistered_FailsGracefully()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        // Register a handler for "Transform" but the slip calls "Validate".
-        var handler = Substitute.For<IRoutingSlipStepHandler>();
-        handler.StepName.Returns("Transform");
-
-        var router = new RoutingSlipRouter(
-            [handler], producer, NullLogger<RoutingSlipRouter>.Instance);
-
-        var slip = new RoutingSlip([new RoutingSlipStep("Validate")]);
-        var envelope = IntegrationEnvelope<string>.Create(
-            "payload", "Service", "event.type") with
-        {
-            Metadata = new Dictionary<string, string>
-            {
-                [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
-            },
-        };
+        var router = CreateRouter(new AlwaysSucceedHandler("Other"));
+        var envelope = CreateEnvelopeWithSlip(
+            new RoutingSlipStep("NonExistent", "dest-topic"));
 
         var result = await router.ExecuteCurrentStepAsync(envelope);
 
         Assert.That(result.Succeeded, Is.False);
-        Assert.That(result.FailureReason, Does.Contain("Validate"));
+        Assert.That(result.FailureReason, Does.Contain("NonExistent"));
+        _output.AssertNoneReceived();
     }
 
-    // ── Multi-Step Slip — Advance Through Steps ─────────────────────────────
-
     [Test]
-    public async Task Execute_MultiStepSlip_AdvancesToNextStep()
+    public async Task ExecuteStep_MultiStepSlip_AdvancesCorrectly()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        var router = CreateRouter(
+            new AlwaysSucceedHandler("Step1"),
+            new AlwaysSucceedHandler("Step2"));
 
-        var validateHandler = Substitute.For<IRoutingSlipStepHandler>();
-        validateHandler.StepName.Returns("Validate");
-        validateHandler.HandleAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Any<IReadOnlyDictionary<string, string>?>(),
-            Arg.Any<CancellationToken>())
-            .Returns(true);
+        var envelope = CreateEnvelopeWithSlip(
+            new RoutingSlipStep("Step1", "step1-out"),
+            new RoutingSlipStep("Step2", "step2-out"));
 
-        var router = new RoutingSlipRouter(
-            [validateHandler], producer, NullLogger<RoutingSlipRouter>.Instance);
+        var result1 = await router.ExecuteCurrentStepAsync(envelope);
 
-        // Slip with two steps: Validate (no forwarding) → Transform.
-        var slip = new RoutingSlip([
-            new RoutingSlipStep("Validate"),
-            new RoutingSlipStep("Transform", "transform-topic"),
-        ]);
-
-        var envelope = IntegrationEnvelope<string>.Create(
-            "payload", "Service", "event.type") with
-        {
-            Metadata = new Dictionary<string, string>
-            {
-                [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
-            },
-        };
-
-        var result = await router.ExecuteCurrentStepAsync(envelope);
-
-        // After executing "Validate", one step remains.
-        Assert.That(result.StepName, Is.EqualTo("Validate"));
-        Assert.That(result.Succeeded, Is.True);
-        Assert.That(result.RemainingSlip.Steps, Has.Count.EqualTo(1));
-        Assert.That(result.RemainingSlip.CurrentStep!.StepName, Is.EqualTo("Transform"));
-        Assert.That(result.ForwardedToTopic, Is.Null); // No destination on Validate step.
+        Assert.That(result1.StepName, Is.EqualTo("Step1"));
+        Assert.That(result1.Succeeded, Is.True);
+        Assert.That(result1.RemainingSlip.Steps, Has.Count.EqualTo(1));
+        Assert.That(result1.RemainingSlip.CurrentStep!.StepName, Is.EqualTo("Step2"));
+        _output.AssertReceivedOnTopic("step1-out", 1);
     }
 
-    // ── Step with Parameters ────────────────────────────────────────────────
-
     [Test]
-    public async Task Execute_StepWithParameters_PassesParametersToHandler()
+    public async Task ExecuteStep_WithParameters_PassesParametersToHandler()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        IReadOnlyDictionary<string, string>? receivedParams = null;
-
-        var handler = Substitute.For<IRoutingSlipStepHandler>();
-        handler.StepName.Returns("Enrich");
-        handler.HandleAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Any<IReadOnlyDictionary<string, string>?>(),
-            Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                receivedParams = ci.ArgAt<IReadOnlyDictionary<string, string>?>(1);
-                return true;
-            });
-
-        var router = new RoutingSlipRouter(
-            [handler], producer, NullLogger<RoutingSlipRouter>.Instance);
+        var handler = new ParameterCapturingHandler("Configure");
+        var router = CreateRouter(handler);
 
         var parameters = new Dictionary<string, string>
         {
-            ["lookupUrl"] = "https://api.example.com/enrich",
-            ["timeout"] = "30",
+            ["format"] = "json",
+            ["compress"] = "true",
         };
-
-        var slip = new RoutingSlip([
-            new RoutingSlipStep("Enrich", null, parameters),
-        ]);
-
-        var envelope = IntegrationEnvelope<string>.Create(
-            "payload", "Service", "event.type") with
-        {
-            Metadata = new Dictionary<string, string>
-            {
-                [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
-            },
-        };
+        var envelope = CreateEnvelopeWithSlip(
+            new RoutingSlipStep("Configure", "configured-topic", parameters));
 
         var result = await router.ExecuteCurrentStepAsync(envelope);
 
         Assert.That(result.Succeeded, Is.True);
-        Assert.That(receivedParams, Is.Not.Null);
-        Assert.That(receivedParams!["lookupUrl"], Is.EqualTo("https://api.example.com/enrich"));
-        Assert.That(receivedParams["timeout"], Is.EqualTo("30"));
+        Assert.That(handler.CapturedParameters, Is.Not.Null);
+        Assert.That(handler.CapturedParameters!["format"], Is.EqualTo("json"));
+        Assert.That(handler.CapturedParameters["compress"], Is.EqualTo("true"));
+        _output.AssertReceivedOnTopic("configured-topic", 1);
     }
 
-    // ── Handler Throws Exception — Step Fails Gracefully ────────────────────
+    // ── Helpers ─────────────────────────────────────────────────────────
 
-    [Test]
-    public async Task Execute_HandlerThrows_ResultIndicatesFailureWithMessage()
+    private RoutingSlipRouter CreateRouter(params IRoutingSlipStepHandler[] handlers) =>
+        new(handlers, _output, NullLogger<RoutingSlipRouter>.Instance);
+
+    private static IntegrationEnvelope<string> CreateEnvelopeWithSlip(
+        params RoutingSlipStep[] steps)
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        var slip = new RoutingSlip(steps.ToList().AsReadOnly());
+        var slipJson = JsonSerializer.Serialize(slip.Steps, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        });
 
-        var handler = Substitute.For<IRoutingSlipStepHandler>();
-        handler.StepName.Returns("RiskyStep");
-        handler.HandleAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Any<IReadOnlyDictionary<string, string>?>(),
-            Arg.Any<CancellationToken>())
-            .Returns<bool>(_ => throw new InvalidOperationException("Connection timed out"));
-
-        var router = new RoutingSlipRouter(
-            [handler], producer, NullLogger<RoutingSlipRouter>.Instance);
-
-        var slip = new RoutingSlip([new RoutingSlipStep("RiskyStep", "output-topic")]);
-        var envelope = IntegrationEnvelope<string>.Create(
-            "payload", "Service", "event.type") with
+        return IntegrationEnvelope<string>.Create("test-payload", "TestSvc", "test.event") with
         {
             Metadata = new Dictionary<string, string>
             {
-                [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
+                [RoutingSlip.MetadataKey] = slipJson,
             },
         };
-
-        var result = await router.ExecuteCurrentStepAsync(envelope);
-
-        Assert.That(result.Succeeded, Is.False);
-        Assert.That(result.FailureReason, Does.Contain("Connection timed out"));
-        Assert.That(result.ForwardedToTopic, Is.Null);
     }
 
-    // ── RoutingSlip Contract Tests ──────────────────────────────────────────
+    // ── Test step handlers ──────────────────────────────────────────────
 
-    [Test]
-    public void RoutingSlip_Advance_ConsumesCurrentStep()
+    private sealed class AlwaysSucceedHandler : IRoutingSlipStepHandler
     {
-        var slip = new RoutingSlip([
-            new RoutingSlipStep("Step1"),
-            new RoutingSlipStep("Step2"),
-            new RoutingSlipStep("Step3"),
-        ]);
+        public AlwaysSucceedHandler(string stepName) => StepName = stepName;
+        public string StepName { get; }
 
-        Assert.That(slip.IsComplete, Is.False);
-        Assert.That(slip.CurrentStep!.StepName, Is.EqualTo("Step1"));
+        public Task<bool> HandleAsync<T>(
+            IntegrationEnvelope<T> envelope,
+            IReadOnlyDictionary<string, string>? parameters,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
+    }
 
-        var advanced = slip.Advance();
-        Assert.That(advanced.CurrentStep!.StepName, Is.EqualTo("Step2"));
-        Assert.That(advanced.Steps, Has.Count.EqualTo(2));
+    private sealed class AlwaysFailHandler : IRoutingSlipStepHandler
+    {
+        public AlwaysFailHandler(string stepName) => StepName = stepName;
+        public string StepName { get; }
 
-        var advanced2 = advanced.Advance();
-        Assert.That(advanced2.CurrentStep!.StepName, Is.EqualTo("Step3"));
+        public Task<bool> HandleAsync<T>(
+            IntegrationEnvelope<T> envelope,
+            IReadOnlyDictionary<string, string>? parameters,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+    }
 
-        var completed = advanced2.Advance();
-        Assert.That(completed.IsComplete, Is.True);
-        Assert.That(completed.CurrentStep, Is.Null);
+    private sealed class ParameterCapturingHandler : IRoutingSlipStepHandler
+    {
+        public ParameterCapturingHandler(string stepName) => StepName = stepName;
+        public string StepName { get; }
+        public IReadOnlyDictionary<string, string>? CapturedParameters { get; private set; }
+
+        public Task<bool> HandleAsync<T>(
+            IntegrationEnvelope<T> envelope,
+            IReadOnlyDictionary<string, string>? parameters,
+            CancellationToken cancellationToken = default)
+        {
+            CapturedParameters = parameters;
+            return Task.FromResult(true);
+        }
     }
 }

@@ -1,120 +1,83 @@
 // ============================================================================
 // Tutorial 46 – Complete Integration / Demo Pipeline (Exam)
 // ============================================================================
-// Coding challenges: full pipeline flow, error handling, and input mapping.
+// E2E challenges: full dispatch-to-publish flow, service activator
+// request-reply, and pipeline failure handling via MockEndpoint.
 // ============================================================================
 
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Demo.Pipeline;
+using EnterpriseIntegrationPlatform.Processing.Dispatcher;
+using EnterpriseIntegrationPlatform.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial46;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Full Pipeline Flow ──────────────────────────────────────
-
     [Test]
-    public async Task Challenge1_FullPipelineFlow_DispatchesAndReturns()
+    public async Task Challenge1_FullDispatchToPublish_EndToEnd()
     {
-        var msgId = Guid.NewGuid();
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        dispatcher.DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(msgId, true));
+        await using var output = new MockEndpoint("e2e");
+        var dispatcher = new MessageDispatcher(
+            Options.Create(new MessageDispatcherOptions()),
+            NullLogger<MessageDispatcher>.Instance);
 
-        var options = Options.Create(new PipelineOptions
+        dispatcher.Register<string>("order.created", async (env, _) =>
         {
-            AckSubject = "ack-subject",
-            NackSubject = "nack-subject",
+            var result = IntegrationEnvelope<string>.Create(
+                $"processed:{env.Payload}", "pipeline", "order.processed");
+            await output.PublishAsync(result, "orders-processed");
         });
 
-        var orchestrator = new PipelineOrchestrator(
-            dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
+        var envelope = IntegrationEnvelope<string>.Create(
+            "{\"orderId\":\"ORD-001\"}", "OrderService", "order.created");
+        var dispatchResult = await dispatcher.DispatchAsync(envelope);
 
-        var payload = JsonSerializer.Deserialize<JsonElement>(
-            "{\"orderId\": \"ORD-001\", \"amount\": 99.99}");
-        var envelope = IntegrationEnvelope<JsonElement>.Create(
-            payload, "OrderService", "order.created");
-
-        await orchestrator.ProcessAsync(envelope);
-
-        await dispatcher.Received(1).DispatchAsync(
-            Arg.Is<IntegrationPipelineInput>(i =>
-                i.Source == "OrderService" &&
-                i.MessageType == "order.created"),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>());
+        Assert.That(dispatchResult.Succeeded, Is.True);
+        output.AssertReceivedOnTopic("orders-processed", 1);
     }
 
-    // ── Challenge 2: Pipeline Input Mapping ─────────────────────────────────
-
     [Test]
-    public async Task Challenge2_PipelineInputMapping_CapturesEnvelopeFields()
+    public async Task Challenge2_ServiceActivator_RequestReplyFlow()
     {
-        IntegrationPipelineInput? captured = null;
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        dispatcher.DispatchAsync(
-            Arg.Do<IntegrationPipelineInput>(i => captured = i),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(Guid.NewGuid(), true));
+        await using var output = new MockEndpoint("reply");
+        var activator = new ServiceActivator(
+            output, Options.Create(new ServiceActivatorOptions()),
+            NullLogger<ServiceActivator>.Instance);
 
-        var options = Options.Create(new PipelineOptions
+        var request = IntegrationEnvelope<string>.Create("lookup-123", "client", "query.request") with
         {
-            AckSubject = "ack",
-            NackSubject = "nack",
-        });
+            ReplyTo = "client-replies",
+        };
 
-        var orchestrator = new PipelineOrchestrator(
-            dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
+        var result = await activator.InvokeAsync<string, string>(
+            request, (env, _) => Task.FromResult<string?>($"found:{env.Payload}"));
 
-        var envelope = IntegrationEnvelope<JsonElement>.Create(
-            JsonSerializer.Deserialize<JsonElement>("{\"key\": \"value\"}"),
-            "TestSource", "test.type");
-
-        await orchestrator.ProcessAsync(envelope);
-
-        Assert.That(captured, Is.Not.Null);
-        Assert.That(captured!.Source, Is.EqualTo("TestSource"));
-        Assert.That(captured.MessageType, Is.EqualTo("test.type"));
-        Assert.That(captured.PayloadJson, Does.Contain("key"));
+        Assert.That(result.Succeeded, Is.True);
+        Assert.That(result.ReplySent, Is.True);
+        output.AssertReceivedOnTopic("client-replies", 1);
     }
 
-    // ── Challenge 3: Dispatcher Failure Scenario ────────────────────────────
-
     [Test]
-    public void Challenge3_DispatcherFailure_OrchestratorHandlesGracefully()
+    public async Task Challenge3_PipelineFailure_HandledGracefully()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        dispatcher.DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(Guid.NewGuid(), false, "Temporal unavailable"));
-
-        var options = Options.Create(new PipelineOptions
-        {
-            AckSubject = "ack",
-            NackSubject = "nack",
-        });
+        var temporal = new MockTemporalWorkflowDispatcher()
+            .ReturnsFailure("Temporal unavailable");
 
         var orchestrator = new PipelineOrchestrator(
-            dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
+            temporal, Options.Create(new PipelineOptions { AckSubject = "ack", NackSubject = "nack" }),
+            NullLogger<PipelineOrchestrator>.Instance);
 
         var envelope = IntegrationEnvelope<JsonElement>.Create(
-            JsonSerializer.Deserialize<JsonElement>("{}"),
-            "Svc", "evt");
+            JsonSerializer.Deserialize<JsonElement>("{}"), "Svc", "evt");
 
-        // Should not throw even on failure result
         Assert.DoesNotThrowAsync(() => orchestrator.ProcessAsync(envelope));
     }
 }

@@ -1,24 +1,33 @@
 // ============================================================================
 // Tutorial 47 – Saga Compensation (Lab)
 // ============================================================================
-// This lab exercises the DefaultCompensationActivityService, saga-related
-// records, and workflow types via reflection.
+// EIP Pattern: Saga / Compensation.
+// E2E: Wire DefaultCompensationActivityService with MockEndpoint to
+// demonstrate compensation notifications published after each step.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Activities;
+using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial47;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── DefaultCompensationActivityService Compensates Successfully ──────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("saga-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task CompensateAsync_ReturnsTrue()
+    public async Task CompensateAsync_SingleStep_ReturnsTrue()
     {
         var svc = new DefaultCompensationActivityService(
             NullLogger<DefaultCompensationActivityService>.Instance);
@@ -28,43 +37,6 @@ public sealed class Lab
         Assert.That(result, Is.True);
     }
 
-    // ── ICompensationActivityService Interface Shape ─────────────────────────
-
-    [Test]
-    public void ICompensationActivityService_InterfaceShape()
-    {
-        var type = typeof(ICompensationActivityService);
-
-        Assert.That(type.IsInterface, Is.True);
-        Assert.That(type.GetMethod("CompensateAsync"), Is.Not.Null);
-    }
-
-    // ── SagaCompensationActivities Class Exists ─────────────────────────────
-
-    [Test]
-    public void SagaCompensationActivities_ClassExists()
-    {
-        var assembly = typeof(EnterpriseIntegrationPlatform.Workflow.Temporal.TemporalOptions).Assembly;
-        var type = assembly.GetTypes()
-            .FirstOrDefault(t => t.Name == "SagaCompensationActivities");
-
-        Assert.That(type, Is.Not.Null);
-    }
-
-    // ── SagaCompensationWorkflow Class Exists ───────────────────────────────
-
-    [Test]
-    public void SagaCompensationWorkflow_ClassExists()
-    {
-        var assembly = typeof(EnterpriseIntegrationPlatform.Workflow.Temporal.TemporalOptions).Assembly;
-        var type = assembly.GetTypes()
-            .FirstOrDefault(t => t.Name == "SagaCompensationWorkflow");
-
-        Assert.That(type, Is.Not.Null);
-    }
-
-    // ── CompensateAsync With Different Step Names ────────────────────────────
-
     [Test]
     public async Task CompensateAsync_MultipleSteps_AllReturnTrue()
     {
@@ -72,31 +44,40 @@ public sealed class Lab
             NullLogger<DefaultCompensationActivityService>.Instance);
 
         var corrId = Guid.NewGuid();
-        var r1 = await svc.CompensateAsync(corrId, "persist");
-        var r2 = await svc.CompensateAsync(corrId, "notify");
-        var r3 = await svc.CompensateAsync(corrId, "route");
+        var steps = new[] { "persist", "notify", "route" };
 
-        Assert.That(r1, Is.True);
-        Assert.That(r2, Is.True);
-        Assert.That(r3, Is.True);
+        foreach (var step in steps)
+        {
+            var ok = await svc.CompensateAsync(corrId, step);
+            Assert.That(ok, Is.True);
+            // Publish compensation notification to MockEndpoint
+            var notification = IntegrationEnvelope<string>.Create(
+                $"compensated:{step}", "saga", "saga.compensated");
+            await _output.PublishAsync(notification, "saga-compensations");
+        }
+
+        _output.AssertReceivedOnTopic("saga-compensations", 3);
     }
-
-    // ── Mock ICompensationActivityService ────────────────────────────────────
 
     [Test]
-    public async Task Mock_CompensationService_ReturnsConfiguredResult()
+    public async Task MockCompensation_FailureDetected_NackPublished()
     {
-        var mock = Substitute.For<ICompensationActivityService>();
-        mock.CompensateAsync(Arg.Any<Guid>(), "validate")
-            .Returns(true);
-        mock.CompensateAsync(Arg.Any<Guid>(), "persist")
-            .Returns(false);
+        var mock = new MockCompensationActivityService()
+            .WithStepResult("persist", false);
 
-        Assert.That(await mock.CompensateAsync(Guid.NewGuid(), "validate"), Is.True);
-        Assert.That(await mock.CompensateAsync(Guid.NewGuid(), "persist"), Is.False);
+        var corrId = Guid.NewGuid();
+        var result = await mock.CompensateAsync(corrId, "persist");
+
+        if (!result)
+        {
+            var nack = IntegrationEnvelope<string>.Create(
+                "persist-failed", "saga", "saga.compensation.failed");
+            await _output.PublishAsync(nack, "saga-failures");
+        }
+
+        Assert.That(result, Is.False);
+        _output.AssertReceivedOnTopic("saga-failures", 1);
     }
-
-    // ── IntegrationPipelineResult Shape ──────────────────────────────────────
 
     [Test]
     public void IntegrationPipelineResult_FailureHasReason()
@@ -105,5 +86,23 @@ public sealed class Lab
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.FailureReason, Is.EqualTo("Compensation required"));
+    }
+
+    [Test]
+    public void SagaCompensationWorkflow_ClassExists()
+    {
+        var assembly = typeof(EnterpriseIntegrationPlatform.Workflow.Temporal.TemporalOptions).Assembly;
+        var type = assembly.GetTypes().FirstOrDefault(t => t.Name == "SagaCompensationWorkflow");
+
+        Assert.That(type, Is.Not.Null);
+    }
+
+    [Test]
+    public void SagaCompensationActivities_ClassExists()
+    {
+        var assembly = typeof(EnterpriseIntegrationPlatform.Workflow.Temporal.TemporalOptions).Assembly;
+        var type = assembly.GetTypes().FirstOrDefault(t => t.Name == "SagaCompensationActivities");
+
+        Assert.That(type, Is.Not.Null);
     }
 }

@@ -1,169 +1,138 @@
 // ============================================================================
 // Tutorial 20 – Splitter (Lab)
 // ============================================================================
-// This lab exercises the MessageSplitter — the pattern that decomposes a
-// composite message into individual messages, each published separately.
-// You will test FuncSplitStrategy, JsonArraySplitStrategy, envelope field
-// preservation, and error handling for unconfigured target topics.
+// EIP Pattern: Splitter.
+// E2E: MessageSplitter with FuncSplitStrategy + MockEndpoint to capture
+// split messages, verify SequenceNumber, TotalCount, and CausationId.
 // ============================================================================
 
-using System.Text.Json;
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Splitter;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial20;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Basic Split with FuncSplitStrategy ───────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("splitter-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task Split_FuncStrategy_SplitsIntoIndividualEnvelopes()
+    public async Task Split_ProducesCorrectItemCount()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var strategy = new FuncSplitStrategy<string>(
-            composite => composite.Split(',').ToList());
-
-        var options = Options.Create(new SplitterOptions { TargetTopic = "items-topic" });
-        var splitter = new MessageSplitter<string>(
-            strategy, producer, options,
-            NullLogger<MessageSplitter<string>>.Instance);
+        var splitter = CreateStringSplitter(",");
 
         var source = IntegrationEnvelope<string>.Create(
-            "apple,banana,cherry", "InventoryService", "batch.items");
-
+            "A,B,C", "OrderService", "batch.created");
         var result = await splitter.SplitAsync(source);
 
         Assert.That(result.ItemCount, Is.EqualTo(3));
-        Assert.That(result.TargetTopic, Is.EqualTo("items-topic"));
-        Assert.That(result.SourceMessageId, Is.EqualTo(source.MessageId));
-        Assert.That(result.SplitEnvelopes[0].Payload, Is.EqualTo("apple"));
-        Assert.That(result.SplitEnvelopes[1].Payload, Is.EqualTo("banana"));
-        Assert.That(result.SplitEnvelopes[2].Payload, Is.EqualTo("cherry"));
+        Assert.That(result.SplitEnvelopes, Has.Count.EqualTo(3));
+        _output.AssertReceivedOnTopic("split-topic", 3);
     }
 
-    // ── CorrelationId and CausationId Preservation ──────────────────────────
-
     [Test]
-    public async Task Split_PreservesCorrelationId_SetsCausationId()
+    public async Task Split_PreservesCorrelationId()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var strategy = new FuncSplitStrategy<string>(s => new[] { s });
-
-        var options = Options.Create(new SplitterOptions { TargetTopic = "topic" });
-        var splitter = new MessageSplitter<string>(
-            strategy, producer, options,
-            NullLogger<MessageSplitter<string>>.Instance);
+        var splitter = CreateStringSplitter(",");
 
         var source = IntegrationEnvelope<string>.Create(
-            "payload", "Service", "event.type");
-
+            "X,Y", "Svc", "batch");
         var result = await splitter.SplitAsync(source);
 
-        var splitEnv = result.SplitEnvelopes[0];
-        Assert.That(splitEnv.CorrelationId, Is.EqualTo(source.CorrelationId));
-        Assert.That(splitEnv.CausationId, Is.EqualTo(source.MessageId));
-        Assert.That(splitEnv.MessageId, Is.Not.EqualTo(source.MessageId));
+        Assert.That(result.SplitEnvelopes[0].CorrelationId, Is.EqualTo(source.CorrelationId));
+        Assert.That(result.SplitEnvelopes[1].CorrelationId, Is.EqualTo(source.CorrelationId));
     }
 
-    // ── Publisher Called for Each Split Envelope ─────────────────────────────
+    [Test]
+    public async Task Split_SetsCausationIdToSourceMessageId()
+    {
+        var splitter = CreateStringSplitter(",");
+
+        var source = IntegrationEnvelope<string>.Create(
+            "A,B", "Svc", "batch");
+        var result = await splitter.SplitAsync(source);
+
+        Assert.That(result.SplitEnvelopes[0].CausationId, Is.EqualTo(source.MessageId));
+        Assert.That(result.SplitEnvelopes[1].CausationId, Is.EqualTo(source.MessageId));
+    }
 
     [Test]
-    public async Task Split_PublishesEachEnvelopeToTargetTopic()
+    public async Task Split_SequenceNumbers_AreZeroBased()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var strategy = new FuncSplitStrategy<string>(
-            s => s.Split('|').ToList());
+        var splitter = CreateStringSplitter(",");
 
+        var source = IntegrationEnvelope<string>.Create(
+            "A,B,C", "Svc", "batch");
+        var result = await splitter.SplitAsync(source);
+
+        Assert.That(result.SplitEnvelopes[0].SequenceNumber, Is.EqualTo(0));
+        Assert.That(result.SplitEnvelopes[1].SequenceNumber, Is.EqualTo(1));
+        Assert.That(result.SplitEnvelopes[2].SequenceNumber, Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task Split_TotalCount_MatchesItemCount()
+    {
+        var splitter = CreateStringSplitter(",");
+
+        var source = IntegrationEnvelope<string>.Create(
+            "A,B,C,D", "Svc", "batch");
+        var result = await splitter.SplitAsync(source);
+
+        foreach (var env in result.SplitEnvelopes)
+            Assert.That(env.TotalCount, Is.EqualTo(4));
+
+        Assert.That(result.ItemCount, Is.EqualTo(4));
+    }
+
+    [Test]
+    public async Task Split_EmptyResult_ReturnsZeroItems()
+    {
+        var strategy = new FuncSplitStrategy<string>(_ => Array.Empty<string>());
         var options = Options.Create(new SplitterOptions { TargetTopic = "split-topic" });
         var splitter = new MessageSplitter<string>(
-            strategy, producer, options,
+            strategy, _output, options,
             NullLogger<MessageSplitter<string>>.Instance);
 
         var source = IntegrationEnvelope<string>.Create(
-            "A|B", "Service", "batch");
-
-        await splitter.SplitAsync(source);
-
-        await producer.Received(2).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Is("split-topic"),
-            Arg.Any<CancellationToken>());
-    }
-
-    // ── No Target Topic Configured — Throws ─────────────────────────────────
-
-    [Test]
-    public void Split_NoTargetTopic_ThrowsInvalidOperationException()
-    {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var strategy = new FuncSplitStrategy<string>(s => new[] { s });
-
-        var options = Options.Create(new SplitterOptions { TargetTopic = "" });
-        var splitter = new MessageSplitter<string>(
-            strategy, producer, options,
-            NullLogger<MessageSplitter<string>>.Instance);
-
-        var source = IntegrationEnvelope<string>.Create("data", "Svc", "evt");
-
-        Assert.ThrowsAsync<InvalidOperationException>(
-            () => splitter.SplitAsync(source));
-    }
-
-    // ── Zero Items After Split ──────────────────────────────────────────────
-
-    [Test]
-    public async Task Split_ZeroItems_ReturnsEmptyResult_NoPublish()
-    {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var strategy = new FuncSplitStrategy<string>(_ => Array.Empty<string>());
-
-        var options = Options.Create(new SplitterOptions { TargetTopic = "topic" });
-        var splitter = new MessageSplitter<string>(
-            strategy, producer, options,
-            NullLogger<MessageSplitter<string>>.Instance);
-
-        var source = IntegrationEnvelope<string>.Create("empty", "Svc", "evt");
-
+            "empty", "Svc", "batch");
         var result = await splitter.SplitAsync(source);
 
         Assert.That(result.ItemCount, Is.EqualTo(0));
         Assert.That(result.SplitEnvelopes, Is.Empty);
-        await producer.DidNotReceive()
-            .PublishAsync(Arg.Any<IntegrationEnvelope<string>>(),
-                Arg.Any<string>(), Arg.Any<CancellationToken>());
+        _output.AssertNoneReceived();
     }
 
-    // ── JsonArraySplitStrategy ──────────────────────────────────────────────
-
     [Test]
-    public async Task Split_JsonArrayStrategy_SplitsTopLevelArray()
+    public async Task Split_SourceMessageId_CapturedInResult()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var splitOptions = Options.Create(new SplitterOptions { TargetTopic = "json-items" });
-        var strategy = new JsonArraySplitStrategy(splitOptions);
+        var splitter = CreateStringSplitter(",");
 
-        var splitter = new MessageSplitter<JsonElement>(
-            strategy, producer, splitOptions,
-            NullLogger<MessageSplitter<JsonElement>>.Instance);
-
-        var jsonArray = JsonSerializer.Deserialize<JsonElement>(
-            """[{"id":1},{"id":2},{"id":3}]""");
-
-        var source = IntegrationEnvelope<JsonElement>.Create(
-            jsonArray, "BatchService", "batch.created");
-
+        var source = IntegrationEnvelope<string>.Create(
+            "A,B", "Svc", "batch");
         var result = await splitter.SplitAsync(source);
 
-        Assert.That(result.ItemCount, Is.EqualTo(3));
-        Assert.That(result.SplitEnvelopes[0].Payload.GetProperty("id").GetInt32(), Is.EqualTo(1));
-        Assert.That(result.SplitEnvelopes[1].Payload.GetProperty("id").GetInt32(), Is.EqualTo(2));
-        Assert.That(result.SplitEnvelopes[2].Payload.GetProperty("id").GetInt32(), Is.EqualTo(3));
+        Assert.That(result.SourceMessageId, Is.EqualTo(source.MessageId));
+        Assert.That(result.TargetTopic, Is.EqualTo("split-topic"));
+    }
+
+    private MessageSplitter<string> CreateStringSplitter(string delimiter)
+    {
+        var strategy = new FuncSplitStrategy<string>(
+            composite => composite.Split(delimiter).ToList());
+        var options = Options.Create(new SplitterOptions { TargetTopic = "split-topic" });
+        return new MessageSplitter<string>(
+            strategy, _output, options,
+            NullLogger<MessageSplitter<string>>.Instance);
     }
 }

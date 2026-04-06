@@ -1,60 +1,62 @@
 // ============================================================================
 // Tutorial 48 – Notification Use Cases (Lab)
 // ============================================================================
-// This lab exercises the notification and validation activity services:
-// DefaultMessageValidationService, MessageValidationResult,
-// DefaultMessageLoggingService, and INotificationActivityService.
+// EIP Pattern: Notification / Ack-Nack.
+// E2E: Wire validation, logging, and notification services with MockEndpoint
+// to verify ack/nack publish flow after validation.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Activities;
+using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial48;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── DefaultMessageValidationService Returns Success ──────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("notify-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task ValidateAsync_ValidMessage_ReturnsSuccess()
+    public async Task Validate_Success_PublishesAck()
     {
-        var svc = new DefaultMessageValidationService();
-
-        var result = await svc.ValidateAsync("order.created", "{\"id\": 1}");
+        var validator = new DefaultMessageValidationService();
+        var result = await validator.ValidateAsync("order.created", "{\"id\": 1}");
 
         Assert.That(result.IsValid, Is.True);
-        Assert.That(result.Reason, Is.Null);
+
+        // Publish ack notification
+        var ack = IntegrationEnvelope<string>.Create("ack", "pipeline", "notification.ack");
+        await _output.PublishAsync(ack, "ack-topic");
+        _output.AssertReceivedOnTopic("ack-topic", 1);
     }
 
-    // ── MessageValidationResult.Success Static ──────────────────────────────
-
     [Test]
-    public void MessageValidationResult_Success_HasExpectedValues()
+    public async Task Validate_Failure_PublishesNack()
     {
-        var result = MessageValidationResult.Success;
+        var validator = new MockMessageValidationService()
+            .WithResult("bad.type", MessageValidationResult.Failure("Unknown type"));
 
-        Assert.That(result.IsValid, Is.True);
-        Assert.That(result.Reason, Is.Null);
-    }
-
-    // ── MessageValidationResult.Failure Static ──────────────────────────────
-
-    [Test]
-    public void MessageValidationResult_Failure_HasReasonAndInvalid()
-    {
-        var result = MessageValidationResult.Failure("Schema mismatch");
-
+        var result = await validator.ValidateAsync("bad.type", "{}");
         Assert.That(result.IsValid, Is.False);
-        Assert.That(result.Reason, Is.EqualTo("Schema mismatch"));
+
+        var nack = IntegrationEnvelope<string>.Create(
+            result.Reason!, "pipeline", "notification.nack");
+        await _output.PublishAsync(nack, "nack-topic");
+        _output.AssertReceivedOnTopic("nack-topic", 1);
     }
 
-    // ── DefaultMessageLoggingService Completes ──────────────────────────────
-
     [Test]
-    public async Task LogAsync_Completes_WithoutError()
+    public async Task LogAsync_CompletesWithoutError()
     {
         var svc = new DefaultMessageLoggingService(
             NullLogger<DefaultMessageLoggingService>.Instance);
@@ -63,43 +65,37 @@ public sealed class Lab
             svc.LogAsync(Guid.NewGuid(), "order.created", "Validated"));
     }
 
-    // ── INotificationActivityService Interface Shape ─────────────────────────
-
     [Test]
-    public void INotificationActivityService_InterfaceShape()
+    public void MessageValidationResult_Success_HasExpectedValues()
     {
-        var type = typeof(INotificationActivityService);
-
-        Assert.That(type.IsInterface, Is.True);
-        Assert.That(type.GetMethod("PublishAckAsync"), Is.Not.Null);
-        Assert.That(type.GetMethod("PublishNackAsync"), Is.Not.Null);
+        var result = MessageValidationResult.Success;
+        Assert.That(result.IsValid, Is.True);
+        Assert.That(result.Reason, Is.Null);
     }
 
-    // ── IPersistenceActivityService Interface Shape ──────────────────────────
-
     [Test]
-    public void IPersistenceActivityService_InterfaceShape()
+    public void MessageValidationResult_Failure_HasReasonAndInvalid()
     {
-        var type = typeof(IPersistenceActivityService);
-
-        Assert.That(type.IsInterface, Is.True);
-        Assert.That(type.GetMethod("SaveMessageAsync"), Is.Not.Null);
-        Assert.That(type.GetMethod("UpdateDeliveryStatusAsync"), Is.Not.Null);
+        var result = MessageValidationResult.Failure("Schema mismatch");
+        Assert.That(result.IsValid, Is.False);
+        Assert.That(result.Reason, Is.EqualTo("Schema mismatch"));
     }
 
-    // ── Mock INotificationActivityService PublishAckAsync ────────────────────
-
     [Test]
-    public async Task Mock_NotificationService_VerifyAckCalled()
+    public async Task FullNotificationFlow_ValidateLogPublish()
     {
-        var mock = Substitute.For<INotificationActivityService>();
+        var validator = new DefaultMessageValidationService();
+        var logger = new DefaultMessageLoggingService(
+            NullLogger<DefaultMessageLoggingService>.Instance);
 
-        await mock.PublishAckAsync(Guid.NewGuid(), Guid.NewGuid(), "ack-topic", CancellationToken.None);
+        var msgId = Guid.NewGuid();
+        var validation = await validator.ValidateAsync("order.created", "{\"id\": 1}");
+        await logger.LogAsync(msgId, "order.created", "Validated");
 
-        await mock.Received(1).PublishAckAsync(
-            Arg.Any<Guid>(),
-            Arg.Any<Guid>(),
-            Arg.Is("ack-topic"),
-            Arg.Any<CancellationToken>());
+        var envelope = IntegrationEnvelope<string>.Create(
+            validation.IsValid ? "ack" : "nack", "pipeline", "notification.result");
+        await _output.PublishAsync(envelope, validation.IsValid ? "ack-topic" : "nack-topic");
+
+        _output.AssertReceivedOnTopic("ack-topic", 1);
     }
 }

@@ -1,181 +1,159 @@
 // ============================================================================
 // Tutorial 44 – Disaster Recovery (Exam)
 // ============================================================================
-// Coding challenges: full DR drill, failover/failback lifecycle, and
-// recovery point validation against objectives.
+// EIP Pattern: Failover / Failback
+// E2E: Full failover/failback lifecycle, multi-region topology with
+//      failover chain, and failover audit trail — all via MockEndpoint.
 // ============================================================================
-
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.DisasterRecovery;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial44;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Full DR Drill ──────────────────────────────────────────
-
     [Test]
-    public async Task Challenge1_FullDrDrill_RegisterRegionsRunDrillVerifyResult()
+    public async Task Challenge1_FullFailoverFailbackLifecycle_WithMockEndpoint()
     {
-        var failoverMgr = new InMemoryFailoverManager(
+        await using var output = new MockEndpoint("exam-dr-lifecycle");
+        var mgr = new InMemoryFailoverManager(
             NullLogger<InMemoryFailoverManager>.Instance,
             Options.Create(new DisasterRecoveryOptions()));
 
-        var replicationMgr = new InMemoryReplicationManager(
-            NullLogger<InMemoryReplicationManager>.Instance,
-            Options.Create(new DisasterRecoveryOptions()));
-
-        var validator = Substitute.For<IRecoveryPointValidator>();
-        validator.GetObjectivesAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<RecoveryObjective>());
-
-        // Register regions
-        await failoverMgr.RegisterRegionAsync(new RegionInfo
+        await mgr.RegisterRegionAsync(new RegionInfo
         {
-            RegionId = "us-east-1",
-            DisplayName = "US East (Primary)",
+            RegionId = "primary-region", DisplayName = "Primary",
             State = FailoverState.Primary,
         });
-
-        await failoverMgr.RegisterRegionAsync(new RegionInfo
+        await mgr.RegisterRegionAsync(new RegionInfo
         {
-            RegionId = "us-west-2",
-            DisplayName = "US West (Standby)",
-            State = FailoverState.Standby,
-        });
-
-        // Set up replication state
-        await replicationMgr.ReportSourceProgressAsync("us-east-1", 100);
-        await replicationMgr.ReportReplicationAsync("us-east-1", "us-west-2", 95);
-
-        var drillRunner = new DrDrillRunner(
-            failoverMgr, replicationMgr, validator,
-            NullLogger<DrDrillRunner>.Instance,
-            Options.Create(new DisasterRecoveryOptions()));
-
-        var scenario = new DrDrillScenario
-        {
-            ScenarioId = "drill-001",
-            Name = "Region Failure Test",
-            DrillType = DrDrillType.RegionFailure,
-            TargetRegionId = "us-east-1",
-            FailoverRegionId = "us-west-2",
-            AutoFailback = false,
-        };
-
-        var result = await drillRunner.RunDrillAsync(scenario);
-
-        Assert.That(result.Success, Is.True);
-        Assert.That(result.Scenario.Name, Is.EqualTo("Region Failure Test"));
-        Assert.That(result.FailoverTime, Is.GreaterThanOrEqualTo(TimeSpan.Zero));
-        Assert.That(result.CompletedAt, Is.GreaterThanOrEqualTo(result.StartedAt));
-
-        // Verify the failover actually happened
-        var primary = await failoverMgr.GetPrimaryAsync();
-        Assert.That(primary!.RegionId, Is.EqualTo("us-west-2"));
-    }
-
-    // ── Challenge 2: Failover and Failback Lifecycle ────────────────────────
-
-    [Test]
-    public async Task Challenge2_FailoverAndFailback_Lifecycle()
-    {
-        var manager = new InMemoryFailoverManager(
-            NullLogger<InMemoryFailoverManager>.Instance,
-            Options.Create(new DisasterRecoveryOptions()));
-
-        await manager.RegisterRegionAsync(new RegionInfo
-        {
-            RegionId = "primary-region",
-            DisplayName = "Primary",
-            State = FailoverState.Primary,
-        });
-
-        await manager.RegisterRegionAsync(new RegionInfo
-        {
-            RegionId = "standby-region",
-            DisplayName = "Standby",
+            RegionId = "standby-region", DisplayName = "Standby",
             State = FailoverState.Standby,
         });
 
         // Initial state
-        var initial = await manager.GetPrimaryAsync();
+        var initial = await mgr.GetPrimaryAsync();
         Assert.That(initial!.RegionId, Is.EqualTo("primary-region"));
 
-        // Failover: promote standby
-        var failoverResult = await manager.FailoverAsync("standby-region");
-        Assert.That(failoverResult.Success, Is.True);
-        Assert.That(failoverResult.PromotedRegionId, Is.EqualTo("standby-region"));
-        Assert.That(failoverResult.DemotedRegionId, Is.EqualTo("primary-region"));
+        // Failover
+        var failover = await mgr.FailoverAsync("standby-region");
+        Assert.That(failover.Success, Is.True);
+        Assert.That(failover.PromotedRegionId, Is.EqualTo("standby-region"));
+        Assert.That(failover.DemotedRegionId, Is.EqualTo("primary-region"));
 
-        var afterFailover = await manager.GetPrimaryAsync();
+        var afterFailover = await mgr.GetPrimaryAsync();
         Assert.That(afterFailover!.RegionId, Is.EqualTo("standby-region"));
 
-        // Failback: restore original primary
-        var failbackResult = await manager.FailbackAsync("primary-region");
-        Assert.That(failbackResult.Success, Is.True);
+        var envelope1 = IntegrationEnvelope<string>.Create(
+            $"failover:{failover.PromotedRegionId}", "dr-manager", "failover.event");
+        await output.PublishAsync(envelope1, "dr-audit", default);
 
-        var afterFailback = await manager.GetPrimaryAsync();
+        // Failback
+        var failback = await mgr.FailbackAsync("primary-region");
+        Assert.That(failback.Success, Is.True);
+
+        var afterFailback = await mgr.GetPrimaryAsync();
         Assert.That(afterFailback!.RegionId, Is.EqualTo("primary-region"));
+
+        var envelope2 = IntegrationEnvelope<string>.Create(
+            $"failback:{failback.PromotedRegionId}", "dr-manager", "failback.event");
+        await output.PublishAsync(envelope2, "dr-audit", default);
+
+        output.AssertReceivedOnTopic("dr-audit", 2);
     }
 
-    // ── Challenge 3: Recovery Point Validation Against Objectives ────────────
+    [Test]
+    public async Task Challenge2_MultiRegionTopology_FailoverChain()
+    {
+        await using var output = new MockEndpoint("exam-dr-chain");
+        var mgr = new InMemoryFailoverManager(
+            NullLogger<InMemoryFailoverManager>.Instance,
+            Options.Create(new DisasterRecoveryOptions()));
+
+        await mgr.RegisterRegionAsync(new RegionInfo
+        {
+            RegionId = "us-east-1", DisplayName = "US East",
+            State = FailoverState.Primary,
+        });
+        await mgr.RegisterRegionAsync(new RegionInfo
+        {
+            RegionId = "eu-west-1", DisplayName = "EU West",
+            State = FailoverState.Standby,
+        });
+        await mgr.RegisterRegionAsync(new RegionInfo
+        {
+            RegionId = "ap-south-1", DisplayName = "AP South",
+            State = FailoverState.Standby,
+        });
+
+        // First failover: us-east-1 → eu-west-1
+        var r1 = await mgr.FailoverAsync("eu-west-1");
+        Assert.That(r1.Success, Is.True);
+        Assert.That((await mgr.GetPrimaryAsync())!.RegionId, Is.EqualTo("eu-west-1"));
+
+        // Second failover: eu-west-1 → ap-south-1
+        var r2 = await mgr.FailoverAsync("ap-south-1");
+        Assert.That(r2.Success, Is.True);
+        Assert.That((await mgr.GetPrimaryAsync())!.RegionId, Is.EqualTo("ap-south-1"));
+
+        var results = new[] { r1, r2 };
+        foreach (var result in results)
+        {
+            var envelope = IntegrationEnvelope<string>.Create(
+                $"{result.DemotedRegionId}→{result.PromotedRegionId}",
+                "dr-manager", "failover.chain");
+            await output.PublishAsync(envelope, "chain-events", default);
+        }
+
+        output.AssertReceivedOnTopic("chain-events", 2);
+
+        var all = output.GetAllReceived<string>("chain-events");
+        Assert.That(all[0].Payload, Is.EqualTo("us-east-1→eu-west-1"));
+        Assert.That(all[1].Payload, Is.EqualTo("eu-west-1→ap-south-1"));
+    }
 
     [Test]
-    public async Task Challenge3_RecoveryPointValidation_AgainstObjectives()
+    public async Task Challenge3_FailoverResultDetails_PublishAuditTrail()
     {
-        var validator = Substitute.For<IRecoveryPointValidator>();
+        await using var output = new MockEndpoint("exam-dr-audit");
+        var mgr = new InMemoryFailoverManager(
+            NullLogger<InMemoryFailoverManager>.Instance,
+            Options.Create(new DisasterRecoveryOptions()));
 
-        var objective = new RecoveryObjective
+        await mgr.RegisterRegionAsync(new RegionInfo
         {
-            ObjectiveId = "sla-platinum",
-            Rpo = TimeSpan.FromMinutes(1),
-            Rto = TimeSpan.FromMinutes(5),
-            Description = "Platinum SLA",
-        };
-
-        validator.RegisterObjectiveAsync(objective, Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
-
-        validator.GetObjectivesAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<RecoveryObjective> { objective });
-
-        var validResult = new RecoveryPointValidationResult
+            RegionId = "region-a", DisplayName = "Region A",
+            State = FailoverState.Primary,
+        });
+        await mgr.RegisterRegionAsync(new RegionInfo
         {
-            Objective = objective,
-            RpoMet = true,
-            RtoMet = true,
-            CurrentLag = TimeSpan.FromSeconds(30),
-            LastFailoverDuration = TimeSpan.FromMinutes(2),
-            ValidatedAt = DateTimeOffset.UtcNow,
-        };
+            RegionId = "region-b", DisplayName = "Region B",
+            State = FailoverState.Standby,
+        });
 
-        validator.ValidateAsync(
-                "sla-platinum",
-                TimeSpan.FromSeconds(30),
-                TimeSpan.FromMinutes(2),
-                Arg.Any<CancellationToken>())
-            .Returns(validResult);
+        var result = await mgr.FailoverAsync("region-b");
 
-        // Register and retrieve objective
-        await validator.RegisterObjectiveAsync(objective);
-        var objectives = await validator.GetObjectivesAsync();
-        Assert.That(objectives, Has.Count.EqualTo(1));
-        Assert.That(objectives[0].Rpo, Is.EqualTo(TimeSpan.FromMinutes(1)));
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.PromotedRegionId, Is.EqualTo("region-b"));
+        Assert.That(result.DemotedRegionId, Is.EqualTo("region-a"));
+        Assert.That(result.Duration, Is.GreaterThanOrEqualTo(TimeSpan.Zero));
+        Assert.That(result.CompletedAt, Is.GreaterThan(DateTimeOffset.MinValue));
+        Assert.That(result.ErrorMessage, Is.Null);
 
-        // Validate against current metrics
-        var result = await validator.ValidateAsync(
-            "sla-platinum",
-            TimeSpan.FromSeconds(30),
-            TimeSpan.FromMinutes(2));
+        var envelope = IntegrationEnvelope<string>.Create(
+            $"success:{result.PromotedRegionId}|demoted:{result.DemotedRegionId}|duration:{result.Duration.TotalMilliseconds}ms",
+            "dr-manager", "failover.audit");
+        await output.PublishAsync(envelope, "audit-trail", default);
+        output.AssertReceivedOnTopic("audit-trail", 1);
 
-        Assert.That(result.RpoMet, Is.True);
-        Assert.That(result.RtoMet, Is.True);
-        Assert.That(result.CurrentLag, Is.LessThan(objective.Rpo));
-        Assert.That(result.LastFailoverDuration, Is.LessThan(objective.Rto));
+        // Verify regions after failover
+        var regions = await mgr.GetAllRegionsAsync();
+        Assert.That(regions.Single(r => r.RegionId == "region-b").IsPrimary, Is.True);
+        Assert.That(regions.Single(r => r.RegionId == "region-a").State, Is.EqualTo(FailoverState.Standby));
     }
 }

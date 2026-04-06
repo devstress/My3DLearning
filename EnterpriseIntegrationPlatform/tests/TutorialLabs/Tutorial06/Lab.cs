@@ -1,175 +1,160 @@
 // ============================================================================
 // Tutorial 06 – Messaging Channels (Lab)
 // ============================================================================
-// This lab explores the core channel types from Enterprise Integration Patterns:
-// Point-to-Point, Publish-Subscribe, Datatype Channel, and Invalid Message
-// Channel.  You will use mocked producers and consumers to exercise each
-// pattern and verify the behaviour.
+// EIP Patterns: Point-to-Point, Publish-Subscribe, Datatype Channel,
+//               Invalid Message Channel.
+// E2E: Wire real channel classes with MockEndpoints, send messages through
+// each channel type, verify delivery patterns.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Ingestion.Channels;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial06;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Point-to-Point Channel ──────────────────────────────────────────────
+    private MockEndpoint _endpoint = null!;
+
+    [SetUp]
+    public void SetUp() => _endpoint = new MockEndpoint("lab06");
+
+    [TearDown]
+    public async Task TearDown() => await _endpoint.DisposeAsync();
+
+    // ── Point-to-Point Channel ──────────────────────────────────────────
 
     [Test]
-    public async Task PointToPoint_PublishToTopic_SingleConsumerReceives()
+    public async Task PointToPoint_Send_DeliversToQueueChannel()
     {
-        // In a Point-to-Point channel, only ONE consumer in a group receives
-        // the message.  We mock the producer and verify a single publish call.
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        var channel = new PointToPointChannel(
+            _endpoint, _endpoint, NullLogger<PointToPointChannel>.Instance);
 
         var envelope = IntegrationEnvelope<string>.Create(
-            payload: "order-123",
-            source: "OrderService",
-            messageType: "order.created") with
-        {
-            Intent = MessageIntent.Command,
-        };
+            "order-123", "OrderService", "order.created");
 
-        await producer.PublishAsync(envelope, "orders.point-to-point");
+        await channel.SendAsync(envelope, "orders-queue", CancellationToken.None);
 
-        // Exactly one publish to the target topic.
-        await producer.Received(1).PublishAsync(
-            Arg.Is<IntegrationEnvelope<string>>(e => e.Payload == "order-123"),
-            Arg.Is("orders.point-to-point"),
-            Arg.Any<CancellationToken>());
+        _endpoint.AssertReceivedCount(1);
+        Assert.That(_endpoint.GetReceived<string>().Payload, Is.EqualTo("order-123"));
+        _endpoint.AssertReceivedOnTopic("orders-queue", 1);
     }
 
-    // ── Publish-Subscribe Channel ───────────────────────────────────────────
-
     [Test]
-    public async Task PubSub_MultipleConsumerGroups_EachGroupReceivesCopy()
+    public async Task PointToPoint_Receive_HandlerTriggeredOnSend()
     {
-        // In Publish-Subscribe, EVERY subscriber group gets a copy.
-        // We simulate three independent consumer groups subscribing to the same topic.
-        var consumer = Substitute.For<IMessageBrokerConsumer>();
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        var channel = new PointToPointChannel(
+            _endpoint, _endpoint, NullLogger<PointToPointChannel>.Instance);
+
+        IntegrationEnvelope<string>? captured = null;
+        await channel.ReceiveAsync<string>("orders-queue", "worker-group",
+            msg => { captured = msg; return Task.CompletedTask; }, CancellationToken.None);
 
         var envelope = IntegrationEnvelope<string>.Create(
-            "event-data", "EventService", "event.published") with
-        {
-            Intent = MessageIntent.Event,
-        };
+            "order-456", "OrderService", "order.created");
+        await _endpoint.SendAsync(envelope);
 
-        // Three subscriber groups each get the same message.
-        var groups = new[] { "billing-group", "analytics-group", "notifications-group" };
-
-        foreach (var group in groups)
-        {
-            await consumer.SubscribeAsync<string>(
-                "events.pubsub", group, _ => Task.CompletedTask);
-        }
-
-        // Publish the message.
-        await producer.PublishAsync(envelope, "events.pubsub");
-
-        // Verify all three groups subscribed independently.
-        await consumer.Received(3).SubscribeAsync<string>(
-            Arg.Is("events.pubsub"),
-            Arg.Any<string>(),
-            Arg.Any<Func<IntegrationEnvelope<string>, Task>>(),
-            Arg.Any<CancellationToken>());
-
-        // Each group was subscribed exactly once.
-        foreach (var group in groups)
-        {
-            await consumer.Received(1).SubscribeAsync<string>(
-                Arg.Is("events.pubsub"),
-                Arg.Is(group),
-                Arg.Any<Func<IntegrationEnvelope<string>, Task>>(),
-                Arg.Any<CancellationToken>());
-        }
+        Assert.That(captured, Is.Not.Null);
+        Assert.That(captured!.Payload, Is.EqualTo("order-456"));
     }
 
-    // ── Datatype Channel ────────────────────────────────────────────────────
+    // ── Publish-Subscribe Channel ───────────────────────────────────────
 
     [Test]
-    public async Task DatatypeChannel_DifferentTypes_RouteToSeparateTopics()
+    public async Task PubSub_Publish_DeliversToChannel()
     {
-        // A Datatype Channel routes each MessageType to its own dedicated topic,
-        // ensuring consumers only see messages of the type they expect.
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        var channel = new PublishSubscribeChannel(
+            _endpoint, _endpoint, NullLogger<PublishSubscribeChannel>.Instance);
 
-        var orderEnvelope = IntegrationEnvelope<string>.Create(
-            "new-order", "OrderService", "order.created");
+        var envelope = IntegrationEnvelope<string>.Create(
+            "event-data", "EventService", "event.fired");
 
-        var paymentEnvelope = IntegrationEnvelope<string>.Create(
-            "payment-received", "PaymentService", "payment.completed");
+        await channel.PublishAsync(envelope, "events-topic", CancellationToken.None);
 
-        var inventoryEnvelope = IntegrationEnvelope<string>.Create(
-            "stock-updated", "InventoryService", "inventory.adjusted");
-
-        // Each message type publishes to its own type-specific topic.
-        await producer.PublishAsync(orderEnvelope, "datatype.order.created");
-        await producer.PublishAsync(paymentEnvelope, "datatype.payment.completed");
-        await producer.PublishAsync(inventoryEnvelope, "datatype.inventory.adjusted");
-
-        // Verify three distinct topics received messages.
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Is("datatype.order.created"),
-            Arg.Any<CancellationToken>());
-
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Is("datatype.payment.completed"),
-            Arg.Any<CancellationToken>());
-
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Is("datatype.inventory.adjusted"),
-            Arg.Any<CancellationToken>());
-    }
-
-    // ── Invalid Message Channel (Expired Messages) ──────────────────────────
-
-    [Test]
-    public void InvalidMessageChannel_ExpiredEnvelope_IsExpiredReturnsTrue()
-    {
-        // An expired message should be routed to the Invalid Message Channel.
-        // We verify the IsExpired property on an envelope with a past ExpiresAt.
-        var expired = IntegrationEnvelope<string>.Create(
-            "stale-data", "LegacySystem", "legacy.update") with
-        {
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-5),
-        };
-
-        // The platform uses IsExpired to detect stale messages.
-        Assert.That(expired.IsExpired, Is.True,
-            "Envelope with ExpiresAt in the past should be expired");
+        _endpoint.AssertReceivedCount(1);
+        _endpoint.AssertReceivedOnTopic("events-topic", 1);
     }
 
     [Test]
-    public void InvalidMessageChannel_FutureExpiry_IsExpiredReturnsFalse()
+    public async Task PubSub_Subscribe_MultipleSubscribersGetUniqueGroups()
     {
-        // A message with a future ExpiresAt is still valid.
-        var valid = IntegrationEnvelope<string>.Create(
-            "fresh-data", "ModernSystem", "modern.update") with
-        {
-            ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
-        };
+        var channel = new PublishSubscribeChannel(
+            _endpoint, _endpoint, NullLogger<PublishSubscribeChannel>.Instance);
 
-        Assert.That(valid.IsExpired, Is.False,
-            "Envelope with ExpiresAt in the future should NOT be expired");
+        var payloads = new List<string>();
+        await channel.SubscribeAsync<string>("events", "sub-A",
+            msg => { payloads.Add(msg.Payload + "-A"); return Task.CompletedTask; },
+            CancellationToken.None);
+        await channel.SubscribeAsync<string>("events", "sub-B",
+            msg => { payloads.Add(msg.Payload + "-B"); return Task.CompletedTask; },
+            CancellationToken.None);
+
+        var envelope = IntegrationEnvelope<string>.Create("fan-out", "svc", "type");
+        await _endpoint.SendAsync(envelope);
+
+        Assert.That(payloads, Has.Count.EqualTo(2));
+        Assert.That(payloads, Does.Contain("fan-out-A"));
+        Assert.That(payloads, Does.Contain("fan-out-B"));
+    }
+
+    // ── Datatype Channel ────────────────────────────────────────────────
+
+    [Test]
+    public async Task DatatypeChannel_RoutesMessageByType()
+    {
+        var options = Options.Create(new DatatypeChannelOptions
+            { TopicPrefix = "datatype", Separator = "." });
+        var channel = new DatatypeChannel(
+            _endpoint, options, NullLogger<DatatypeChannel>.Instance);
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "order-data", "OrderService", "order.created");
+        await channel.PublishAsync(envelope, CancellationToken.None);
+
+        _endpoint.AssertReceivedCount(1);
+        _endpoint.AssertReceivedOnTopic("datatype.order.created", 1);
+    }
+
+    // ── Invalid Message Channel ─────────────────────────────────────────
+
+    [Test]
+    public async Task InvalidMessageChannel_RouteInvalid_PublishesToInvalidTopic()
+    {
+        var options = Options.Create(new InvalidMessageChannelOptions
+            { InvalidMessageTopic = "invalid-msgs", Source = "TestChannel" });
+        var channel = new InvalidMessageChannel(
+            _endpoint, options, NullLogger<InvalidMessageChannel>.Instance);
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "bad-data", "LegacySystem", "legacy.event");
+        await channel.RouteInvalidAsync(envelope, "Schema mismatch", CancellationToken.None);
+
+        _endpoint.AssertReceivedCount(1);
+        _endpoint.AssertReceivedOnTopic("invalid-msgs", 1);
+        var received = _endpoint.GetReceived<InvalidMessageEnvelope>();
+        Assert.That(received.Payload.Reason, Is.EqualTo("Schema mismatch"));
     }
 
     [Test]
-    public void InvalidMessageChannel_NoExpiry_IsNeverExpired()
+    public async Task InvalidMessageChannel_RouteRawInvalid_PublishesToInvalidTopic()
     {
-        // A message without an ExpiresAt never expires.
-        var noExpiry = IntegrationEnvelope<string>.Create(
-            "persistent-data", "CoreService", "core.event");
+        var options = Options.Create(new InvalidMessageChannelOptions
+            { InvalidMessageTopic = "invalid-raw", Source = "Gateway" });
+        var channel = new InvalidMessageChannel(
+            _endpoint, options, NullLogger<InvalidMessageChannel>.Instance);
 
-        Assert.That(noExpiry.ExpiresAt, Is.Null);
-        Assert.That(noExpiry.IsExpired, Is.False,
-            "Envelope without ExpiresAt should never be expired");
+        await channel.RouteRawInvalidAsync(
+            "not-json-at-all", "inbound-topic", "Parse failure", CancellationToken.None);
+
+        _endpoint.AssertReceivedCount(1);
+        _endpoint.AssertReceivedOnTopic("invalid-raw", 1);
+        var received = _endpoint.GetReceived<InvalidMessageEnvelope>();
+        Assert.That(received.Payload.RawData, Is.EqualTo("not-json-at-all"));
+        Assert.That(received.Payload.Reason, Is.EqualTo("Parse failure"));
     }
 }

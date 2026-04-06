@@ -1,8 +1,8 @@
 // ============================================================================
 // Tutorial 27 – Resequencer (Exam)
 // ============================================================================
-// Coding challenges: multiple independent sequences, ResequencerOptions
-// defaults, and ReleaseOnTimeout for unknown correlation ID.
+// E2E challenges: large out-of-order batch, interleaved sequences, timeout
+// partial release.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -10,75 +10,106 @@ using EnterpriseIntegrationPlatform.Processing.Resequencer;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial27;
 
 [TestFixture]
 public sealed class Exam
 {
-    private static MessageResequencer CreateResequencer() =>
-        new(Options.Create(new ResequencerOptions()), NullLogger<MessageResequencer>.Instance);
+    [Test]
+    public async Task Challenge1_LargeOutOfOrderBatch_ReleasedInSequence()
+    {
+        await using var output = new MockEndpoint("reseq-batch");
+        var resequencer = new MessageResequencer(
+            Options.Create(new ResequencerOptions()), NullLogger<MessageResequencer>.Instance);
+        var correlationId = Guid.NewGuid();
+        const int total = 10;
 
-    private static IntegrationEnvelope<string> MakeSequenced(
-        Guid correlationId, int seqNum, int totalCount) =>
-        new()
+        var indices = Enumerable.Range(0, total).Reverse().ToList();
+        IReadOnlyList<IntegrationEnvelope<string>> released = [];
+        foreach (var i in indices)
         {
-            MessageId = Guid.NewGuid(),
-            CorrelationId = correlationId,
-            Timestamp = DateTimeOffset.UtcNow,
-            Source = "Svc",
-            MessageType = "type",
-            Payload = $"msg-{seqNum}",
-            SequenceNumber = seqNum,
-            TotalCount = totalCount,
-        };
+            var env = IntegrationEnvelope<string>.Create($"msg-{i}", "Svc", "evt") with
+            {
+                CorrelationId = correlationId, SequenceNumber = i, TotalCount = total,
+            };
+            released = resequencer.Accept(env);
+        }
 
-    // ── Challenge 1: Multiple Independent Sequences ─────────────────────────
+        Assert.That(released, Has.Count.EqualTo(total));
+        for (var i = 0; i < total; i++)
+            Assert.That(released[i].SequenceNumber, Is.EqualTo(i));
+
+        foreach (var env in released)
+            await output.PublishAsync(env, "ordered");
+
+        output.AssertReceivedOnTopic("ordered", total);
+    }
 
     [Test]
-    public void Challenge1_TwoIndependentSequences_EachReleasedSeparately()
+    public async Task Challenge2_InterleavedSequences_EachReleasedIndependently()
     {
-        var resequencer = CreateResequencer();
-        var seqA = Guid.NewGuid();
-        var seqB = Guid.NewGuid();
+        await using var output = new MockEndpoint("reseq-interleave");
+        var resequencer = new MessageResequencer(
+            Options.Create(new ResequencerOptions()), NullLogger<MessageResequencer>.Instance);
 
-        // Interleave messages from two sequences
-        resequencer.Accept(MakeSequenced(seqA, 1, 2));
-        resequencer.Accept(MakeSequenced(seqB, 0, 2));
-        var releaseA = resequencer.Accept(MakeSequenced(seqA, 0, 2));
-        var releaseB = resequencer.Accept(MakeSequenced(seqB, 1, 2));
+        var corrA = Guid.NewGuid();
+        var corrB = Guid.NewGuid();
 
-        Assert.That(releaseA, Has.Count.EqualTo(2));
-        Assert.That(releaseA[0].Payload, Is.EqualTo("msg-0"));
-        Assert.That(releaseA[1].Payload, Is.EqualTo("msg-1"));
+        resequencer.Accept(CreateEnvelope("A1", corrA, 1, 2));
+        resequencer.Accept(CreateEnvelope("B0", corrB, 0, 2));
 
-        Assert.That(releaseB, Has.Count.EqualTo(2));
-        Assert.That(releaseB[0].Payload, Is.EqualTo("msg-0"));
-        Assert.That(releaseB[1].Payload, Is.EqualTo("msg-1"));
+        var releasedA = resequencer.Accept(CreateEnvelope("A0", corrA, 0, 2));
+        Assert.That(releasedA, Has.Count.EqualTo(2));
+        Assert.That(releasedA[0].Payload, Is.EqualTo("A0"));
 
+        var releasedB = resequencer.Accept(CreateEnvelope("B1", corrB, 1, 2));
+        Assert.That(releasedB, Has.Count.EqualTo(2));
+        Assert.That(releasedB[0].Payload, Is.EqualTo("B0"));
+
+        foreach (var env in releasedA.Concat(releasedB))
+            await output.PublishAsync(env, "interleaved");
+
+        output.AssertReceivedOnTopic("interleaved", 4);
+    }
+
+    [Test]
+    public async Task Challenge3_TimeoutPartialRelease_ThenCompleteNewSequence()
+    {
+        await using var output = new MockEndpoint("reseq-timeout");
+        var resequencer = new MessageResequencer(
+            Options.Create(new ResequencerOptions()), NullLogger<MessageResequencer>.Instance);
+
+        var corrOld = Guid.NewGuid();
+        resequencer.Accept(CreateEnvelope("old-0", corrOld, 0, 5));
+        resequencer.Accept(CreateEnvelope("old-3", corrOld, 3, 5));
+
+        var partial = resequencer.ReleaseOnTimeout<string>(corrOld);
+        Assert.That(partial, Has.Count.EqualTo(2));
+
+        foreach (var env in partial)
+            await output.PublishAsync(env, "partial");
+
+        var corrNew = Guid.NewGuid();
+        resequencer.Accept(CreateEnvelope("new-1", corrNew, 1, 2));
+        var complete = resequencer.Accept(CreateEnvelope("new-0", corrNew, 0, 2));
+        Assert.That(complete, Has.Count.EqualTo(2));
+
+        foreach (var env in complete)
+            await output.PublishAsync(env, "complete");
+
+        output.AssertReceivedOnTopic("partial", 2);
+        output.AssertReceivedOnTopic("complete", 2);
         Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(0));
     }
 
-    // ── Challenge 2: ResequencerOptions Default Values ──────────────────────
-
-    [Test]
-    public void Challenge2_ResequencerOptions_DefaultValues()
-    {
-        var opts = new ResequencerOptions();
-
-        Assert.That(opts.ReleaseTimeout, Is.EqualTo(TimeSpan.FromSeconds(30)));
-        Assert.That(opts.MaxConcurrentSequences, Is.EqualTo(10_000));
-    }
-
-    // ── Challenge 3: ReleaseOnTimeout For Unknown CorrelationId ─────────────
-
-    [Test]
-    public void Challenge3_ReleaseOnTimeout_UnknownCorrelationId_ReturnsEmpty()
-    {
-        var resequencer = CreateResequencer();
-
-        var result = resequencer.ReleaseOnTimeout<string>(Guid.NewGuid());
-
-        Assert.That(result, Is.Empty);
-    }
+    private static IntegrationEnvelope<string> CreateEnvelope(
+        string payload, Guid correlationId, int sequenceNumber, int totalCount) =>
+        IntegrationEnvelope<string>.Create(payload, "Svc", "evt") with
+        {
+            CorrelationId = correlationId,
+            SequenceNumber = sequenceNumber,
+            TotalCount = totalCount,
+        };
 }

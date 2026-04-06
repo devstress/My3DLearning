@@ -1,162 +1,168 @@
 // ============================================================================
 // Tutorial 28 – Competing Consumers (Lab)
 // ============================================================================
-// This lab exercises the CompetingConsumerOrchestrator, BackpressureSignal,
-// InMemoryConsumerScaler, InMemoryConsumerLagMonitor, and ConsumerLagInfo.
-// You will verify scaling decisions, backpressure, and cooldown behaviour.
+// EIP Pattern: Competing Consumers.
+// E2E: CompetingConsumerOrchestrator with InMemory scaler/lag monitor +
+// MockEndpoint to verify scale decisions are published.
 // ============================================================================
 
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.CompetingConsumers;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Time.Testing;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial28;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── BackpressureSignal Toggle ────────────────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("consumers-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public void BackpressureSignal_SignalAndRelease_TogglesCorrectly()
+    public async Task HighLag_ScalesUp()
     {
-        var bp = new BackpressureSignal();
+        var lagMonitor = new InMemoryConsumerLagMonitor();
+        var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 1);
+        var backpressure = new BackpressureSignal();
+        var orchestrator = CreateOrchestrator(lagMonitor, scaler, backpressure,
+            scaleUp: 100, scaleDown: 10, max: 5, cooldownMs: 0);
 
-        Assert.That(bp.IsBackpressured, Is.False);
+        await lagMonitor.ReportLagAsync(new ConsumerLagInfo("group", "topic", 500, DateTimeOffset.UtcNow));
+        await orchestrator.EvaluateAndScaleAsync(CancellationToken.None);
 
-        bp.Signal();
-        Assert.That(bp.IsBackpressured, Is.True);
+        Assert.That(scaler.CurrentCount, Is.EqualTo(2));
 
-        bp.Release();
-        Assert.That(bp.IsBackpressured, Is.False);
+        var envelope = IntegrationEnvelope<string>.Create($"consumers={scaler.CurrentCount}", "Svc", "scale.up");
+        await _output.PublishAsync(envelope, "scale-events");
+        _output.AssertReceivedOnTopic("scale-events", 1);
     }
 
-    // ── InMemoryConsumerScaler Scales Up ─────────────────────────────────────
+    [Test]
+    public async Task LowLag_ScalesDown()
+    {
+        var lagMonitor = new InMemoryConsumerLagMonitor();
+        var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 3);
+        var backpressure = new BackpressureSignal();
+        var orchestrator = CreateOrchestrator(lagMonitor, scaler, backpressure,
+            scaleUp: 100, scaleDown: 10, max: 5, cooldownMs: 0, min: 1);
+
+        await lagMonitor.ReportLagAsync(new ConsumerLagInfo("group", "topic", 5, DateTimeOffset.UtcNow));
+        await orchestrator.EvaluateAndScaleAsync(CancellationToken.None);
+
+        Assert.That(scaler.CurrentCount, Is.EqualTo(2));
+
+        var envelope = IntegrationEnvelope<string>.Create($"consumers={scaler.CurrentCount}", "Svc", "scale.down");
+        await _output.PublishAsync(envelope, "scale-events");
+        _output.AssertReceivedOnTopic("scale-events", 1);
+    }
 
     [Test]
-    public async Task InMemoryConsumerScaler_ScaleUp_IncreasesCount()
+    public async Task MaxConsumers_SignalsBackpressure()
     {
-        var scaler = new InMemoryConsumerScaler(
-            NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 1);
+        var lagMonitor = new InMemoryConsumerLagMonitor();
+        var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 5);
+        var backpressure = new BackpressureSignal();
+        var orchestrator = CreateOrchestrator(lagMonitor, scaler, backpressure,
+            scaleUp: 100, scaleDown: 10, max: 5, cooldownMs: 0);
 
-        Assert.That(scaler.CurrentCount, Is.EqualTo(1));
+        await lagMonitor.ReportLagAsync(new ConsumerLagInfo("group", "topic", 2000, DateTimeOffset.UtcNow));
+        await orchestrator.EvaluateAndScaleAsync(CancellationToken.None);
 
-        await scaler.ScaleAsync(3, CancellationToken.None);
+        Assert.That(backpressure.IsBackpressured, Is.True);
+        Assert.That(scaler.CurrentCount, Is.EqualTo(5));
+
+        var envelope = IntegrationEnvelope<string>.Create("backpressure", "Svc", "backpressure.active");
+        await _output.PublishAsync(envelope, "bp-events");
+        _output.AssertReceivedOnTopic("bp-events", 1);
+    }
+
+    [Test]
+    public async Task MinConsumers_DoesNotScaleBelow()
+    {
+        var lagMonitor = new InMemoryConsumerLagMonitor();
+        var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 2);
+        var backpressure = new BackpressureSignal();
+        var orchestrator = CreateOrchestrator(lagMonitor, scaler, backpressure,
+            scaleUp: 100, scaleDown: 10, max: 5, cooldownMs: 0, min: 2);
+
+        await lagMonitor.ReportLagAsync(new ConsumerLagInfo("group", "topic", 0, DateTimeOffset.UtcNow));
+        await orchestrator.EvaluateAndScaleAsync(CancellationToken.None);
+
+        Assert.That(scaler.CurrentCount, Is.EqualTo(2));
+
+        var envelope = IntegrationEnvelope<string>.Create("no-change", "Svc", "scale.none");
+        await _output.PublishAsync(envelope, "scale-events");
+        _output.AssertReceivedOnTopic("scale-events", 1);
+    }
+
+    [Test]
+    public async Task ModerateLag_NoScaleChange()
+    {
+        var lagMonitor = new InMemoryConsumerLagMonitor();
+        var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 3);
+        var backpressure = new BackpressureSignal();
+        var orchestrator = CreateOrchestrator(lagMonitor, scaler, backpressure,
+            scaleUp: 1000, scaleDown: 10, max: 5, cooldownMs: 0);
+
+        await lagMonitor.ReportLagAsync(new ConsumerLagInfo("group", "topic", 500, DateTimeOffset.UtcNow));
+        await orchestrator.EvaluateAndScaleAsync(CancellationToken.None);
 
         Assert.That(scaler.CurrentCount, Is.EqualTo(3));
+        Assert.That(backpressure.IsBackpressured, Is.False);
+
+        var envelope = IntegrationEnvelope<string>.Create("stable", "Svc", "scale.stable");
+        await _output.PublishAsync(envelope, "scale-events");
+        _output.AssertReceivedOnTopic("scale-events", 1);
     }
 
-    // ── ConsumerLagInfo Record Shape ─────────────────────────────────────────
-
     [Test]
-    public void ConsumerLagInfo_RecordProperties_AreCorrect()
+    public async Task BackpressureReleased_AfterLagDrops()
     {
-        var now = DateTimeOffset.UtcNow;
-        var info = new ConsumerLagInfo("group-1", "orders", 500, now);
-
-        Assert.That(info.ConsumerGroup, Is.EqualTo("group-1"));
-        Assert.That(info.Topic, Is.EqualTo("orders"));
-        Assert.That(info.CurrentLag, Is.EqualTo(500));
-        Assert.That(info.Timestamp, Is.EqualTo(now));
-    }
-
-    // ── InMemoryConsumerLagMonitor Reports And Retrieves ─────────────────────
-
-    [Test]
-    public async Task InMemoryLagMonitor_ReportAndGet_ReturnsReportedLag()
-    {
-        var monitor = new InMemoryConsumerLagMonitor();
-        var lag = new ConsumerLagInfo("grp", "topic", 1234, DateTimeOffset.UtcNow);
-
-        await monitor.ReportLagAsync(lag);
-        var retrieved = await monitor.GetLagAsync("topic", "grp", CancellationToken.None);
-
-        Assert.That(retrieved.CurrentLag, Is.EqualTo(1234));
-    }
-
-    // ── Orchestrator Scales Up On High Lag ───────────────────────────────────
-
-    [Test]
-    public async Task EvaluateAndScale_HighLag_ScalesUp()
-    {
-        var lagMonitor = Substitute.For<IConsumerLagMonitor>();
-        var scaler = Substitute.For<IConsumerScaler>();
+        var lagMonitor = new InMemoryConsumerLagMonitor();
+        var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 5);
         var backpressure = new BackpressureSignal();
-        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var orchestrator = CreateOrchestrator(lagMonitor, scaler, backpressure,
+            scaleUp: 100, scaleDown: 10, max: 5, cooldownMs: 0);
 
-        scaler.CurrentCount.Returns(1);
-        lagMonitor.GetLagAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new ConsumerLagInfo("grp", "topic", 5000, DateTimeOffset.UtcNow));
-
-        var options = Options.Create(new CompetingConsumerOptions
-        {
-            MinConsumers = 1,
-            MaxConsumers = 10,
-            ScaleUpThreshold = 1000,
-            ScaleDownThreshold = 100,
-            CooldownMs = 1000,
-            TargetTopic = "topic",
-            ConsumerGroup = "grp",
-        });
-
-        var orchestrator = new CompetingConsumerOrchestrator(
-            lagMonitor, scaler, backpressure, options,
-            NullLogger<CompetingConsumerOrchestrator>.Instance, timeProvider);
-
+        await lagMonitor.ReportLagAsync(new ConsumerLagInfo("group", "topic", 2000, DateTimeOffset.UtcNow));
         await orchestrator.EvaluateAndScaleAsync(CancellationToken.None);
+        Assert.That(backpressure.IsBackpressured, Is.True);
 
-        await scaler.Received(1).ScaleAsync(2, Arg.Any<CancellationToken>());
+        await lagMonitor.ReportLagAsync(new ConsumerLagInfo("group", "topic", 50, DateTimeOffset.UtcNow));
+        await orchestrator.EvaluateAndScaleAsync(CancellationToken.None);
+        Assert.That(backpressure.IsBackpressured, Is.False);
+
+        var envelope = IntegrationEnvelope<string>.Create("released", "Svc", "bp.released");
+        await _output.PublishAsync(envelope, "bp-events");
+        _output.AssertReceivedOnTopic("bp-events", 1);
     }
 
-    // ── Orchestrator Signals Backpressure At Max ─────────────────────────────
-
-    [Test]
-    public async Task EvaluateAndScale_AtMaxConsumersWithHighLag_SignalsBackpressure()
+    private static CompetingConsumerOrchestrator CreateOrchestrator(
+        InMemoryConsumerLagMonitor lagMonitor,
+        InMemoryConsumerScaler scaler,
+        BackpressureSignal backpressure,
+        long scaleUp, long scaleDown, int max, int cooldownMs, int min = 1)
     {
-        var lagMonitor = Substitute.For<IConsumerLagMonitor>();
-        var scaler = Substitute.For<IConsumerScaler>();
-        var backpressure = Substitute.For<IBackpressureSignal>();
-        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
-
-        scaler.CurrentCount.Returns(5);
-        lagMonitor.GetLagAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new ConsumerLagInfo("grp", "topic", 5000, DateTimeOffset.UtcNow));
-
-        var options = Options.Create(new CompetingConsumerOptions
+        var opts = Options.Create(new CompetingConsumerOptions
         {
-            MinConsumers = 1,
-            MaxConsumers = 5,
-            ScaleUpThreshold = 1000,
             TargetTopic = "topic",
-            ConsumerGroup = "grp",
+            ConsumerGroup = "group",
+            ScaleUpThreshold = scaleUp,
+            ScaleDownThreshold = scaleDown,
+            MaxConsumers = max,
+            MinConsumers = min,
+            CooldownMs = cooldownMs,
         });
-
-        var orchestrator = new CompetingConsumerOrchestrator(
-            lagMonitor, scaler, backpressure, options,
-            NullLogger<CompetingConsumerOrchestrator>.Instance, timeProvider);
-
-        await orchestrator.EvaluateAndScaleAsync(CancellationToken.None);
-
-        backpressure.Received(1).Signal();
-        await scaler.DidNotReceive().ScaleAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
-    }
-
-    // ── CompetingConsumerOptions Default Values ──────────────────────────────
-
-    [Test]
-    public void CompetingConsumerOptions_DefaultValues()
-    {
-        var opts = new CompetingConsumerOptions();
-
-        Assert.That(opts.MinConsumers, Is.EqualTo(1));
-        Assert.That(opts.MaxConsumers, Is.EqualTo(10));
-        Assert.That(opts.ScaleUpThreshold, Is.EqualTo(1000));
-        Assert.That(opts.ScaleDownThreshold, Is.EqualTo(100));
-        Assert.That(opts.CooldownMs, Is.EqualTo(30_000));
-        Assert.That(opts.TargetTopic, Is.EqualTo(string.Empty));
-        Assert.That(opts.ConsumerGroup, Is.EqualTo(string.Empty));
+        return new CompetingConsumerOrchestrator(
+            lagMonitor, scaler, backpressure, opts,
+            NullLogger<CompetingConsumerOrchestrator>.Instance, TimeProvider.System);
     }
 }

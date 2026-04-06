@@ -1,94 +1,117 @@
 // ============================================================================
 // Tutorial 42 – Configuration (Exam)
 // ============================================================================
-// Coding challenges: multi-environment config management, feature flag
-// tenant targeting, and configuration versioning.
+// EIP Pattern: Configuration Store + Feature Flags
+// E2E: Multi-environment config routing, feature flag rollout with tenant
+//      targeting, and config change notification — all via MockEndpoint.
 // ============================================================================
-
 using EnterpriseIntegrationPlatform.Configuration;
+using EnterpriseIntegrationPlatform.Contracts;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial42;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Multi-Environment Configuration Management ─────────────
-
     [Test]
-    public async Task Challenge1_MultiEnvironment_ConfigurationManagement()
+    public async Task Challenge1_MultiEnvironmentConfigDrivenRouting()
     {
         using var notifier = new ConfigurationChangeNotifier();
+        await using var output = new MockEndpoint("exam-config");
         var store = new InMemoryConfigurationStore(notifier);
 
         await store.SetAsync(new ConfigurationEntry("Database:Host", "localhost", "dev"));
         await store.SetAsync(new ConfigurationEntry("Database:Host", "staging-db.internal", "staging"));
         await store.SetAsync(new ConfigurationEntry("Database:Host", "prod-db.internal", "prod"));
 
-        var devHost = await store.GetAsync("Database:Host", "dev");
-        var stagingHost = await store.GetAsync("Database:Host", "staging");
-        var prodHost = await store.GetAsync("Database:Host", "prod");
+        var environments = new[] { "dev", "staging", "prod" };
+        foreach (var env in environments)
+        {
+            var entry = await store.GetAsync("Database:Host", env);
+            Assert.That(entry, Is.Not.Null);
 
-        Assert.That(devHost, Is.Not.Null);
-        Assert.That(devHost!.Value, Is.EqualTo("localhost"));
-        Assert.That(stagingHost!.Value, Is.EqualTo("staging-db.internal"));
-        Assert.That(prodHost!.Value, Is.EqualTo("prod-db.internal"));
+            var topic = $"config-{env}";
+            var envelope = IntegrationEnvelope<string>.Create(
+                entry!.Value, "config-store", "config.routed");
+            await output.PublishAsync(envelope, topic, default);
+        }
 
-        // Each environment is independent — delete dev, others remain
+        output.AssertReceivedOnTopic("config-dev", 1);
+        output.AssertReceivedOnTopic("config-staging", 1);
+        output.AssertReceivedOnTopic("config-prod", 1);
+
+        // Delete dev, others remain
         await store.DeleteAsync("Database:Host", "dev");
         Assert.That(await store.GetAsync("Database:Host", "dev"), Is.Null);
-        Assert.That((await store.GetAsync("Database:Host", "staging"))!.Value,
-            Is.EqualTo("staging-db.internal"));
         Assert.That((await store.GetAsync("Database:Host", "prod"))!.Value,
             Is.EqualTo("prod-db.internal"));
     }
 
-    // ── Challenge 2: Feature Flag with Tenant Targeting ─────────────────────
-
     [Test]
-    public async Task Challenge2_FeatureFlag_WithTenantTargeting()
+    public async Task Challenge2_FeatureFlagRolloutAndTenantTargeting()
     {
+        await using var output = new MockEndpoint("exam-flags");
         var service = new InMemoryFeatureFlagService();
 
-        var flag = new FeatureFlag(
-            "BetaFeature",
-            IsEnabled: true,
-            RolloutPercentage: 0,
-            TargetTenants: new List<string> { "premium-tenant", "early-adopter" });
+        await service.SetAsync(new FeatureFlag(
+            "BetaFeature", IsEnabled: true, RolloutPercentage: 0,
+            TargetTenants: new List<string> { "premium-tenant", "early-adopter" }));
 
-        await service.SetAsync(flag);
+        var tenants = new[] { "premium-tenant", "early-adopter", "regular-tenant" };
+        foreach (var tenant in tenants)
+        {
+            var enabled = await service.IsEnabledAsync("BetaFeature", tenant);
+            var topic = enabled ? "beta-access" : "standard-access";
+            var envelope = IntegrationEnvelope<string>.Create(
+                tenant, "feature-flags", "flag.routed");
+            await output.PublishAsync(envelope, topic, default);
+        }
 
-        // Targeted tenants get the feature despite 0% rollout
-        var premiumEnabled = await service.IsEnabledAsync("BetaFeature", "premium-tenant");
-        var earlyAdopterEnabled = await service.IsEnabledAsync("BetaFeature", "early-adopter");
-        Assert.That(premiumEnabled, Is.True);
-        Assert.That(earlyAdopterEnabled, Is.True);
-
-        // Non-targeted tenants do not get the feature at 0% rollout
-        var regularEnabled = await service.IsEnabledAsync("BetaFeature", "regular-tenant");
-        Assert.That(regularEnabled, Is.False);
+        output.AssertReceivedOnTopic("beta-access", 2);
+        output.AssertReceivedOnTopic("standard-access", 1);
     }
-
-    // ── Challenge 3: Configuration Versioning ───────────────────────────────
 
     [Test]
-    public async Task Challenge3_ConfigurationVersioning_IncrementOnUpdate()
+    public async Task Challenge3_ConfigChangeNotification_PublishToMockEndpoint()
     {
         using var notifier = new ConfigurationChangeNotifier();
+        await using var output = new MockEndpoint("exam-notify");
         var store = new InMemoryConfigurationStore(notifier);
 
-        var entry1 = await store.SetAsync(new ConfigurationEntry("Cache:Ttl", "300"));
-        Assert.That(entry1.Version, Is.EqualTo(1));
+        var changes = new List<ConfigurationChange>();
+        using var subscription = notifier.Subscribe(
+            new DelegateObserver<ConfigurationChange>(c => changes.Add(c)));
 
-        var entry2 = await store.SetAsync(new ConfigurationEntry("Cache:Ttl", "600"));
-        Assert.That(entry2.Version, Is.EqualTo(2));
+        await store.SetAsync(new ConfigurationEntry("Cache:Ttl", "300"));
+        await store.SetAsync(new ConfigurationEntry("Cache:Ttl", "600"));
+        await store.DeleteAsync("Cache:Ttl");
 
-        var entry3 = await store.SetAsync(new ConfigurationEntry("Cache:Ttl", "900"));
-        Assert.That(entry3.Version, Is.EqualTo(3));
+        // Allow async channel pump to deliver
+        await Task.Delay(100);
 
-        var retrieved = await store.GetAsync("Cache:Ttl");
-        Assert.That(retrieved, Is.Not.Null);
-        Assert.That(retrieved!.Value, Is.EqualTo("900"));
-        Assert.That(retrieved.Version, Is.EqualTo(3));
+        Assert.That(changes, Has.Count.EqualTo(3));
+        Assert.That(changes[0].ChangeType, Is.EqualTo(ConfigurationChangeType.Created));
+        Assert.That(changes[1].ChangeType, Is.EqualTo(ConfigurationChangeType.Updated));
+        Assert.That(changes[2].ChangeType, Is.EqualTo(ConfigurationChangeType.Deleted));
+
+        foreach (var change in changes)
+        {
+            var envelope = IntegrationEnvelope<string>.Create(
+                $"{change.Key}:{change.ChangeType}", "config-store", "config.changed");
+            await output.PublishAsync(envelope, "change-notifications", default);
+        }
+
+        output.AssertReceivedOnTopic("change-notifications", 3);
     }
+}
+
+file sealed class DelegateObserver<T> : IObserver<T>
+{
+    private readonly Action<T> _onNext;
+    public DelegateObserver(Action<T> onNext) => _onNext = onNext;
+    public void OnCompleted() { }
+    public void OnError(Exception error) { }
+    public void OnNext(T value) => _onNext(value);
 }

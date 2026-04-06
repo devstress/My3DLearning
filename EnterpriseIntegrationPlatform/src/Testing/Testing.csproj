@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="NUnit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\Ingestion\Ingestion.csproj" />
+    <ProjectReference Include="..\Activities\Activities.csproj" />
+    <ProjectReference Include="..\Demo.Pipeline\Demo.Pipeline.csproj" />
+    <ProjectReference Include="..\Processing.Translator\Processing.Translator.csproj" />
+    <ProjectReference Include="..\Processing.Transform\Processing.Transform.csproj" />
+    <ProjectReference Include="..\Processing.Aggregator\Processing.Aggregator.csproj" />
+    <ProjectReference Include="..\Connector.Http\Connector.Http.csproj" />
+    <ProjectReference Include="..\Connector.Sftp\Connector.Sftp.csproj" />
+    <ProjectReference Include="..\Connector.Email\Connector.Email.csproj" />
+    <ProjectReference Include="..\Connector.File\Connector.File.csproj" />
+    <ProjectReference Include="..\AI.Ollama\AI.Ollama.csproj" />
+    <ProjectReference Include="..\AI.RagFlow\AI.RagFlow.csproj" />
+    <ProjectReference Include="..\Observability\Observability.csproj" />
+    <ProjectReference Include="..\EventSourcing\EventSourcing.csproj" />
+  </ItemGroup>
+</Project>

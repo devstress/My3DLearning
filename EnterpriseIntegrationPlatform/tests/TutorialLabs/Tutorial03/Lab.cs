@@ -1,152 +1,128 @@
 // ============================================================================
-// Tutorial 03 – Your First Message (Lab)
+// Tutorial 03 – First Message (Lab)
 // ============================================================================
-// This lab walks through the complete lifecycle of a message: creating an
-// envelope, publishing it through a mocked broker, and consuming it on the
-// other side.  NSubstitute is used so no real broker is needed.
+// EIP Pattern: Message Channel
+// End-to-End: Use MockEndpoint as producer/consumer, send and receive
+// messages, verify end-to-end delivery.
 // ============================================================================
 
-using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
+using EnterpriseIntegrationPlatform.Contracts;
 
 namespace TutorialLabs.Tutorial03;
 
-// A simple domain payload used throughout this tutorial.
 public sealed record OrderPayload(string OrderId, string Product, int Quantity);
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Creating Your First Envelope ────────────────────────────────────────
+    private MockEndpoint _output = null!;
 
-    [Test]
-    public void CreateEnvelope_WithStringPayload_HasValidFields()
+    [SetUp]
+    public void SetUp()
     {
-        var envelope = IntegrationEnvelope<string>.Create(
-            payload: "Hello, Messaging!",
-            source: "Tutorial03",
-            messageType: "greeting");
+        _output = new MockEndpoint("output");
+    }
 
-        Assert.That(envelope.Payload, Is.EqualTo("Hello, Messaging!"));
-        Assert.That(envelope.Source, Is.EqualTo("Tutorial03"));
-        Assert.That(envelope.MessageType, Is.EqualTo("greeting"));
-        Assert.That(envelope.MessageId, Is.Not.EqualTo(Guid.Empty));
-        Assert.That(envelope.CorrelationId, Is.Not.EqualTo(Guid.Empty));
+    [TearDown]
+    public async Task TearDown()
+    {
+        await _output.DisposeAsync();
     }
 
     [Test]
-    public void CreateEnvelope_WithDomainObject_WrapsPayloadCorrectly()
+    public async Task EndToEnd_PublishStringMessage_ReceivedAtOutput()
+    {
+        var envelope = IntegrationEnvelope<string>.Create(
+            "Hello, Messaging!", "Tutorial03", "greeting");
+
+        await _output.PublishAsync(envelope, "greetings");
+
+        _output.AssertReceivedCount(1);
+        var received = _output.GetReceived<string>();
+        Assert.That(received.Payload, Is.EqualTo("Hello, Messaging!"));
+        Assert.That(received.Source, Is.EqualTo("Tutorial03"));
+    }
+
+    [Test]
+    public async Task EndToEnd_PublishDomainObject_PayloadPreserved()
     {
         var order = new OrderPayload("ORD-100", "Gadget", 3);
-
-        var envelope = IntegrationEnvelope<OrderPayload>.Create(
-            payload: order,
-            source: "OrderService",
-            messageType: "order.created");
-
-        Assert.That(envelope.Payload, Is.EqualTo(order));
-        Assert.That(envelope.Payload.OrderId, Is.EqualTo("ORD-100"));
-        Assert.That(envelope.Payload.Product, Is.EqualTo("Gadget"));
-        Assert.That(envelope.Payload.Quantity, Is.EqualTo(3));
-    }
-
-    // ── Publishing with a Mocked Producer ───────────────────────────────────
-
-    [Test]
-    public async Task PublishAsync_WithMockedProducer_CallIsMade()
-    {
-        // Arrange: create a mock producer using NSubstitute.
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var envelope = IntegrationEnvelope<string>.Create(
-            "first-message", "Tutorial03", "demo.publish");
-
-        // Act: publish the envelope to a topic.
-        await producer.PublishAsync(envelope, "demo-topic");
-
-        // Assert: verify the broker received exactly one publish call.
-        await producer.Received(1).PublishAsync(
-            Arg.Is<IntegrationEnvelope<string>>(e => e.Payload == "first-message"),
-            Arg.Is("demo-topic"),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task PublishAsync_WithOrderPayload_TopicIsCorrect()
-    {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var order = new OrderPayload("ORD-200", "Widget", 1);
         var envelope = IntegrationEnvelope<OrderPayload>.Create(
             order, "OrderService", "order.created");
 
-        await producer.PublishAsync(envelope, "orders-topic");
+        await _output.PublishAsync(envelope, "orders");
 
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<OrderPayload>>(),
-            Arg.Is("orders-topic"),
-            Arg.Any<CancellationToken>());
+        _output.AssertReceivedCount(1);
+        var received = _output.GetReceived<OrderPayload>();
+        Assert.That(received.Payload.OrderId, Is.EqualTo("ORD-100"));
+        Assert.That(received.Payload.Product, Is.EqualTo("Gadget"));
     }
 
-    // ── Consuming with a Mocked Consumer ────────────────────────────────────
-
     [Test]
-    public async Task SubscribeAsync_WhenHandlerInvoked_PayloadIsReceived()
+    public async Task EndToEnd_SubscribeAndSend_HandlerInvoked()
     {
-        // Arrange: configure the mock to capture the handler callback so we
-        // can invoke it manually, simulating a broker delivering a message.
-        var consumer = Substitute.For<IMessageBrokerConsumer>();
-        Func<IntegrationEnvelope<string>, Task>? capturedHandler = null;
+        IntegrationEnvelope<string>? captured = null;
+        await _output.SubscribeAsync<string>("topic", "group", msg =>
+        {
+            captured = msg;
+            return Task.CompletedTask;
+        });
 
-        consumer.SubscribeAsync<string>(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Do<Func<IntegrationEnvelope<string>, Task>>(h => capturedHandler = h),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
-
-        // Act: subscribe — this triggers the Arg.Do capture above.
-        await consumer.SubscribeAsync<string>(
-            "demo-topic",
-            "demo-group",
-            msg => Task.CompletedTask);
-
-        // Create a message as if the broker delivered it.
         var envelope = IntegrationEnvelope<string>.Create(
             "consumed-payload", "Producer", "demo.event");
+        await _output.SendAsync(envelope);
 
-        Assert.That(capturedHandler, Is.Not.Null, "Handler should have been captured");
+        Assert.That(captured, Is.Not.Null);
+        Assert.That(captured!.Payload, Is.EqualTo("consumed-payload"));
+    }
 
-        // Simulate message delivery by invoking the captured handler.
+    [Test]
+    public async Task EndToEnd_MultipleMessages_AllCaptured()
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            var envelope = IntegrationEnvelope<string>.Create(
+                $"msg-{i}", "source", "type");
+            await _output.PublishAsync(envelope, "topic");
+        }
+
+        _output.AssertReceivedCount(3);
+        Assert.That(_output.GetReceived<string>(0).Payload, Is.EqualTo("msg-0"));
+        Assert.That(_output.GetReceived<string>(2).Payload, Is.EqualTo("msg-2"));
+    }
+
+    [Test]
+    public async Task EndToEnd_TopicRouting_MessagesOnCorrectTopics()
+    {
+        var orderEnv = IntegrationEnvelope<string>.Create("order", "svc", "type");
+        var paymentEnv = IntegrationEnvelope<string>.Create("payment", "svc", "type");
+
+        await _output.PublishAsync(orderEnv, "orders-topic");
+        await _output.PublishAsync(paymentEnv, "payments-topic");
+
+        _output.AssertReceivedOnTopic("orders-topic", 1);
+        _output.AssertReceivedOnTopic("payments-topic", 1);
+        Assert.That(_output.GetReceivedTopics(), Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public async Task EndToEnd_SendAndReceive_FullRoundTrip()
+    {
         IntegrationEnvelope<string>? received = null;
-        capturedHandler = msg =>
+        await _output.SubscribeAsync<string>("channel", "group", msg =>
         {
             received = msg;
             return Task.CompletedTask;
-        };
-        await capturedHandler(envelope);
+        });
 
-        // Assert: the handler processed the message.
+        var envelope = IntegrationEnvelope<string>.Create(
+            "round-trip", "Producer", "test");
+        await _output.SendAsync(envelope);
+
         Assert.That(received, Is.Not.Null);
-        Assert.That(received!.Payload, Is.EqualTo("consumed-payload"));
-    }
-
-    [Test]
-    public async Task SubscribeAsync_MockVerification_SubscribeWasCalled()
-    {
-        var consumer = Substitute.For<IMessageBrokerConsumer>();
-
-        await consumer.SubscribeAsync<string>(
-            "events-topic",
-            "my-consumer-group",
-            _ => Task.CompletedTask);
-
-        await consumer.Received(1).SubscribeAsync<string>(
-            Arg.Is("events-topic"),
-            Arg.Is("my-consumer-group"),
-            Arg.Any<Func<IntegrationEnvelope<string>, Task>>(),
-            Arg.Any<CancellationToken>());
+        Assert.That(received!.MessageId, Is.EqualTo(envelope.MessageId));
+        Assert.That(received.Payload, Is.EqualTo("round-trip"));
     }
 }

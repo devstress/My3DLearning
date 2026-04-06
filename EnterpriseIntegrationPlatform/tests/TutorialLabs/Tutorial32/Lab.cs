@@ -1,128 +1,108 @@
 // ============================================================================
 // Tutorial 32 – Multi-Tenancy (Lab)
 // ============================================================================
-// This lab exercises TenantResolver, TenantIsolationGuard, TenantContext,
-// and TenantIsolationException to learn multi-tenant message handling.
+// EIP Pattern: Multi-Tenant Messaging
+// E2E: TenantResolver + TenantIsolationGuard resolve and enforce tenant
+//      boundaries, with MockEndpoint for tenant-scoped publishing.
 // ============================================================================
-
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.MultiTenancy;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial32;
 
 [TestFixture]
 public sealed class Lab
 {
-    private TenantResolver _resolver = null!;
+    private MockEndpoint _output = null!;
 
     [SetUp]
-    public void SetUp()
-    {
-        _resolver = new TenantResolver();
-    }
+    public void SetUp() => _output = new MockEndpoint("tenant-out");
 
-    // ── Resolve From Metadata With tenantId Key ─────────────────────────────
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public void Resolve_FromMetadata_WithTenantIdKey()
+    public async Task ResolveFromMetadata_ReturnsTenantContext()
     {
+        var resolver = new TenantResolver();
         var metadata = new Dictionary<string, string>
         {
-            [TenantResolver.TenantMetadataKey] = "tenant-abc",
+            { TenantResolver.TenantMetadataKey, "acme" },
         };
+        var ctx = resolver.Resolve(metadata);
 
-        var context = _resolver.Resolve(metadata);
+        Assert.That(ctx.IsResolved, Is.True);
+        Assert.That(ctx.TenantId, Is.EqualTo("acme"));
 
-        Assert.That(context.TenantId, Is.EqualTo("tenant-abc"));
-        Assert.That(context.IsResolved, Is.True);
+        var envelope = IntegrationEnvelope<string>.Create("ok", "resolver", "TenantResolved");
+        await _output.PublishAsync(envelope, $"tenant.{ctx.TenantId}", default);
+        _output.AssertReceivedOnTopic("tenant.acme", 1);
     }
 
-    // ── Resolve Returns Anonymous For Missing tenantId ──────────────────────
-
     [Test]
-    public void Resolve_MissingTenantId_ReturnsAnonymous()
+    public async Task ResolveFromMetadata_MissingKey_ReturnsAnonymous()
     {
-        var metadata = new Dictionary<string, string>();
+        var resolver = new TenantResolver();
+        var ctx = resolver.Resolve(new Dictionary<string, string>());
 
-        var context = _resolver.Resolve(metadata);
-
-        Assert.That(context.IsResolved, Is.False);
-        Assert.That(context, Is.SameAs(TenantContext.Anonymous));
+        Assert.That(ctx.IsResolved, Is.False);
+        Assert.That(ctx.TenantId, Is.EqualTo("anonymous"));
+        await Task.CompletedTask;
     }
 
-    // ── Resolve(string) With Explicit TenantId ──────────────────────────────
-
     [Test]
-    public void Resolve_String_WithExplicitTenantId()
+    public async Task ResolveFromString_ReturnsTenantContext()
     {
-        var context = _resolver.Resolve("my-tenant");
+        var resolver = new TenantResolver();
+        var ctx = resolver.Resolve("tenant-42");
 
-        Assert.That(context.TenantId, Is.EqualTo("my-tenant"));
-        Assert.That(context.IsResolved, Is.True);
+        Assert.That(ctx.IsResolved, Is.True);
+        Assert.That(ctx.TenantId, Is.EqualTo("tenant-42"));
+        await Task.CompletedTask;
     }
 
-    // ── TenantIsolationGuard Passes When Tenant Matches ─────────────────────
-
     [Test]
-    public void IsolationGuard_Enforce_PassesWhenTenantMatches()
+    public async Task ResolveFromString_NullOrWhitespace_ReturnsAnonymous()
     {
-        var guard = new TenantIsolationGuard(_resolver);
-        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
-        {
-            Metadata = new Dictionary<string, string>
-            {
-                [TenantResolver.TenantMetadataKey] = "tenant-x",
-            },
-        };
+        var resolver = new TenantResolver();
 
-        Assert.DoesNotThrow(() => guard.Enforce(envelope, "tenant-x"));
+        Assert.That(resolver.Resolve((string?)null).IsResolved, Is.False);
+        Assert.That(resolver.Resolve("   ").IsResolved, Is.False);
+        await Task.CompletedTask;
     }
 
-    // ── TenantIsolationGuard Throws On Mismatch ─────────────────────────────
+    [Test]
+    public async Task IsolationGuard_MatchingTenant_DoesNotThrow()
+    {
+        var resolver = new TenantResolver();
+        var guard = new TenantIsolationGuard(resolver);
+        var envelope = IntegrationEnvelope<string>.Create("data", "src", "type");
+        envelope.Metadata["tenantId"] = "acme";
+
+        Assert.DoesNotThrow(() => guard.Enforce(envelope, "acme"));
+        await Task.CompletedTask;
+    }
 
     [Test]
-    public void IsolationGuard_Enforce_ThrowsOnMismatch()
+    public async Task IsolationGuard_MismatchedTenant_ThrowsAndPublishesAlert()
     {
-        var guard = new TenantIsolationGuard(_resolver);
-        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
-        {
-            Metadata = new Dictionary<string, string>
-            {
-                [TenantResolver.TenantMetadataKey] = "tenant-a",
-            },
-        };
+        var resolver = new TenantResolver();
+        var guard = new TenantIsolationGuard(resolver);
+        var envelope = IntegrationEnvelope<string>.Create("data", "src", "type");
+        envelope.Metadata["tenantId"] = "acme";
 
         var ex = Assert.Throws<TenantIsolationException>(
-            () => guard.Enforce(envelope, "tenant-b"));
+            () => guard.Enforce(envelope, "globex"));
 
-        Assert.That(ex!.ActualTenantId, Is.EqualTo("tenant-a"));
-        Assert.That(ex.ExpectedTenantId, Is.EqualTo("tenant-b"));
-    }
+        Assert.That(ex!.ExpectedTenantId, Is.EqualTo("globex"));
+        Assert.That(ex.ActualTenantId, Is.EqualTo("acme"));
 
-    // ── TenantContext.Anonymous Has Expected Defaults ────────────────────────
-
-    [Test]
-    public void TenantContext_Anonymous_HasExpectedDefaults()
-    {
-        var anon = TenantContext.Anonymous;
-
-        Assert.That(anon.TenantId, Is.EqualTo("anonymous"));
-        Assert.That(anon.IsResolved, Is.False);
-        Assert.That(anon.TenantName, Is.Null);
-    }
-
-    // ── TenantIsolationException Captures Fields ────────────────────────────
-
-    [Test]
-    public void TenantIsolationException_CapturesFields()
-    {
-        var msgId = Guid.NewGuid();
-        var ex = new TenantIsolationException(msgId, "actual-t", "expected-t", "details");
-
-        Assert.That(ex.MessageId, Is.EqualTo(msgId));
-        Assert.That(ex.ActualTenantId, Is.EqualTo("actual-t"));
-        Assert.That(ex.ExpectedTenantId, Is.EqualTo("expected-t"));
-        Assert.That(ex.Message, Is.EqualTo("details"));
+        var alert = IntegrationEnvelope<string>.Create(
+            $"Cross-tenant violation: {ex.ActualTenantId} vs {ex.ExpectedTenantId}",
+            "guard", "TenantViolation");
+        await _output.PublishAsync(alert, "security-alerts", default);
+        _output.AssertReceivedOnTopic("security-alerts", 1);
     }
 }

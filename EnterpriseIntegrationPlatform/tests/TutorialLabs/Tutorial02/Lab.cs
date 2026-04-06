@@ -1,142 +1,154 @@
 // ============================================================================
 // Tutorial 02 – Environment Setup (Lab)
 // ============================================================================
-// This lab verifies that your development environment is correctly configured
-// by using reflection to confirm that all key platform types, enums, and
-// namespaces are available and correctly structured.
+// EIP Pattern: Service Activator
+// End-to-End: Build AspireIntegrationTestHost, register & resolve services,
+// verify DI wiring with MockEndpoints.
 // ============================================================================
 
-using System.Reflection;
+using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
-using NUnit.Framework;
+using EnterpriseIntegrationPlatform.Ingestion.Channels;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace TutorialLabs.Tutorial02;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Verify Core Types Exist ─────────────────────────────────────────────
+    private AspireIntegrationTestHost _host = null!;
+    private MockEndpoint _output = null!;
 
-    [Test]
-    public void IntegrationEnvelope_TypeExists()
+    [TearDown]
+    public async Task TearDown()
     {
-        var type = typeof(IntegrationEnvelope<string>);
-        Assert.That(type, Is.Not.Null);
-        Assert.That(type.IsGenericType || type.IsClass, Is.True);
+        if (_host is not null) await _host.DisposeAsync();
+        if (_output is not null) await _output.DisposeAsync();
     }
 
     [Test]
-    public void IMessageBrokerProducer_InterfaceExists()
+    public async Task EndToEnd_HostResolvesProducer_PublishCapturedByMock()
     {
-        var type = typeof(IMessageBrokerProducer);
-        Assert.That(type.IsInterface, Is.True);
+        var builder = AspireIntegrationTestHost.CreateBuilder();
+        _output = builder.AddMockEndpoint("output");
+        builder.UseProducer(_output);
+        _host = builder.Build();
+
+        var producer = _host.GetService<IMessageBrokerProducer>();
+        var envelope = IntegrationEnvelope<string>.Create("hello", "lab", "test");
+
+        await producer.PublishAsync(envelope, "topic");
+
+        _output.AssertReceivedCount(1);
+        Assert.That(_output.GetReceived<string>().Payload, Is.EqualTo("hello"));
     }
 
     [Test]
-    public void IMessageBrokerConsumer_InterfaceExists()
+    public async Task EndToEnd_HostResolvesConsumer_SubscribeReceivesMessage()
     {
-        var type = typeof(IMessageBrokerConsumer);
-        Assert.That(type.IsInterface, Is.True);
+        var builder = AspireIntegrationTestHost.CreateBuilder();
+        _output = builder.AddMockEndpoint("input");
+        builder.UseConsumer(_output);
+        _host = builder.Build();
 
-        // Consumer also implements IAsyncDisposable for resource cleanup.
-        Assert.That(typeof(IAsyncDisposable).IsAssignableFrom(type), Is.True);
+        var consumer = _host.GetService<IMessageBrokerConsumer>();
+        IntegrationEnvelope<string>? received = null;
+        await consumer.SubscribeAsync<string>("topic", "group", msg =>
+        {
+            received = msg;
+            return Task.CompletedTask;
+        });
+
+        var envelope = IntegrationEnvelope<string>.Create("data", "lab", "test");
+        await _output.SendAsync(envelope);
+
+        Assert.That(received, Is.Not.Null);
+        Assert.That(received!.Payload, Is.EqualTo("data"));
     }
 
     [Test]
-    public void BrokerOptions_ClassExists()
+    public async Task EndToEnd_NamedEndpoints_RetrievedByName()
     {
-        var type = typeof(BrokerOptions);
-        Assert.That(type, Is.Not.Null);
-        Assert.That(type.IsClass, Is.True);
-        Assert.That(type.IsSealed, Is.True);
-    }
+        var builder = AspireIntegrationTestHost.CreateBuilder();
+        var ep1 = builder.AddMockEndpoint("orders");
+        var ep2 = builder.AddMockEndpoint("payments");
+        builder.UseProducer(ep1);
+        _host = builder.Build();
 
-    // ── Verify BrokerType Enum ──────────────────────────────────────────────
+        var envelope = IntegrationEnvelope<string>.Create("order-1", "lab", "test");
+        await _host.GetEndpoint("orders").PublishAsync(envelope, "topic");
 
-    [Test]
-    public void BrokerType_HasNatsJetStreamValue()
-    {
-        Assert.That(Enum.IsDefined(typeof(BrokerType), BrokerType.NatsJetStream), Is.True);
-    }
-
-    [Test]
-    public void BrokerType_HasKafkaValue()
-    {
-        Assert.That(Enum.IsDefined(typeof(BrokerType), BrokerType.Kafka), Is.True);
+        _host.GetEndpoint("orders").AssertReceivedCount(1);
+        _host.GetEndpoint("payments").AssertNoneReceived();
+        _output = ep1;
     }
 
     [Test]
-    public void BrokerType_HasPulsarValue()
+    public async Task EndToEnd_CustomServiceRegistration_ResolvedFromHost()
     {
-        Assert.That(Enum.IsDefined(typeof(BrokerType), BrokerType.Pulsar), Is.True);
+        var builder = AspireIntegrationTestHost.CreateBuilder();
+        _output = builder.AddMockEndpoint("output");
+        builder.UseProducer(_output);
+        builder.ConfigureServices(services =>
+            services.AddSingleton<IGreetingService, GreetingService>());
+        _host = builder.Build();
+
+        var service = _host.GetService<IGreetingService>();
+        var envelope = IntegrationEnvelope<string>.Create(
+            service.Greet("World"), "lab", "greeting");
+
+        var producer = _host.GetService<IMessageBrokerProducer>();
+        await producer.PublishAsync(envelope, "greetings");
+
+        _output.AssertReceivedCount(1);
+        Assert.That(_output.GetReceived<string>().Payload, Is.EqualTo("Hello, World!"));
     }
 
     [Test]
-    public void BrokerType_HasExactlyThreeValues()
+    public async Task EndToEnd_PointToPointChannel_WiredThroughDI()
     {
-        var values = Enum.GetValues<BrokerType>();
-        Assert.That(values, Has.Length.EqualTo(3));
-    }
+        var builder = AspireIntegrationTestHost.CreateBuilder();
+        _output = builder.AddMockEndpoint("output");
+        builder.UseProducer(_output).UseConsumer(_output);
+        builder.ConfigureServices(services =>
+            services.AddSingleton<PointToPointChannel>());
+        _host = builder.Build();
 
-    // ── Verify MessagePriority Enum ─────────────────────────────────────────
+        var channel = _host.GetService<PointToPointChannel>();
+        var envelope = IntegrationEnvelope<string>.Create("p2p", "lab", "test");
 
-    [Test]
-    [TestCase(MessagePriority.Low, 0)]
-    [TestCase(MessagePriority.Normal, 1)]
-    [TestCase(MessagePriority.High, 2)]
-    [TestCase(MessagePriority.Critical, 3)]
-    public void MessagePriority_HasExpectedValues(MessagePriority priority, int expected)
-    {
-        Assert.That((int)priority, Is.EqualTo(expected));
-    }
+        await channel.SendAsync(envelope, "queue", CancellationToken.None);
 
-    [Test]
-    public void MessagePriority_HasExactlyFourValues()
-    {
-        var values = Enum.GetValues<MessagePriority>();
-        Assert.That(values, Has.Length.EqualTo(4));
-    }
-
-    // ── Verify MessageIntent Enum ───────────────────────────────────────────
-
-    [Test]
-    [TestCase(MessageIntent.Command, 0)]
-    [TestCase(MessageIntent.Document, 1)]
-    [TestCase(MessageIntent.Event, 2)]
-    public void MessageIntent_HasExpectedValues(MessageIntent intent, int expected)
-    {
-        Assert.That((int)intent, Is.EqualTo(expected));
-    }
-
-    // ── Verify Namespace Presence via Assembly ──────────────────────────────
-
-    [Test]
-    public void ContractsNamespace_ContainsExpectedTypes()
-    {
-        var assembly = typeof(IntegrationEnvelope<>).Assembly;
-        var typeNames = assembly.GetTypes()
-            .Where(t => t.Namespace == "EnterpriseIntegrationPlatform.Contracts")
-            .Select(t => t.Name)
-            .ToList();
-
-        Assert.That(typeNames, Does.Contain("MessagePriority"));
-        Assert.That(typeNames, Does.Contain("MessageIntent"));
-        Assert.That(typeNames, Does.Contain("MessageHeaders"));
+        _output.AssertReceivedCount(1);
+        Assert.That(_output.GetReceived<string>().Payload, Is.EqualTo("p2p"));
     }
 
     [Test]
-    public void IngestionNamespace_ContainsExpectedTypes()
+    public async Task EndToEnd_PublishSubscribeChannel_WiredThroughDI()
     {
-        var assembly = typeof(IMessageBrokerProducer).Assembly;
-        var typeNames = assembly.GetTypes()
-            .Where(t => t.Namespace == "EnterpriseIntegrationPlatform.Ingestion")
-            .Select(t => t.Name)
-            .ToList();
+        var builder = AspireIntegrationTestHost.CreateBuilder();
+        _output = builder.AddMockEndpoint("output");
+        builder.UseProducer(_output).UseConsumer(_output);
+        builder.ConfigureServices(services =>
+            services.AddSingleton<PublishSubscribeChannel>());
+        _host = builder.Build();
 
-        Assert.That(typeNames, Does.Contain("IMessageBrokerProducer"));
-        Assert.That(typeNames, Does.Contain("IMessageBrokerConsumer"));
-        Assert.That(typeNames, Does.Contain("BrokerOptions"));
-        Assert.That(typeNames, Does.Contain("BrokerType"));
+        var channel = _host.GetService<PublishSubscribeChannel>();
+        var envelope = IntegrationEnvelope<string>.Create("pubsub", "lab", "test");
+
+        await channel.PublishAsync(envelope, "fanout", CancellationToken.None);
+
+        _output.AssertReceivedCount(1);
+        Assert.That(_output.GetReceived<string>().Payload, Is.EqualTo("pubsub"));
     }
+}
+
+public interface IGreetingService { string Greet(string name); }
+public class GreetingService : IGreetingService
+{
+    public string Greet(string name) => $"Hello, {name}!";
 }

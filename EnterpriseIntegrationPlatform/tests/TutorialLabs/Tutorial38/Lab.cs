@@ -1,192 +1,167 @@
 // ============================================================================
 // Tutorial 38 – OpenTelemetry / Observability (Lab)
 // ============================================================================
-// This lab exercises MessageEvent, InMemoryMessageStateStore, InspectionResult,
-// MessageStateSnapshot, DeliveryStatus, and CorrelationPropagator.
+// EIP Pattern: Observability.
+// E2E: Wire real InMemoryMessageStateStore and CorrelationPropagator with
+// MockEndpoint to track message lifecycle events as envelopes flow.
 // ============================================================================
 
+using System.Diagnostics;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial38;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── MessageEvent Record Shape ───────────────────────────────────────────
+    private MockEndpoint _input = null!;
+    private InMemoryMessageStateStore _store = null!;
 
-    [Test]
-    public void MessageEvent_RecordShape_AllPropertiesAccessible()
+    [SetUp]
+    public void SetUp()
     {
-        var evt = new MessageEvent
-        {
-            EventId = Guid.NewGuid(),
-            MessageId = Guid.NewGuid(),
-            CorrelationId = Guid.NewGuid(),
-            MessageType = "order.placed",
-            Source = "OrderSvc",
-            Stage = "Ingestion",
-            Status = DeliveryStatus.Pending,
-            RecordedAt = DateTimeOffset.UtcNow,
-            Details = "Received at gateway",
-            BusinessKey = "ORD-123",
-            TraceId = "abc123",
-            SpanId = "def456",
-        };
-
-        Assert.That(evt.EventId, Is.Not.EqualTo(Guid.Empty));
-        Assert.That(evt.MessageId, Is.Not.EqualTo(Guid.Empty));
-        Assert.That(evt.CorrelationId, Is.Not.EqualTo(Guid.Empty));
-        Assert.That(evt.MessageType, Is.EqualTo("order.placed"));
-        Assert.That(evt.Source, Is.EqualTo("OrderSvc"));
-        Assert.That(evt.Stage, Is.EqualTo("Ingestion"));
-        Assert.That(evt.Status, Is.EqualTo(DeliveryStatus.Pending));
-        Assert.That(evt.Details, Is.EqualTo("Received at gateway"));
-        Assert.That(evt.BusinessKey, Is.EqualTo("ORD-123"));
-        Assert.That(evt.TraceId, Is.EqualTo("abc123"));
-        Assert.That(evt.SpanId, Is.EqualTo("def456"));
+        _input = new MockEndpoint("obs-in");
+        _store = new InMemoryMessageStateStore();
     }
 
-    // ── InMemoryMessageStateStore Record and Retrieve by CorrelationId ──────
+    [TearDown]
+    public async Task TearDown() => await _input.DisposeAsync();
 
     [Test]
-    public async Task InMemoryMessageStateStore_RecordAndRetrieveByCorrelationId()
+    public async Task RecordAndRetrieve_ByCorrelationId()
     {
-        var store = new InMemoryMessageStateStore();
         var correlationId = Guid.NewGuid();
+        var evt = CreateEvent(correlationId, "Ingestion", DeliveryStatus.Pending);
 
-        var evt = new MessageEvent
-        {
-            EventId = Guid.NewGuid(),
-            MessageId = Guid.NewGuid(),
-            CorrelationId = correlationId,
-            MessageType = "order.placed",
-            Source = "OrderSvc",
-            Stage = "Routing",
-            Status = DeliveryStatus.InFlight,
-            RecordedAt = DateTimeOffset.UtcNow,
-        };
+        await _store.RecordAsync(evt);
 
-        await store.RecordAsync(evt);
-
-        var results = await store.GetByCorrelationIdAsync(correlationId);
-
+        var results = await _store.GetByCorrelationIdAsync(correlationId);
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results[0].CorrelationId, Is.EqualTo(correlationId));
+        Assert.That(results[0].Stage, Is.EqualTo("Ingestion"));
     }
 
-    // ── InMemoryMessageStateStore Record and Retrieve by BusinessKey ────────
+    [Test]
+    public async Task RecordAndRetrieve_ByBusinessKey()
+    {
+        var evt = CreateEvent(Guid.NewGuid(), "Processing", DeliveryStatus.InFlight,
+            businessKey: "ORD-123");
+
+        await _store.RecordAsync(evt);
+
+        var results = await _store.GetByBusinessKeyAsync("ORD-123");
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].BusinessKey, Is.EqualTo("ORD-123"));
+    }
 
     [Test]
-    public async Task InMemoryMessageStateStore_RecordAndRetrieveByBusinessKey()
+    public async Task GetLatestByCorrelationId_ReturnsNewestEvent()
     {
-        var store = new InMemoryMessageStateStore();
+        var correlationId = Guid.NewGuid();
 
+        await _store.RecordAsync(CreateEvent(correlationId, "Ingestion", DeliveryStatus.Pending));
+        await _store.RecordAsync(CreateEvent(correlationId, "Routing", DeliveryStatus.InFlight));
+        await _store.RecordAsync(CreateEvent(correlationId, "Delivery", DeliveryStatus.Delivered));
+
+        var latest = await _store.GetLatestByCorrelationIdAsync(correlationId);
+        Assert.That(latest, Is.Not.Null);
+        Assert.That(latest!.Stage, Is.EqualTo("Delivery"));
+        Assert.That(latest.Status, Is.EqualTo(DeliveryStatus.Delivered));
+    }
+
+    [Test]
+    public async Task GetByMessageId_ReturnsMatchingEvents()
+    {
+        var messageId = Guid.NewGuid();
+        var correlationId = Guid.NewGuid();
         var evt = new MessageEvent
         {
-            EventId = Guid.NewGuid(),
-            MessageId = Guid.NewGuid(),
-            CorrelationId = Guid.NewGuid(),
-            MessageType = "invoice.paid",
-            Source = "BillingSvc",
-            Stage = "Processing",
-            Status = DeliveryStatus.Delivered,
-            RecordedAt = DateTimeOffset.UtcNow,
-            BusinessKey = "INV-2024-001",
+            MessageId = messageId,
+            CorrelationId = correlationId,
+            MessageType = "order.placed",
+            Source = "Svc",
+            Stage = "Ingestion",
+            Status = DeliveryStatus.Pending,
         };
 
-        await store.RecordAsync(evt);
+        await _store.RecordAsync(evt);
 
-        var results = await store.GetByBusinessKeyAsync("INV-2024-001");
-
+        var results = await _store.GetByMessageIdAsync(messageId);
         Assert.That(results, Has.Count.EqualTo(1));
-        Assert.That(results[0].BusinessKey, Is.EqualTo("INV-2024-001"));
+        Assert.That(results[0].MessageId, Is.EqualTo(messageId));
     }
 
-    // ── InspectionResult Record Shape ───────────────────────────────────────
-
     [Test]
-    public void InspectionResult_RecordShape()
-    {
-        var result = new InspectionResult
-        {
-            Query = "ORD-123",
-            Found = true,
-            Summary = "Message delivered successfully",
-            Events = new List<MessageEvent>(),
-            LatestStage = "Delivery",
-            LatestStatus = DeliveryStatus.Delivered,
-        };
-
-        Assert.That(result.Query, Is.EqualTo("ORD-123"));
-        Assert.That(result.Found, Is.True);
-        Assert.That(result.Summary, Is.EqualTo("Message delivered successfully"));
-        Assert.That(result.Events, Is.Not.Null);
-        Assert.That(result.LatestStage, Is.EqualTo("Delivery"));
-        Assert.That(result.LatestStatus, Is.EqualTo(DeliveryStatus.Delivered));
-    }
-
-    // ── MessageStateSnapshot Record Shape ───────────────────────────────────
-
-    [Test]
-    public void MessageStateSnapshot_RecordShape()
-    {
-        var snapshot = new MessageStateSnapshot
-        {
-            MessageId = Guid.NewGuid(),
-            CorrelationId = Guid.NewGuid(),
-            CausationId = Guid.NewGuid(),
-            MessageType = "order.shipped",
-            Source = "ShippingSvc",
-            Priority = MessagePriority.High,
-            Timestamp = DateTimeOffset.UtcNow,
-            CurrentStage = "Delivery",
-            DeliveryStatus = DeliveryStatus.Delivered,
-            TraceId = "trace-abc",
-            SpanId = "span-xyz",
-            RetryCount = 0,
-        };
-
-        Assert.That(snapshot.MessageId, Is.Not.EqualTo(Guid.Empty));
-        Assert.That(snapshot.CorrelationId, Is.Not.EqualTo(Guid.Empty));
-        Assert.That(snapshot.CausationId, Is.Not.Null);
-        Assert.That(snapshot.MessageType, Is.EqualTo("order.shipped"));
-        Assert.That(snapshot.Source, Is.EqualTo("ShippingSvc"));
-        Assert.That(snapshot.Priority, Is.EqualTo(MessagePriority.High));
-        Assert.That(snapshot.CurrentStage, Is.EqualTo("Delivery"));
-        Assert.That(snapshot.DeliveryStatus, Is.EqualTo(DeliveryStatus.Delivered));
-        Assert.That(snapshot.TraceId, Is.EqualTo("trace-abc"));
-        Assert.That(snapshot.SpanId, Is.EqualTo("span-xyz"));
-        Assert.That(snapshot.RetryCount, Is.EqualTo(0));
-    }
-
-    // ── DeliveryStatus Enum Values ──────────────────────────────────────────
-
-    [Test]
-    public void DeliveryStatus_EnumValues()
-    {
-        Assert.That((int)DeliveryStatus.Pending, Is.EqualTo(0));
-        Assert.That((int)DeliveryStatus.InFlight, Is.EqualTo(1));
-        Assert.That((int)DeliveryStatus.Delivered, Is.EqualTo(2));
-        Assert.That((int)DeliveryStatus.Failed, Is.EqualTo(3));
-        Assert.That((int)DeliveryStatus.Retrying, Is.EqualTo(4));
-        Assert.That((int)DeliveryStatus.DeadLettered, Is.EqualTo(5));
-    }
-
-    // ── CorrelationPropagator.InjectTraceContext Adds Trace Metadata ────────
-
-    [Test]
-    public void CorrelationPropagator_InjectTraceContext_AddsTraceMetadata()
+    public void CorrelationPropagator_InjectTraceContext_ReturnsEnvelope()
     {
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "test.event");
 
         var enriched = CorrelationPropagator.InjectTraceContext(envelope);
 
-        // InjectTraceContext reads from Activity.Current; if no activity is active,
-        // the metadata keys may not be set. Verify the method runs without error
-        // and returns an envelope.
         Assert.That(enriched, Is.Not.Null);
         Assert.That(enriched.MessageId, Is.EqualTo(envelope.MessageId));
     }
+
+    [Test]
+    public async Task MultipleStages_OrderedByRecordedAt()
+    {
+        var correlationId = Guid.NewGuid();
+        var stages = new[] { "Ingestion", "Routing", "Transform", "Delivery" };
+
+        foreach (var stage in stages)
+            await _store.RecordAsync(CreateEvent(correlationId, stage, DeliveryStatus.InFlight));
+
+        var trail = await _store.GetByCorrelationIdAsync(correlationId);
+        Assert.That(trail, Has.Count.EqualTo(4));
+        Assert.That(trail[0].Stage, Is.EqualTo("Ingestion"));
+        Assert.That(trail[^1].Stage, Is.EqualTo("Delivery"));
+    }
+
+    [Test]
+    public async Task E2E_MockEndpoint_RecordEventsAsEnvelopesFlow()
+    {
+        await _input.SubscribeAsync<string>("obs-topic", "obs-group",
+            async envelope =>
+            {
+                await _store.RecordAsync(new MessageEvent
+                {
+                    MessageId = envelope.MessageId,
+                    CorrelationId = envelope.CorrelationId,
+                    MessageType = envelope.MessageType,
+                    Source = envelope.Source,
+                    Stage = "Ingestion",
+                    Status = DeliveryStatus.Pending,
+                });
+            });
+
+        var env1 = IntegrationEnvelope<string>.Create("order-1", "OrderSvc", "order.placed");
+        var env2 = IntegrationEnvelope<string>.Create("order-2", "OrderSvc", "order.shipped");
+
+        await _input.SendAsync(env1);
+        await _input.SendAsync(env2);
+
+        var trail1 = await _store.GetByCorrelationIdAsync(env1.CorrelationId);
+        var trail2 = await _store.GetByCorrelationIdAsync(env2.CorrelationId);
+
+        Assert.That(trail1, Has.Count.EqualTo(1));
+        Assert.That(trail2, Has.Count.EqualTo(1));
+        Assert.That(trail1[0].MessageType, Is.EqualTo("order.placed"));
+        Assert.That(trail2[0].MessageType, Is.EqualTo("order.shipped"));
+    }
+
+    private static MessageEvent CreateEvent(
+        Guid correlationId, string stage, DeliveryStatus status,
+        string? businessKey = null) => new()
+    {
+        MessageId = Guid.NewGuid(),
+        CorrelationId = correlationId,
+        MessageType = "order.placed",
+        Source = "OrderSvc",
+        Stage = stage,
+        Status = status,
+        BusinessKey = businessKey,
+    };
 }

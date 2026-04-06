@@ -1,125 +1,97 @@
 // ============================================================================
-// Tutorial 36 – Connector.Email (Exam)
+// Tutorial 36 – Email Connector (Exam)
 // ============================================================================
-// Coding challenges: full send lifecycle, multi-recipient email,
-// and custom subject template.
+// E2E challenges: ordered SMTP lifecycle, multi-recipient MIME verification,
+// and MockEndpoint-driven custom subject template.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Connector.Email;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial36;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Full Send Lifecycle ─────────────────────────────────────
-
     [Test]
-    public async Task Challenge1_FullSendLifecycle_ConnectAuthSendDisconnect()
+    public async Task Challenge1_FullSmtpLifecycle_ConnectAuthSendDisconnect()
     {
-        var smtpClient = Substitute.For<ISmtpClientWrapper>();
-        smtpClient.IsConnected.Returns(false);
+        var smtp = new MockSmtpClient();
+        var connector = new EmailConnector(smtp,
+            Options.Create(new EmailConnectorOptions
+            {
+                SmtpHost = "smtp.lifecycle.com", SmtpPort = 587, UseTls = true,
+                Username = "admin", Password = "s3cret",
+                DefaultFrom = "system@lifecycle.com",
+            }),
+            NullLogger<EmailConnector>.Instance);
 
-        var opts = Options.Create(new EmailConnectorOptions
-        {
-            SmtpHost = "smtp.lifecycle.com",
-            SmtpPort = 587,
-            UseTls = true,
-            Username = "admin",
-            Password = "s3cret",
-            DefaultFrom = "system@lifecycle.com",
-        });
-
-        var connector = new EmailConnector(smtpClient, opts, NullLogger<EmailConnector>.Instance);
-        var envelope = IntegrationEnvelope<string>.Create("Order confirmed", "OrderSvc", "order.confirmed");
+        var envelope = IntegrationEnvelope<string>.Create(
+            "Order confirmed", "OrderSvc", "order.confirmed");
 
         await connector.SendAsync(
             envelope, "customer@example.com", "Order Update", p => p, CancellationToken.None);
 
-        Received.InOrder(() =>
-        {
-            smtpClient.ConnectAsync(
-                "smtp.lifecycle.com", 587, true, Arg.Any<CancellationToken>());
-            smtpClient.AuthenticateAsync(
-                "admin", "s3cret", Arg.Any<CancellationToken>());
-            smtpClient.SendAsync(
-                Arg.Any<MimeKit.MimeMessage>(), Arg.Any<CancellationToken>());
-            smtpClient.DisconnectAsync(
-                true, Arg.Any<CancellationToken>());
-        });
+        smtp.AssertLifecycleOrder();
     }
 
-    // ── Challenge 2: Multi-Recipient Email ──────────────────────────────────
-
     [Test]
-    public async Task Challenge2_MultiRecipientEmail()
+    public async Task Challenge2_MultiRecipient_MimeMessageContainsAllAddresses()
     {
-        var smtpClient = Substitute.For<ISmtpClientWrapper>();
-        smtpClient.IsConnected.Returns(false);
+        var smtp = new MockSmtpClient();
 
-        var opts = Options.Create(new EmailConnectorOptions
-        {
-            SmtpHost = "smtp.multi.com",
-            SmtpPort = 587,
-            UseTls = true,
-            Username = "user",
-            Password = "pass",
-            DefaultFrom = "noreply@multi.com",
-        });
+        var connector = new EmailConnector(smtp,
+            Options.Create(new EmailConnectorOptions
+            {
+                SmtpHost = "smtp.multi.com", SmtpPort = 587, UseTls = true,
+                Username = "user", Password = "pass",
+                DefaultFrom = "noreply@multi.com",
+            }),
+            NullLogger<EmailConnector>.Instance);
 
-        var connector = new EmailConnector(smtpClient, opts, NullLogger<EmailConnector>.Instance);
         var envelope = IntegrationEnvelope<string>.Create("Alert body", "AlertSvc", "system.alert");
+        var recipients = new List<string> { "admin@multi.com", "ops@multi.com", "dev@multi.com" };
 
-        var recipients = new List<string>
-        {
-            "admin@multi.com",
-            "ops@multi.com",
-            "dev@multi.com",
-        };
+        await connector.SendAsync(envelope, recipients, "System Alert", p => p, CancellationToken.None);
 
-        await connector.SendAsync(
-            envelope, recipients, "System Alert", p => p, CancellationToken.None);
-
-        await smtpClient.Received(1).SendAsync(
-            Arg.Any<MimeKit.MimeMessage>(), Arg.Any<CancellationToken>());
+        var captured = smtp.LastSentMessage;
+        Assert.That(captured, Is.Not.Null);
+        Assert.That(captured!.To.Count, Is.EqualTo(3));
+        Assert.That(smtp.SendCount, Is.EqualTo(1));
     }
 
-    // ── Challenge 3: Email with Custom Subject Template ─────────────────────
-
     [Test]
-    public async Task Challenge3_EmailWithCustomSubjectTemplate()
+    public async Task Challenge3_MockEndpoint_CustomSubjectTemplate()
     {
-        MimeKit.MimeMessage? capturedMessage = null;
-        var smtpClient = Substitute.For<ISmtpClientWrapper>();
-        smtpClient.IsConnected.Returns(false);
-        smtpClient.SendAsync(Arg.Any<MimeKit.MimeMessage>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci => capturedMessage = ci.ArgAt<MimeKit.MimeMessage>(0));
+        await using var input = new MockEndpoint("exam-email-in");
+        var smtp = new MockSmtpClient();
 
-        var opts = Options.Create(new EmailConnectorOptions
-        {
-            SmtpHost = "smtp.template.com",
-            SmtpPort = 587,
-            UseTls = true,
-            Username = "user",
-            Password = "pass",
-            DefaultFrom = "noreply@template.com",
-            DefaultSubjectTemplate = "[EIP] {MessageType} notification",
-        });
+        var connector = new EmailConnector(smtp,
+            Options.Create(new EmailConnectorOptions
+            {
+                SmtpHost = "smtp.tpl.com", SmtpPort = 587, UseTls = true,
+                Username = "user", Password = "pass",
+                DefaultFrom = "noreply@tpl.com",
+                DefaultSubjectTemplate = "[EIP] {MessageType} notification",
+            }),
+            NullLogger<EmailConnector>.Instance);
 
-        var connector = new EmailConnector(smtpClient, opts, NullLogger<EmailConnector>.Instance);
-        var envelope = IntegrationEnvelope<string>.Create("Body", "Svc", "invoice.created");
+        await input.SubscribeAsync<string>("email-topic", "email-group",
+            async envelope =>
+            {
+                await connector.SendAsync(envelope, "dest@tpl.com", null, p => p, CancellationToken.None);
+            });
 
-        // Send with null subject to trigger template usage
-        await connector.SendAsync(
-            envelope, "dest@template.com", null, p => p, CancellationToken.None);
+        var env = IntegrationEnvelope<string>.Create("Body", "Svc", "invoice.created");
+        await input.SendAsync(env);
 
-        Assert.That(capturedMessage, Is.Not.Null);
-        Assert.That(capturedMessage!.Subject, Does.Contain("invoice.created"));
+        var captured = smtp.LastSentMessage;
+        Assert.That(captured, Is.Not.Null);
+        Assert.That(captured!.Subject, Is.EqualTo("[EIP] invoice.created notification"));
     }
 }

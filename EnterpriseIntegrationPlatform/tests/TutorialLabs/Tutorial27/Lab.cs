@@ -1,9 +1,9 @@
 // ============================================================================
 // Tutorial 27 – Resequencer (Lab)
 // ============================================================================
-// This lab exercises the MessageResequencer, which buffers out-of-order
-// messages and releases them in sequence-number order once complete.
-// You will verify ordering, buffering, timeout release, and duplicate handling.
+// EIP Pattern: Resequencer.
+// E2E: MessageResequencer buffers out-of-order messages, releases in sequence,
+// then publishes results to MockEndpoint.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -11,91 +11,65 @@ using EnterpriseIntegrationPlatform.Processing.Resequencer;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial27;
 
 [TestFixture]
 public sealed class Lab
 {
-    private MessageResequencer CreateResequencer(int maxConcurrent = 10_000)
-    {
-        var options = Options.Create(new ResequencerOptions
-        {
-            MaxConcurrentSequences = maxConcurrent,
-        });
-        return new MessageResequencer(options, NullLogger<MessageResequencer>.Instance);
-    }
+    private MockEndpoint _output = null!;
 
-    private static IntegrationEnvelope<string> MakeSequenced(
-        Guid correlationId, int seqNum, int totalCount) =>
-        new()
-        {
-            MessageId = Guid.NewGuid(),
-            CorrelationId = correlationId,
-            Timestamp = DateTimeOffset.UtcNow,
-            Source = "Svc",
-            MessageType = "type",
-            Payload = $"msg-{seqNum}",
-            SequenceNumber = seqNum,
-            TotalCount = totalCount,
-        };
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("reseq-out");
 
-    // ── In-Order Delivery Releases Immediately ───────────────────────────────
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public void Accept_CompleteSequenceInOrder_ReleasesAllMessages()
+    public async Task Accept_InOrder_ReleasesAllWhenComplete()
     {
         var resequencer = CreateResequencer();
         var correlationId = Guid.NewGuid();
 
-        var r1 = resequencer.Accept(MakeSequenced(correlationId, 0, 3));
-        var r2 = resequencer.Accept(MakeSequenced(correlationId, 1, 3));
-        var r3 = resequencer.Accept(MakeSequenced(correlationId, 2, 3));
+        var env1 = CreateEnvelope("p1", correlationId, sequenceNumber: 0, totalCount: 2);
+        var result1 = resequencer.Accept(env1);
+        Assert.That(result1, Is.Empty);
 
-        // Only the last accept should release all 3
-        Assert.That(r1, Is.Empty);
-        Assert.That(r2, Is.Empty);
-        Assert.That(r3, Has.Count.EqualTo(3));
-        Assert.That(r3[0].Payload, Is.EqualTo("msg-0"));
-        Assert.That(r3[1].Payload, Is.EqualTo("msg-1"));
-        Assert.That(r3[2].Payload, Is.EqualTo("msg-2"));
+        var env2 = CreateEnvelope("p2", correlationId, sequenceNumber: 1, totalCount: 2);
+        var result2 = resequencer.Accept(env2);
+        Assert.That(result2, Has.Count.EqualTo(2));
+
+        foreach (var env in result2)
+            await _output.PublishAsync(env, "ordered-topic");
+
+        _output.AssertReceivedOnTopic("ordered-topic", 2);
     }
 
-    // ── Out-Of-Order Delivery Reorders Correctly ─────────────────────────────
-
     [Test]
-    public void Accept_OutOfOrder_ReleasesInCorrectOrder()
+    public async Task Accept_OutOfOrder_ReleasesInCorrectSequence()
     {
         var resequencer = CreateResequencer();
         var correlationId = Guid.NewGuid();
 
-        var r1 = resequencer.Accept(MakeSequenced(correlationId, 2, 3));
-        var r2 = resequencer.Accept(MakeSequenced(correlationId, 0, 3));
-        var r3 = resequencer.Accept(MakeSequenced(correlationId, 1, 3));
+        var env3 = CreateEnvelope("third", correlationId, sequenceNumber: 2, totalCount: 3);
+        var env1 = CreateEnvelope("first", correlationId, sequenceNumber: 0, totalCount: 3);
+        var env2 = CreateEnvelope("second", correlationId, sequenceNumber: 1, totalCount: 3);
 
-        Assert.That(r1, Is.Empty);
-        Assert.That(r2, Is.Empty);
-        Assert.That(r3, Has.Count.EqualTo(3));
-        Assert.That(r3[0].Payload, Is.EqualTo("msg-0"));
-        Assert.That(r3[1].Payload, Is.EqualTo("msg-1"));
-        Assert.That(r3[2].Payload, Is.EqualTo("msg-2"));
+        Assert.That(resequencer.Accept(env3), Is.Empty);
+        Assert.That(resequencer.Accept(env1), Is.Empty);
+        var released = resequencer.Accept(env2);
+
+        Assert.That(released, Has.Count.EqualTo(3));
+        Assert.That(released[0].Payload, Is.EqualTo("first"));
+        Assert.That(released[1].Payload, Is.EqualTo("second"));
+        Assert.That(released[2].Payload, Is.EqualTo("third"));
+
+        foreach (var env in released)
+            await _output.PublishAsync(env, "ordered-topic");
+
+        _output.AssertReceivedOnTopic("ordered-topic", 3);
     }
-
-    // ── Incomplete Sequence Stays Buffered ───────────────────────────────────
-
-    [Test]
-    public void Accept_IncompleteSequence_BuffersAndReturnsEmpty()
-    {
-        var resequencer = CreateResequencer();
-        var correlationId = Guid.NewGuid();
-
-        var result = resequencer.Accept(MakeSequenced(correlationId, 1, 3));
-
-        Assert.That(result, Is.Empty);
-        Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(1));
-    }
-
-    // ── Duplicate Sequence Number Is Ignored ─────────────────────────────────
 
     [Test]
     public void Accept_DuplicateSequenceNumber_IsIgnored()
@@ -103,56 +77,76 @@ public sealed class Lab
         var resequencer = CreateResequencer();
         var correlationId = Guid.NewGuid();
 
-        resequencer.Accept(MakeSequenced(correlationId, 0, 2));
-        var dup = resequencer.Accept(MakeSequenced(correlationId, 0, 2));
+        var env1 = CreateEnvelope("first", correlationId, sequenceNumber: 0, totalCount: 3);
+        resequencer.Accept(env1);
 
-        Assert.That(dup, Is.Empty);
-        // Still waiting for seq 1
+        var dup = CreateEnvelope("dup-first", correlationId, sequenceNumber: 0, totalCount: 3);
+        var result = resequencer.Accept(dup);
+
+        Assert.That(result, Is.Empty);
         Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(1));
     }
 
-    // ── ReleaseOnTimeout Returns Buffered Messages In Order ──────────────────
-
     [Test]
-    public void ReleaseOnTimeout_IncompleteSequence_ReturnsBufferedInOrder()
+    public void Accept_MissingSequenceInfo_ThrowsArgumentException()
     {
         var resequencer = CreateResequencer();
-        var correlationId = Guid.NewGuid();
-
-        resequencer.Accept(MakeSequenced(correlationId, 2, 5));
-        resequencer.Accept(MakeSequenced(correlationId, 0, 5));
-
-        var released = resequencer.ReleaseOnTimeout<string>(correlationId);
-
-        Assert.That(released, Has.Count.EqualTo(2));
-        Assert.That(released[0].Payload, Is.EqualTo("msg-0"));
-        Assert.That(released[1].Payload, Is.EqualTo("msg-2"));
-        Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(0));
-    }
-
-    // ── Missing Sequence Info Throws ─────────────────────────────────────────
-
-    [Test]
-    public void Accept_NoSequenceInfo_ThrowsArgumentException()
-    {
-        var resequencer = CreateResequencer();
-        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "type");
+        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "evt");
 
         Assert.Throws<ArgumentException>(() => resequencer.Accept(envelope));
     }
 
-    // ── Single Message Sequence Releases Immediately ─────────────────────────
-
     [Test]
-    public void Accept_SingleMessageSequence_ReleasesImmediately()
+    public async Task ReleaseOnTimeout_IncompleteSequence_ReleasesBuffered()
     {
         var resequencer = CreateResequencer();
         var correlationId = Guid.NewGuid();
 
-        var result = resequencer.Accept(MakeSequenced(correlationId, 0, 1));
+        resequencer.Accept(CreateEnvelope("a", correlationId, 0, 5));
+        resequencer.Accept(CreateEnvelope("c", correlationId, 2, 5));
 
-        Assert.That(result, Has.Count.EqualTo(1));
-        Assert.That(result[0].Payload, Is.EqualTo("msg-0"));
+        var released = resequencer.ReleaseOnTimeout<string>(correlationId);
+        Assert.That(released, Has.Count.EqualTo(2));
+        Assert.That(released[0].SequenceNumber, Is.EqualTo(0));
+        Assert.That(released[1].SequenceNumber, Is.EqualTo(2));
+
+        foreach (var env in released)
+            await _output.PublishAsync(env, "timeout-topic");
+
+        _output.AssertReceivedOnTopic("timeout-topic", 2);
         Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(0));
     }
+
+    [Test]
+    public void ReleaseOnTimeout_UnknownCorrelation_ReturnsEmpty()
+    {
+        var resequencer = CreateResequencer();
+        var released = resequencer.ReleaseOnTimeout<string>(Guid.NewGuid());
+        Assert.That(released, Is.Empty);
+    }
+
+    [Test]
+    public void ActiveSequenceCount_TracksBufferedSequences()
+    {
+        var resequencer = CreateResequencer();
+        Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(0));
+
+        resequencer.Accept(CreateEnvelope("a", Guid.NewGuid(), 0, 3));
+        Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(1));
+
+        resequencer.Accept(CreateEnvelope("b", Guid.NewGuid(), 0, 2));
+        Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(2));
+    }
+
+    private static MessageResequencer CreateResequencer() =>
+        new(Options.Create(new ResequencerOptions()), NullLogger<MessageResequencer>.Instance);
+
+    private static IntegrationEnvelope<string> CreateEnvelope(
+        string payload, Guid correlationId, int sequenceNumber, int totalCount) =>
+        IntegrationEnvelope<string>.Create(payload, "Svc", "evt") with
+        {
+            CorrelationId = correlationId,
+            SequenceNumber = sequenceNumber,
+            TotalCount = totalCount,
+        };
 }

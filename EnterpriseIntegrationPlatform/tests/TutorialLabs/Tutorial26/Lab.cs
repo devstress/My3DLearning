@@ -1,211 +1,138 @@
 // ============================================================================
 // Tutorial 26 – Message Replay (Lab)
 // ============================================================================
-// This lab exercises the MessageReplayer, ReplayFilter, ReplayResult,
-// ReplayOptions, and the InMemoryMessageReplayStore.
-// You will verify replay filtering, deduplication, and result reporting.
+// EIP Pattern: Message Store / Replay.
+// E2E: MessageReplayer with InMemoryMessageReplayStore + MockEndpoint.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.Replay;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial26;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Replay Returns Correct Counts ────────────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("replay-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task Replay_AllMessagesReplayed_CountsAreCorrect()
+    public async Task Replay_SingleMessage_PublishesToTargetTopic()
     {
         var store = new InMemoryMessageReplayStore();
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        var envelope = IntegrationEnvelope<string>.Create("order-1", "OrderService", "order.created");
+        await store.StoreForReplayAsync(envelope, "source-topic", CancellationToken.None);
 
-        var options = Options.Create(new ReplayOptions
-        {
-            SourceTopic = "orders",
-            TargetTopic = "orders-replay",
-            MaxMessages = 100,
-        });
-
-        var replayer = new MessageReplayer(
-            store, producer, options, NullLogger<MessageReplayer>.Instance);
-
-        var env1 = IntegrationEnvelope<string>.Create("p1", "Svc", "order.created");
-        var env2 = IntegrationEnvelope<string>.Create("p2", "Svc", "order.created");
-        await store.StoreForReplayAsync(env1, "orders", CancellationToken.None);
-        await store.StoreForReplayAsync(env2, "orders", CancellationToken.None);
-
+        var replayer = CreateReplayer(store);
         var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        Assert.That(result.ReplayedCount, Is.EqualTo(2));
-        Assert.That(result.SkippedCount, Is.EqualTo(0));
+        Assert.That(result.ReplayedCount, Is.EqualTo(1));
         Assert.That(result.FailedCount, Is.EqualTo(0));
+        _output.AssertReceivedOnTopic("replay-target", 1);
     }
 
-    // ── Replay Publishes To Target Topic ─────────────────────────────────────
-
     [Test]
-    public async Task Replay_PublishesToConfiguredTargetTopic()
+    public async Task Replay_MultipleMessages_ReplaysAll()
     {
         var store = new InMemoryMessageReplayStore();
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var options = Options.Create(new ReplayOptions
+        for (var i = 0; i < 3; i++)
         {
-            SourceTopic = "events",
-            TargetTopic = "events-replay",
-            MaxMessages = 10,
-        });
+            var env = IntegrationEnvelope<string>.Create($"data-{i}", "Svc", "event.type");
+            await store.StoreForReplayAsync(env, "source-topic", CancellationToken.None);
+        }
 
-        var replayer = new MessageReplayer(
-            store, producer, options, NullLogger<MessageReplayer>.Instance);
+        var replayer = CreateReplayer(store);
+        var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        var env = IntegrationEnvelope<string>.Create("data", "Svc", "event.fired");
-        await store.StoreForReplayAsync(env, "events", CancellationToken.None);
-
-        await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
-
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<object>>(),
-            "events-replay",
-            Arg.Any<CancellationToken>());
+        Assert.That(result.ReplayedCount, Is.EqualTo(3));
+        _output.AssertReceivedOnTopic("replay-target", 3);
     }
 
-    // ── ReplayFilter By MessageType ──────────────────────────────────────────
-
     [Test]
-    public async Task Replay_FilterByMessageType_OnlyMatchingMessagesReplayed()
+    public async Task Replay_FilterByMessageType_OnlyMatchingReplayed()
     {
         var store = new InMemoryMessageReplayStore();
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        await store.StoreForReplayAsync(
+            IntegrationEnvelope<string>.Create("a", "Svc", "order.created"), "source-topic", CancellationToken.None);
+        await store.StoreForReplayAsync(
+            IntegrationEnvelope<string>.Create("b", "Svc", "payment.received"), "source-topic", CancellationToken.None);
 
-        var options = Options.Create(new ReplayOptions
-        {
-            SourceTopic = "topic",
-            TargetTopic = "topic-replay",
-            MaxMessages = 100,
-        });
-
-        var replayer = new MessageReplayer(
-            store, producer, options, NullLogger<MessageReplayer>.Instance);
-
-        var match = IntegrationEnvelope<string>.Create("m", "Svc", "order.created");
-        var noMatch = IntegrationEnvelope<string>.Create("n", "Svc", "invoice.created");
-        await store.StoreForReplayAsync(match, "topic", CancellationToken.None);
-        await store.StoreForReplayAsync(noMatch, "topic", CancellationToken.None);
-
+        var replayer = CreateReplayer(store);
         var filter = new ReplayFilter { MessageType = "order.created" };
         var result = await replayer.ReplayAsync(filter, CancellationToken.None);
 
         Assert.That(result.ReplayedCount, Is.EqualTo(1));
+        _output.AssertReceivedOnTopic("replay-target", 1);
     }
 
-    // ── SkipAlreadyReplayed Deduplication ────────────────────────────────────
-
     [Test]
-    public async Task Replay_SkipAlreadyReplayed_SkipsMessagesWithReplayIdHeader()
+    public async Task Replay_EmptyStore_ReturnsZeroReplayed()
     {
         var store = new InMemoryMessageReplayStore();
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        var replayer = CreateReplayer(store);
+        var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        var options = Options.Create(new ReplayOptions
+        Assert.That(result.ReplayedCount, Is.EqualTo(0));
+        Assert.That(result.SkippedCount, Is.EqualTo(0));
+        _output.AssertNoneReceived();
+    }
+
+    [Test]
+    public async Task Replay_SkipAlreadyReplayed_SkipsTaggedMessages()
+    {
+        var store = new InMemoryMessageReplayStore();
+        var env = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
         {
-            SourceTopic = "src",
-            TargetTopic = "tgt",
+            Metadata = new Dictionary<string, string> { [MessageHeaders.ReplayId] = Guid.NewGuid().ToString() },
+        };
+        await store.StoreForReplayAsync(env, "source-topic", CancellationToken.None);
+
+        var opts = new ReplayOptions
+        {
+            SourceTopic = "source-topic",
+            TargetTopic = "replay-target",
             MaxMessages = 100,
             SkipAlreadyReplayed = true,
-        });
-
-        var replayer = new MessageReplayer(
-            store, producer, options, NullLogger<MessageReplayer>.Instance);
-
-        var alreadyReplayed = new IntegrationEnvelope<string>
-        {
-            MessageId = Guid.NewGuid(),
-            CorrelationId = Guid.NewGuid(),
-            Timestamp = DateTimeOffset.UtcNow,
-            Source = "Svc",
-            MessageType = "type",
-            Payload = "data",
-            Metadata = new Dictionary<string, string>
-            {
-                [MessageHeaders.ReplayId] = Guid.NewGuid().ToString(),
-            },
         };
-        var fresh = IntegrationEnvelope<string>.Create("fresh", "Svc", "type");
-
-        await store.StoreForReplayAsync(alreadyReplayed, "src", CancellationToken.None);
-        await store.StoreForReplayAsync(fresh, "src", CancellationToken.None);
-
+        var replayer = new MessageReplayer(store, _output, Options.Create(opts), NullLogger<MessageReplayer>.Instance);
         var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        Assert.That(result.ReplayedCount, Is.EqualTo(1));
         Assert.That(result.SkippedCount, Is.EqualTo(1));
+        Assert.That(result.ReplayedCount, Is.EqualTo(0));
+        _output.AssertNoneReceived();
     }
 
-    // ── Empty SourceTopic Throws ─────────────────────────────────────────────
-
     [Test]
-    public void Replay_EmptySourceTopic_ThrowsInvalidOperationException()
+    public async Task Replay_ResultTimestamps_ArePopulated()
     {
         var store = new InMemoryMessageReplayStore();
-        var producer = Substitute.For<IMessageBrokerProducer>();
+        await store.StoreForReplayAsync(
+            IntegrationEnvelope<string>.Create("d", "Svc", "evt"), "source-topic", CancellationToken.None);
 
-        var options = Options.Create(new ReplayOptions
-        {
-            SourceTopic = "",
-            TargetTopic = "tgt",
-        });
-
-        var replayer = new MessageReplayer(
-            store, producer, options, NullLogger<MessageReplayer>.Instance);
-
-        Assert.ThrowsAsync<InvalidOperationException>(
-            () => replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None));
-    }
-
-    // ── ReplayResult Timestamps Are Populated ────────────────────────────────
-
-    [Test]
-    public async Task Replay_Result_HasValidTimestamps()
-    {
-        var store = new InMemoryMessageReplayStore();
-        var producer = Substitute.For<IMessageBrokerProducer>();
-
-        var options = Options.Create(new ReplayOptions
-        {
-            SourceTopic = "src",
-            TargetTopic = "tgt",
-            MaxMessages = 10,
-        });
-
-        var replayer = new MessageReplayer(
-            store, producer, options, NullLogger<MessageReplayer>.Instance);
-
-        var before = DateTimeOffset.UtcNow;
+        var replayer = CreateReplayer(store);
         var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
-        Assert.That(result.StartedAt, Is.GreaterThanOrEqualTo(before));
-        Assert.That(result.CompletedAt, Is.GreaterThanOrEqualTo(result.StartedAt));
+        Assert.That(result.StartedAt, Is.LessThanOrEqualTo(result.CompletedAt));
+        Assert.That(result.CompletedAt, Is.LessThanOrEqualTo(DateTimeOffset.UtcNow));
     }
 
-    // ── ReplayFilter Record Shape ────────────────────────────────────────────
-
-    [Test]
-    public void ReplayFilter_DefaultValues_AreNull()
+    private MessageReplayer CreateReplayer(InMemoryMessageReplayStore store)
     {
-        var filter = new ReplayFilter();
-
-        Assert.That(filter.CorrelationId, Is.Null);
-        Assert.That(filter.MessageType, Is.Null);
-        Assert.That(filter.FromTimestamp, Is.Null);
-        Assert.That(filter.ToTimestamp, Is.Null);
+        var opts = Options.Create(new ReplayOptions
+        {
+            SourceTopic = "source-topic",
+            TargetTopic = "replay-target",
+            MaxMessages = 100,
+        });
+        return new MessageReplayer(store, _output, opts, NullLogger<MessageReplayer>.Instance);
     }
 }

@@ -1,104 +1,98 @@
 // ============================================================================
-// Tutorial 34 – Connector.Http (Exam)
+// Tutorial 34 – HTTP Connector (Exam)
 // ============================================================================
-// Coding challenges: token caching lifecycle, custom headers in options,
-// and HttpConnector construction with all dependencies.
+// EIP Pattern: Connector
+// E2E: HttpConnectorAdapter send with custom destination, token caching
+//      lifecycle, and multiple independent connectors with MockEndpoint.
 // ============================================================================
-
+using System.Text.Json;
 using EnterpriseIntegrationPlatform.Connector.Http;
 using EnterpriseIntegrationPlatform.Connectors;
+using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial34;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Token Caching Lifecycle ────────────────────────────────
-
     [Test]
-    public void Challenge1_TokenCaching_SetRetrieveVerify()
+    public async Task Challenge1_SendToCustomDestination_PublishesResult()
     {
-        var fakeTime = new FakeTimeProvider(DateTimeOffset.UtcNow);
-        var cache = new InMemoryTokenCache(fakeTime);
+        await using var output = new MockEndpoint("exam-http-dest");
+        var http = new MockHttpConnector()
+            .WithResponse<JsonElement>("/api/orders", JsonDocument.Parse("{\"id\":1}").RootElement);
 
-        // Set a token with 10 minute expiry
-        cache.SetToken("service-a", "token-aaa", TimeSpan.FromMinutes(10));
-
-        // Verify it's cached and retrievable
-        Assert.That(cache.TryGetToken("service-a", out var t1), Is.True);
-        Assert.That(t1, Is.EqualTo("token-aaa"));
-
-        // Advance time but stay within expiry
-        fakeTime.Advance(TimeSpan.FromMinutes(5));
-        Assert.That(cache.TryGetToken("service-a", out var t2), Is.True);
-        Assert.That(t2, Is.EqualTo("token-aaa"));
-
-        // Advance time past expiry
-        fakeTime.Advance(TimeSpan.FromMinutes(6));
-        Assert.That(cache.TryGetToken("service-a", out _), Is.False);
-
-        // Set a new token
-        cache.SetToken("service-a", "token-bbb", TimeSpan.FromMinutes(10));
-        Assert.That(cache.TryGetToken("service-a", out var t3), Is.True);
-        Assert.That(t3, Is.EqualTo("token-bbb"));
-    }
-
-    // ── Challenge 2: Custom Headers in Options ──────────────────────────────
-
-    [Test]
-    public void Challenge2_CustomHeaders_InHttpConnectorOptions()
-    {
-        var opts = new HttpConnectorOptions
-        {
-            BaseUrl = "https://api.example.com",
-            DefaultHeaders = new Dictionary<string, string>
-            {
-                ["X-Api-Key"] = "secret-key",
-                ["X-Tenant-Id"] = "tenant-123",
-                ["Accept"] = "application/json",
-            },
-        };
-
-        Assert.That(opts.DefaultHeaders, Has.Count.EqualTo(3));
-        Assert.That(opts.DefaultHeaders["X-Api-Key"], Is.EqualTo("secret-key"));
-        Assert.That(opts.DefaultHeaders["X-Tenant-Id"], Is.EqualTo("tenant-123"));
-        Assert.That(opts.DefaultHeaders["Accept"], Is.EqualTo("application/json"));
-    }
-
-    // ── Challenge 3: HttpConnector Construction With All Dependencies ────────
-
-    [Test]
-    public void Challenge3_HttpConnector_ConstructionWithAllDependencies()
-    {
-        var httpClientFactory = Substitute.For<IHttpClientFactory>();
-        httpClientFactory.CreateClient(Arg.Any<string>())
-            .Returns(new HttpClient { BaseAddress = new Uri("https://api.example.com") });
-
-        var tokenCache = new InMemoryTokenCache();
-        var options = Options.Create(new HttpConnectorOptions
-        {
-            BaseUrl = "https://api.example.com",
-            TimeoutSeconds = 45,
-            MaxRetryAttempts = 5,
-        });
-
-        var connector = new HttpConnector(
-            httpClientFactory, tokenCache, options,
-            NullLogger<HttpConnector>.Instance);
-
-        Assert.That(connector, Is.Not.Null);
-
-        // Verify the adapter wraps the connector properly
         var adapter = new HttpConnectorAdapter(
-            "api-connector", connector, options,
+            "order-http", http,
+            Options.Create(new HttpConnectorOptions { BaseUrl = "http://orders.api" }),
             NullLogger<HttpConnectorAdapter>.Instance);
 
-        Assert.That(adapter.Name, Is.EqualTo("api-connector"));
-        Assert.That(adapter.ConnectorType, Is.EqualTo(ConnectorType.Http));
+        var envelope = IntegrationEnvelope<string>.Create(
+            "{\"item\":\"widget\"}", "shop", "Order.Create");
+        var result = await adapter.SendAsync(
+            envelope, new ConnectorSendOptions { Destination = "/api/orders" });
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.ConnectorName, Is.EqualTo("order-http"));
+
+        await output.PublishAsync(envelope, "order-results", default);
+        output.AssertReceivedOnTopic("order-results", 1);
+    }
+
+    [Test]
+    public async Task Challenge2_TokenCachingLifecycle()
+    {
+        await using var output = new MockEndpoint("exam-token");
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var cache = new InMemoryTokenCache(time);
+
+        cache.SetToken("auth-endpoint", "token-abc", TimeSpan.FromSeconds(30));
+        Assert.That(cache.TryGetToken("auth-endpoint", out var t1), Is.True);
+        Assert.That(t1, Is.EqualTo("token-abc"));
+
+        time.Advance(TimeSpan.FromSeconds(31));
+        Assert.That(cache.TryGetToken("auth-endpoint", out _), Is.False);
+
+        cache.SetToken("auth-endpoint", "token-xyz", TimeSpan.FromSeconds(60));
+        Assert.That(cache.TryGetToken("auth-endpoint", out var t2), Is.True);
+        Assert.That(t2, Is.EqualTo("token-xyz"));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "token-lifecycle-ok", "cache", "TokenStatus");
+        await output.PublishAsync(envelope, "token-events", default);
+        output.AssertReceivedOnTopic("token-events", 1);
+    }
+
+    [Test]
+    public async Task Challenge3_MultipleConnectors_IndependentResults()
+    {
+        await using var output = new MockEndpoint("exam-multi");
+        var connectors = new[] { "api-a", "api-b" };
+
+        foreach (var name in connectors)
+        {
+            var http = new MockHttpConnector();
+
+            var adapter = new HttpConnectorAdapter(
+                name, http,
+                Options.Create(new HttpConnectorOptions { BaseUrl = $"http://{name}.local" }),
+                NullLogger<HttpConnectorAdapter>.Instance);
+
+            var envelope = IntegrationEnvelope<string>.Create($"msg-{name}", "test", "Send");
+            var result = await adapter.SendAsync(envelope, new ConnectorSendOptions());
+            Assert.That(result.Success, Is.True);
+
+            await output.PublishAsync(envelope, $"results.{name}", default);
+        }
+
+        output.AssertReceivedCount(2);
+        output.AssertReceivedOnTopic("results.api-a", 1);
+        output.AssertReceivedOnTopic("results.api-b", 1);
     }
 }

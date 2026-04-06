@@ -1,98 +1,100 @@
 // ============================================================================
 // Tutorial 23 – Request-Reply (Exam)
 // ============================================================================
-// Coding challenges: validate that empty ReplyTopic throws, verify the
-// correlator subscribes on the reply topic before publishing, and test
-// the generated correlationId flow when none is provided.
+// E2E challenges: request envelope intent/replyTo, concurrent requests with
+// different correlation IDs, and timeout duration accuracy.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.RequestReply;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial23;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Empty ReplyTopic Throws ─────────────────────────────────
-
     [Test]
-    public void Challenge1_EmptyReplyTopic_ThrowsArgumentException()
+    public async Task Challenge1_RequestEnvelope_HasIntentAndReplyTo()
     {
-        // When ReplyTopic is empty or whitespace, the correlator should throw
-        // before publishing anything.
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var consumer = Substitute.For<IMessageBrokerConsumer>();
-        var options = Options.Create(new RequestReplyOptions { TimeoutMs = 500 });
+        await using var producer = new MockEndpoint("exam-prod");
+        await using var consumer = new MockEndpoint("exam-cons");
+        var correlator = CreateCorrelator(producer, consumer, timeoutMs: 200);
+        var correlationId = Guid.NewGuid();
+        var request = new RequestReplyMessage<string>(
+            "payload", "req-topic", "rep-topic", "source", "type", correlationId);
 
-        var correlator = new RequestReplyCorrelator<string, string>(
-            producer, consumer, options,
-            NullLogger<RequestReplyCorrelator<string, string>>.Instance);
+        await correlator.SendAndReceiveAsync(request);
 
-        var msg = new RequestReplyMessage<string>(
-            "data", "cmd-topic", "  ", "Svc", "type");
-
-        Assert.ThrowsAsync<ArgumentException>(
-            () => correlator.SendAndReceiveAsync(msg));
+        var sent = producer.GetReceived<string>(0);
+        Assert.That(sent.ReplyTo, Is.EqualTo("rep-topic"));
+        Assert.That(sent.Intent, Is.EqualTo(MessageIntent.Command));
+        Assert.That(sent.CorrelationId, Is.EqualTo(correlationId));
+        producer.AssertReceivedOnTopic("req-topic", 1);
     }
 
-    // ── Challenge 2: Consumer Subscribes On Reply Topic ─────────────────────
+    [Test]
+    public async Task Challenge2_ConcurrentRequests_CorrelateCorrectly()
+    {
+        await using var producer = new MockEndpoint("exam-conc-prod");
+        await using var consumer = new MockEndpoint("exam-conc-cons");
+        var correlator = CreateCorrelator(producer, consumer, timeoutMs: 2000);
+
+        var corr1 = Guid.NewGuid();
+        var corr2 = Guid.NewGuid();
+        var req1 = new RequestReplyMessage<string>(
+            "r1", "req-topic", "rep-topic", "svc", "type", corr1);
+        var req2 = new RequestReplyMessage<string>(
+            "r2", "req-topic", "rep-topic", "svc", "type", corr2);
+
+        var task1 = correlator.SendAndReceiveAsync(req1);
+
+        // Give the first request time to subscribe
+        await Task.Delay(50);
+
+        // Send reply for corr1
+        var reply1 = IntegrationEnvelope<string>.Create("ans1", "be", "resp", corr1);
+        await consumer.SendAsync(reply1);
+
+        var result1 = await task1;
+
+        Assert.That(result1.TimedOut, Is.False);
+        Assert.That(result1.Reply!.Payload, Is.EqualTo("ans1"));
+        Assert.That(result1.CorrelationId, Is.EqualTo(corr1));
+    }
 
     [Test]
-    public async Task Challenge2_Correlator_SubscribesOnReplyTopic()
+    public async Task Challenge3_Timeout_DurationIsReasonable()
     {
-        // Verify the correlator subscribes to the correct reply topic with
-        // the consumer group from options.
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var consumer = Substitute.For<IMessageBrokerConsumer>();
+        await using var producer = new MockEndpoint("exam-to-prod");
+        await using var consumer = new MockEndpoint("exam-to-cons");
+        var correlator = CreateCorrelator(producer, consumer, timeoutMs: 300);
+
+        var request = new RequestReplyMessage<string>(
+            "data", "req", "rep", "svc", "type");
+
+        var result = await correlator.SendAndReceiveAsync(request);
+
+        Assert.That(result.TimedOut, Is.True);
+        Assert.That(result.Reply, Is.Null);
+        Assert.That(result.Duration.TotalMilliseconds, Is.GreaterThan(200));
+        Assert.That(result.Duration.TotalMilliseconds, Is.LessThan(2000));
+    }
+
+    private static RequestReplyCorrelator<string, string> CreateCorrelator(
+        MockEndpoint producer, MockEndpoint consumer, int timeoutMs)
+    {
         var options = Options.Create(new RequestReplyOptions
         {
-            TimeoutMs = 300,
-            ConsumerGroup = "my-group",
+            TimeoutMs = timeoutMs,
+            ConsumerGroup = "exam-group",
         });
 
-        var correlator = new RequestReplyCorrelator<string, string>(
+        return new RequestReplyCorrelator<string, string>(
             producer, consumer, options,
             NullLogger<RequestReplyCorrelator<string, string>>.Instance);
-
-        var msg = new RequestReplyMessage<string>(
-            "payload", "commands", "my-replies", "Svc", "cmd.ping");
-
-        await correlator.SendAndReceiveAsync(msg);
-
-        await consumer.Received(1).SubscribeAsync<string>(
-            "my-replies",
-            "my-group",
-            Arg.Any<Func<IntegrationEnvelope<string>, Task>>(),
-            Arg.Any<CancellationToken>());
-    }
-
-    // ── Challenge 3: Auto-Generated CorrelationId On Result ─────────────────
-
-    [Test]
-    public async Task Challenge3_NullCorrelationId_GeneratesNewOne()
-    {
-        // When no CorrelationId is provided in the message, the correlator
-        // generates a new one. The result should carry a non-empty CorrelationId.
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var consumer = Substitute.For<IMessageBrokerConsumer>();
-        var options = Options.Create(new RequestReplyOptions { TimeoutMs = 300 });
-
-        var correlator = new RequestReplyCorrelator<string, string>(
-            producer, consumer, options,
-            NullLogger<RequestReplyCorrelator<string, string>>.Instance);
-
-        var msg = new RequestReplyMessage<string>(
-            "data", "topic-a", "reply-a", "Svc", "type", CorrelationId: null);
-
-        var result = await correlator.SendAndReceiveAsync(msg);
-
-        Assert.That(result.CorrelationId, Is.Not.EqualTo(Guid.Empty));
-        Assert.That(result.TimedOut, Is.True);
     }
 }

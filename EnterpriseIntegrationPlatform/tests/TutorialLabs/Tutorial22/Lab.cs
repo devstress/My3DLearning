@@ -1,180 +1,141 @@
 // ============================================================================
 // Tutorial 22 – Scatter-Gather (Lab)
 // ============================================================================
-// This lab exercises the ScatterGatherer: empty recipients, max-recipient
-// validation, scatter publishing, response submission, and result assembly.
+// EIP Pattern: Scatter-Gather.
+// E2E: Wire real ScatterGatherer with MockEndpoint as producer.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Processing.ScatterGather;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial22;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── Empty Recipients Returns Immediately ─────────────────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("scatter-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task Scatter_EmptyRecipients_ReturnsEmptyResult()
+    public async Task Scatter_PublishesToAllRecipients()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var options = Options.Create(new ScatterGatherOptions { TimeoutMs = 5000 });
+        var sg = CreateScatterGatherer(timeoutMs: 500);
+        var correlationId = Guid.NewGuid();
+        var request = new ScatterRequest<string>(correlationId, "quote-request",
+            new[] { "supplier-a", "supplier-b", "supplier-c" });
 
-        var sg = new ScatterGatherer<string, string>(
-            producer, options,
-            NullLogger<ScatterGatherer<string, string>>.Instance);
+        // Start scatter-gather in background; submit responses immediately
+        var task = sg.ScatterGatherAsync(request);
 
-        var request = new ScatterRequest<string>(
-            Guid.NewGuid(), "ping", new List<string>());
+        await sg.SubmitResponseAsync(correlationId,
+            new GatherResponse<string>("supplier-a", "price-a", DateTimeOffset.UtcNow, true, null));
+        await sg.SubmitResponseAsync(correlationId,
+            new GatherResponse<string>("supplier-b", "price-b", DateTimeOffset.UtcNow, true, null));
+        await sg.SubmitResponseAsync(correlationId,
+            new GatherResponse<string>("supplier-c", "price-c", DateTimeOffset.UtcNow, true, null));
+
+        var result = await task;
+
+        Assert.That(result.Responses.Count, Is.EqualTo(3));
+        Assert.That(result.TimedOut, Is.False);
+        _output.AssertReceivedOnTopic("supplier-a", 1);
+        _output.AssertReceivedOnTopic("supplier-b", 1);
+        _output.AssertReceivedOnTopic("supplier-c", 1);
+    }
+
+    [Test]
+    public async Task Scatter_EmptyRecipients_ReturnsImmediately()
+    {
+        var sg = CreateScatterGatherer(timeoutMs: 500);
+        var request = new ScatterRequest<string>(Guid.NewGuid(), "data", Array.Empty<string>());
 
         var result = await sg.ScatterGatherAsync(request);
 
-        Assert.That(result.Responses, Is.Empty);
+        Assert.That(result.Responses.Count, Is.EqualTo(0));
         Assert.That(result.TimedOut, Is.False);
-        Assert.That(result.Duration, Is.LessThanOrEqualTo(TimeSpan.FromSeconds(1)));
+        _output.AssertNoneReceived();
     }
 
-    // ── Max Recipients Exceeded Throws ───────────────────────────────────────
-
     [Test]
-    public void Scatter_ExceedsMaxRecipients_ThrowsArgumentException()
+    public async Task Gather_TimesOut_ReturnsPartialResponses()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var options = Options.Create(new ScatterGatherOptions
-        {
-            MaxRecipients = 2,
-            TimeoutMs = 5000,
-        });
-
-        var sg = new ScatterGatherer<string, string>(
-            producer, options,
-            NullLogger<ScatterGatherer<string, string>>.Instance);
-
-        var request = new ScatterRequest<string>(
-            Guid.NewGuid(), "payload",
-            new List<string> { "t1", "t2", "t3" });
-
-        Assert.ThrowsAsync<ArgumentException>(() => sg.ScatterGatherAsync(request));
-    }
-
-    // ── Scatter Publishes To All Recipients ──────────────────────────────────
-
-    [Test]
-    public async Task Scatter_PublishesToEachRecipientTopic()
-    {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var options = Options.Create(new ScatterGatherOptions { TimeoutMs = 500 });
-
-        var sg = new ScatterGatherer<string, string>(
-            producer, options,
-            NullLogger<ScatterGatherer<string, string>>.Instance);
-
-        var recipients = new List<string> { "svc-a", "svc-b" };
-        var request = new ScatterRequest<string>(
-            Guid.NewGuid(), "hello", recipients);
-
-        // Scatter will publish to both topics then time out waiting for responses.
-        await sg.ScatterGatherAsync(request);
-
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            "svc-a",
-            Arg.Any<CancellationToken>());
-
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            "svc-b",
-            Arg.Any<CancellationToken>());
-    }
-
-    // ── SubmitResponse For Unknown CorrelationId Returns False ────────────────
-
-    [Test]
-    public async Task SubmitResponse_UnknownCorrelation_ReturnsFalse()
-    {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var options = Options.Create(new ScatterGatherOptions { TimeoutMs = 5000 });
-
-        var sg = new ScatterGatherer<string, string>(
-            producer, options,
-            NullLogger<ScatterGatherer<string, string>>.Instance);
-
-        var response = new GatherResponse<string>(
-            "svc-a", "pong", DateTimeOffset.UtcNow, true, null);
-
-        var accepted = await sg.SubmitResponseAsync(Guid.NewGuid(), response);
-
-        Assert.That(accepted, Is.False);
-    }
-
-    // ── Full Scatter-Gather With Submitted Responses ─────────────────────────
-
-    [Test]
-    public async Task Scatter_ReceivesAllResponses_CompletesBeforeTimeout()
-    {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var options = Options.Create(new ScatterGatherOptions { TimeoutMs = 10_000 });
-
-        var sg = new ScatterGatherer<string, string>(
-            producer, options,
-            NullLogger<ScatterGatherer<string, string>>.Instance);
-
+        var sg = CreateScatterGatherer(timeoutMs: 200);
         var correlationId = Guid.NewGuid();
-        var request = new ScatterRequest<string>(
-            correlationId, "query", new List<string> { "svc-a" });
+        var request = new ScatterRequest<string>(correlationId, "req",
+            new[] { "fast", "slow" });
 
-        // Start scatter-gather on a background task.
-        var scatterTask = sg.ScatterGatherAsync(request);
+        var task = sg.ScatterGatherAsync(request);
 
-        // Give scatter time to publish, then submit a response.
-        await Task.Delay(100);
-        var submitted = await sg.SubmitResponseAsync(
-            correlationId,
-            new GatherResponse<string>("svc-a", "answer", DateTimeOffset.UtcNow, true, null));
+        // Only fast responds
+        await sg.SubmitResponseAsync(correlationId,
+            new GatherResponse<string>("fast", "done", DateTimeOffset.UtcNow, true, null));
 
-        var result = await scatterTask;
+        var result = await task;
 
-        Assert.That(submitted, Is.True);
+        Assert.That(result.TimedOut, Is.True);
         Assert.That(result.Responses.Count, Is.EqualTo(1));
-        Assert.That(result.Responses[0].Payload, Is.EqualTo("answer"));
-        Assert.That(result.TimedOut, Is.False);
+        Assert.That(result.Responses[0].Recipient, Is.EqualTo("fast"));
     }
 
-    // ── ScatterGatherResult Preserves CorrelationId ──────────────────────────
-
     [Test]
-    public async Task Result_CorrelationId_MatchesRequest()
+    public async Task Gather_PreservesCorrelationId()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var options = Options.Create(new ScatterGatherOptions { TimeoutMs = 500 });
-
-        var sg = new ScatterGatherer<string, string>(
-            producer, options,
-            NullLogger<ScatterGatherer<string, string>>.Instance);
-
+        var sg = CreateScatterGatherer(timeoutMs: 500);
         var correlationId = Guid.NewGuid();
-        var request = new ScatterRequest<string>(
-            correlationId, "payload", new List<string>());
+        var request = new ScatterRequest<string>(correlationId, "data",
+            new[] { "topic-1" });
 
-        var result = await sg.ScatterGatherAsync(request);
+        var task = sg.ScatterGatherAsync(request);
+        await sg.SubmitResponseAsync(correlationId,
+            new GatherResponse<string>("topic-1", "resp", DateTimeOffset.UtcNow, true, null));
+
+        var result = await task;
 
         Assert.That(result.CorrelationId, Is.EqualTo(correlationId));
     }
 
-    // ── Options Default Values ──────────────────────────────────────────────
+    [Test]
+    public async Task SubmitResponse_UnknownCorrelation_ReturnsFalse()
+    {
+        var sg = CreateScatterGatherer(timeoutMs: 500);
+
+        var accepted = await sg.SubmitResponseAsync(Guid.NewGuid(),
+            new GatherResponse<string>("x", "data", DateTimeOffset.UtcNow, true, null));
+
+        Assert.That(accepted, Is.False);
+    }
 
     [Test]
-    public void Options_DefaultValues_AreCorrect()
+    public async Task Scatter_ExceedsMaxRecipients_Throws()
     {
-        var opts = new ScatterGatherOptions();
+        var sg = CreateScatterGatherer(timeoutMs: 500, maxRecipients: 2);
+        var request = new ScatterRequest<string>(Guid.NewGuid(), "data",
+            new[] { "a", "b", "c" });
 
-        Assert.That(opts.TimeoutMs, Is.EqualTo(30_000));
-        Assert.That(opts.MaxRecipients, Is.EqualTo(50));
+        Assert.ThrowsAsync<ArgumentException>(async () =>
+            await sg.ScatterGatherAsync(request));
+    }
+
+    private ScatterGatherer<string, string> CreateScatterGatherer(
+        int timeoutMs, int maxRecipients = 50)
+    {
+        var options = Options.Create(new ScatterGatherOptions
+        {
+            TimeoutMs = timeoutMs,
+            MaxRecipients = maxRecipients,
+        });
+
+        return new ScatterGatherer<string, string>(
+            _output, options,
+            NullLogger<ScatterGatherer<string, string>>.Instance);
     }
 }

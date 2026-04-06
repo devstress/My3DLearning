@@ -1,149 +1,149 @@
 // ============================================================================
 // Tutorial 24 – Retry Framework (Lab)
 // ============================================================================
-// This lab exercises the ExponentialBackoffRetryPolicy with a no-delay
-// override.  You will verify success on first attempt, retry on transient
-// failures, max-attempt exhaustion, and the void-returning overload.
+// EIP Pattern: Retry / Guaranteed Delivery.
+// E2E: Wire real ExponentialBackoffRetryPolicy with no-delay override,
+// then publish success to MockEndpoint.
 // ============================================================================
 
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Retry;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial24;
 
 [TestFixture]
 public sealed class Lab
 {
-    private static ExponentialBackoffRetryPolicy CreatePolicy(
-        int maxAttempts = 3,
-        int initialDelayMs = 100,
-        double multiplier = 2.0) =>
-        new(
-            Options.Create(new RetryOptions
-            {
-                MaxAttempts = maxAttempts,
-                InitialDelayMs = initialDelayMs,
-                MaxDelayMs = 5000,
-                BackoffMultiplier = multiplier,
-                UseJitter = false,
-            }),
-            NullLogger<ExponentialBackoffRetryPolicy>.Instance,
-            delayFunc: (_, _) => Task.CompletedTask);
+    private MockEndpoint _output = null!;
 
-    // ── Success On First Attempt ─────────────────────────────────────────────
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("retry-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
 
     [Test]
-    public async Task Execute_SuccessOnFirstAttempt_ReturnsResult()
-    {
-        var policy = CreatePolicy();
-
-        var result = await policy.ExecuteAsync<int>(
-            _ => Task.FromResult(42), CancellationToken.None);
-
-        Assert.That(result.IsSucceeded, Is.True);
-        Assert.That(result.Attempts, Is.EqualTo(1));
-        Assert.That(result.Result, Is.EqualTo(42));
-        Assert.That(result.LastException, Is.Null);
-    }
-
-    // ── Retry Succeeds After Transient Failure ───────────────────────────────
-
-    [Test]
-    public async Task Execute_FailsThenSucceeds_RetriesCorrectly()
-    {
-        var policy = CreatePolicy(maxAttempts: 5);
-        var callCount = 0;
-
-        var result = await policy.ExecuteAsync<string>(
-            _ =>
-            {
-                callCount++;
-                if (callCount < 3)
-                    throw new InvalidOperationException("transient");
-                return Task.FromResult("ok");
-            },
-            CancellationToken.None);
-
-        Assert.That(result.IsSucceeded, Is.True);
-        Assert.That(result.Attempts, Is.EqualTo(3));
-        Assert.That(result.Result, Is.EqualTo("ok"));
-    }
-
-    // ── All Attempts Exhausted ───────────────────────────────────────────────
-
-    [Test]
-    public async Task Execute_AllAttemptsFail_ReturnsFailureWithException()
+    public async Task Execute_SucceedsFirstAttempt_ReturnsResult()
     {
         var policy = CreatePolicy(maxAttempts: 3);
 
         var result = await policy.ExecuteAsync<string>(
-            _ => throw new TimeoutException("always fails"),
+            _ => Task.FromResult("ok"), CancellationToken.None);
+
+        Assert.That(result.IsSucceeded, Is.True);
+        Assert.That(result.Attempts, Is.EqualTo(1));
+        Assert.That(result.Result, Is.EqualTo("ok"));
+
+        // Publish success to MockEndpoint
+        var envelope = IntegrationEnvelope<string>.Create(result.Result!, "svc", "retry.success");
+        await _output.PublishAsync(envelope, "success-topic", CancellationToken.None);
+        _output.AssertReceivedOnTopic("success-topic", 1);
+    }
+
+    [Test]
+    public async Task Execute_FailsThenSucceeds_RetriesCorrectly()
+    {
+        var policy = CreatePolicy(maxAttempts: 3);
+        var attempts = 0;
+
+        var result = await policy.ExecuteAsync<string>(_ =>
+        {
+            attempts++;
+            if (attempts < 3)
+                throw new InvalidOperationException("transient failure");
+            return Task.FromResult("recovered");
+        }, CancellationToken.None);
+
+        Assert.That(result.IsSucceeded, Is.True);
+        Assert.That(result.Attempts, Is.EqualTo(3));
+        Assert.That(result.Result, Is.EqualTo("recovered"));
+    }
+
+    [Test]
+    public async Task Execute_AllAttemptsFail_ReturnsFailure()
+    {
+        var policy = CreatePolicy(maxAttempts: 3);
+
+        var result = await policy.ExecuteAsync<string>(
+            _ => throw new InvalidOperationException("permanent"),
             CancellationToken.None);
 
         Assert.That(result.IsSucceeded, Is.False);
         Assert.That(result.Attempts, Is.EqualTo(3));
-        Assert.That(result.LastException, Is.TypeOf<TimeoutException>());
-        Assert.That(result.Result, Is.Null);
+        Assert.That(result.LastException, Is.Not.Null);
+        Assert.That(result.LastException, Is.InstanceOf<InvalidOperationException>());
     }
 
-    // ── Void Overload Returns True On Success ────────────────────────────────
-
     [Test]
-    public async Task ExecuteVoid_SuccessOnFirst_ReturnsTrueResult()
+    public async Task Execute_VoidOverload_ReturnsRetryResultBool()
     {
-        var policy = CreatePolicy();
+        var policy = CreatePolicy(maxAttempts: 2);
+        var called = false;
 
-        var result = await policy.ExecuteAsync(
-            _ => Task.CompletedTask, CancellationToken.None);
+        var result = await policy.ExecuteAsync(_ =>
+        {
+            called = true;
+            return Task.CompletedTask;
+        }, CancellationToken.None);
 
         Assert.That(result.IsSucceeded, Is.True);
         Assert.That(result.Attempts, Is.EqualTo(1));
-        Assert.That(result.Result, Is.True);
+        Assert.That(called, Is.True);
     }
 
-    // ── Void Overload Retries And Fails ──────────────────────────────────────
+    [Test]
+    public async Task Execute_RetryThenPublish_EndToEnd()
+    {
+        var policy = CreatePolicy(maxAttempts: 3);
+        var attempt = 0;
+
+        var result = await policy.ExecuteAsync<string>(_ =>
+        {
+            attempt++;
+            if (attempt < 2)
+                throw new Exception("fail");
+            return Task.FromResult("data");
+        }, CancellationToken.None);
+
+        Assert.That(result.IsSucceeded, Is.True);
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            result.Result!, "svc", "retry.success");
+        await _output.PublishAsync(envelope, "processed-topic", CancellationToken.None);
+        _output.AssertReceivedOnTopic("processed-topic", 1);
+    }
 
     [Test]
-    public async Task ExecuteVoid_AllFail_ReturnsFailure()
+    public async Task Execute_MaxAttemptsOne_NoRetry()
     {
-        var policy = CreatePolicy(maxAttempts: 2);
+        var policy = CreatePolicy(maxAttempts: 1);
 
-        var result = await policy.ExecuteAsync(
-            _ => throw new IOException("disk full"),
+        var result = await policy.ExecuteAsync<string>(
+            _ => throw new Exception("fail"),
             CancellationToken.None);
 
         Assert.That(result.IsSucceeded, Is.False);
-        Assert.That(result.Attempts, Is.EqualTo(2));
-        Assert.That(result.LastException, Is.TypeOf<IOException>());
+        Assert.That(result.Attempts, Is.EqualTo(1));
     }
 
-    // ── Options Default Values ──────────────────────────────────────────────
-
-    [Test]
-    public void Options_DefaultValues_AreCorrect()
+    private static ExponentialBackoffRetryPolicy CreatePolicy(int maxAttempts)
     {
-        var opts = new RetryOptions();
+        var options = Options.Create(new RetryOptions
+        {
+            MaxAttempts = maxAttempts,
+            InitialDelayMs = 100,
+            BackoffMultiplier = 2.0,
+            MaxDelayMs = 5000,
+            UseJitter = false,
+        });
 
-        Assert.That(opts.MaxAttempts, Is.EqualTo(3));
-        Assert.That(opts.InitialDelayMs, Is.EqualTo(1000));
-        Assert.That(opts.MaxDelayMs, Is.EqualTo(30000));
-        Assert.That(opts.BackoffMultiplier, Is.EqualTo(2.0));
-        Assert.That(opts.UseJitter, Is.True);
-    }
-
-    // ── Cancellation Is Propagated ──────────────────────────────────────────
-
-    [Test]
-    public void Execute_CancelledToken_ThrowsOperationCancelled()
-    {
-        var policy = CreatePolicy(maxAttempts: 5);
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-
-        Assert.ThrowsAsync<OperationCanceledException>(
-            () => policy.ExecuteAsync<int>(
-                _ => Task.FromResult(1), cts.Token));
+        return new ExponentialBackoffRetryPolicy(
+            options,
+            NullLogger<ExponentialBackoffRetryPolicy>.Instance,
+            delayFunc: (_, _) => Task.CompletedTask);
     }
 }

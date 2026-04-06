@@ -1,107 +1,87 @@
 // ============================================================================
 // Tutorial 17 – Normalizer (Exam)
 // ============================================================================
-// Coding challenges: normalise a multi-format message stream, verify XML
-// with nested elements, and test CSV-without-headers mode.
+// E2E challenges: XML with repeated elements (arrays), CSV with custom
+// delimiter, and multi-format batch normalization via MockEndpoint.
 // ============================================================================
 
-using System.Text.Json;
+using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Transform;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial17;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Multi-Format Stream ────────────────────────────────────
-
     [Test]
-    public async Task Challenge1_MultiFormat_AllNormaliseToJson()
+    public async Task Challenge1_XmlRepeatedElements_ProducesJsonArrays()
     {
-        // Normalise three payloads (JSON, XML, CSV) using one normalizer and
-        // verify they all produce valid JSON output.
-        var options = Options.Create(new NormalizerOptions());
-        var normalizer = new MessageNormalizer(options, NullLogger<MessageNormalizer>.Instance);
+        var normalizer = new MessageNormalizer(
+            Options.Create(new NormalizerOptions()),
+            NullLogger<MessageNormalizer>.Instance);
 
-        var jsonPayload = """{"product":"Widget","qty":5}""";
-        var xmlPayload = "<Product><name>Gadget</name><qty>10</qty></Product>";
-        var csvPayload = "product,qty\nGizmo,3";
-
-        var jsonResult = await normalizer.NormalizeAsync(jsonPayload, "application/json");
-        var xmlResult = await normalizer.NormalizeAsync(xmlPayload, "application/xml");
-        var csvResult = await normalizer.NormalizeAsync(csvPayload, "text/csv");
-
-        // All results should be parsable JSON.
-        Assert.DoesNotThrow(() => JsonDocument.Parse(jsonResult.Payload));
-        Assert.DoesNotThrow(() => JsonDocument.Parse(xmlResult.Payload));
-        Assert.DoesNotThrow(() => JsonDocument.Parse(csvResult.Payload));
-
-        Assert.That(jsonResult.WasTransformed, Is.False);
-        Assert.That(xmlResult.WasTransformed, Is.True);
-        Assert.That(csvResult.WasTransformed, Is.True);
-    }
-
-    // ── Challenge 2: Nested XML Conversion ──────────────────────────────────
-
-    [Test]
-    public async Task Challenge2_NestedXml_ConvertedToNestedJson()
-    {
-        // XML with nested elements should produce nested JSON objects.
-        var options = Options.Create(new NormalizerOptions());
-        var normalizer = new MessageNormalizer(options, NullLogger<MessageNormalizer>.Instance);
-
-        var xml = """
-            <Order>
-                <id>ORD-42</id>
-                <customer>
-                    <name>Alice</name>
-                    <email>alice@example.com</email>
-                </customer>
-                <total>150.00</total>
-            </Order>
-            """;
-
+        var xml = "<Root><item>A</item><item>B</item><item>C</item></Root>";
         var result = await normalizer.NormalizeAsync(xml, "application/xml");
 
         Assert.That(result.DetectedFormat, Is.EqualTo("XML"));
         Assert.That(result.WasTransformed, Is.True);
-
-        using var doc = JsonDocument.Parse(result.Payload);
-        Assert.That(doc.RootElement.GetProperty("id").GetString(), Is.EqualTo("ORD-42"));
-        Assert.That(
-            doc.RootElement.GetProperty("customer").GetProperty("name").GetString(),
-            Is.EqualTo("Alice"));
-        Assert.That(
-            doc.RootElement.GetProperty("customer").GetProperty("email").GetString(),
-            Is.EqualTo("alice@example.com"));
+        // Repeated sibling elements become JSON arrays
+        Assert.That(result.Payload, Does.Contain("["));
+        Assert.That(result.Payload, Does.Contain("A"));
+        Assert.That(result.Payload, Does.Contain("B"));
+        Assert.That(result.Payload, Does.Contain("C"));
     }
 
-    // ── Challenge 3: CSV Without Headers ────────────────────────────────────
-
     [Test]
-    public async Task Challenge3_CsvWithoutHeaders_ProducesArrayOfArrays()
+    public async Task Challenge2_CsvCustomDelimiter_ParsesCorrectly()
     {
-        // When CsvHasHeaders is false, each row should be a JSON array of values
-        // rather than an object with named properties.
-        var options = Options.Create(new NormalizerOptions { CsvHasHeaders = false });
-        var normalizer = new MessageNormalizer(options, NullLogger<MessageNormalizer>.Instance);
+        var normalizer = new MessageNormalizer(
+            Options.Create(new NormalizerOptions
+            {
+                CsvDelimiter = ';',
+                CsvHasHeaders = true,
+            }),
+            NullLogger<MessageNormalizer>.Instance);
 
-        var csv = "Alice,30\nBob,25\nCharlie,35";
-
+        var csv = "product;price\nWidget;9.99\nGadget;19.99";
         var result = await normalizer.NormalizeAsync(csv, "text/csv");
 
+        Assert.That(result.DetectedFormat, Is.EqualTo("CSV"));
         Assert.That(result.WasTransformed, Is.True);
+        Assert.That(result.Payload, Does.Contain("Widget"));
+        Assert.That(result.Payload, Does.Contain("9.99"));
+        Assert.That(result.Payload, Does.Contain("Gadget"));
+    }
 
-        using var doc = JsonDocument.Parse(result.Payload);
-        var array = doc.RootElement.GetProperty("Root");
-        Assert.That(array.GetArrayLength(), Is.EqualTo(3));
+    [Test]
+    public async Task Challenge3_MultiformatBatch_NormalizeAndPublish()
+    {
+        await using var output = new MockEndpoint("exam-normalizer");
+        var normalizer = new MessageNormalizer(
+            Options.Create(new NormalizerOptions()),
+            NullLogger<MessageNormalizer>.Instance);
 
-        // Each row is an array of string values.
-        Assert.That(array[0].GetArrayLength(), Is.EqualTo(2));
-        Assert.That(array[0][0].GetString(), Is.EqualTo("Alice"));
-        Assert.That(array[0][1].GetString(), Is.EqualTo("30"));
+        var jsonResult = await normalizer.NormalizeAsync(
+            """{"status":"ok"}""", "application/json");
+        var xmlResult = await normalizer.NormalizeAsync(
+            "<Root><status>ok</status></Root>", "application/xml");
+        var csvResult = await normalizer.NormalizeAsync(
+            "status\nok\ndone", "text/csv");
+
+        foreach (var r in new[] { jsonResult, xmlResult, csvResult })
+        {
+            var envelope = IntegrationEnvelope<string>.Create(
+                r.Payload, "NormSvc", "normalized");
+            await output.PublishAsync(envelope, "canonical-json", CancellationToken.None);
+        }
+
+        output.AssertReceivedOnTopic("canonical-json", 3);
+        Assert.That(jsonResult.DetectedFormat, Is.EqualTo("JSON"));
+        Assert.That(xmlResult.DetectedFormat, Is.EqualTo("XML"));
+        Assert.That(csvResult.DetectedFormat, Is.EqualTo("CSV"));
     }
 }

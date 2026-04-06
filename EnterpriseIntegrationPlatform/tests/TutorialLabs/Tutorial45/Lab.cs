@@ -1,163 +1,166 @@
 // ============================================================================
 // Tutorial 45 – Performance Profiling (Lab)
 // ============================================================================
-// This lab exercises ContinuousProfiler, AllocationHotspotDetector,
-// InMemoryBenchmarkRegistry, ProfileSnapshot, OperationStats, and
-// ProfilingOptions.
+// EIP Pattern: Profiling.
+// E2E: ContinuousProfiler — capture snapshots, query by time range,
+//      publish profiling results to MockEndpoint.
 // ============================================================================
-
+using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using Performance.Profiling;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial45;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── ContinuousProfiler Captures Snapshot with Label ─────────────────────
+    private MockEndpoint _output = null!;
+
+    [SetUp]
+    public void SetUp() => _output = new MockEndpoint("profiler-out");
+
+    [TearDown]
+    public async Task TearDown() => await _output.DisposeAsync();
+
+    private static ContinuousProfiler CreateProfiler(int maxSnapshots = 1000) =>
+        new(NullLogger<ContinuousProfiler>.Instance,
+            Options.Create(new ProfilingOptions { MaxRetainedSnapshots = maxSnapshots }));
 
     [Test]
-    public void ContinuousProfiler_CaptureSnapshot_WithLabel()
+    public async Task CaptureSnapshot_PublishMetricsToMockEndpoint()
     {
-        var profiler = new ContinuousProfiler(
-            NullLogger<ContinuousProfiler>.Instance,
-            Options.Create(new ProfilingOptions()));
+        var profiler = CreateProfiler();
 
         var snapshot = profiler.CaptureSnapshot("baseline");
-
         Assert.That(snapshot, Is.Not.Null);
         Assert.That(snapshot.Label, Is.EqualTo("baseline"));
         Assert.That(snapshot.SnapshotId, Is.Not.Null.And.Not.Empty);
         Assert.That(snapshot.Cpu, Is.Not.Null);
         Assert.That(snapshot.Memory, Is.Not.Null);
         Assert.That(snapshot.Gc, Is.Not.Null);
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            $"cpu-threads:{snapshot.Cpu.ThreadCount}", "profiler", "snapshot.captured");
+        await _output.PublishAsync(envelope, "profiling-metrics", default);
+        _output.AssertReceivedOnTopic("profiling-metrics", 1);
     }
 
-    // ── ContinuousProfiler.SnapshotCount Increments ─────────────────────────
-
     [Test]
-    public void ContinuousProfiler_SnapshotCount_Increments()
+    public async Task SnapshotCount_Increments_PublishCount()
     {
-        var profiler = new ContinuousProfiler(
-            NullLogger<ContinuousProfiler>.Instance,
-            Options.Create(new ProfilingOptions()));
+        var profiler = CreateProfiler();
 
         Assert.That(profiler.SnapshotCount, Is.EqualTo(0));
 
         profiler.CaptureSnapshot();
-        Assert.That(profiler.SnapshotCount, Is.EqualTo(1));
-
         profiler.CaptureSnapshot();
         profiler.CaptureSnapshot();
         Assert.That(profiler.SnapshotCount, Is.EqualTo(3));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            $"count:{profiler.SnapshotCount}", "profiler", "snapshot.count");
+        await _output.PublishAsync(envelope, "profiling-stats", default);
+        _output.AssertReceivedOnTopic("profiling-stats", 1);
     }
 
-    // ── ContinuousProfiler.GetLatestSnapshot Returns Last Captured ──────────
-
     [Test]
-    public void ContinuousProfiler_GetLatestSnapshot_ReturnsLastCaptured()
+    public async Task GetLatestSnapshot_PublishLabel()
     {
-        var profiler = new ContinuousProfiler(
-            NullLogger<ContinuousProfiler>.Instance,
-            Options.Create(new ProfilingOptions()));
+        var profiler = CreateProfiler();
 
         Assert.That(profiler.GetLatestSnapshot(), Is.Null);
 
         profiler.CaptureSnapshot("first");
         profiler.CaptureSnapshot("second");
-        var latest = profiler.CaptureSnapshot("third");
+        var last = profiler.CaptureSnapshot("third");
 
-        var retrieved = profiler.GetLatestSnapshot();
-        Assert.That(retrieved, Is.Not.Null);
-        Assert.That(retrieved!.SnapshotId, Is.EqualTo(latest.SnapshotId));
-        Assert.That(retrieved.Label, Is.EqualTo("third"));
+        var latest = profiler.GetLatestSnapshot();
+        Assert.That(latest, Is.Not.Null);
+        Assert.That(latest!.SnapshotId, Is.EqualTo(last.SnapshotId));
+        Assert.That(latest.Label, Is.EqualTo("third"));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            latest.Label!, "profiler", "snapshot.latest");
+        await _output.PublishAsync(envelope, "latest-snapshot", default);
+        _output.AssertReceivedOnTopic("latest-snapshot", 1);
     }
 
-    // ── AllocationHotspotDetector Registers and Retrieves Stats ─────────────
-
     [Test]
-    public void AllocationHotspotDetector_RegisterAndGetOperationStats()
+    public async Task GetSnapshotsByTimeRange_PublishFiltered()
     {
-        var detector = new AllocationHotspotDetector(
-            NullLogger<AllocationHotspotDetector>.Instance,
-            Options.Create(new ProfilingOptions()));
+        var profiler = CreateProfiler();
+        var before = DateTimeOffset.UtcNow.AddSeconds(-1);
 
-        detector.RegisterOperation("ProcessOrder", TimeSpan.FromMilliseconds(100), 1024);
-        detector.RegisterOperation("ProcessOrder", TimeSpan.FromMilliseconds(200), 2048);
+        profiler.CaptureSnapshot("snap-1");
+        profiler.CaptureSnapshot("snap-2");
+        profiler.CaptureSnapshot("snap-3");
 
-        var stats = detector.GetOperationStats("ProcessOrder");
+        var after = DateTimeOffset.UtcNow.AddSeconds(1);
 
-        Assert.That(stats, Is.Not.Null);
-        Assert.That(stats!.OperationName, Is.EqualTo("ProcessOrder"));
-        Assert.That(stats.InvocationCount, Is.EqualTo(2));
-        Assert.That(stats.AverageDuration, Is.EqualTo(TimeSpan.FromMilliseconds(150)));
-        Assert.That(stats.MaxDuration, Is.EqualTo(TimeSpan.FromMilliseconds(200)));
-        Assert.That(stats.MinDuration, Is.EqualTo(TimeSpan.FromMilliseconds(100)));
-        Assert.That(stats.TotalAllocatedBytes, Is.EqualTo(3072));
-    }
+        var snapshots = profiler.GetSnapshots(before, after);
+        Assert.That(snapshots, Has.Count.EqualTo(3));
+        Assert.That(snapshots[0].CapturedAt, Is.LessThanOrEqualTo(snapshots[1].CapturedAt));
 
-    // ── InMemoryBenchmarkRegistry Registers and Retrieves Baseline ──────────
-
-    [Test]
-    public void InMemoryBenchmarkRegistry_RegisterAndGetBaseline()
-    {
-        var registry = new InMemoryBenchmarkRegistry(
-            NullLogger<InMemoryBenchmarkRegistry>.Instance);
-
-        var baseline = new BenchmarkBaseline
+        foreach (var snap in snapshots)
         {
-            BenchmarkName = "SerializeOrder",
-            MeanDuration = TimeSpan.FromMilliseconds(5),
-            MeanAllocatedBytes = 4096,
-            Iterations = 1000,
-            RecordedAt = DateTimeOffset.UtcNow,
-        };
+            var envelope = IntegrationEnvelope<string>.Create(
+                snap.Label!, "profiler", "snapshot.range");
+            await _output.PublishAsync(envelope, "range-results", default);
+        }
 
-        registry.RegisterBaseline(baseline);
+        _output.AssertReceivedOnTopic("range-results", 3);
 
-        var retrieved = registry.GetBaseline("SerializeOrder");
-        Assert.That(retrieved, Is.Not.Null);
-        Assert.That(retrieved!.BenchmarkName, Is.EqualTo("SerializeOrder"));
-        Assert.That(retrieved.MeanDuration, Is.EqualTo(TimeSpan.FromMilliseconds(5)));
-        Assert.That(retrieved.MeanAllocatedBytes, Is.EqualTo(4096));
-        Assert.That(retrieved.Iterations, Is.EqualTo(1000));
-        Assert.That(retrieved.RegressionThresholdPercent, Is.EqualTo(20.0));
+        // Narrow range should return empty
+        var empty = profiler.GetSnapshots(
+            DateTimeOffset.UtcNow.AddMinutes(1), DateTimeOffset.UtcNow.AddMinutes(2));
+        Assert.That(empty, Is.Empty);
     }
 
-    // ── ProfilingOptions Defaults ───────────────────────────────────────────
-
     [Test]
-    public void ProfilingOptions_Defaults()
+    public async Task LabelledSnapshots_PublishWithMetadata()
     {
-        var opts = new ProfilingOptions();
+        var profiler = CreateProfiler();
 
-        Assert.That(opts.Enabled, Is.True);
-        Assert.That(opts.MaxRetainedSnapshots, Is.EqualTo(1000));
-        Assert.That(opts.SnapshotInterval, Is.EqualTo(TimeSpan.FromSeconds(30)));
-        Assert.That(opts.MaxTrackedOperations, Is.EqualTo(10000));
-        Assert.That(opts.HotspotThresholds, Is.Not.Null);
+        var s1 = profiler.CaptureSnapshot("before-load");
+        var s2 = profiler.CaptureSnapshot("during-load");
+        var s3 = profiler.CaptureSnapshot("after-load");
+
+        Assert.That(s1.Label, Is.EqualTo("before-load"));
+        Assert.That(s2.Label, Is.EqualTo("during-load"));
+        Assert.That(s3.Label, Is.EqualTo("after-load"));
+        Assert.That(s3.Memory.WorkingSetBytes, Is.GreaterThan(0));
+
+        foreach (var snap in new[] { s1, s2, s3 })
+        {
+            var envelope = IntegrationEnvelope<string>.Create(
+                $"{snap.Label}|ws:{snap.Memory.WorkingSetBytes}", "profiler", "snapshot.labelled");
+            await _output.PublishAsync(envelope, "labelled-snapshots", default);
+        }
+
+        _output.AssertReceivedOnTopic("labelled-snapshots", 3);
     }
 
-    // ── ProfileSnapshot Record Shape ────────────────────────────────────────
-
     [Test]
-    public void ProfileSnapshot_RecordShape()
+    public async Task MaxRetention_EvictsOldest_PublishCurrent()
     {
-        var profiler = new ContinuousProfiler(
-            NullLogger<ContinuousProfiler>.Instance,
-            Options.Create(new ProfilingOptions()));
+        var profiler = CreateProfiler(maxSnapshots: 3);
 
-        var snapshot = profiler.CaptureSnapshot("shape-test");
+        profiler.CaptureSnapshot("s1");
+        profiler.CaptureSnapshot("s2");
+        profiler.CaptureSnapshot("s3");
+        profiler.CaptureSnapshot("s4");
 
-        Assert.That(snapshot.SnapshotId, Is.Not.Null.And.Not.Empty);
-        Assert.That(snapshot.CapturedAt, Is.GreaterThan(DateTimeOffset.MinValue));
-        Assert.That(snapshot.Cpu, Is.Not.Null);
-        Assert.That(snapshot.Cpu.ThreadCount, Is.GreaterThan(0));
-        Assert.That(snapshot.Memory, Is.Not.Null);
-        Assert.That(snapshot.Memory.WorkingSetBytes, Is.GreaterThan(0));
-        Assert.That(snapshot.Gc, Is.Not.Null);
-        Assert.That(snapshot.Label, Is.EqualTo("shape-test"));
+        Assert.That(profiler.SnapshotCount, Is.EqualTo(3));
+
+        var latest = profiler.GetLatestSnapshot();
+        Assert.That(latest!.Label, Is.EqualTo("s4"));
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            $"retained:{profiler.SnapshotCount}", "profiler", "snapshot.retention");
+        await _output.PublishAsync(envelope, "retention-results", default);
+        _output.AssertReceivedOnTopic("retention-results", 1);
     }
 }
