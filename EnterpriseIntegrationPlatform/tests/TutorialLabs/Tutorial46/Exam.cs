@@ -10,9 +10,9 @@ using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Demo.Pipeline;
 using EnterpriseIntegrationPlatform.Processing.Dispatcher;
+using EnterpriseIntegrationPlatform.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -68,10 +68,8 @@ public sealed class Exam
     [Test]
     public async Task Challenge3_PipelineFailure_HandledGracefully()
     {
-        var temporal = Substitute.For<ITemporalWorkflowDispatcher>();
-        temporal.DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(Guid.NewGuid(), false, "Temporal unavailable"));
+        var temporal = new MockTemporalWorkflowDispatcher()
+            .ReturnsFailure("Temporal unavailable");
 
         var orchestrator = new PipelineOrchestrator(
             temporal, Options.Create(new PipelineOptions { AckSubject = "ack", NackSubject = "nack" }),

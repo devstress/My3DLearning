@@ -11,9 +11,9 @@ using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Demo.Pipeline;
 using EnterpriseIntegrationPlatform.Processing.Dispatcher;
+using EnterpriseIntegrationPlatform.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -125,10 +125,7 @@ public sealed class Lab
     [Test]
     public async Task PipelineOrchestrator_ProcessAsync_DispatchesToWorkflow()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        dispatcher.DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(Guid.NewGuid(), true));
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
 
         var orchestrator = new PipelineOrchestrator(
             dispatcher, Options.Create(new PipelineOptions { AckSubject = "ack", NackSubject = "nack" }),
@@ -138,19 +135,13 @@ public sealed class Lab
             JsonSerializer.Deserialize<JsonElement>("{}"), "TestService", "test.event");
         await orchestrator.ProcessAsync(envelope);
 
-        await dispatcher.Received(1).DispatchAsync(
-            Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        dispatcher.AssertDispatchCount(1);
     }
 
     [Test]
     public async Task PipelineOrchestrator_MapsAckNackFromOptions()
     {
-        IntegrationPipelineInput? captured = null;
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        dispatcher.DispatchAsync(
-            Arg.Do<IntegrationPipelineInput>(i => captured = i),
-            Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new IntegrationPipelineResult(Guid.NewGuid(), true));
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
 
         var orchestrator = new PipelineOrchestrator(
             dispatcher, Options.Create(new PipelineOptions { AckSubject = "my-ack", NackSubject = "my-nack" }),
@@ -159,8 +150,8 @@ public sealed class Lab
         await orchestrator.ProcessAsync(IntegrationEnvelope<JsonElement>.Create(
             JsonSerializer.Deserialize<JsonElement>("{}"), "Svc", "evt"));
 
-        Assert.That(captured, Is.Not.Null);
-        Assert.That(captured!.AckSubject, Is.EqualTo("my-ack"));
-        Assert.That(captured.NackSubject, Is.EqualTo("my-nack"));
+        Assert.That(dispatcher.LastInput, Is.Not.Null);
+        Assert.That(dispatcher.LastInput!.AckSubject, Is.EqualTo("my-ack"));
+        Assert.That(dispatcher.LastInput.NackSubject, Is.EqualTo("my-nack"));
     }
 }

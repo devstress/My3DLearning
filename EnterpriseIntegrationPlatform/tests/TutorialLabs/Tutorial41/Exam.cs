@@ -7,8 +7,8 @@
 // ============================================================================
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
+using EnterpriseIntegrationPlatform.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -103,8 +103,8 @@ public sealed class Exam
     {
         await using var output = new MockEndpoint("exam-snapshot");
 
-        var log = Substitute.For<IObservabilityEventLog>();
-        var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
+        var log = new MockObservabilityEventLog();
+        var traceAnalyzer = new MockTraceAnalyzer();
         var inspector = new MessageStateInspector(
             log, traceAnalyzer, NullLogger<MessageStateInspector>.Instance);
 

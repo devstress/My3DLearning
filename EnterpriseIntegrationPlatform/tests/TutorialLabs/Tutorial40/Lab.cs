@@ -9,7 +9,7 @@
 using EnterpriseIntegrationPlatform.AI.Ollama;
 using EnterpriseIntegrationPlatform.AI.RagFlow;
 using EnterpriseIntegrationPlatform.Contracts;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -38,9 +38,8 @@ public sealed class Lab
     [Test]
     public async Task Ollama_GenerateAsync_ReturnsExpected()
     {
-        var ollama = Substitute.For<IOllamaService>();
-        ollama.GenerateAsync("What is EIP?", Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("Enterprise Integration Patterns");
+        var ollama = new MockOllamaService()
+            .WithGenerateResponse("What is EIP?", "Enterprise Integration Patterns");
 
         var result = await ollama.GenerateAsync("What is EIP?");
 
@@ -50,13 +49,12 @@ public sealed class Lab
     [Test]
     public async Task RagFlow_ChatAsync_ReturnsChatResponse()
     {
-        var ragFlow = Substitute.For<IRagFlowService>();
         var expected = new RagFlowChatResponse(
             "The answer is 42", "conv-123",
             new List<RagFlowReference> { new("Relevant passage", "doc.pdf", 0.95) });
 
-        ragFlow.ChatAsync("What is the answer?", null, Arg.Any<CancellationToken>())
-            .Returns(expected);
+        var ragFlow = new MockRagFlowService()
+            .WithChatResponse("What is the answer?", null, expected);
 
         var result = await ragFlow.ChatAsync("What is the answer?");
 
@@ -102,11 +100,8 @@ public sealed class Lab
     [Test]
     public async Task E2E_MockEndpoint_AiEnrichedPipeline()
     {
-        var ollama = Substitute.For<IOllamaService>();
-        ollama.AnalyseAsync(
-                Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("Message processed successfully through all stages");
+        var ollama = new MockOllamaService()
+            .WithDefaultResponse("Message processed successfully through all stages");
 
         // Subscribe: receive envelope, enrich with AI analysis, publish to output
         await _input.SubscribeAsync<string>("ai-topic", "ai-group",

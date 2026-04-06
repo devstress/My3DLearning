@@ -8,7 +8,7 @@
 using EnterpriseIntegrationPlatform.AI.Ollama;
 using EnterpriseIntegrationPlatform.AI.RagFlow;
 using EnterpriseIntegrationPlatform.Contracts;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -23,17 +23,14 @@ public sealed class Exam
         await using var input = new MockEndpoint("exam-rag-in");
         await using var output = new MockEndpoint("exam-rag-out");
 
-        var ragFlow = Substitute.For<IRagFlowService>();
-        ragFlow.ChatAsync("What is EIP?", null, Arg.Any<CancellationToken>())
-            .Returns(new RagFlowChatResponse(
+        var ragFlow = new MockRagFlowService()
+            .WithChatResponse("What is EIP?", null, new RagFlowChatResponse(
                 "EIP stands for Enterprise Integration Patterns", "conv-abc",
                 new List<RagFlowReference>
                 {
                     new("EIP is a set of patterns...", "eip-book.pdf", 0.97),
-                }));
-
-        ragFlow.ChatAsync("Give me an example", "conv-abc", Arg.Any<CancellationToken>())
-            .Returns(new RagFlowChatResponse(
+                }))
+            .WithChatResponse("Give me an example", "conv-abc", new RagFlowChatResponse(
                 "Content-Based Router is a common EIP pattern", "conv-abc",
                 new List<RagFlowReference>
                 {
@@ -72,12 +69,10 @@ public sealed class Exam
     [Test]
     public async Task Challenge2_OllamaAnalysis_WithSystemPrompt()
     {
-        var ollama = Substitute.For<IOllamaService>();
-        ollama.AnalyseAsync(
-                "You are an expert in message routing patterns.",
+        var ollama = new MockOllamaService()
+            .WithAnalyseResponse(
                 "The message was routed to dead-letter after 3 retries.",
-                Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("The message likely failed due to a schema validation error. " +
+                "The message likely failed due to a schema validation error. " +
                      "After exhausting retries, it was moved to the dead-letter queue.");
 
         var analysis = await ollama.AnalyseAsync(
@@ -87,24 +82,20 @@ public sealed class Exam
         Assert.That(analysis, Does.Contain("dead-letter"));
         Assert.That(analysis, Does.Contain("schema validation"));
 
-        await ollama.Received(1).AnalyseAsync(
-            Arg.Is<string>(s => s.Contains("routing patterns")),
-            Arg.Is<string>(s => s.Contains("3 retries")),
-            Arg.Any<string>(), Arg.Any<CancellationToken>());
+        Assert.That(ollama.CallCount, Is.EqualTo(1));
+        Assert.That(ollama.Calls[0].SystemPrompt, Does.Contain("routing patterns"));
+        Assert.That(ollama.Calls[0].Prompt, Does.Contain("3 retries"));
     }
 
     [Test]
     public async Task Challenge3_RagFlowDatasetListing_AndHealthCheck()
     {
-        var ragFlow = Substitute.For<IRagFlowService>();
-        ragFlow.IsHealthyAsync(Arg.Any<CancellationToken>()).Returns(true);
-        ragFlow.ListDatasetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<RagFlowDataset>
-            {
-                new("ds-1", "EIP Patterns", 42),
-                new("ds-2", "System Management Docs", 15),
-                new("ds-3", "API Reference", 108),
-            });
+        var ragFlow = new MockRagFlowService()
+            .WithHealthy(true)
+            .WithDatasets(
+                new RagFlowDataset("ds-1", "EIP Patterns", 42),
+                new RagFlowDataset("ds-2", "System Management Docs", 15),
+                new RagFlowDataset("ds-3", "API Reference", 108));
 
         var healthy = await ragFlow.IsHealthyAsync();
         Assert.That(healthy, Is.True);
