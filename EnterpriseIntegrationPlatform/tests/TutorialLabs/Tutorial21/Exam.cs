@@ -9,7 +9,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Aggregator;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -91,9 +91,7 @@ public sealed class Exam
     {
         var store = new InMemoryMessageAggregateStore<string>();
         var completion = new CountCompletionStrategy<string>(expectedCount);
-        var strategy = Substitute.For<IAggregationStrategy<string, string>>();
-        strategy.Aggregate(Arg.Any<IReadOnlyList<string>>())
-            .Returns(ci => string.Join(",", ci.Arg<IReadOnlyList<string>>()));
+        var strategy = new MockAggregationStrategy<string, string>(items => string.Join(",", items));
 
         var options = Options.Create(new AggregatorOptions
         {

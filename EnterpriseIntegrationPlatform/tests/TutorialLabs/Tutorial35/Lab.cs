@@ -2,7 +2,7 @@
 // Tutorial 35 – SFTP Connector (Lab)
 // ============================================================================
 // EIP Pattern: Connector
-// E2E: SftpConnector with NSubstitute ISftpConnectionPool/ISftpClient +
+// E2E: SftpConnector with MockSftpConnectionPool/MockSftpClient +
 //      MockEndpoint for publishing transfer results.
 // ============================================================================
 using System.Text;
@@ -10,7 +10,7 @@ using EnterpriseIntegrationPlatform.Connector.Sftp;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -27,12 +27,10 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
-    private static (ISftpConnectionPool Pool, ISftpClient Client) CreateMockPool()
+    private static (MockSftpConnectionPool Pool, MockSftpClient Client) CreateMockPool()
     {
-        var client = Substitute.For<ISftpClient>();
-        client.IsConnected.Returns(true);
-        var pool = Substitute.For<ISftpConnectionPool>();
-        pool.AcquireAsync(Arg.Any<CancellationToken>()).Returns(client);
+        var client = new MockSftpClient();
+        var pool = new MockSftpConnectionPool(client);
         return (pool, client);
     }
 
@@ -65,8 +63,7 @@ public sealed class Lab
             envelope, "test.dat", s => Encoding.UTF8.GetBytes(s), default);
 
         Assert.That(path, Does.Contain("test.dat"));
-        client.Received().UploadFile(
-            Arg.Any<Stream>(), Arg.Is<string>(s => s.Contains("test.dat")));
+        Assert.That(client.UploadedPaths.Any(p => p.Contains("test.dat")), Is.True);
 
         await _output.PublishAsync(envelope, "upload-results", default);
         _output.AssertReceivedOnTopic("upload-results", 1);
@@ -77,7 +74,7 @@ public sealed class Lab
     {
         var (pool, client) = CreateMockPool();
         var data = Encoding.UTF8.GetBytes("downloaded-content");
-        client.DownloadFile("/remote/file.txt").Returns(new MemoryStream(data));
+        client.Files["/remote/file.txt"] = data;
 
         var connector = CreateConnector(pool);
         var result = await connector.DownloadAsync("/remote/file.txt", default);
@@ -89,7 +86,8 @@ public sealed class Lab
     public async Task ListFiles_DelegatesToPoolAndClient()
     {
         var (pool, client) = CreateMockPool();
-        client.ListFiles("/data").Returns(new[] { "/data/a.txt", "/data/b.txt" });
+        client.Files["/data/a.txt"] = Array.Empty<byte>();
+        client.Files["/data/b.txt"] = Array.Empty<byte>();
 
         var connector = CreateConnector(pool);
         var files = await connector.ListFilesAsync("/data", default);
@@ -108,9 +106,8 @@ public sealed class Lab
         await connector.UploadAsync(
             envelope, "doc.json", s => Encoding.UTF8.GetBytes(s), default);
 
-        client.Received(2).UploadFile(Arg.Any<Stream>(), Arg.Any<string>());
-        client.Received().UploadFile(
-            Arg.Any<Stream>(), Arg.Is<string>(s => s.EndsWith(".meta")));
+        Assert.That(client.UploadCount, Is.EqualTo(2));
+        Assert.That(client.UploadedPaths.Any(p => p.EndsWith(".meta")), Is.True);
     }
 
     [Test]
@@ -123,7 +120,7 @@ public sealed class Lab
         await connector.UploadAsync(
             envelope, "file.bin", s => Encoding.UTF8.GetBytes(s), default);
 
-        pool.Received(1).Release(client);
+        Assert.That(pool.ReleaseCount, Is.EqualTo(1));
     }
 
     [Test]

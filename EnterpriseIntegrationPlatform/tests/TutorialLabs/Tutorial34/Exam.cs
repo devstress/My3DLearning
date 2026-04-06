@@ -12,7 +12,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -25,11 +25,8 @@ public sealed class Exam
     public async Task Challenge1_SendToCustomDestination_PublishesResult()
     {
         await using var output = new MockEndpoint("exam-http-dest");
-        var http = Substitute.For<IHttpConnector>();
-        http.SendAsync<string, JsonElement>(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            "/api/orders", HttpMethod.Post, Arg.Any<CancellationToken>())
-            .Returns(JsonDocument.Parse("{\"id\":1}").RootElement);
+        var http = new MockHttpConnector()
+            .WithResponse<JsonElement>("/api/orders", JsonDocument.Parse("{\"id\":1}").RootElement);
 
         var adapter = new HttpConnectorAdapter(
             "order-http", http,
@@ -80,11 +77,7 @@ public sealed class Exam
 
         foreach (var name in connectors)
         {
-            var http = Substitute.For<IHttpConnector>();
-            http.SendAsync<string, JsonElement>(
-                Arg.Any<IntegrationEnvelope<string>>(),
-                Arg.Any<string>(), Arg.Any<HttpMethod>(), Arg.Any<CancellationToken>())
-                .Returns(JsonDocument.Parse("{}").RootElement);
+            var http = new MockHttpConnector();
 
             var adapter = new HttpConnectorAdapter(
                 name, http,

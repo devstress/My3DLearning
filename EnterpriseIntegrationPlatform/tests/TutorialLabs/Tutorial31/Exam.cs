@@ -9,7 +9,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.EventSourcing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -32,9 +32,7 @@ public sealed class Exam
             DateTimeOffset.UtcNow, new Dictionary<string, string>());
         await store.AppendAsync("account-1", [e1, e2], 0);
 
-        var projection = Substitute.For<IEventProjection<int>>();
-        projection.ProjectAsync(Arg.Any<int>(), Arg.Any<EventEnvelope>(), Arg.Any<CancellationToken>())
-            .Returns(ci => ci.ArgAt<int>(0) + int.Parse(ci.ArgAt<EventEnvelope>(1).Data));
+        var projection = new MockEventProjection<int>((state, envelope) => state + int.Parse(envelope.Data));
 
         var snapStore = new InMemorySnapshotStore<int>();
         var engine = new EventProjectionEngine<int>(
@@ -69,9 +67,7 @@ public sealed class Exam
         var snapStore = new InMemorySnapshotStore<int>();
         await snapStore.SaveAsync("s1", 30, 3);
 
-        var projection = Substitute.For<IEventProjection<int>>();
-        projection.ProjectAsync(Arg.Any<int>(), Arg.Any<EventEnvelope>(), Arg.Any<CancellationToken>())
-            .Returns(ci => ci.ArgAt<int>(0) + int.Parse(ci.ArgAt<EventEnvelope>(1).Data));
+        var projection = new MockEventProjection<int>((state, envelope) => state + int.Parse(envelope.Data));
 
         var engine = new EventProjectionEngine<int>(
             store, snapStore, projection,

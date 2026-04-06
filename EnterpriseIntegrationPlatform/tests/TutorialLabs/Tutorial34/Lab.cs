@@ -2,7 +2,7 @@
 // Tutorial 34 – HTTP Connector (Lab)
 // ============================================================================
 // EIP Pattern: Connector
-// E2E: HttpConnectorAdapter with NSubstitute IHttpConnector + MockEndpoint
+// E2E: HttpConnectorAdapter with MockHttpConnector + MockEndpoint
 //      for publishing send results.
 // ============================================================================
 using System.Text.Json;
@@ -12,7 +12,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -38,7 +38,7 @@ public sealed class Lab
     [Test]
     public async Task Adapter_NameAndType_AreCorrect()
     {
-        var http = Substitute.For<IHttpConnector>();
+        var http = new MockHttpConnector();
         var adapter = CreateAdapter("my-http", http);
 
         Assert.That(adapter.Name, Is.EqualTo("my-http"));
@@ -49,11 +49,7 @@ public sealed class Lab
     [Test]
     public async Task SendAsync_Success_ReturnsOkResult()
     {
-        var http = Substitute.For<IHttpConnector>();
-        http.SendAsync<string, JsonElement>(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Any<string>(), Arg.Any<HttpMethod>(), Arg.Any<CancellationToken>())
-            .Returns(JsonDocument.Parse("{}").RootElement);
+        var http = new MockHttpConnector();
 
         var adapter = CreateAdapter("test-http", http, "http://example.com");
         var envelope = IntegrationEnvelope<string>.Create("{\"key\":\"val\"}", "src", "Http.Send");
@@ -70,11 +66,8 @@ public sealed class Lab
     [Test]
     public async Task SendAsync_Failure_ReturnsFailResult()
     {
-        var http = Substitute.For<IHttpConnector>();
-        http.SendAsync<string, JsonElement>(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            Arg.Any<string>(), Arg.Any<HttpMethod>(), Arg.Any<CancellationToken>())
-            .Returns<JsonElement>(_ => throw new HttpRequestException("Connection refused"));
+        var http = new MockHttpConnector()
+            .WithFailure(new HttpRequestException("Connection refused"));
 
         var adapter = CreateAdapter("fail-http", http, "http://down.example.com");
         var envelope = IntegrationEnvelope<string>.Create("payload", "src", "Http.Send");
@@ -87,20 +80,16 @@ public sealed class Lab
     [Test]
     public async Task SendAsync_DefaultDestination_UsesSlash()
     {
-        var http = Substitute.For<IHttpConnector>();
-        http.SendAsync<string, JsonElement>(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            "/", HttpMethod.Post, Arg.Any<CancellationToken>())
-            .Returns(JsonDocument.Parse("{}").RootElement);
+        var http = new MockHttpConnector();
 
         var adapter = CreateAdapter("default-dest", http);
         var envelope = IntegrationEnvelope<string>.Create("data", "src", "Send");
         var result = await adapter.SendAsync(envelope, new ConnectorSendOptions());
 
         Assert.That(result.Success, Is.True);
-        await http.Received(1).SendAsync<string, JsonElement>(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            "/", HttpMethod.Post, Arg.Any<CancellationToken>());
+        Assert.That(http.CallCount, Is.EqualTo(1));
+        Assert.That(http.Calls[0].RelativeUrl, Is.EqualTo("/"));
+        Assert.That(http.Calls[0].Method, Is.EqualTo(HttpMethod.Post));
     }
 
     [Test]
