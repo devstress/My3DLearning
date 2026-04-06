@@ -10,7 +10,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -86,8 +86,8 @@ public sealed class Exam
     [Test]
     public async Task Challenge3_MultiStage_PersistValidatePublishVerify()
     {
-        var persistence = Substitute.For<IPersistenceActivityService>();
-        var logging = Substitute.For<IMessageLoggingService>();
+        var persistence = new MockPersistenceActivityService();
+        var logging = new MockMessageLoggingService();
         var validator = new DefaultMessageValidationService();
         await using var output = new MockEndpoint("final");
 
@@ -112,9 +112,9 @@ public sealed class Exam
         await logging.LogAsync(input.MessageId, input.MessageType, "Published");
 
         output.AssertReceivedCount(1);
-        await persistence.Received(1).SaveMessageAsync(input, Arg.Any<CancellationToken>());
-        await logging.Received(1).LogAsync(input.MessageId, input.MessageType, "Persisted");
-        await logging.Received(1).LogAsync(input.MessageId, input.MessageType, "Validated");
-        await logging.Received(1).LogAsync(input.MessageId, input.MessageType, "Published");
+        persistence.AssertSaveCount(1);
+        logging.AssertLogged(input.MessageId, "Persisted");
+        logging.AssertLogged(input.MessageId, "Validated");
+        logging.AssertLogged(input.MessageId, "Published");
     }
 }

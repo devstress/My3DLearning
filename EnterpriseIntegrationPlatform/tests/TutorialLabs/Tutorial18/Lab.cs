@@ -2,7 +2,7 @@
 // Tutorial 18 – Content Enricher (Lab)
 // ============================================================================
 // EIP Pattern: Content Enricher.
-// E2E: ContentEnricher with NSubstitute IEnrichmentSource, verify enriched
+// E2E: ContentEnricher with MockEnrichmentSource, verify enriched
 // JSON payload, fallback behaviour, and publish via MockEndpoint.
 // ============================================================================
 
@@ -11,7 +11,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Transform;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -31,9 +31,8 @@ public sealed class Lab
     [Test]
     public async Task Enrich_MergesExternalData()
     {
-        var source = Substitute.For<IEnrichmentSource>();
-        source.FetchAsync("C-100", Arg.Any<CancellationToken>())
-            .Returns(JsonNode.Parse("""{"name":"Alice","tier":"Gold"}"""));
+        var source = new MockEnrichmentSource()
+            .WithData("C-100", """{"name":"Alice","tier":"Gold"}""");
 
         var enricher = CreateEnricher(source, "order.customerId", "customer");
 
@@ -48,9 +47,8 @@ public sealed class Lab
     [Test]
     public async Task Enrich_NestedLookup_ExtractsCorrectKey()
     {
-        var source = Substitute.For<IEnrichmentSource>();
-        source.FetchAsync("P-200", Arg.Any<CancellationToken>())
-            .Returns(JsonNode.Parse("""{"sku":"Widget","warehouse":"WH-1"}"""));
+        var source = new MockEnrichmentSource()
+            .WithData("P-200", """{"sku":"Widget","warehouse":"WH-1"}""");
 
         var enricher = CreateEnricher(source, "line.productId", "product");
 
@@ -64,9 +62,8 @@ public sealed class Lab
     [Test]
     public async Task Enrich_SourceReturnsNull_UsesFallback()
     {
-        var source = Substitute.For<IEnrichmentSource>();
-        source.FetchAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((JsonNode?)null);
+        var source = new MockEnrichmentSource()
+            .ReturnsNullForUnknown();
 
         var options = new ContentEnricherOptions
         {
@@ -90,7 +87,8 @@ public sealed class Lab
     [Test]
     public async Task Enrich_MissingLookupKey_FallsBack()
     {
-        var source = Substitute.For<IEnrichmentSource>();
+        var source = new MockEnrichmentSource()
+            .ReturnsNullForUnknown();
         var options = new ContentEnricherOptions
         {
             EndpointUrlTemplate = "https://api.example.com/{key}",
@@ -112,7 +110,8 @@ public sealed class Lab
     [Test]
     public async Task Enrich_MissingLookupKey_ThrowsWhenNoFallback()
     {
-        var source = Substitute.For<IEnrichmentSource>();
+        var source = new MockEnrichmentSource()
+            .ReturnsNullForUnknown();
         var options = new ContentEnricherOptions
         {
             EndpointUrlTemplate = "https://api.example.com/{key}",
@@ -132,9 +131,8 @@ public sealed class Lab
     [Test]
     public async Task Enrich_E2E_PublishEnrichedToMockEndpoint()
     {
-        var source = Substitute.For<IEnrichmentSource>();
-        source.FetchAsync("C-100", Arg.Any<CancellationToken>())
-            .Returns(JsonNode.Parse("""{"name":"Alice"}"""));
+        var source = new MockEnrichmentSource()
+            .WithData("C-100", """{"name":"Alice"}""");
 
         var enricher = CreateEnricher(source, "order.customerId", "customer");
 

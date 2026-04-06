@@ -2,7 +2,7 @@
 // Tutorial 15 – Message Translator (Lab)
 // ============================================================================
 // EIP Pattern: Message Translator
-// E2E: Wire real MessageTranslator with NSubstitute IPayloadTransform and
+// E2E: Wire real MessageTranslator with MockPayloadTransform and
 // MockEndpoint, verify payload transformation and envelope publishing.
 // ============================================================================
 
@@ -10,7 +10,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Translator;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -30,8 +30,7 @@ public sealed class Lab
     [Test]
     public async Task Translate_TransformsPayload_PublishesToTarget()
     {
-        var transform = Substitute.For<IPayloadTransform<string, string>>();
-        transform.Transform("hello").Returns("HELLO");
+        var transform = new MockPayloadTransform<string, string>(input => input.ToUpperInvariant());
 
         var translator = CreateTranslator(transform, "translated-topic");
         var envelope = IntegrationEnvelope<string>.Create(
@@ -48,8 +47,7 @@ public sealed class Lab
     [Test]
     public async Task Translate_PreservesCorrelationId()
     {
-        var transform = Substitute.For<IPayloadTransform<string, string>>();
-        transform.Transform(Arg.Any<string>()).Returns("out");
+        var transform = new MockPayloadTransform<string, string>(_ => "out");
 
         var translator = CreateTranslator(transform, "target");
         var envelope = IntegrationEnvelope<string>.Create("in", "Svc", "type");
@@ -63,8 +61,7 @@ public sealed class Lab
     [Test]
     public async Task Translate_SetsCausationIdToSourceMessageId()
     {
-        var transform = Substitute.For<IPayloadTransform<string, string>>();
-        transform.Transform(Arg.Any<string>()).Returns("out");
+        var transform = new MockPayloadTransform<string, string>(_ => "out");
 
         var translator = CreateTranslator(transform, "target");
         var envelope = IntegrationEnvelope<string>.Create("in", "Svc", "type");
@@ -78,8 +75,7 @@ public sealed class Lab
     [Test]
     public async Task Translate_OverridesSourceAndMessageType()
     {
-        var transform = Substitute.For<IPayloadTransform<string, string>>();
-        transform.Transform(Arg.Any<string>()).Returns("out");
+        var transform = new MockPayloadTransform<string, string>(_ => "out");
 
         var options = Options.Create(new TranslatorOptions
         {
@@ -102,8 +98,7 @@ public sealed class Lab
     [Test]
     public async Task Translate_PreservesMetadata()
     {
-        var transform = Substitute.For<IPayloadTransform<string, string>>();
-        transform.Transform(Arg.Any<string>()).Returns("out");
+        var transform = new MockPayloadTransform<string, string>(_ => "out");
 
         var translator = CreateTranslator(transform, "target");
         var envelope = IntegrationEnvelope<string>.Create("in", "Svc", "type") with
@@ -124,7 +119,7 @@ public sealed class Lab
     [Test]
     public async Task Translate_NoTargetTopic_ThrowsInvalidOperation()
     {
-        var transform = Substitute.For<IPayloadTransform<string, string>>();
+        var transform = new MockPayloadTransform<string, string>(_ => "out");
         var options = Options.Create(new TranslatorOptions { TargetTopic = "" });
         var translator = new MessageTranslator<string, string>(
             transform, _output, options,

@@ -9,7 +9,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Translator;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -22,8 +22,7 @@ public sealed class Exam
     public async Task Challenge1_TypeConversion_StringToInt()
     {
         await using var output = new MockEndpoint("type-convert");
-        var transform = Substitute.For<IPayloadTransform<string, int>>();
-        transform.Transform("42").Returns(42);
+        var transform = new MockPayloadTransform<string, int>(input => int.Parse(input));
 
         var options = Options.Create(new TranslatorOptions
         {
@@ -50,11 +49,9 @@ public sealed class Exam
         await using var output1 = new MockEndpoint("stage1");
         await using var output2 = new MockEndpoint("stage2");
 
-        var transform1 = Substitute.For<IPayloadTransform<string, string>>();
-        transform1.Transform(Arg.Any<string>()).Returns(x => ((string)x[0]).ToUpperInvariant());
+        var transform1 = new MockPayloadTransform<string, string>(input => input.ToUpperInvariant());
 
-        var transform2 = Substitute.For<IPayloadTransform<string, string>>();
-        transform2.Transform(Arg.Any<string>()).Returns(x => $"[{x[0]}]");
+        var transform2 = new MockPayloadTransform<string, string>(input => $"[{input}]");
 
         var translator1 = new MessageTranslator<string, string>(
             transform1, output1, Options.Create(new TranslatorOptions { TargetTopic = "stage1-topic" }),
@@ -87,8 +84,7 @@ public sealed class Exam
     public async Task Challenge3_PreservesSourceWhenNoOverride()
     {
         await using var output = new MockEndpoint("preserve");
-        var transform = Substitute.For<IPayloadTransform<string, string>>();
-        transform.Transform(Arg.Any<string>()).Returns("out");
+        var transform = new MockPayloadTransform<string, string>(_ => "out");
 
         var options = Options.Create(new TranslatorOptions
         {

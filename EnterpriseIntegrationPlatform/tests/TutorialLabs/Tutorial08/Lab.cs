@@ -11,7 +11,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -102,7 +102,7 @@ public sealed class Lab
     [Test]
     public async Task PipelineChain_PersistThenValidateThenPublish()
     {
-        var persistence = Substitute.For<IPersistenceActivityService>();
+        var persistence = new MockPersistenceActivityService();
         var validator = new DefaultMessageValidationService();
         await using var output = new MockEndpoint("pipeline-out");
 
@@ -114,7 +114,7 @@ public sealed class Lab
             AckSubject: "ack", NackSubject: "nack");
 
         await persistence.SaveMessageAsync(input);
-        await persistence.Received(1).SaveMessageAsync(input, Arg.Any<CancellationToken>());
+        persistence.AssertSaveCount(1);
 
         var validation = await validator.ValidateAsync(input.MessageType, input.PayloadJson);
         Assert.That(validation.IsValid, Is.True);

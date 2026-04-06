@@ -10,7 +10,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Transform;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -22,9 +22,8 @@ public sealed class Exam
     [Test]
     public async Task Challenge1_DeepNestedMerge_EnrichesAtNestedPath()
     {
-        var source = Substitute.For<IEnrichmentSource>();
-        source.FetchAsync("WH-1", Arg.Any<CancellationToken>())
-            .Returns(JsonNode.Parse("""{"location":"NYC","capacity":5000}"""));
+        var source = new MockEnrichmentSource()
+            .WithData("WH-1", """{"location":"NYC","capacity":5000}""");
 
         var options = new ContentEnricherOptions
         {
@@ -47,9 +46,8 @@ public sealed class Exam
     [Test]
     public async Task Challenge2_NumericLookupKey_ExtractsCorrectly()
     {
-        var source = Substitute.For<IEnrichmentSource>();
-        source.FetchAsync("42", Arg.Any<CancellationToken>())
-            .Returns(JsonNode.Parse("""{"status":"active","plan":"enterprise"}"""));
+        var source = new MockEnrichmentSource()
+            .WithData("42", """{"status":"active","plan":"enterprise"}""");
 
         var options = new ContentEnricherOptions
         {
@@ -73,13 +71,10 @@ public sealed class Exam
     {
         await using var output = new MockEndpoint("exam-enricher");
 
-        var source = Substitute.For<IEnrichmentSource>();
-        source.FetchAsync("C-1", Arg.Any<CancellationToken>())
-            .Returns(JsonNode.Parse("""{"name":"Alice"}"""));
-        source.FetchAsync("C-2", Arg.Any<CancellationToken>())
-            .Returns(JsonNode.Parse("""{"name":"Bob"}"""));
-        source.FetchAsync("C-3", Arg.Any<CancellationToken>())
-            .Returns(JsonNode.Parse("""{"name":"Charlie"}"""));
+        var source = new MockEnrichmentSource()
+            .WithData("C-1", """{"name":"Alice"}""")
+            .WithData("C-2", """{"name":"Bob"}""")
+            .WithData("C-3", """{"name":"Charlie"}""");
 
         var options = new ContentEnricherOptions
         {
