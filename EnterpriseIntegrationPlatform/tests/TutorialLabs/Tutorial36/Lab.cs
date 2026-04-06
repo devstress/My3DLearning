@@ -2,7 +2,7 @@
 // Tutorial 36 – Email Connector (Lab)
 // ============================================================================
 // EIP Pattern: Connector.
-// E2E: Wire real EmailConnector with NSubstitute ISmtpClientWrapper and
+// E2E: Wire real EmailConnector with MockSmtpClient and
 // MockEndpoint to simulate envelope-driven email dispatch.
 // ============================================================================
 
@@ -10,8 +10,7 @@ using EnterpriseIntegrationPlatform.Connector.Email;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using MimeKit;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -21,13 +20,13 @@ namespace TutorialLabs.Tutorial36;
 public sealed class Lab
 {
     private MockEndpoint _input = null!;
-    private ISmtpClientWrapper _smtp = null!;
+    private MockSmtpClient _smtp = null!;
 
     [SetUp]
     public void SetUp()
     {
         _input = new MockEndpoint("email-in");
-        _smtp = Substitute.For<ISmtpClientWrapper>();
+        _smtp = new MockSmtpClient();
     }
 
     [TearDown]
@@ -41,12 +40,9 @@ public sealed class Lab
 
         await connector.SendAsync(envelope, "user@test.com", "Test", p => p, CancellationToken.None);
 
-        await _smtp.Received(1).ConnectAsync(
-            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
-        await _smtp.Received(1).SendAsync(
-            Arg.Any<MimeMessage>(), Arg.Any<CancellationToken>());
-        await _smtp.Received(1).DisconnectAsync(
-            Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        Assert.That(_smtp.Calls.Count(c => c.Operation == "Connect"), Is.EqualTo(1));
+        Assert.That(_smtp.SendCount, Is.EqualTo(1));
+        Assert.That(_smtp.Calls.Count(c => c.Operation == "Disconnect"), Is.EqualTo(1));
     }
 
     [Test]
@@ -58,23 +54,18 @@ public sealed class Lab
 
         await connector.SendAsync(envelope, recipients, "Alert", p => p, CancellationToken.None);
 
-        await _smtp.Received(1).SendAsync(
-            Arg.Any<MimeMessage>(), Arg.Any<CancellationToken>());
+        Assert.That(_smtp.SendCount, Is.EqualTo(1));
     }
 
     [Test]
     public async Task Send_NullSubject_UsesDefaultTemplate()
     {
-        MimeMessage? captured = null;
-        _smtp.SendAsync(Arg.Any<MimeMessage>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci => captured = ci.ArgAt<MimeMessage>(0));
-
         var connector = CreateConnector();
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "invoice.created");
 
         await connector.SendAsync(envelope, "to@test.com", null, p => p, CancellationToken.None);
 
+        var captured = _smtp.LastSentMessage;
         Assert.That(captured, Is.Not.Null);
         Assert.That(captured!.Subject, Is.EqualTo("invoice.created notification"));
     }
@@ -82,16 +73,12 @@ public sealed class Lab
     [Test]
     public async Task Send_InjectsCorrelationHeaders()
     {
-        MimeMessage? captured = null;
-        _smtp.SendAsync(Arg.Any<MimeMessage>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci => captured = ci.ArgAt<MimeMessage>(0));
-
         var connector = CreateConnector();
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "order.shipped");
 
         await connector.SendAsync(envelope, "to@test.com", "Shipped", p => p, CancellationToken.None);
 
+        var captured = _smtp.LastSentMessage;
         Assert.That(captured, Is.Not.Null);
         Assert.That(captured!.Headers["X-Correlation-Id"],
             Is.EqualTo(envelope.CorrelationId.ToString()));
@@ -102,8 +89,7 @@ public sealed class Lab
     [Test]
     public async Task Send_DisconnectsEvenWhenAuthThrows()
     {
-        _smtp.AuthenticateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns<Task>(_ => throw new InvalidOperationException("Auth failed"));
+        _smtp.WithAuthFailure(new InvalidOperationException("Auth failed"));
 
         var connector = CreateConnector();
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "test.event");
@@ -111,17 +97,13 @@ public sealed class Lab
         Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await connector.SendAsync(envelope, "to@test.com", "Sub", p => p, CancellationToken.None));
 
-        await _smtp.Received(1).DisconnectAsync(true, Arg.Any<CancellationToken>());
+        Assert.That(_smtp.Calls.Count(c => c.Operation == "Disconnect"), Is.EqualTo(1));
     }
 
     [Test]
     public async Task E2E_MockEndpoint_FeedsEnvelope_ToEmailConnector()
     {
         var connector = CreateConnector();
-        MimeMessage? captured = null;
-        _smtp.SendAsync(Arg.Any<MimeMessage>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci => captured = ci.ArgAt<MimeMessage>(0));
 
         // Subscribe handler on MockEndpoint that triggers email send
         await _input.SubscribeAsync<string>("email-topic", "email-group",
@@ -134,7 +116,8 @@ public sealed class Lab
         var env = IntegrationEnvelope<string>.Create("Order confirmed", "OrderSvc", "order.confirmed");
         await _input.SendAsync(env);
 
-        await _smtp.Received(1).SendAsync(Arg.Any<MimeMessage>(), Arg.Any<CancellationToken>());
+        Assert.That(_smtp.SendCount, Is.EqualTo(1));
+        var captured = _smtp.LastSentMessage;
         Assert.That(captured, Is.Not.Null);
         Assert.That(captured!.Subject, Is.EqualTo("order.confirmed notification"));
     }

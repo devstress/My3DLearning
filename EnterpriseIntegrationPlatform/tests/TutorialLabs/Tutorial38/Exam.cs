@@ -8,7 +8,7 @@
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -92,13 +92,10 @@ public sealed class Exam
             },
         };
 
-        var eventLog = Substitute.For<IObservabilityEventLog>();
-        eventLog.GetByBusinessKeyAsync("ORD-555", Arg.Any<CancellationToken>())
-            .Returns(events);
+        var eventLog = new MockObservabilityEventLog().WithEvents(events.ToArray());
 
-        var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
-        traceAnalyzer.WhereIsMessageAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("Message is currently being routed");
+        var traceAnalyzer = new MockTraceAnalyzer()
+            .WithWhereIsResponse("Message is currently being routed");
 
         var inspector = new MessageStateInspector(
             eventLog, traceAnalyzer, NullLogger<MessageStateInspector>.Instance);
@@ -113,8 +110,8 @@ public sealed class Exam
     [Test]
     public void Challenge3_CreateSnapshot_FromEnvelope()
     {
-        var eventLog = Substitute.For<IObservabilityEventLog>();
-        var traceAnalyzer = Substitute.For<ITraceAnalyzer>();
+        var eventLog = new MockObservabilityEventLog();
+        var traceAnalyzer = new MockTraceAnalyzer();
         var inspector = new MessageStateInspector(
             eventLog, traceAnalyzer, NullLogger<MessageStateInspector>.Instance);
 

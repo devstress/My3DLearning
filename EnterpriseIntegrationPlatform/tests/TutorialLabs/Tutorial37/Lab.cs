@@ -2,7 +2,7 @@
 // Tutorial 37 – File Connector (Lab)
 // ============================================================================
 // EIP Pattern: Connector.
-// E2E: Wire real FileConnector with NSubstitute IFileSystem and
+// E2E: Wire real FileConnector with MockFileSystem and
 // MockEndpoint to simulate envelope-driven file I/O.
 // ============================================================================
 
@@ -11,7 +11,7 @@ using EnterpriseIntegrationPlatform.Connector.FileSystem;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -21,13 +21,13 @@ namespace TutorialLabs.Tutorial37;
 public sealed class Lab
 {
     private MockEndpoint _input = null!;
-    private IFileSystem _fs = null!;
+    private MockFileSystem _fs = null!;
 
     [SetUp]
     public void SetUp()
     {
         _input = new MockEndpoint("file-in");
-        _fs = Substitute.For<IFileSystem>();
+        _fs = new MockFileSystem();
     }
 
     [TearDown]
@@ -41,29 +41,19 @@ public sealed class Lab
 
         await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None);
 
-        _fs.Received(1).CreateDirectory(Arg.Any<string>());
-        await _fs.Received(2).WriteAllBytesAsync(
-            Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>());
+        Assert.That(_fs.Calls.Count(c => c.Operation == "CreateDirectory"), Is.EqualTo(1));
+        Assert.That(_fs.Calls.Count(c => c.Operation == "WriteAllBytes"), Is.EqualTo(2));
     }
 
     [Test]
     public async Task Write_ExpandsFilenamePattern_FromEnvelope()
     {
-        string? capturedPath = null;
-        _fs.WriteAllBytesAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci =>
-            {
-                var path = ci.ArgAt<string>(0);
-                if (!path.EndsWith(".meta.json"))
-                    capturedPath = path;
-            });
-
         var connector = CreateConnector();
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "invoice.created");
 
         await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None);
 
+        var capturedPath = _fs.LastWrittenPath;
         Assert.That(capturedPath, Is.Not.Null);
         Assert.That(capturedPath, Does.Contain(envelope.MessageId.ToString()));
         Assert.That(capturedPath, Does.Contain("invoice.created"));
@@ -77,14 +67,12 @@ public sealed class Lab
 
         await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None);
 
-        _fs.Received(1).CreateDirectory("/output");
+        Assert.That(_fs.Calls.Count(c => c.Operation == "CreateDirectory" && c.Path == "/output"), Is.EqualTo(1));
     }
 
     [Test]
     public async Task Write_Throws_WhenFileExists_AndOverwriteDisabled()
     {
-        _fs.FileExists(Arg.Any<string>()).Returns(true);
-
         var connector = new FileConnector(_fs,
             Options.Create(new FileConnectorOptions
             {
@@ -96,6 +84,10 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "test.event");
 
+        // Pre-populate the file so FileExists returns true for the generated path
+        var expectedPath = Path.Combine("/output", $"{envelope.MessageId}-test.event.json");
+        _fs.Files[expectedPath] = Array.Empty<byte>();
+
         Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None));
     }
@@ -104,8 +96,7 @@ public sealed class Lab
     public async Task Read_ReturnsFileContent()
     {
         var expected = Encoding.UTF8.GetBytes("file-content");
-        _fs.ReadAllBytesAsync("/output/test.json", Arg.Any<CancellationToken>())
-            .Returns(expected);
+        _fs.Files["/output/test.json"] = expected;
 
         var connector = CreateConnector();
         var result = await connector.ReadAsync("/output/test.json", CancellationToken.None);
@@ -116,8 +107,8 @@ public sealed class Lab
     [Test]
     public async Task ListFiles_ReturnsMatchingPaths()
     {
-        _fs.GetFiles(Arg.Any<string>(), Arg.Any<string>())
-            .Returns(new[] { "/output/a.json", "/output/b.json" });
+        _fs.Files["/output/a.json"] = Array.Empty<byte>();
+        _fs.Files["/output/b.json"] = Array.Empty<byte>();
 
         var connector = CreateConnector();
         var files = await connector.ListFilesAsync(null, "*.json", CancellationToken.None);
@@ -129,16 +120,6 @@ public sealed class Lab
     [Test]
     public async Task E2E_MockEndpoint_FeedsEnvelope_ThroughFileConnector()
     {
-        var writtenPaths = new List<string>();
-        _fs.WriteAllBytesAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci =>
-            {
-                var path = ci.ArgAt<string>(0);
-                if (!path.EndsWith(".meta.json"))
-                    writtenPaths.Add(path);
-            });
-
         var connector = CreateConnector();
 
         await _input.SubscribeAsync<string>("file-topic", "file-group",
@@ -153,6 +134,10 @@ public sealed class Lab
         await _input.SendAsync(env1);
         await _input.SendAsync(env2);
 
+        var writtenPaths = _fs.Calls
+            .Where(c => c.Operation == "WriteAllBytes" && !c.Path!.EndsWith(".meta.json"))
+            .Select(c => c.Path)
+            .ToList();
         Assert.That(writtenPaths, Has.Count.EqualTo(2));
     }
 

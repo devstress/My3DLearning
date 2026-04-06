@@ -10,7 +10,7 @@ using EnterpriseIntegrationPlatform.Connector.FileSystem;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -24,13 +24,7 @@ public sealed class Exam
     {
         await using var input = new MockEndpoint("exam-file-in");
 
-        var store = new Dictionary<string, byte[]>();
-        var fs = Substitute.For<IFileSystem>();
-        fs.WriteAllBytesAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci => store[ci.ArgAt<string>(0)] = ci.ArgAt<byte[]>(1));
-        fs.ReadAllBytesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(ci => Task.FromResult(store[ci.ArgAt<string>(0)]));
+        var fs = new MockFileSystem();
 
         var connector = new FileConnector(fs,
             Options.Create(new FileConnectorOptions
@@ -53,7 +47,7 @@ public sealed class Exam
         await input.SendAsync(env);
 
         Assert.That(writtenPath, Is.Not.Null.And.Not.Empty);
-        Assert.That(store.ContainsKey(writtenPath!), Is.True);
+        Assert.That(fs.Files.ContainsKey(writtenPath!), Is.True);
 
         var readBytes = await connector.ReadAsync(writtenPath!, CancellationToken.None);
         Assert.That(Encoding.UTF8.GetString(readBytes), Is.EqualTo(payload));
@@ -62,16 +56,7 @@ public sealed class Exam
     [Test]
     public async Task Challenge2_CustomFilenamePattern_ContainsMessageTypeAndId()
     {
-        string? capturedPath = null;
-        var fs = Substitute.For<IFileSystem>();
-        fs.WriteAllBytesAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci =>
-            {
-                var path = ci.ArgAt<string>(0);
-                if (!path.EndsWith(".meta.json"))
-                    capturedPath = path;
-            });
+        var fs = new MockFileSystem();
 
         var connector = new FileConnector(fs,
             Options.Create(new FileConnectorOptions
@@ -86,6 +71,7 @@ public sealed class Exam
 
         await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None);
 
+        var capturedPath = fs.LastWrittenPath;
         Assert.That(capturedPath, Is.Not.Null);
         Assert.That(capturedPath, Does.Contain("invoice.created"));
         Assert.That(capturedPath, Does.Contain(envelope.MessageId.ToString()));
@@ -94,9 +80,10 @@ public sealed class Exam
     [Test]
     public async Task Challenge3_SubdirectoryListing_CombinesRootAndSub()
     {
-        var fs = Substitute.For<IFileSystem>();
-        fs.GetFiles(Arg.Is<string>(d => d.Contains("sub")), Arg.Any<string>())
-            .Returns(new[] { "/root/sub/file1.json", "/root/sub/file2.json", "/root/sub/file3.json" });
+        var fs = new MockFileSystem();
+        fs.Files["/root/sub/file1.json"] = Array.Empty<byte>();
+        fs.Files["/root/sub/file2.json"] = Array.Empty<byte>();
+        fs.Files["/root/sub/file3.json"] = Array.Empty<byte>();
 
         var connector = new FileConnector(fs,
             Options.Create(new FileConnectorOptions { RootDirectory = "/root" }),
