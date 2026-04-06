@@ -1,148 +1,165 @@
 // ============================================================================
-// Tutorial 37 – Connector.File (Lab)
+// Tutorial 37 – File Connector (Lab)
 // ============================================================================
-// This lab exercises FileConnectorOptions, IFileSystem, PhysicalFileSystem,
-// and FileConnector to learn the File connector subsystem.
+// EIP Pattern: Connector.
+// E2E: Wire real FileConnector with NSubstitute IFileSystem and
+// MockEndpoint to simulate envelope-driven file I/O.
 // ============================================================================
 
+using System.Text;
 using EnterpriseIntegrationPlatform.Connector.FileSystem;
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial37;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── FileConnectorOptions Defaults ───────────────────────────────────────
+    private MockEndpoint _input = null!;
+    private IFileSystem _fs = null!;
 
-    [Test]
-    public void FileConnectorOptions_Defaults()
+    [SetUp]
+    public void SetUp()
     {
-        var opts = new FileConnectorOptions();
-
-        Assert.That(opts.RootDirectory, Is.EqualTo(string.Empty));
-        Assert.That(opts.Encoding, Is.EqualTo("utf-8"));
-        Assert.That(opts.CreateDirectoryIfNotExists, Is.True);
-        Assert.That(opts.OverwriteExisting, Is.False);
-        Assert.That(opts.FilenamePattern, Is.EqualTo("{MessageId}-{MessageType}.json"));
+        _input = new MockEndpoint("file-in");
+        _fs = Substitute.For<IFileSystem>();
     }
 
-    // ── FileConnectorOptions Custom Values ──────────────────────────────────
+    [TearDown]
+    public async Task TearDown() => await _input.DisposeAsync();
 
     [Test]
-    public void FileConnectorOptions_CustomValues()
+    public async Task Write_CreatesDataFile_AndMetadataSidecar()
     {
-        var opts = new FileConnectorOptions
-        {
-            RootDirectory = "/data/exports",
-            Encoding = "ascii",
-            CreateDirectoryIfNotExists = false,
-            OverwriteExisting = true,
-            FilenamePattern = "{CorrelationId}.xml",
-        };
-
-        Assert.That(opts.RootDirectory, Is.EqualTo("/data/exports"));
-        Assert.That(opts.Encoding, Is.EqualTo("ascii"));
-        Assert.That(opts.CreateDirectoryIfNotExists, Is.False);
-        Assert.That(opts.OverwriteExisting, Is.True);
-        Assert.That(opts.FilenamePattern, Is.EqualTo("{CorrelationId}.xml"));
-    }
-
-    // ── IFileSystem Interface Shape (Reflection) ────────────────────────────
-
-    [Test]
-    public void IFileSystem_InterfaceShape_HasExpectedMembers()
-    {
-        var type = typeof(IFileSystem);
-
-        Assert.That(type.GetMethod("WriteAllBytesAsync"), Is.Not.Null);
-        Assert.That(type.GetMethod("ReadAllBytesAsync"), Is.Not.Null);
-        Assert.That(type.GetMethod("GetFiles"), Is.Not.Null);
-        Assert.That(type.GetMethod("FileExists"), Is.Not.Null);
-        Assert.That(type.GetMethod("CreateDirectory"), Is.Not.Null);
-    }
-
-    // ── FileConnector Writes via Mocked IFileSystem ─────────────────────────
-
-    [Test]
-    public async Task FileConnector_Write_DelegatesToFileSystem()
-    {
-        var fs = Substitute.For<IFileSystem>();
-
-        var opts = Options.Create(new FileConnectorOptions
-        {
-            RootDirectory = "/output",
-            CreateDirectoryIfNotExists = true,
-        });
-
-        var connector = new FileConnector(fs, opts, NullLogger<FileConnector>.Instance);
-
+        var connector = CreateConnector();
         var envelope = IntegrationEnvelope<string>.Create("payload", "Svc", "order.placed");
 
-        await connector.WriteAsync(
-            envelope,
-            s => System.Text.Encoding.UTF8.GetBytes(s),
-            CancellationToken.None);
+        await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None);
 
-        // Verify directory creation was called
-        fs.Received(1).CreateDirectory(Arg.Any<string>());
-
-        // Verify file write was called (data + metadata sidecar)
-        await fs.Received(2).WriteAllBytesAsync(
+        _fs.Received(1).CreateDirectory(Arg.Any<string>());
+        await _fs.Received(2).WriteAllBytesAsync(
             Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>());
     }
 
-    // ── FileConnector Reads via Mocked IFileSystem ──────────────────────────
+    [Test]
+    public async Task Write_ExpandsFilenamePattern_FromEnvelope()
+    {
+        string? capturedPath = null;
+        _fs.WriteAllBytesAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask)
+            .AndDoes(ci =>
+            {
+                var path = ci.ArgAt<string>(0);
+                if (!path.EndsWith(".meta.json"))
+                    capturedPath = path;
+            });
+
+        var connector = CreateConnector();
+        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "invoice.created");
+
+        await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None);
+
+        Assert.That(capturedPath, Is.Not.Null);
+        Assert.That(capturedPath, Does.Contain(envelope.MessageId.ToString()));
+        Assert.That(capturedPath, Does.Contain("invoice.created"));
+    }
 
     [Test]
-    public async Task FileConnector_Read_DelegatesToFileSystem()
+    public async Task Write_CreatesDirectory_WhenOptionEnabled()
     {
-        var fs = Substitute.For<IFileSystem>();
-        var expected = System.Text.Encoding.UTF8.GetBytes("file-content");
-        fs.ReadAllBytesAsync("/output/test.json", Arg.Any<CancellationToken>())
-            .Returns(expected);
+        var connector = CreateConnector();
+        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "test.event");
 
-        var connector = new FileConnector(
-            fs,
-            Options.Create(new FileConnectorOptions { RootDirectory = "/output" }),
+        await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None);
+
+        _fs.Received(1).CreateDirectory("/output");
+    }
+
+    [Test]
+    public async Task Write_Throws_WhenFileExists_AndOverwriteDisabled()
+    {
+        _fs.FileExists(Arg.Any<string>()).Returns(true);
+
+        var connector = new FileConnector(_fs,
+            Options.Create(new FileConnectorOptions
+            {
+                RootDirectory = "/output",
+                CreateDirectoryIfNotExists = true,
+                OverwriteExisting = false,
+            }),
             NullLogger<FileConnector>.Instance);
 
+        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "test.event");
+
+        Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None));
+    }
+
+    [Test]
+    public async Task Read_ReturnsFileContent()
+    {
+        var expected = Encoding.UTF8.GetBytes("file-content");
+        _fs.ReadAllBytesAsync("/output/test.json", Arg.Any<CancellationToken>())
+            .Returns(expected);
+
+        var connector = CreateConnector();
         var result = await connector.ReadAsync("/output/test.json", CancellationToken.None);
 
         Assert.That(result, Is.EqualTo(expected));
     }
 
-    // ── FileConnector Lists Files via Mocked IFileSystem ────────────────────
-
     [Test]
-    public async Task FileConnector_ListFiles_DelegatesToFileSystem()
+    public async Task ListFiles_ReturnsMatchingPaths()
     {
-        var fs = Substitute.For<IFileSystem>();
-        fs.GetFiles(Arg.Any<string>(), Arg.Any<string>())
+        _fs.GetFiles(Arg.Any<string>(), Arg.Any<string>())
             .Returns(new[] { "/output/a.json", "/output/b.json" });
 
-        var connector = new FileConnector(
-            fs,
-            Options.Create(new FileConnectorOptions { RootDirectory = "/output" }),
-            NullLogger<FileConnector>.Instance);
-
+        var connector = CreateConnector();
         var files = await connector.ListFilesAsync(null, "*.json", CancellationToken.None);
 
         Assert.That(files, Has.Count.EqualTo(2));
         Assert.That(files, Does.Contain("/output/a.json"));
     }
 
-    // ── PhysicalFileSystem Implements IFileSystem ───────────────────────────
-
     [Test]
-    public void PhysicalFileSystem_ImplementsIFileSystem()
+    public async Task E2E_MockEndpoint_FeedsEnvelope_ThroughFileConnector()
     {
-        var pfs = new PhysicalFileSystem();
+        var writtenPaths = new List<string>();
+        _fs.WriteAllBytesAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask)
+            .AndDoes(ci =>
+            {
+                var path = ci.ArgAt<string>(0);
+                if (!path.EndsWith(".meta.json"))
+                    writtenPaths.Add(path);
+            });
 
-        Assert.That(pfs, Is.InstanceOf<IFileSystem>());
+        var connector = CreateConnector();
+
+        await _input.SubscribeAsync<string>("file-topic", "file-group",
+            async envelope =>
+            {
+                await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None);
+            });
+
+        var env1 = IntegrationEnvelope<string>.Create("order-1", "Svc", "order.placed");
+        var env2 = IntegrationEnvelope<string>.Create("order-2", "Svc", "order.shipped");
+
+        await _input.SendAsync(env1);
+        await _input.SendAsync(env2);
+
+        Assert.That(writtenPaths, Has.Count.EqualTo(2));
     }
+
+    private FileConnector CreateConnector() =>
+        new(_fs, Options.Create(new FileConnectorOptions
+        {
+            RootDirectory = "/output",
+            CreateDirectoryIfNotExists = true,
+        }), NullLogger<FileConnector>.Instance);
 }

@@ -1,49 +1,50 @@
 // ============================================================================
 // Tutorial 39 – Message Lifecycle / System Management (Lab)
 // ============================================================================
-// This lab exercises SmartProxy, TestMessageGenerator, ControlBusPublisher,
-// and their associated options and result records.
+// EIP Pattern: Smart Proxy + Control Bus.
+// E2E: Wire real SmartProxy with MockEndpoint for request-reply tracking,
+// and real ControlBusPublisher with MockEndpoint as both producer and consumer.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.SystemManagement;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial39;
 
 [TestFixture]
 public sealed class Lab
 {
-    // ── SmartProxy Tracks Request and Increments OutstandingCount ────────────
+    private MockEndpoint _bus = null!;
+
+    [SetUp]
+    public void SetUp() => _bus = new MockEndpoint("control-bus");
+
+    [TearDown]
+    public async Task TearDown() => await _bus.DisposeAsync();
 
     [Test]
-    public void SmartProxy_TrackRequest_IncrementsOutstandingCount()
+    public void SmartProxy_TrackRequest_IncrementsOutstanding()
     {
         var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
+        var request = CreateEnvelopeWithReplyTo("req", "Svc", "cmd.query", "reply-queue");
 
-        var envelope = CreateEnvelopeWithReplyTo("request", "Svc", "cmd.query", "reply-queue-1");
-
-        var tracked = proxy.TrackRequest(envelope);
+        var tracked = proxy.TrackRequest(request);
 
         Assert.That(tracked, Is.True);
         Assert.That(proxy.OutstandingCount, Is.EqualTo(1));
     }
 
-    // ── SmartProxy Correlates Reply to Tracked Request ──────────────────────
-
     [Test]
     public void SmartProxy_CorrelateReply_ReturnsCorrelation()
     {
         var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
-
-        var request = CreateEnvelopeWithReplyTo("request", "Svc", "cmd.query", "reply-queue");
+        var request = CreateEnvelopeWithReplyTo("req", "Svc", "cmd.query", "reply-queue");
         proxy.TrackRequest(request);
 
-        // Create a reply with the same CorrelationId
         var reply = IntegrationEnvelope<string>.Create(
             "response", "ReplySvc", "cmd.response",
             correlationId: request.CorrelationId);
@@ -57,105 +58,120 @@ public sealed class Lab
         Assert.That(proxy.OutstandingCount, Is.EqualTo(0));
     }
 
-    // ── SmartProxy Returns Null for Unknown Reply ───────────────────────────
-
     [Test]
-    public void SmartProxy_CorrelateReply_ReturnsNull_ForUnknownReply()
+    public void SmartProxy_CorrelateReply_ReturnsNull_ForUnknown()
     {
         var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
+        var unknown = IntegrationEnvelope<string>.Create("data", "Svc", "unknown.reply");
 
-        var unknownReply = IntegrationEnvelope<string>.Create("data", "Svc", "unknown.reply");
-
-        var correlation = proxy.CorrelateReply(unknownReply);
-
-        Assert.That(correlation, Is.Null);
+        Assert.That(proxy.CorrelateReply(unknown), Is.Null);
     }
 
-    // ── TestMessageGenerator Publishes to Target Topic ──────────────────────
+    [Test]
+    public void SmartProxy_NoReplyTo_ReturnsFalse()
+    {
+        var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
+        var noReply = IntegrationEnvelope<string>.Create("data", "Svc", "cmd.query");
+
+        var tracked = proxy.TrackRequest(noReply);
+
+        Assert.That(tracked, Is.False);
+        Assert.That(proxy.OutstandingCount, Is.EqualTo(0));
+    }
 
     [Test]
-    public async Task TestMessageGenerator_PublishesToTargetTopic()
+    public async Task ControlBus_PublishCommand_MockEndpoint_CapturesMessage()
     {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var generator = new TestMessageGenerator(
-            producer, NullLogger<TestMessageGenerator>.Instance);
+        var publisher = new ControlBusPublisher(
+            _bus, _bus,
+            Options.Create(new ControlBusOptions
+            {
+                ControlTopic = "eip.control",
+                Source = "TestBus",
+            }),
+            NullLogger<ControlBusPublisher>.Instance);
 
-        var result = await generator.GenerateAsync("test-topic", CancellationToken.None);
+        var result = await publisher.PublishCommandAsync(
+            new { Action = "restart" }, "system.restart");
 
         Assert.That(result.Succeeded, Is.True);
-        Assert.That(result.TargetTopic, Is.EqualTo("test-topic"));
-        Assert.That(result.MessageId, Is.Not.EqualTo(Guid.Empty));
-
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<string>>(),
-            "test-topic",
-            Arg.Any<CancellationToken>());
+        Assert.That(result.ControlTopic, Is.EqualTo("eip.control"));
+        _bus.AssertReceivedOnTopic("eip.control", 1);
     }
-
-    // ── ControlBusOptions Shape ─────────────────────────────────────────────
 
     [Test]
-    public void ControlBusOptions_Shape()
+    public async Task ControlBus_Subscribe_MockEndpoint_DeliversCommand()
     {
-        var opts = new ControlBusOptions();
+        IntegrationEnvelope<string>? received = null;
+        var publisher = new ControlBusPublisher(
+            _bus, _bus,
+            Options.Create(new ControlBusOptions
+            {
+                ControlTopic = "eip.control",
+                ConsumerGroup = "ctrl-group",
+                Source = "TestBus",
+            }),
+            NullLogger<ControlBusPublisher>.Instance);
 
-        Assert.That(opts.ControlTopic, Is.EqualTo("eip.control-bus"));
-        Assert.That(opts.ConsumerGroup, Is.EqualTo("control-bus-consumers"));
-        Assert.That(opts.Source, Is.EqualTo("ControlBus"));
+        await publisher.SubscribeAsync<string>("system.restart",
+            env => { received = env; return Task.CompletedTask; });
+
+        // Feed a matching control command through MockEndpoint
+        var command = IntegrationEnvelope<string>.Create(
+            "restart-payload", "ControlBus", "system.restart") with
+        {
+            Intent = MessageIntent.Command,
+        };
+        await _bus.SendAsync(command);
+
+        Assert.That(received, Is.Not.Null);
+        Assert.That(received!.MessageType, Is.EqualTo("system.restart"));
     }
-
-    // ── ControlBusResult Record Shape ───────────────────────────────────────
 
     [Test]
-    public void ControlBusResult_RecordShape()
+    public async Task ControlBus_PublishAndSubscribe_E2E_Roundtrip()
     {
-        var success = new ControlBusResult(
-            Succeeded: true, ControlTopic: "eip.control-bus", FailureReason: null);
+        await using var output = new MockEndpoint("ctrl-output");
+        IntegrationEnvelope<string>? captured = null;
 
-        Assert.That(success.Succeeded, Is.True);
-        Assert.That(success.ControlTopic, Is.EqualTo("eip.control-bus"));
-        Assert.That(success.FailureReason, Is.Null);
+        var publisher = new ControlBusPublisher(
+            output, _bus,
+            Options.Create(new ControlBusOptions
+            {
+                ControlTopic = "eip.control",
+                ConsumerGroup = "ctrl-group",
+                Source = "TestBus",
+            }),
+            NullLogger<ControlBusPublisher>.Instance);
 
-        var failure = new ControlBusResult(
-            Succeeded: false, ControlTopic: "eip.control-bus",
-            FailureReason: "Broker unavailable");
+        // Publish a command — lands on output MockEndpoint
+        var result = await publisher.PublishCommandAsync("scale-up", "system.scale");
 
-        Assert.That(failure.Succeeded, Is.False);
-        Assert.That(failure.FailureReason, Is.EqualTo("Broker unavailable"));
+        Assert.That(result.Succeeded, Is.True);
+        output.AssertReceivedOnTopic("eip.control", 1);
+
+        // Subscribe for commands — uses _bus (consumer) MockEndpoint
+        await publisher.SubscribeAsync<string>("system.scale",
+            env => { captured = env; return Task.CompletedTask; });
+
+        // Feed the command to the consumer side
+        var cmd = IntegrationEnvelope<string>.Create(
+            "scale-up", "ControlBus", "system.scale") with
+        {
+            Intent = MessageIntent.Command,
+        };
+        await _bus.SendAsync(cmd);
+
+        Assert.That(captured, Is.Not.Null);
+        Assert.That(captured!.Payload, Is.EqualTo("scale-up"));
     }
-
-    // ── TestMessageResult Record Shape ──────────────────────────────────────
-
-    [Test]
-    public void TestMessageResult_RecordShape()
-    {
-        var id = Guid.NewGuid();
-
-        var success = new TestMessageResult(
-            MessageId: id, TargetTopic: "orders", Succeeded: true, FailureReason: null);
-
-        Assert.That(success.MessageId, Is.EqualTo(id));
-        Assert.That(success.TargetTopic, Is.EqualTo("orders"));
-        Assert.That(success.Succeeded, Is.True);
-        Assert.That(success.FailureReason, Is.Null);
-
-        var failure = new TestMessageResult(
-            MessageId: id, TargetTopic: "orders", Succeeded: false,
-            FailureReason: "Publish failed");
-
-        Assert.That(failure.Succeeded, Is.False);
-        Assert.That(failure.FailureReason, Is.EqualTo("Publish failed"));
-    }
-
-    // ── Helper ──────────────────────────────────────────────────────────────
 
     private static IntegrationEnvelope<string> CreateEnvelopeWithReplyTo(
-        string payload, string source, string messageType, string replyTo,
-        Guid? correlationId = null) =>
+        string payload, string source, string messageType, string replyTo) =>
         new()
         {
             MessageId = Guid.NewGuid(),
-            CorrelationId = correlationId ?? Guid.NewGuid(),
+            CorrelationId = Guid.NewGuid(),
             Timestamp = DateTimeOffset.UtcNow,
             Source = source,
             MessageType = messageType,

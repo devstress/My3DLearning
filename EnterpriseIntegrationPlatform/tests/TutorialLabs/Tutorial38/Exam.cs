@@ -1,8 +1,8 @@
 // ============================================================================
 // Tutorial 38 – OpenTelemetry / Observability (Exam)
 // ============================================================================
-// Coding challenges: full message lifecycle tracking, WhereIs inspection,
-// and creating a MessageStateSnapshot from an envelope.
+// E2E challenges: full lifecycle tracking through MockEndpoint, WhereIs
+// inspection with mocked services, and CreateSnapshot from envelope.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -10,17 +10,17 @@ using EnterpriseIntegrationPlatform.Observability;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial38;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Full Message Lifecycle Tracking ─────────────────────────
-
     [Test]
-    public async Task Challenge1_FullMessageLifecycleTracking()
+    public async Task Challenge1_FullLifecycleTracking_ThroughMockEndpoint()
     {
+        await using var input = new MockEndpoint("exam-obs-in");
         var store = new InMemoryMessageStateStore();
         var correlationId = Guid.NewGuid();
         var messageId = Guid.NewGuid();
@@ -33,24 +33,37 @@ public sealed class Exam
             (Stage: "Delivery",  Status: DeliveryStatus.Delivered),
         };
 
-        foreach (var (stage, status) in stages)
-        {
-            await store.RecordAsync(new MessageEvent
+        // Subscribe handler that records lifecycle events
+        int stageIndex = 0;
+        await input.SubscribeAsync<string>("lifecycle-topic", "lifecycle-group",
+            async envelope =>
             {
-                EventId = Guid.NewGuid(),
-                MessageId = messageId,
-                CorrelationId = correlationId,
-                MessageType = "order.placed",
-                Source = "OrderSvc",
-                Stage = stage,
-                Status = status,
-                RecordedAt = DateTimeOffset.UtcNow,
-                BusinessKey = "ORD-999",
+                if (stageIndex < stages.Length)
+                {
+                    var (stage, status) = stages[stageIndex++];
+                    await store.RecordAsync(new MessageEvent
+                    {
+                        MessageId = messageId,
+                        CorrelationId = correlationId,
+                        MessageType = envelope.MessageType,
+                        Source = envelope.Source,
+                        Stage = stage,
+                        Status = status,
+                        BusinessKey = "ORD-999",
+                    });
+                }
             });
+
+        // Feed envelope through each stage
+        foreach (var _ in stages)
+        {
+            var env = IntegrationEnvelope<string>.Create(
+                "order-data", "OrderSvc", "order.placed", correlationId);
+            env = env with { MessageId = messageId };
+            await input.SendAsync(env);
         }
 
         var trail = await store.GetByCorrelationIdAsync(correlationId);
-
         Assert.That(trail, Has.Count.EqualTo(4));
         Assert.That(trail[0].Stage, Is.EqualTo("Ingestion"));
         Assert.That(trail[^1].Stage, Is.EqualTo("Delivery"));
@@ -61,8 +74,6 @@ public sealed class Exam
         Assert.That(latest!.Stage, Is.EqualTo("Delivery"));
     }
 
-    // ── Challenge 2: WhereIs Inspection with Mocked Services ────────────────
-
     [Test]
     public async Task Challenge2_WhereIsInspection_WithMockedServices()
     {
@@ -71,14 +82,12 @@ public sealed class Exam
         {
             new()
             {
-                EventId = Guid.NewGuid(),
                 MessageId = Guid.NewGuid(),
                 CorrelationId = correlationId,
                 MessageType = "order.placed",
                 Source = "OrderSvc",
                 Stage = "Routing",
                 Status = DeliveryStatus.InFlight,
-                RecordedAt = DateTimeOffset.UtcNow,
                 BusinessKey = "ORD-555",
             },
         };
@@ -101,10 +110,8 @@ public sealed class Exam
         Assert.That(result.Events, Has.Count.EqualTo(1));
     }
 
-    // ── Challenge 3: Create MessageStateSnapshot from Envelope ──────────────
-
     [Test]
-    public void Challenge3_CreateMessageStateSnapshot_FromEnvelope()
+    public void Challenge3_CreateSnapshot_FromEnvelope()
     {
         var eventLog = Substitute.For<IObservabilityEventLog>();
         var traceAnalyzer = Substitute.For<ITraceAnalyzer>();

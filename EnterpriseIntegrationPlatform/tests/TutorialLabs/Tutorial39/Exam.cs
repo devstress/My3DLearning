@@ -1,31 +1,27 @@
 // ============================================================================
 // Tutorial 39 – Message Lifecycle / System Management (Exam)
 // ============================================================================
-// Coding challenges: full SmartProxy lifecycle, TestMessageGenerator with
-// custom payload, and ControlBus publish command verification.
+// E2E challenges: full SmartProxy lifecycle, ControlBus publish with
+// MockEndpoint verification, and SmartProxy + ControlBus combined E2E.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.SystemManagement;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 using NUnit.Framework;
+using TutorialLabs.Infrastructure;
 
 namespace TutorialLabs.Tutorial39;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Full SmartProxy Lifecycle ──────────────────────────────
-
     [Test]
     public void Challenge1_FullSmartProxyLifecycle()
     {
         var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
 
-        // Track three requests
         var req1 = CreateEnvelopeWithReplyTo("r1", "Svc", "cmd.a", "reply-1");
         var req2 = CreateEnvelopeWithReplyTo("r2", "Svc", "cmd.b", "reply-2");
         var req3 = CreateEnvelopeWithReplyTo("r3", "Svc", "cmd.c", "reply-3");
@@ -39,7 +35,6 @@ public sealed class Exam
         var reply2 = IntegrationEnvelope<string>.Create(
             "resp2", "ReplySvc", "cmd.response",
             correlationId: req2.CorrelationId);
-
         var corr2 = proxy.CorrelateReply(reply2);
         Assert.That(corr2, Is.Not.Null);
         Assert.That(corr2!.OriginalReplyTo, Is.EqualTo("reply-2"));
@@ -49,86 +44,83 @@ public sealed class Exam
         var reply1 = IntegrationEnvelope<string>.Create(
             "resp1", "ReplySvc", "cmd.response",
             correlationId: req1.CorrelationId);
-
         var corr1 = proxy.CorrelateReply(reply1);
         Assert.That(corr1, Is.Not.Null);
         Assert.That(corr1!.OriginalReplyTo, Is.EqualTo("reply-1"));
         Assert.That(proxy.OutstandingCount, Is.EqualTo(1));
 
         // Duplicate reply returns null
-        var duplicateReply = IntegrationEnvelope<string>.Create(
+        var dup = IntegrationEnvelope<string>.Create(
             "dup", "ReplySvc", "cmd.response",
             correlationId: req2.CorrelationId);
-
-        Assert.That(proxy.CorrelateReply(duplicateReply), Is.Null);
+        Assert.That(proxy.CorrelateReply(dup), Is.Null);
         Assert.That(proxy.OutstandingCount, Is.EqualTo(1));
     }
 
-    // ── Challenge 2: TestMessageGenerator with Custom Payload ───────────────
-
     [Test]
-    public async Task Challenge2_TestMessageGenerator_CustomPayload()
+    public async Task Challenge2_ControlBus_PublishMultipleCommands_MockEndpoint()
     {
-        IntegrationEnvelope<Dictionary<string, object>>? captured = null;
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        producer.PublishAsync(
-                Arg.Any<IntegrationEnvelope<Dictionary<string, object>>>(),
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask)
-            .AndDoes(ci =>
-                captured = ci.ArgAt<IntegrationEnvelope<Dictionary<string, object>>>(0));
-
-        var generator = new TestMessageGenerator(
-            producer, NullLogger<TestMessageGenerator>.Instance);
-
-        var customPayload = new Dictionary<string, object>
-        {
-            ["orderId"] = "ORD-42",
-            ["amount"] = 99.95,
-        };
-
-        var result = await generator.GenerateAsync(
-            customPayload, "custom-topic", CancellationToken.None);
-
-        Assert.That(result.Succeeded, Is.True);
-        Assert.That(result.TargetTopic, Is.EqualTo("custom-topic"));
-        Assert.That(captured, Is.Not.Null);
-        Assert.That(captured!.Payload["orderId"], Is.EqualTo("ORD-42"));
-    }
-
-    // ── Challenge 3: ControlBus Publish Command Verification ────────────────
-
-    [Test]
-    public async Task Challenge3_ControlBusPublishCommand_Verification()
-    {
-        var producer = Substitute.For<IMessageBrokerProducer>();
-        var consumer = Substitute.For<IMessageBrokerConsumer>();
-
-        var opts = Options.Create(new ControlBusOptions
-        {
-            ControlTopic = "eip.control",
-            ConsumerGroup = "ctrl-group",
-            Source = "TestBus",
-        });
+        await using var bus = new MockEndpoint("exam-ctrl-bus");
 
         var publisher = new ControlBusPublisher(
-            producer, consumer, opts, NullLogger<ControlBusPublisher>.Instance);
+            bus, bus,
+            Options.Create(new ControlBusOptions
+            {
+                ControlTopic = "eip.control",
+                ConsumerGroup = "ctrl-group",
+                Source = "TestBus",
+            }),
+            NullLogger<ControlBusPublisher>.Instance);
 
-        var command = new { Action = "restart", Target = "router-1" };
-        var result = await publisher.PublishCommandAsync(
-            command, "system.restart", CancellationToken.None);
+        var r1 = await publisher.PublishCommandAsync("restart", "system.restart");
+        var r2 = await publisher.PublishCommandAsync("scale-up", "system.scale");
+        var r3 = await publisher.PublishCommandAsync("flush", "system.flush");
 
-        Assert.That(result.Succeeded, Is.True);
-        Assert.That(result.ControlTopic, Is.EqualTo("eip.control"));
-
-        await producer.Received(1).PublishAsync(
-            Arg.Any<IntegrationEnvelope<object>>(),
-            "eip.control",
-            Arg.Any<CancellationToken>());
+        Assert.That(r1.Succeeded, Is.True);
+        Assert.That(r2.Succeeded, Is.True);
+        Assert.That(r3.Succeeded, Is.True);
+        bus.AssertReceivedOnTopic("eip.control", 3);
     }
 
-    // ── Helper ──────────────────────────────────────────────────────────────
+    [Test]
+    public async Task Challenge3_SmartProxy_And_ControlBus_CombinedE2E()
+    {
+        await using var bus = new MockEndpoint("exam-combined");
+        var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
+
+        // Track a request through SmartProxy
+        var request = CreateEnvelopeWithReplyTo(
+            "query-data", "ClientSvc", "data.query", "client-reply-queue");
+        Assert.That(proxy.TrackRequest(request), Is.True);
+        Assert.That(proxy.OutstandingCount, Is.EqualTo(1));
+
+        // Publish tracking event to ControlBus
+        var publisher = new ControlBusPublisher(
+            bus, bus,
+            Options.Create(new ControlBusOptions
+            {
+                ControlTopic = "eip.control",
+                Source = "SmartProxy",
+            }),
+            NullLogger<ControlBusPublisher>.Instance);
+
+        var trackResult = await publisher.PublishCommandAsync(
+            new { RequestId = request.MessageId, ReplyTo = request.ReplyTo },
+            "proxy.request.tracked");
+
+        Assert.That(trackResult.Succeeded, Is.True);
+        bus.AssertReceivedOnTopic("eip.control", 1);
+
+        // Simulate reply arriving — correlate it
+        var reply = IntegrationEnvelope<string>.Create(
+            "query-result", "DataSvc", "data.response",
+            correlationId: request.CorrelationId);
+        var correlation = proxy.CorrelateReply(reply);
+
+        Assert.That(correlation, Is.Not.Null);
+        Assert.That(correlation!.OriginalReplyTo, Is.EqualTo("client-reply-queue"));
+        Assert.That(proxy.OutstandingCount, Is.EqualTo(0));
+    }
 
     private static IntegrationEnvelope<string> CreateEnvelopeWithReplyTo(
         string payload, string source, string messageType, string replyTo) =>
