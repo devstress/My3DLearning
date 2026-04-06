@@ -47,12 +47,11 @@
 
 | Chunk | Scope | Status |
 |-------|-------|--------|
-| Chunk | Scope | Status |
-|-------|-------|--------|
-| 101 | Update all 50 tutorial .md files — replace MCQ Exam sections with "See coding exam" pointers, update Lab sections to reference TutorialLabs | not-started |
-| 102 | Update tutorials/README.md — document new coding-only format and TutorialLabs project | not-started |
+✅ Phase 27 complete — see completion-log.md.
 
-**Next chunk:** 101
+522 TutorialLabs tests (350 lab + 150 exam + 22 extra). All 50 tutorials updated with coding lab/exam pointers.
+
+**Next chunk:** None — all chunks complete.
 
 ---
 

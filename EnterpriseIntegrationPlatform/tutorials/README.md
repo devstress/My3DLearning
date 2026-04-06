@@ -159,7 +159,46 @@ The course is grounded in three pillars:
 2. **Jump to a specific tutorial** if you already know the basics and want to learn a specific pattern
 3. **Each tutorial is self-contained** with context, but builds on earlier concepts
 4. **Code examples reference actual platform source files** — open them side-by-side
-5. **Practice exercises** at the end of each tutorial reinforce learning
+5. **Run the coding labs and exams** to reinforce learning through hands-on practice
+
+## 💻 Coding Labs & Exams
+
+Every tutorial includes **runnable coding exercises** in the [`tests/TutorialLabs/`](../tests/TutorialLabs/) project:
+
+- **Lab** (`Lab.cs`) — 7 NUnit tests per tutorial demonstrating the pattern with real platform APIs. Run them to see the pattern in action, then modify and experiment.
+- **Exam** (`Exam.cs`) — 3 coding challenges per tutorial. Each challenge is a test you must complete — no multiple choice, only real code.
+
+### Running the labs
+
+```bash
+# Run all tutorial labs and exams
+dotnet test tests/TutorialLabs/TutorialLabs.csproj
+
+# Run labs for a specific tutorial (e.g. Tutorial 09 — Content-Based Router)
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial09"
+
+# Run only the exam for a specific tutorial
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial09.Exam"
+```
+
+### Project structure
+
+```
+tests/TutorialLabs/
+├── TutorialLabs.csproj          # NUnit test project referencing all src projects
+├── Tutorial01/
+│   ├── Lab.cs                   # 7 runnable tests demonstrating the pattern
+│   └── Exam.cs                  # 3 coding challenges
+├── Tutorial02/
+│   ├── Lab.cs
+│   └── Exam.cs
+├── ...
+└── Tutorial50/
+    ├── Lab.cs
+    └── Exam.cs
+```
+
+**Total: 500 lab tests + 150 exam challenges = 522 coding exercises across all 50 tutorials.**
 
 ## Quick Reference
 

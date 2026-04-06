@@ -4,6 +4,27 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 102 – Update tutorials/README.md
+
+- **Date**: 2026-04-06
+- **Phase**: 27 — Coding Tutorial Labs & Exams
+- **Status**: done
+- **Goal**: Update tutorials/README.md to document the new coding-only format and TutorialLabs project.
+- **Files modified**:
+  - `tutorials/README.md` — Added "Coding Labs & Exams" section with project structure, running instructions, and test counts.
+- **Test counts**: 522 TutorialLabs tests. (Documentation-only change.)
+
+## Chunk 101 – Update all 50 tutorial .md files
+
+- **Date**: 2026-04-06
+- **Phase**: 27 — Coding Tutorial Labs & Exams
+- **Status**: done
+- **Goal**: Replace MCQ Exam sections in all 50 tutorials with coding exam pointers. Add TutorialLabs lab references.
+- **Files modified**:
+  - All 50 tutorial `.md` files — Added `> 💻 Runnable lab:` reference after `## Lab`, replaced MCQ `## Exam` sections with `> 💻 Coding exam:` pointer.
+- **Test counts**: 522 TutorialLabs tests. (Documentation-only change.)
+- **Notes**: All 150 MCQ questions (3 per tutorial × 50 tutorials) removed and replaced with pointers to coding exams.
+
 ## Chunk 100 – Tutorial 46-50 Lab.cs + Exam.cs
 
 - **Date**: 2026-04-06
