@@ -8,7 +8,6 @@
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit3TestAdapter" />
     <PackageReference Include="NUnit.Analyzers" />
-    <PackageReference Include="NSubstitute" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
@@ -56,6 +55,7 @@
     <ProjectReference Include="..\..\src\Demo.Pipeline\Demo.Pipeline.csproj" />
     <ProjectReference Include="..\..\src\AI.Ollama\AI.Ollama.csproj" />
     <ProjectReference Include="..\..\src\AI.RagFlow\AI.RagFlow.csproj" />
+    <ProjectReference Include="..\..\src\Testing\Testing.csproj" />
     <ProjectReference Include="..\..\src\AI.RagKnowledge\AI.RagKnowledge.csproj" />
   </ItemGroup>
 </Project>
