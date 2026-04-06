@@ -109,7 +109,7 @@ Open `src/Processing.Routing/ContentBasedRouter.cs`. Create a routing configurat
 |----------|-------|----------|-------|-------------|
 | 1 | `Payload.customer.tier` | Equals | `"platinum"` | `priority-processing` |
 | 5 | `MessageType` | Equals | `"OrderCreated"` | `orders.standard` |
-| 10 | `MessageType` | Matches | `"Return.*"` | `returns.processing` |
+| 10 | `MessageType` | Regex | `"Return.*"` | `returns.processing` |
 | 100 | (default) | — | — | `general.inbox` |
 
 A message arrives with `MessageType = "OrderCreated"` and `Payload.customer.tier = "platinum"`. Which topic does it route to? Explain how priority ordering ensures deterministic routing.
@@ -127,7 +127,7 @@ Using the `RoutingDecision` record, trace the router's decision path for a messa
 Consider a Content-Based Router processing 50,000 messages/second with 200 routing rules:
 
 - What is the computational cost per message? (hint: O(n) for n rules)
-- How does pre-compiling regex patterns (`RoutingOperator.Matches`) improve throughput?
+- How does pre-compiling regex patterns (`RoutingOperator.Regex`) improve throughput?
 - If you need to route to different brokers (Kafka for audit, NATS for real-time), how would the router's output topic abstraction enable this without code changes?
 
 ## Exam

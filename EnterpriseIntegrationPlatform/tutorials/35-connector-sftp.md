@@ -108,7 +108,7 @@ Open `src/Connector.Sftp/SftpConnector.cs` and check: How does the platform pool
 ```csharp
 var remotePath = await sftpConnector.UploadAsync(
     envelope,
-    remoteDir: "/incoming/orders",
+    fileName: "order-42.json",
     serializer: payload => System.Text.Encoding.UTF8.GetBytes(
         System.Text.Json.JsonSerializer.Serialize(payload)),
     cancellationToken: ct);

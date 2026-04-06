@@ -144,8 +144,10 @@ Lifecycle recording is a **best-effort side effect** — it must not block or fa
 A message was received 30 minutes ago but never reached "Delivered" status. Use `ITraceAnalyzer.WhereIsMessageAsync` to investigate:
 
 ```csharp
-var location = await traceAnalyzer.WhereIsMessageAsync(messageId);
-// Returns: { Stage: "Transform", Status: "InProgress", SinceUtc: "30 min ago" }
+var location = await traceAnalyzer.WhereIsMessageAsync(
+    correlationId: messageCorrelationId,
+    knownState: """{"lastSeen":"Transform","status":"InProgress"}""");
+// Returns: a natural-language description of the message's current location
 ```
 
 Open `src/Observability/TraceAnalyzer.cs` and trace: How does the analyzer query the message state store? What lifecycle states are tracked (Received, Routing, Transforming, Delivering, Delivered, Failed)?

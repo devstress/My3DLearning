@@ -138,7 +138,7 @@ An operator searches for "failed orders from PartnerX last week." Trace the quer
 4. Return: list of failed messages with failure reasons, stages, and timestamps
 ```
 
-Open `src/Admin.Web/` and trace: How does the `/api/inspect/ask` endpoint delegate to `MessageStateInspector`? What data sources does it query?
+Open `src/OpenClaw.Web/` and trace: How does the `/api/inspect/ask` endpoint delegate to `MessageStateInspector`? What data sources does it query?
 
 ### Step 2: Design the "Where Is My Message?" Feature
 

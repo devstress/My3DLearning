@@ -208,8 +208,7 @@ Activities are the building blocks that workflows orchestrate. Each activity is 
 // src/Workflow.Temporal/Activities/IntegrationActivities.cs (simplified)
 // Handles validation and processing-stage logging
 
-[Activity]
-public class IntegrationActivities
+public sealed class IntegrationActivities
 {
     [Activity]
     public async Task<MessageValidationResult> ValidateMessageAsync(
@@ -230,8 +229,7 @@ public class IntegrationActivities
 // src/Workflow.Temporal/Activities/PipelineActivities.cs (simplified)
 // Handles persistence, delivery status, acknowledgments, and faults
 
-[Activity]
-public class PipelineActivities
+public sealed class PipelineActivities
 {
     [Activity]
     public async Task PersistMessageAsync(IntegrationPipelineInput input)
