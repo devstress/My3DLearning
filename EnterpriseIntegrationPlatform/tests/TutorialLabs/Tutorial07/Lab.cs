@@ -14,7 +14,7 @@ using EnterpriseIntegrationPlatform.Demo.Pipeline;
 using EnterpriseIntegrationPlatform.Workflow.Temporal;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -47,15 +47,7 @@ public sealed class Lab
     [Test]
     public async Task PipelineOrchestrator_DispatchesCorrectInput()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        IntegrationPipelineInput? capturedInput = null;
-
-        dispatcher.DispatchAsync(Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                capturedInput = ci.ArgAt<IntegrationPipelineInput>(0);
-                return new IntegrationPipelineResult(capturedInput.MessageId, true);
-            });
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
 
         var options = Options.Create(new PipelineOptions
             { AckSubject = "ack.test", NackSubject = "nack.test" });
@@ -68,6 +60,7 @@ public sealed class Lab
 
         await orchestrator.ProcessAsync(envelope);
 
+        var capturedInput = dispatcher.LastInput;
         Assert.That(capturedInput, Is.Not.Null);
         Assert.That(capturedInput!.Source, Is.EqualTo("OrderService"));
         Assert.That(capturedInput.MessageType, Is.EqualTo("order.created"));
@@ -78,16 +71,7 @@ public sealed class Lab
     [Test]
     public async Task PipelineOrchestrator_SetsWorkflowIdFromMessageId()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        string? capturedWorkflowId = null;
-
-        dispatcher.DispatchAsync(Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                capturedWorkflowId = ci.ArgAt<string>(1);
-                var input = ci.ArgAt<IntegrationPipelineInput>(0);
-                return new IntegrationPipelineResult(input.MessageId, true);
-            });
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
 
         var options = Options.Create(new PipelineOptions());
         var orchestrator = new PipelineOrchestrator(
@@ -98,21 +82,13 @@ public sealed class Lab
 
         await orchestrator.ProcessAsync(envelope);
 
-        Assert.That(capturedWorkflowId, Is.EqualTo($"integration-{envelope.MessageId}"));
+        Assert.That(dispatcher.LastWorkflowId, Is.EqualTo($"integration-{envelope.MessageId}"));
     }
 
     [Test]
     public async Task PipelineOrchestrator_SerializesPayloadAndMetadata()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        IntegrationPipelineInput? capturedInput = null;
-
-        dispatcher.DispatchAsync(Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                capturedInput = ci.ArgAt<IntegrationPipelineInput>(0);
-                return new IntegrationPipelineResult(capturedInput.MessageId, true);
-            });
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
 
         var options = Options.Create(new PipelineOptions());
         var orchestrator = new PipelineOrchestrator(
@@ -126,6 +102,7 @@ public sealed class Lab
 
         await orchestrator.ProcessAsync(envelope);
 
+        var capturedInput = dispatcher.LastInput;
         Assert.That(capturedInput!.PayloadJson, Does.Contain("key"));
         Assert.That(capturedInput.MetadataJson, Does.Contain("tenant"));
     }
@@ -133,15 +110,7 @@ public sealed class Lab
     [Test]
     public async Task PipelineOrchestrator_MapsPriorityAsInt()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        IntegrationPipelineInput? capturedInput = null;
-
-        dispatcher.DispatchAsync(Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                capturedInput = ci.ArgAt<IntegrationPipelineInput>(0);
-                return new IntegrationPipelineResult(capturedInput.MessageId, true);
-            });
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
 
         var options = Options.Create(new PipelineOptions());
         var orchestrator = new PipelineOrchestrator(
@@ -155,6 +124,7 @@ public sealed class Lab
 
         await orchestrator.ProcessAsync(envelope);
 
+        var capturedInput = dispatcher.LastInput;
         Assert.That(capturedInput!.Priority, Is.EqualTo((int)MessagePriority.High));
     }
 }

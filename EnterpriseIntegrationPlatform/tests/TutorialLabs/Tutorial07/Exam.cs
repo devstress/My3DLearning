@@ -12,7 +12,7 @@ using EnterpriseIntegrationPlatform.Demo.Pipeline;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
+using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -24,20 +24,12 @@ public sealed class Exam
     [Test]
     public async Task Challenge1_AspireHost_OrchestratorDispatchesViaDI()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        IntegrationPipelineInput? captured = null;
-
-        dispatcher.DispatchAsync(Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                captured = ci.ArgAt<IntegrationPipelineInput>(0);
-                return new IntegrationPipelineResult(captured.MessageId, true);
-            });
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
 
         await using var host = AspireIntegrationTestHost.CreateBuilder()
             .ConfigureServices(svc =>
             {
-                svc.AddSingleton(dispatcher);
+                svc.AddSingleton<ITemporalWorkflowDispatcher>(dispatcher);
                 svc.Configure<PipelineOptions>(o => { o.AckSubject = "ack.di"; o.NackSubject = "nack.di"; });
                 svc.AddSingleton<PipelineOrchestrator>();
             })
@@ -49,6 +41,7 @@ public sealed class Exam
 
         await orchestrator.ProcessAsync(envelope);
 
+        var captured = dispatcher.LastInput;
         Assert.That(captured, Is.Not.Null);
         Assert.That(captured!.Source, Is.EqualTo("DIService"));
         Assert.That(captured.AckSubject, Is.EqualTo("ack.di"));
@@ -57,14 +50,7 @@ public sealed class Exam
     [Test]
     public async Task Challenge2_WorkflowFailure_LogsWarning()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-
-        dispatcher.DispatchAsync(Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                var input = ci.ArgAt<IntegrationPipelineInput>(0);
-                return new IntegrationPipelineResult(input.MessageId, false, "Validation failed");
-            });
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsFailure("Validation failed");
 
         var options = Options.Create(new PipelineOptions());
         var orchestrator = new PipelineOrchestrator(
@@ -75,23 +61,14 @@ public sealed class Exam
 
         await orchestrator.ProcessAsync(envelope);
 
-        await dispatcher.Received(1).DispatchAsync(
-            Arg.Is<IntegrationPipelineInput>(i => i.MessageType == "bad.type"),
-            Arg.Any<string>(), Arg.Any<CancellationToken>());
+        dispatcher.AssertDispatchCount(1);
+        Assert.That(dispatcher.LastInput!.MessageType, Is.EqualTo("bad.type"));
     }
 
     [Test]
     public async Task Challenge3_CorrelationAndCausation_PropagatedToInput()
     {
-        var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-        IntegrationPipelineInput? captured = null;
-
-        dispatcher.DispatchAsync(Arg.Any<IntegrationPipelineInput>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(ci =>
-            {
-                captured = ci.ArgAt<IntegrationPipelineInput>(0);
-                return new IntegrationPipelineResult(captured.MessageId, true);
-            });
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
 
         var options = Options.Create(new PipelineOptions());
         var orchestrator = new PipelineOrchestrator(
@@ -105,6 +82,7 @@ public sealed class Exam
 
         await orchestrator.ProcessAsync(envelope);
 
+        var captured = dispatcher.LastInput;
         Assert.That(captured!.CorrelationId, Is.EqualTo(correlationId));
         Assert.That(captured.CausationId, Is.EqualTo(causationId));
     }
