@@ -7,6 +7,7 @@
     <Project Path="src/Quoting/Quoting.csproj" />
     <Project Path="src/Marketplace/Marketplace.csproj" />
     <Project Path="src/Compliance/Compliance.csproj" />
+    <Project Path="src/PartnerIntegration/PartnerIntegration.csproj" />
     <Project Path="src/Platform.Api/Platform.Api.csproj" />
   </Folder>
   <Folder Name="/tests/">

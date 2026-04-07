@@ -12,5 +12,6 @@
     <ProjectReference Include="..\Quoting\Quoting.csproj" />
     <ProjectReference Include="..\Marketplace\Marketplace.csproj" />
     <ProjectReference Include="..\Compliance\Compliance.csproj" />
+    <ProjectReference Include="..\PartnerIntegration\PartnerIntegration.csproj" />
   </ItemGroup>
 </Project>

@@ -20,6 +20,15 @@
 >
 > This rule is mandatory for every AI agent session. Never leave done rows in milestones.md.
 
+> **UAT READINESS RULE — Confirm when the app is ready for customer use.**
+>
+> When the application has a working UI and all backend services are wired end-to-end:
+> 1. Confirm explicitly: **"The implementation is ready for UAT."**
+> 2. The app must fully work as expected per the requirements — not partially, not with stubs.
+> 3. The app must be ready for the customer to use: all features functional, all endpoints wired, all validations in place, all tests passing.
+> 4. Do not declare UAT readiness until the Platform.Api (or future web UI) is runnable and exercises every service end-to-end.
+> 5. Include clear run instructions (e.g. `dotnet run --project src/Platform.Api`) and a summary of all available endpoints/features.
+
 ## Completed Phases
 
 ✅ Phase 1 complete — see `rules/completion-log.md` for full history.
@@ -30,20 +39,9 @@
 
 6 src projects (Models3D, Land, SitePlacement, Quoting, Marketplace, Compliance) + Platform.Api. Core platform services with real in-memory implementations, validation, and REST API.
 
----
+✅ Phase 3 complete — see `rules/completion-log.md` for full history.
 
-## Phase 3 — Partner Integration
-
-**Goal:** Connect external partners (builders, landscapers, furniture suppliers, solicitors, real estate agents) via standardised APIs.
-
-| Chunk | Scope | Status |
-|-------|-------|--------|
-| 008 | Builder Integration — volume/custom builder APIs, quote request/response | not-started |
-| 009 | Landscaper Integration — landscaping provider APIs, design templates | not-started |
-| 010 | Furniture & Interior Integration — supplier catalog, room fitting, pricing | not-started |
-| 011 | Smart Home Integration — smart home supplier APIs, compatibility checks | not-started |
-| 012 | Solicitor Integration — property lawyer matching, contract templates | not-started |
-| 013 | Real Estate Agent Integration — land/home listings sync, MLS feeds | not-started |
+PartnerIntegration project with 6 services: Builder, Landscaper, Furniture, SmartHome, Solicitor, RealEstateAgent. All wired into Platform.Api with 30+ partner endpoints.
 
 ---
 
@@ -76,7 +74,7 @@
 
 ## Next Chunk
 
-**Chunk 008** — Builder Integration (Phase 3)
+**Chunk 014** — Virtual Village (Phase 4)
 
 ---
 
