@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 12 – Recipient List (Exam)
+// Tutorial 12 – Recipient List (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: event notification fan-out, combined rule + metadata
-// resolution, and cross-rule deduplication verification via MockEndpoint.
+// PURPOSE: Prove you can apply the Recipient List pattern in realistic
+//          scenarios that combine multiple routing concepts end-to-end.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Multi-rule fan-out with metadata-driven priority alerts
+//   🟡 Intermediate — Rule-based and metadata-based recipients merged together
+//   🔴 Advanced     — Cross-rule and cross-source deduplication verification
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint (in-memory capture for assertion)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,8 +30,17 @@ namespace TutorialLabs.Tutorial12;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Event Notification Fan-Out ────────────────────────
+    //
+    // SCENARIO: An order is placed with high priority. The system must
+    //           notify email, SMS, and push channels, plus page on-call
+    //           staff for high-priority orders.
+    //
+    // WHAT YOU PROVE: Multiple rules can fire on the same envelope,
+    //                 routing to all matching destinations in one pass.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge1_EventNotificationFanOut_RoutesToAllSubscribers()
+    public async Task Starter_EventNotificationFanOut_RoutesToAllSubscribers()
     {
         await using var output = new MockEndpoint("notification");
         var options = Options.Create(new RecipientListOptions
@@ -60,8 +82,17 @@ public sealed class Exam
         output.AssertReceivedOnTopic("pager-svc", 1);
     }
 
+    // ── 🟡 INTERMEDIATE — Rules + Metadata Merge ──────────────────────
+    //
+    // SCENARIO: A static audit rule always captures order events, but the
+    //           sender also embeds dynamic webhook and reporting endpoints
+    //           in envelope metadata. Both sources must be merged.
+    //
+    // WHAT YOU PROVE: Rule-based and metadata-based recipient resolution
+    //                 combine into a single deduplicated destination set.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge2_RulesAndMetadataCombined_MergesDestinations()
+    public async Task Intermediate_RulesAndMetadataCombined_MergesDestinations()
     {
         await using var output = new MockEndpoint("combined");
         var options = Options.Create(new RecipientListOptions
@@ -98,8 +129,17 @@ public sealed class Exam
         output.AssertReceivedOnTopic("reporting-svc", 1);
     }
 
+    // ── 🔴 ADVANCED — Cross-Rule Deduplication ─────────────────────────
+    //
+    // SCENARIO: Two static rules and a metadata recipients list all resolve
+    //           "shared-topic". The router must deliver exactly one copy per
+    //           unique destination while preserving all distinct endpoints.
+    //
+    // WHAT YOU PROVE: The recipient list correctly deduplicates destinations
+    //                 across rules and metadata, reporting accurate counts.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge3_CrossRuleDedup_RemovesDuplicateDestinations()
+    public async Task Advanced_CrossRuleDedup_RemovesDuplicateDestinations()
     {
         await using var output = new MockEndpoint("dedup");
         var options = Options.Create(new RecipientListOptions
