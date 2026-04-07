@@ -2,11 +2,11 @@
 // Tutorial 03 – Your First Message (Lab)
 // ============================================================================
 // EIP Patterns: Message, Message Channel (Point-to-Point, Publish-Subscribe)
-// End-to-End: IntegrationEnvelope anatomy (auto-generated identity fields,
-// causation chains, priority/intent/schema defaults), metadata propagation,
-// message expiration, sequence numbers for split batches, and real channel
-// components (PointToPointChannel, PublishSubscribeChannel) wired to
-// MockEndpoint for verified delivery.
+// Real Integrations: All broker tests use real NATS JetStream via Aspire.
+// Envelope anatomy tests (identity, causation, priority) are pure record
+// tests that don't need a broker. Channel tests wire PointToPointChannel
+// and PublishSubscribeChannel to NatsBrokerEndpoint for verified delivery
+// through real NATS.
 // ============================================================================
 
 using NUnit.Framework;
@@ -22,14 +22,6 @@ public sealed record OrderPayload(string OrderId, string Product, int Quantity);
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("output");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
     // ── 1. IntegrationEnvelope Anatomy ──────────────────────────────────
 
     [Test]
@@ -57,16 +49,19 @@ public sealed class Lab
     [Test]
     public async Task Envelope_DomainObjectPayload_PreservedEndToEnd()
     {
-        // A typed domain record survives the full publish → receive path.
-        // The envelope preserves the payload type and all field values.
+        // A typed domain record survives the full publish → receive path
+        // through real NATS JetStream.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t03-payload");
+        var topic = AspireFixture.UniqueTopic("t03-payload");
+
         var order = new OrderPayload("ORD-100", "Gadget", 3);
         var envelope = IntegrationEnvelope<OrderPayload>.Create(
             order, "OrderService", "order.created");
 
-        await _output.PublishAsync(envelope, "orders");
+        await nats.PublishAsync(envelope, topic);
 
-        _output.AssertReceivedCount(1);
-        var received = _output.GetReceived<OrderPayload>();
+        nats.AssertReceivedCount(1);
+        var received = nats.GetReceived<OrderPayload>();
         Assert.That(received.Payload.OrderId, Is.EqualTo("ORD-100"));
         Assert.That(received.Payload.Product, Is.EqualTo("Gadget"));
         Assert.That(received.Payload.Quantity, Is.EqualTo(3));
@@ -124,7 +119,10 @@ public sealed class Lab
     public async Task Envelope_Metadata_KeyValuePairsFlowWithMessage()
     {
         // Metadata dictionary carries arbitrary key-value pairs alongside
-        // the message — used for headers, tracing, and custom context.
+        // the message through real NATS JetStream.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t03-meta");
+        var topic = AspireFixture.UniqueTopic("t03-meta");
+
         var envelope = IntegrationEnvelope<string>.Create(
             "traced-payload", "svc", "event") with
         {
@@ -136,9 +134,9 @@ public sealed class Lab
             },
         };
 
-        await _output.PublishAsync(envelope, "events");
+        await nats.PublishAsync(envelope, topic);
 
-        var received = _output.GetReceived<string>();
+        var received = nats.GetReceived<string>();
         Assert.That(received.Metadata[MessageHeaders.TraceId], Is.EqualTo("abc-trace-123"));
         Assert.That(received.Metadata[MessageHeaders.ContentType], Is.EqualTo("application/json"));
         Assert.That(received.Metadata["custom-header"], Is.EqualTo("custom-value"));
@@ -173,7 +171,10 @@ public sealed class Lab
     public async Task Envelope_SequenceNumbers_SplitBatchTracking()
     {
         // SequenceNumber + TotalCount track position within a split batch.
-        // A Splitter produces N messages; each carries its index and total.
+        // Published through real NATS JetStream.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t03-seq");
+        var topic = AspireFixture.UniqueTopic("t03-seq");
+
         var totalItems = 3;
         for (var i = 0; i < totalItems; i++)
         {
@@ -183,34 +184,37 @@ public sealed class Lab
                 SequenceNumber = i,
                 TotalCount = totalItems,
             };
-            await _output.PublishAsync(envelope, "batch-items");
+            await nats.PublishAsync(envelope, topic);
         }
 
-        _output.AssertReceivedCount(3);
-        var first = _output.GetReceived<string>(0);
-        var last = _output.GetReceived<string>(2);
+        nats.AssertReceivedCount(3);
+        var first = nats.GetReceived<string>(0);
+        var last = nats.GetReceived<string>(2);
         Assert.That(first.SequenceNumber, Is.EqualTo(0));
         Assert.That(last.SequenceNumber, Is.EqualTo(2));
         Assert.That(first.TotalCount, Is.EqualTo(3));
     }
 
-    // ── 3. Message Channels ─────────────────────────────────────────────
+    // ── 3. Message Channels (Real NATS) ─────────────────────────────────
 
     [Test]
     public async Task PointToPointChannel_SendToQueue_SingleDelivery()
     {
         // Point-to-Point Channel: each message delivered to exactly one
-        // consumer in the group — queue semantics.
+        // consumer — wired to real NATS JetStream via NatsBrokerEndpoint.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t03-p2p");
+        var topic = AspireFixture.UniqueTopic("t03-p2p");
+
         var channel = new PointToPointChannel(
-            _output, _output, NullLogger<PointToPointChannel>.Instance);
+            nats, nats, NullLogger<PointToPointChannel>.Instance);
 
         var envelope = IntegrationEnvelope<string>.Create(
             "order-created", "OrderService", "order.created");
 
-        await channel.SendAsync(envelope, "orders-queue", CancellationToken.None);
+        await channel.SendAsync(envelope, topic, CancellationToken.None);
 
-        _output.AssertReceivedCount(1);
-        var received = _output.GetReceived<string>();
+        nats.AssertReceivedCount(1);
+        var received = nats.GetReceived<string>();
         Assert.That(received.Payload, Is.EqualTo("order-created"));
         Assert.That(received.MessageId, Is.EqualTo(envelope.MessageId));
     }
@@ -219,9 +223,10 @@ public sealed class Lab
     public async Task PublishSubscribeChannel_FanOut_AllSubscribersReceive()
     {
         // Publish-Subscribe Channel: every subscriber receives every message
-        // — fan-out delivery. Each subscriber gets its own consumer group.
-        var sub1 = new MockEndpoint("subscriber-1");
-        var sub2 = new MockEndpoint("subscriber-2");
+        // — fan-out delivery through real NATS JetStream.
+        await using var sub1 = AspireFixture.CreateNatsEndpoint("t03-sub1");
+        await using var sub2 = AspireFixture.CreateNatsEndpoint("t03-sub2");
+        var topic = AspireFixture.UniqueTopic("t03-pubsub");
 
         var channel1 = new PublishSubscribeChannel(
             sub1, sub1, NullLogger<PublishSubscribeChannel>.Instance);
@@ -232,43 +237,43 @@ public sealed class Lab
             "price-updated", "PricingService", "price.changed");
 
         // Same message published to both channels — simulates fan-out
-        await channel1.PublishAsync(envelope, "price-events", CancellationToken.None);
-        await channel2.PublishAsync(envelope, "price-events", CancellationToken.None);
+        await channel1.PublishAsync(envelope, topic, CancellationToken.None);
+        await channel2.PublishAsync(envelope, topic, CancellationToken.None);
 
         sub1.AssertReceivedCount(1);
         sub2.AssertReceivedCount(1);
         Assert.That(sub1.GetReceived<string>().Payload, Is.EqualTo("price-updated"));
         Assert.That(sub2.GetReceived<string>().Payload, Is.EqualTo("price-updated"));
-
-        await sub1.DisposeAsync();
-        await sub2.DisposeAsync();
     }
 
     [Test]
     public async Task TopicRouting_MessagesDeliveredToCorrectTopics()
     {
-        // Different message types routed to different topics.
-        // Each topic accumulates only its own messages.
+        // Different message types routed to different topics through real NATS.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t03-topics");
+        var ordersTopic = AspireFixture.UniqueTopic("t03-orders");
+        var paymentsTopic = AspireFixture.UniqueTopic("t03-payments");
+
         var channel = new PointToPointChannel(
-            _output, _output, NullLogger<PointToPointChannel>.Instance);
+            nats, nats, NullLogger<PointToPointChannel>.Instance);
 
         for (var i = 0; i < 3; i++)
         {
             var env = IntegrationEnvelope<string>.Create(
                 $"order-{i}", "OrderService", "order.created");
-            await channel.SendAsync(env, "orders", CancellationToken.None);
+            await channel.SendAsync(env, ordersTopic, CancellationToken.None);
         }
 
         for (var i = 0; i < 2; i++)
         {
             var env = IntegrationEnvelope<string>.Create(
                 $"payment-{i}", "PaymentService", "payment.processed");
-            await channel.SendAsync(env, "payments", CancellationToken.None);
+            await channel.SendAsync(env, paymentsTopic, CancellationToken.None);
         }
 
-        _output.AssertReceivedCount(5);
-        _output.AssertReceivedOnTopic("orders", 3);
-        _output.AssertReceivedOnTopic("payments", 2);
-        Assert.That(_output.GetReceivedTopics(), Has.Count.EqualTo(2));
+        nats.AssertReceivedCount(5);
+        nats.AssertReceivedOnTopic(ordersTopic, 3);
+        nats.AssertReceivedOnTopic(paymentsTopic, 2);
+        Assert.That(nats.GetReceivedTopics(), Has.Count.EqualTo(2));
     }
 }
