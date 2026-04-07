@@ -26,6 +26,8 @@ public sealed class Lab
     [SetUp]
     public void SetUp() => _dispatcher = new MockTemporalWorkflowDispatcher();
 
+    // ── 1. Workflow Dispatching ────────────────────────────────────────
+
     [Test]
     public async Task ProcessAsync_DispatchesCorrectWorkflowId()
     {
@@ -54,6 +56,8 @@ public sealed class Lab
         Assert.That(capturedInput.Source, Is.EqualTo("TestSource"));
         Assert.That(capturedInput.MessageType, Is.EqualTo("test.type"));
     }
+
+    // ── 2. Envelope-to-Input Mapping ──────────────────────────────────
 
     [Test]
     public async Task ProcessAsync_SerializesPayloadAsJson()
@@ -92,6 +96,8 @@ public sealed class Lab
         Assert.That(capturedInput.MetadataJson, Does.Contain("region"));
         Assert.That(capturedInput.MetadataJson, Does.Contain("us-east"));
     }
+
+    // ── 3. Pipeline Options ───────────────────────────────────────────
 
     [Test]
     public async Task ProcessAsync_EmptyMetadata_SetsMetadataJsonNull()

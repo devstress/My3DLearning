@@ -26,6 +26,8 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+    // ── 1. Single-Step Execution ───────────────────────────────────────
+
     [Test]
     public async Task ExecuteStep_SingleStep_SucceedsAndForwards()
     {
@@ -57,6 +59,8 @@ public sealed class Lab
         _output.AssertNoneReceived();
     }
 
+    // ── 2. Error Handling ──────────────────────────────────────────────
+
     [Test]
     public async Task ExecuteStep_HandlerFails_ReturnsFalseResult()
     {
@@ -85,6 +89,8 @@ public sealed class Lab
         Assert.That(result.FailureReason, Does.Contain("NonExistent"));
         _output.AssertNoneReceived();
     }
+
+    // ── 3. Multi-Step & Parameters ────────────────────────────────────
 
     [Test]
     public async Task ExecuteStep_MultiStepSlip_AdvancesCorrectly()
