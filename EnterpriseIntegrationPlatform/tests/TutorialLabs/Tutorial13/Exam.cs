@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 13 – Routing Slip (Exam)
+// Tutorial 13 – Routing Slip (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: multi-step pipeline execution, partial failure mid-slip,
-// and step-by-step forwarding verification via MockEndpoint.
+// PURPOSE: Prove you can apply the Routing Slip pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Execute a full three-step pipeline sequentially
+//   🟡 Intermediate — Detect partial failure mid-slip and verify it halts
+//   🔴 Advanced     — Handle a missing routing slip with the correct exception
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint, RoutingSlipRouter, NUnit
 // ============================================================================
 
 using System.Text.Json;
@@ -17,8 +30,18 @@ namespace TutorialLabs.Tutorial13;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Full pipeline executes all steps sequentially ────
+    //
+    // SCENARIO: A three-step routing slip (Validate → Transform → Deliver)
+    //           is attached to a message. Each step succeeds and forwards
+    //           to its destination topic.
+    //
+    // WHAT YOU PROVE: The router executes steps in order, advances the
+    //                 slip after each one, and publishes to every topic.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_FullPipeline_ExecutesAllStepsSequentially()
+    public async Task Starter_FullPipeline_ExecutesAllStepsSequentially()
     {
         await using var output = new MockEndpoint("pipeline");
         var handlers = new IRoutingSlipStepHandler[]
@@ -56,8 +79,18 @@ public sealed class Exam
         output.AssertReceivedOnTopic("step3-out", 1);
     }
 
+    // ── 🟡 INTERMEDIATE — Partial failure stops at the failed step ────
+    //
+    // SCENARIO: A three-step slip where the second handler (Transform)
+    //           always fails. The first step succeeds and forwards, but
+    //           the pipeline halts at the failing step.
+    //
+    // WHAT YOU PROVE: The router stops processing when a step fails and
+    //                 does not forward to subsequent destination topics.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_PartialFailure_StopsAtFailedStep()
+    public async Task Intermediate_PartialFailure_StopsAtFailedStep()
     {
         await using var output = new MockEndpoint("partial-fail");
         var handlers = new IRoutingSlipStepHandler[]
@@ -87,8 +120,18 @@ public sealed class Exam
         output.AssertReceivedCount(1);
     }
 
+    // ── 🔴 ADVANCED — Missing routing slip throws InvalidOperation ────
+    //
+    // SCENARIO: An envelope arrives without any routing slip metadata.
+    //           The router must detect the absence and throw rather than
+    //           silently skip processing.
+    //
+    // WHAT YOU PROVE: The router validates that a routing slip is present
+    //                 and raises InvalidOperationException when it is not.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_MissingSlip_ThrowsInvalidOperation()
+    public async Task Advanced_MissingSlip_ThrowsInvalidOperation()
     {
         await using var output = new MockEndpoint("no-slip");
         var router = new RoutingSlipRouter(

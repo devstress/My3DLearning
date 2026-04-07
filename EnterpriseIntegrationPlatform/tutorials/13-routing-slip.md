@@ -4,6 +4,17 @@ Each message carries its own processing itinerary — steps are executed sequent
 
 ---
 
+## Learning Objectives
+
+1. Understand the Routing Slip pattern and how it attaches a processing itinerary to each message
+2. Execute a single routing-slip step and verify successful forwarding to a destination topic
+3. Advance through a multi-step slip, confirming step-by-step consumption
+4. Pass step-specific parameters to handlers and verify they are received correctly
+5. Handle step failures and missing handlers gracefully without crashing the pipeline
+6. Detect a missing routing slip on an envelope and confirm the expected exception
+
+---
+
 ## Key Types
 
 ```csharp
@@ -57,176 +68,36 @@ public sealed record RoutingSlipStepResult(
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Execute a single step successfully
+> 💻 Run the lab tests to see each Routing Slip concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var handler = Substitute.For<IRoutingSlipStepHandler>();
-handler.StepName.Returns("Validate");
-handler.HandleAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Any<IReadOnlyDictionary<string, string>?>(),
-    Arg.Any<CancellationToken>())
-    .Returns(true);
-
-var router = new RoutingSlipRouter(
-    [handler], producer, NullLogger<RoutingSlipRouter>.Instance);
-
-var slip = new RoutingSlip([new RoutingSlipStep("Validate", "output-topic")]);
-var envelope = IntegrationEnvelope<string>.Create(
-    "payload", "Service", "event.type") with
-{
-    Metadata = new Dictionary<string, string>
-    {
-        [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
-    },
-};
-
-var result = await router.ExecuteCurrentStepAsync(envelope);
-
-Assert.That(result.StepName, Is.EqualTo("Validate"));
-Assert.That(result.Succeeded, Is.True);
-Assert.That(result.FailureReason, Is.Null);
-Assert.That(result.RemainingSlip.IsComplete, Is.True);
-Assert.That(result.ForwardedToTopic, Is.EqualTo("output-topic"));
-```
-
-### 2. Multi-step slip — advance through steps
-
-```csharp
-var slip = new RoutingSlip([
-    new RoutingSlipStep("Validate"),
-    new RoutingSlipStep("Transform", "transform-topic"),
-]);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "payload", "Service", "event.type") with
-{
-    Metadata = new Dictionary<string, string>
-    {
-        [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
-    },
-};
-
-var result = await router.ExecuteCurrentStepAsync(envelope);
-
-Assert.That(result.StepName, Is.EqualTo("Validate"));
-Assert.That(result.Succeeded, Is.True);
-Assert.That(result.RemainingSlip.Steps, Has.Count.EqualTo(1));
-Assert.That(result.RemainingSlip.CurrentStep!.StepName, Is.EqualTo("Transform"));
-Assert.That(result.ForwardedToTopic, Is.Null);
-```
-
-### 3. Step with parameters passed to handler
-
-```csharp
-IReadOnlyDictionary<string, string>? receivedParams = null;
-
-var handler = Substitute.For<IRoutingSlipStepHandler>();
-handler.StepName.Returns("Enrich");
-handler.HandleAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Any<IReadOnlyDictionary<string, string>?>(),
-    Arg.Any<CancellationToken>())
-    .Returns(ci =>
-    {
-        receivedParams = ci.ArgAt<IReadOnlyDictionary<string, string>?>(1);
-        return true;
-    });
-
-var parameters = new Dictionary<string, string>
-{
-    ["lookupUrl"] = "https://api.example.com/enrich",
-    ["timeout"] = "30",
-};
-
-var slip = new RoutingSlip([new RoutingSlipStep("Enrich", null, parameters)]);
-var envelope = IntegrationEnvelope<string>.Create(
-    "payload", "Service", "event.type") with
-{
-    Metadata = new Dictionary<string, string>
-    {
-        [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
-    },
-};
-
-var result = await router.ExecuteCurrentStepAsync(envelope);
-
-Assert.That(result.Succeeded, Is.True);
-Assert.That(receivedParams, Is.Not.Null);
-Assert.That(receivedParams!["lookupUrl"], Is.EqualTo("https://api.example.com/enrich"));
-Assert.That(receivedParams["timeout"], Is.EqualTo("30"));
-```
-
-### 4. RoutingSlip.Advance() consumes current step
-
-```csharp
-var slip = new RoutingSlip([
-    new RoutingSlipStep("Step1"),
-    new RoutingSlipStep("Step2"),
-    new RoutingSlipStep("Step3"),
-]);
-
-Assert.That(slip.IsComplete, Is.False);
-Assert.That(slip.CurrentStep!.StepName, Is.EqualTo("Step1"));
-
-var advanced = slip.Advance();
-Assert.That(advanced.CurrentStep!.StepName, Is.EqualTo("Step2"));
-Assert.That(advanced.Steps, Has.Count.EqualTo(2));
-
-var advanced2 = advanced.Advance();
-Assert.That(advanced2.CurrentStep!.StepName, Is.EqualTo("Step3"));
-
-var completed = advanced2.Advance();
-Assert.That(completed.IsComplete, Is.True);
-Assert.That(completed.CurrentStep, Is.Null);
-```
-
-### 5. Handler throws exception — step fails gracefully
-
-```csharp
-var handler = Substitute.For<IRoutingSlipStepHandler>();
-handler.StepName.Returns("RiskyStep");
-handler.HandleAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Any<IReadOnlyDictionary<string, string>?>(),
-    Arg.Any<CancellationToken>())
-    .Returns<bool>(_ => throw new InvalidOperationException("Connection timed out"));
-
-var router = new RoutingSlipRouter(
-    [handler], producer, NullLogger<RoutingSlipRouter>.Instance);
-
-var slip = new RoutingSlip([new RoutingSlipStep("RiskyStep", "output-topic")]);
-var envelope = IntegrationEnvelope<string>.Create(
-    "payload", "Service", "event.type") with
-{
-    Metadata = new Dictionary<string, string>
-    {
-        [RoutingSlip.MetadataKey] = JsonSerializer.Serialize(slip.Steps),
-    },
-};
-
-var result = await router.ExecuteCurrentStepAsync(envelope);
-
-Assert.That(result.Succeeded, Is.False);
-Assert.That(result.FailureReason, Does.Contain("Connection timed out"));
-Assert.That(result.ForwardedToTopic, Is.Null);
-```
-
----
-
-## Lab
-
-> 💻 [`tests/TutorialLabs/Tutorial13/Lab.cs`](../tests/TutorialLabs/Tutorial13/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `ExecuteStep_SingleStep_SucceedsAndForwards` | Execute one step and verify forwarding to a destination topic |
+| 2 | `ExecuteStep_NoDestination_CompletesInProcess` | Step without a destination completes without publishing |
+| 3 | `ExecuteStep_HandlerFails_ReturnsFalseResult` | Handler returning false produces a failed result |
+| 4 | `ExecuteStep_NoHandlerRegistered_FailsGracefully` | Missing handler is detected and reported gracefully |
+| 5 | `ExecuteStep_MultiStepSlip_AdvancesCorrectly` | Multi-step slip advances and preserves remaining steps |
+| 6 | `ExecuteStep_WithParameters_PassesParametersToHandler` | Step-specific parameters are forwarded to the handler |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial13.Lab"
 ```
 
-## Exam
+---
 
-> 💻 [`tests/TutorialLabs/Tutorial13/Exam.cs`](../tests/TutorialLabs/Tutorial13/Exam.cs)
+## Exam — Assessment Challenges
+
+> 🎯 Prove you can apply the Routing Slip pattern in realistic, end-to-end scenarios.
+> Each challenge combines multiple concepts and uses a business-like domain.
+
+| # | Challenge | Difficulty |
+|---|-----------|------------|
+| 1 | `Starter_FullPipeline_ExecutesAllStepsSequentially` | 🟢 Starter |
+| 2 | `Intermediate_PartialFailure_StopsAtFailedStep` | 🟡 Intermediate |
+| 3 | `Advanced_MissingSlip_ThrowsInvalidOperation` | 🔴 Advanced |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial13.Exam"
