@@ -1,8 +1,22 @@
 // ============================================================================
-// Tutorial 09 – Content-Based Router (Exam)
+// Tutorial 09 – Content-Based Router (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: multi-rule regional routing, payload-based routing with
-// JsonElement, and multi-message batch routing verification via MockEndpoint.
+// PURPOSE: Prove you can apply content-based routing in realistic scenarios —
+//          regional routing, payload-based routing with JSON, and batch
+//          verification across multiple message types.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Multi-rule regional routing with fallback to global
+//   🟡 Intermediate — Route by JSON payload fields using JsonElement
+//   🔴 Advanced     — Batch routing with per-topic count verification
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using System.Text.Json;
@@ -18,8 +32,17 @@ namespace TutorialLabs.Tutorial09;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Regional Order Routing ───────────────────────────────
+    //
+    // SCENARIO: An e-commerce platform routes orders to regional fulfilment
+    // centres based on the "region" metadata field. US-East and EU-West
+    // orders go to dedicated topics; unknown regions fall back to global.
+    //
+    // WHAT YOU PROVE: You can configure multi-rule routing with metadata
+    // matching and verify fallback behavior for unmatched regions.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge1_RegionalRouting_MatchesAndFallsBack()
+    public async Task Starter_RegionalRouting_MatchesAndFallsBack()
     {
         await using var output = new MockEndpoint("regional");
         var options = Options.Create(new RouterOptions
@@ -55,8 +78,17 @@ public sealed class Exam
         output.AssertReceivedOnTopic("fulfilment.global", 1);
     }
 
+    // ── 🟡 INTERMEDIATE — JSON Payload-Based Routing ──────────────────────
+    //
+    // SCENARIO: A payment processing system routes orders by their status
+    // field inside the JSON payload — urgent orders to priority processing,
+    // normal orders to standard processing, and unknown statuses to default.
+    //
+    // WHAT YOU PROVE: You can route messages based on JsonElement payload
+    // fields and verify correct topic assignment for each status level.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge2_PayloadRouting_JsonElementField()
+    public async Task Intermediate_PayloadRouting_JsonElementField()
     {
         await using var output = new MockEndpoint("payload");
         var options = Options.Create(new RouterOptions
@@ -96,8 +128,17 @@ public sealed class Exam
         output.AssertReceivedOnTopic("default-processing", 1);
     }
 
+    // ── 🔴 ADVANCED — Batch Routing with Topic Verification ───────────────
+    //
+    // SCENARIO: A message hub receives a batch of four messages — two orders,
+    // one payment, and one inventory update. Each must be routed to the
+    // correct topic using StartsWith rules, with per-topic count verification.
+    //
+    // WHAT YOU PROVE: You can route a batch of mixed message types and
+    // verify exact per-topic delivery counts across multiple topics.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge3_BatchRouting_MultipleMessagesVerifyTopics()
+    public async Task Advanced_BatchRouting_MultipleMessagesVerifyTopics()
     {
         await using var output = new MockEndpoint("batch");
         var options = Options.Create(new RouterOptions
