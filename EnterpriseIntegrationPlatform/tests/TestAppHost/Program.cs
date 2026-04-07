@@ -30,4 +30,12 @@ var mailhog = builder.AddContainer("mailhog", "mailhog/mailhog", "latest")
     .WithEndpoint(targetPort: 1025, name: "smtp", scheme: "tcp")
     .WithHttpEndpoint(targetPort: 8025, name: "mailhog-api");
 
+// ── PostgreSQL — EIP Postgres message broker for integration tests ───────────
+// Used by Ingestion.Postgres integration tests to verify full broker behaviour.
+var postgres = builder.AddContainer("postgres", "postgres", "17")
+    .WithEnvironment("POSTGRES_DB", "eip")
+    .WithEnvironment("POSTGRES_USER", "eip")
+    .WithEnvironment("POSTGRES_PASSWORD", "eip")
+    .WithEndpoint(targetPort: 5432, name: "postgres-tcp", scheme: "tcp");
+
 builder.Build().Run();

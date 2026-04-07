@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\src\Ingestion.Kafka\Ingestion.Kafka.csproj" />
     <ProjectReference Include="..\..\src\Ingestion.Nats\Ingestion.Nats.csproj" />
     <ProjectReference Include="..\..\src\Ingestion.Pulsar\Ingestion.Pulsar.csproj" />
+    <ProjectReference Include="..\..\src\Ingestion.Postgres\Ingestion.Postgres.csproj" />
     <ProjectReference Include="..\..\src\Processing.Routing\Processing.Routing.csproj" />
     <ProjectReference Include="..\..\src\Processing.Translator\Processing.Translator.csproj" />
     <ProjectReference Include="..\..\src\Processing.Transform\Processing.Transform.csproj" />

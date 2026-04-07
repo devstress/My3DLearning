@@ -61,10 +61,9 @@ transactions, channels, competing consumers) work through the same interfaces.
 
 | Chunk | Scope | Status |
 |-------|-------|--------|
-| 108 | **DI wiring + Aspire integration** — `AddPostgresBroker(services, connectionString)` extension. Register in `IngestionServiceExtensions.BrokerRegistrations`. Add Postgres container to `tests/TestAppHost/Program.cs`. `PostgresBrokerEndpoint` test helper (mirrors `NatsBrokerEndpoint`). Connectivity integration tests. | `not-started` |
 | 109 | **Routing + advanced EIP on Postgres** — Integration tests: `ContentBasedRouter`, `DynamicRouter`, `RecipientListRouter`, `RoutingSlipRouter`, `MessageFilter`, `Detour`, `ScatterGather`, `Splitter`, `Aggregator`, `Resequencer` — all wired to Postgres broker. Proves every EIP routing pattern works on Postgres transport. | `not-started` |
 
-**Next Chunk:** 108
+**Next Chunk:** 109
 
 ---
 

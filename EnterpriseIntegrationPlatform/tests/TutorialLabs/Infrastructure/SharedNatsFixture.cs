@@ -106,6 +106,16 @@ public static class SharedTestAppHost
         return (smtpEndpoint.Host, smtpEndpoint.Port, apiEndpoint.Port);
     }
 
+    /// <summary>Gets the PostgreSQL connection string from the running TestAppHost.</summary>
+    public static async Task<string?> GetPostgresConnectionStringAsync()
+    {
+        var app = await GetAppAsync();
+        if (app is null) return null;
+
+        var endpoint = app.GetEndpoint("postgres", "postgres-tcp");
+        return $"Host={endpoint.Host};Port={endpoint.Port};Database=eip;Username=eip;Password=eip";
+    }
+
     /// <summary>Stops the test host.</summary>
     public static async Task DisposeAsync()
     {

@@ -36,6 +36,9 @@ public sealed class AspireFixture
     /// <summary>SMTP endpoint from the running Aspire TestAppHost.</summary>
     public static (string Host, int SmtpPort, int ApiPort)? SmtpEndpoint { get; private set; }
 
+    /// <summary>PostgreSQL connection string from the running Aspire TestAppHost.</summary>
+    public static string? PostgresConnectionString { get; private set; }
+
     [OneTimeSetUp]
     public async Task GlobalSetUp()
     {
@@ -48,6 +51,7 @@ public sealed class AspireFixture
             TemporalAddress = await SharedTestAppHost.GetTemporalAddressAsync();
             SftpEndpoint = await SharedTestAppHost.GetSftpEndpointAsync();
             SmtpEndpoint = await SharedTestAppHost.GetSmtpEndpointAsync();
+            PostgresConnectionString = await SharedTestAppHost.GetPostgresConnectionStringAsync();
         }
     }
 
@@ -66,6 +70,17 @@ public sealed class AspireFixture
         if (!IsAvailable || NatsUrl is null)
             Assert.Ignore("Docker not available — skipping real broker test");
         return new NatsBrokerEndpoint(name, NatsUrl);
+    }
+
+    /// <summary>
+    /// Creates a PostgresBrokerEndpoint connected to the real PostgreSQL.
+    /// Throws Ignore if Docker is not available.
+    /// </summary>
+    public static PostgresBrokerEndpoint CreatePostgresEndpoint(string name)
+    {
+        if (!IsAvailable || PostgresConnectionString is null)
+            Assert.Ignore("Docker not available — skipping real Postgres broker test");
+        return new PostgresBrokerEndpoint(name, PostgresConnectionString);
     }
 
     /// <summary>

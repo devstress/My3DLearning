@@ -115,4 +115,89 @@ public sealed class InfrastructureConnectivityTests
         Assert.That(SharedTestAppHost.IsAvailable, Is.True,
             "Aspire TestAppHost should be running");
     }
+
+    // ── PostgreSQL via Aspire ───────────────────────────────────────────
+
+    [Test]
+    public async Task Postgres_PublishAndPoll_RoundTrip()
+    {
+        var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
+        if (connStr is null)
+            Assert.Ignore("Docker not available — skipping Postgres test");
+
+        await using var endpoint = new PostgresBrokerEndpoint("pg-roundtrip-test", connStr);
+        await endpoint.EnsureSchemaAsync();
+
+        var topic = $"pg-test-{Guid.NewGuid():N}";
+        var envelope = IntegrationEnvelope<string>.Create("Hello Postgres!", "test", "greeting");
+
+        await endpoint.PublishAsync(envelope, topic);
+
+        // Poll for the message
+        var messages = await endpoint.PollAsync<string>(topic, "test-group", maxMessages: 10);
+
+        Assert.That(messages.Count, Is.GreaterThanOrEqualTo(1),
+            "At least one message should be retrieved from Postgres");
+        Assert.That(messages[0].Payload, Is.EqualTo("Hello Postgres!"),
+            "Message payload should match after Postgres round-trip");
+    }
+
+    [Test]
+    public async Task Postgres_ProducerCaptures_PublishedMessages()
+    {
+        var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
+        if (connStr is null)
+            Assert.Ignore("Docker not available — skipping Postgres test");
+
+        await using var endpoint = new PostgresBrokerEndpoint("pg-capture-test", connStr);
+        await endpoint.EnsureSchemaAsync();
+
+        var topic = $"pg-capture-{Guid.NewGuid():N}";
+        var envelope = IntegrationEnvelope<string>.Create("PG Captured!", "test", "cmd");
+
+        await endpoint.PublishAsync(envelope, topic);
+
+        endpoint.AssertReceivedCount(1);
+        endpoint.AssertReceivedOnTopic(topic, 1);
+
+        var msg = endpoint.GetReceived<string>();
+        Assert.That(msg.Payload, Is.EqualTo("PG Captured!"));
+    }
+
+    [Test]
+    public async Task Postgres_SubscribeAndReceive_EventDriven()
+    {
+        var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
+        if (connStr is null)
+            Assert.Ignore("Docker not available — skipping Postgres test");
+
+        await using var endpoint = new PostgresBrokerEndpoint("pg-subscribe-test", connStr);
+        await endpoint.EnsureSchemaAsync();
+
+        var topic = $"pg-sub-{Guid.NewGuid():N}";
+        var received = new TaskCompletionSource<string>();
+
+        // Subscribe first
+        await endpoint.SubscribeAsync<string>(topic, "sub-group", env =>
+        {
+            received.TrySetResult(env.Payload);
+            return Task.CompletedTask;
+        });
+
+        // Small delay for subscription to establish
+        await Task.Delay(500);
+
+        // Publish via a separate producer (simulating another service)
+        await endpoint.SendAsync(
+            IntegrationEnvelope<string>.Create("Event Driven!", "test", "event"),
+            topic);
+
+        // Wait for delivery (pg_notify + consumer loop polling at 200ms)
+        var payload = await Task.WhenAny(received.Task, Task.Delay(15_000)) == received.Task
+            ? received.Task.Result
+            : null;
+
+        Assert.That(payload, Is.EqualTo("Event Driven!"),
+            "Message should round-trip through real PostgreSQL event-driven consumer");
+    }
 }

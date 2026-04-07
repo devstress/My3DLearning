@@ -4,6 +4,30 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 108 – DI Wiring + Aspire Postgres Container + PostgresBrokerEndpoint
+
+- **Date**: 2026-04-07
+- **Phase**: 28 — PostgreSQL Message Broker (EIP-Complete, ≤ 5k TPS)
+- **Status**: done
+- **Goal**: Add Postgres container to Aspire TestAppHost, create PostgresBrokerEndpoint test helper (mirrors NatsBrokerEndpoint), add Postgres connectivity integration tests.
+- **Architecture**:
+  - Postgres 17 container added to `tests/TestAppHost/Program.cs` with EIP database credentials
+  - `SharedTestAppHost.GetPostgresConnectionStringAsync()` returns connection string from Aspire endpoint
+  - `AspireFixture.PostgresConnectionString` exposed for all test fixtures
+  - `AspireFixture.CreatePostgresEndpoint(name)` factory method (mirrors CreateNatsEndpoint)
+  - `PostgresBrokerEndpoint` wraps real `PostgresBrokerProducer`/`PostgresBrokerConsumer` with MockEndpoint-compatible assertion API (AssertReceivedCount, AssertReceivedOnTopic, WaitForConsumedAsync, etc.)
+  - 3 new connectivity tests: publish+poll round-trip, producer capture assertions, event-driven subscribe+receive
+  - TutorialLabs csproj now references Ingestion.Postgres
+- **Files created**:
+  - `tests/TutorialLabs/Infrastructure/PostgresBrokerEndpoint.cs`
+- **Files modified**:
+  - `tests/TestAppHost/Program.cs` — Added Postgres 17 container
+  - `tests/TutorialLabs/Infrastructure/SharedNatsFixture.cs` — Added `GetPostgresConnectionStringAsync()`
+  - `tests/TutorialLabs/Infrastructure/AspireFixture.cs` — Added `PostgresConnectionString` property + `CreatePostgresEndpoint()`
+  - `tests/TutorialLabs/InfrastructureTests/ConnectivityTests.cs` — Added 3 Postgres connectivity tests
+  - `tests/TutorialLabs/TutorialLabs.csproj` — Added Ingestion.Postgres project reference
+- **Test counts**: 38 BrokerAgnosticTests pass. 522+ TutorialLabs tests + 3 new Postgres connectivity tests (Docker-gated). 49 src projects, 0 errors, 0 warnings.
+
 ## Chunk 107 – Broker-Agnostic EIP Integration Tests (DLQ, Retry, Channels, Routing, Splitter, Aggregator)
 
 - **Date**: 2026-04-07
