@@ -1,11 +1,23 @@
 // ============================================================================
-// Tutorial 07 – Temporal Workflows (Lab)
+// Tutorial 07 – Temporal Workflows (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Process Manager / Workflow Orchestration
-// End-to-End: TemporalOptions configuration, workflow type discovery,
-// PipelineOrchestrator dispatch with MockTemporalWorkflowDispatcher —
-// workflow ID generation, payload serialization, priority mapping, and
-// correlation/causation propagation through the full dispatch path.
+// PURPOSE: Run each test in order to see how Temporal workflow configuration,
+//          orchestrator dispatch, and failure handling work through
+//          MockTemporalWorkflowDispatcher. Read the code and comments to
+//          understand each concept before moving to the Exam.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. TemporalOptions defaults — section name, task queue, namespace
+//   2. Workflow type discovery — four workflow types in the assembly
+//   3. PipelineOptions defaults — Ack/Nack subject configuration
+//   4. Orchestrator dispatch — envelope converted to pipeline input
+//   5. Workflow ID generation — deterministic from MessageId
+//   6. Payload serialization — JSON strings for Temporal replay
+//   7. Priority mapping — enum to integer for Temporal serialization
+//   8. Failure handling — dispatch failure handled without throwing
+//   9. Dispatch tracking — multiple dispatches counted for verification
+//
+// INFRASTRUCTURE: MockTemporalWorkflowDispatcher
 // ============================================================================
 
 using System.Reflection;
