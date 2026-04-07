@@ -13,7 +13,8 @@
 | Build | Vite 8 | Config in `vite.config.ts` |
 | CSS | Bootstrap 5.3 (CDN) + custom `style.css` | No Tailwind, no CSS-in-JS. Use Bootstrap utility classes first, custom CSS only when needed |
 | Icons | Bootstrap Icons (SVG inline) | Currently using inline SVG data URIs in `style.css` |
-| Testing | Vitest + @vue/test-utils | Tests in `src/__tests__/`. Every new component and composable must have tests |
+| Unit Testing | Vitest + @vue/test-utils | Tests in `src/__tests__/`. Every new component and composable must have tests |
+| E2E Testing | Playwright (Chromium, Firefox, WebKit) | Tests in `e2e/`. Multi-browser + mobile. See `rules/playwright-rules.md` |
 | Router | vue-router 4 | Lazy-loaded routes in `src/router/index.ts` |
 | API | Fetch-based client | `src/api/client.ts`. All API calls return typed promises |
 | Aspire | .NET Aspire AppHost | Orchestrates Platform.Api + Vue frontend. Vite proxy for `/api` |
@@ -125,15 +126,18 @@ The sidebar currently collapses at 641px (custom). New chunks should migrate thi
 When implementing a UX chunk:
 
 1. **Read this file** and `rules/milestones.md` first
-2. **Check existing components** in `src/components/` — reuse before creating
-3. **Install npm packages** only if absolutely necessary. Check `gh-advisory-database` for vulnerabilities first
-4. **Write the component/composable** following conventions above
-5. **Write Vitest tests** for new components and composables
-6. **Update existing view tests** if you changed view behaviour
-7. **Run `npm test`** in `src/Web.Vue/` to verify all Vitest tests pass
-8. **Run `npm run build`** to verify TypeScript compiles and Vite builds
-9. **Run `dotnet build && dotnet test`** in `Terranes/` to verify .NET is unbroken
-10. **Update milestones.md and completion-log.md** per the standard rules
+2. **Read `rules/playwright-rules.md`** for E2E cross-browser testing conventions
+3. **Check existing components** in `src/components/` — reuse before creating
+4. **Install npm packages** only if absolutely necessary. Check `gh-advisory-database` for vulnerabilities first
+5. **Write the component/composable** following conventions above
+6. **Write Vitest tests** for new components and composables
+7. **Write Playwright E2E tests** for new user-facing behaviour (see `rules/playwright-rules.md`)
+8. **Update existing view tests** if you changed view behaviour
+9. **Run `npm test`** in `src/Web.Vue/` to verify all Vitest tests pass
+10. **Run `npm run test:e2e:chromium`** to verify Playwright tests pass (use single browser for speed)
+11. **Run `npm run build`** to verify TypeScript compiles and Vite builds
+12. **Run `dotnet build && dotnet test`** in `Terranes/` to verify .NET is unbroken
+13. **Update milestones.md and completion-log.md** per the standard rules
 
 ---
 

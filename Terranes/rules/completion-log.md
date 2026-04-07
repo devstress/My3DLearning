@@ -740,3 +740,26 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - Updated 4 view tests to check for placeholder-glow instead of text-based loading messages
 
 **Tests:** 529 total (390 NUnit unit + 56 NUnit integration + 83 Vitest component), all passing
+
+### Chunk 063 — Playwright Multi-Browser E2E Tests (2026-04-07)
+
+**Goal:** Add Playwright E2E cross-browser testing infrastructure with Chromium, Firefox, WebKit + mobile and tablet viewports. Create AI agent rule for Playwright conventions. 29 E2E tests across 5 spec files covering navigation, home page, responsive layout, views smoke, and UX feedback/accessibility.
+
+**Files created:**
+- `playwright.config.ts` — 6 browser projects (Chromium, Firefox, WebKit, mobile-chrome/Pixel 5, mobile-safari/iPhone 13, tablet/iPad gen 7). Auto-starts Vite dev server. Trace on retry, screenshot on failure.
+- `e2e/helpers.ts` — `openSidebarIfMobile()` helper for mobile viewport sidebar toggle
+- `e2e/navigation.spec.ts` — 5 tests: home load, sidebar links, sidebar navigation with mobile support, CTA cards, active link highlighting
+- `e2e/home.spec.ts` — 4 tests: hero section, feature cards grid, CTA buttons, tagline section
+- `e2e/responsive.spec.ts` — 6 tests: desktop sidebar, mobile hidden nav, mobile toggler, tablet cards, mobile stacking, page title
+- `e2e/views.spec.ts` — 8 tests: per-view smoke tests for Villages, Home Models, Land Blocks, Marketplace, Journey, Dashboard + search controls
+- `e2e/ux-feedback.spec.ts` — 6 tests: route transitions, toast container, skeleton loaders, document structure, button text, link text
+- `rules/playwright-rules.md` — AI agent rule: multi-browser projects, run commands, test conventions, selector priority, customer-first philosophy, forbidden patterns
+
+**Files modified:**
+- `package.json` — Added `@playwright/test ^1.59.1` devDep, 6 new scripts: `test:e2e`, `test:e2e:chromium`, `test:e2e:firefox`, `test:e2e:webkit`, `test:e2e:mobile`, `test:e2e:report`
+- `vite.config.ts` — Added `exclude: ['e2e/**']` to Vitest config to prevent Playwright spec collision
+- `.gitignore` — Added `test-results/`, `playwright-report/`, `blob-report/`
+- `rules/ux-rules.md` — Added E2E Testing row to tech stack, added Playwright steps to chunk implementation pattern
+- `rules/milestones.md` — Added Chunk 063 (done)
+
+**Tests:** 29 Playwright E2E tests × 6 browser projects = 174 cross-browser runs. 83 Vitest component tests. 446 NUnit tests. All passing.

@@ -105,6 +105,7 @@ Each chunk is independently deployable and testable.
 | 060 | **Breadcrumbs, Page Titles & Navigation** — Add `BreadcrumbBar.vue` component with auto-generated breadcrumbs from route meta. Add `<title>` updates per route. Add active-page icon highlighting in sidebar. Add "Back to" links in detail modals. Add 404 page. 5+ Vitest tests. | `not-started` |
 | 061 | **Form Validation & Input UX** — Add real-time validation on all filter inputs (number ranges, required fields). Add input masking for price fields (AUD format). Add clear-all-filters button. Add auto-focus on first input when views mount. Standardise form-group spacing. 5+ Vitest tests. | `not-started` |
 | 062 | **Performance & Bundle Optimisation** — Add route-based code splitting verification. Add image lazy loading for card thumbnails. Add virtual scrolling for large lists (> 50 items). Add web font preloading. Measure and log Lighthouse scores. 3+ Vitest tests. | `not-started` |
+| 063 | **Playwright Multi-Browser E2E Tests** — Add Playwright with Chromium, Firefox, WebKit + mobile + tablet viewports. 29 E2E tests across 5 spec files: navigation, home page, responsive layout, views smoke, UX feedback/accessibility. AI agent rule in `rules/playwright-rules.md`. | `done` |
 
 ---
 
