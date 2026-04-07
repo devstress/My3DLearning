@@ -2,8 +2,9 @@
 // Tutorial 48 – Notification Use Cases (Lab)
 // ============================================================================
 // EIP Pattern: Notification / Ack-Nack.
-// E2E: Wire validation, logging, and notification services with MockEndpoint
-// to verify ack/nack publish flow after validation.
+// E2E: Wire validation, logging, and notification services with
+// NatsBrokerEndpoint (real NATS JetStream via Aspire) to verify ack/nack
+// publish flow after validation.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Activities;
@@ -18,20 +19,14 @@ namespace TutorialLabs.Tutorial48;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("notify-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
     // ── 1. Validation & Notification ─────────────────────────────────
 
     [Test]
     public async Task Validate_Success_PublishesAck()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t48-ack");
+        var topic = AspireFixture.UniqueTopic("t48-ack");
+
         var validator = new DefaultMessageValidationService();
         var result = await validator.ValidateAsync("order.created", "{\"id\": 1}");
 
@@ -39,13 +34,16 @@ public sealed class Lab
 
         // Publish ack notification
         var ack = IntegrationEnvelope<string>.Create("ack", "pipeline", "notification.ack");
-        await _output.PublishAsync(ack, "ack-topic");
-        _output.AssertReceivedOnTopic("ack-topic", 1);
+        await nats.PublishAsync(ack, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task Validate_Failure_PublishesNack()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t48-nack");
+        var topic = AspireFixture.UniqueTopic("t48-nack");
+
         var validator = new MockMessageValidationService()
             .WithResult("bad.type", MessageValidationResult.Failure("Unknown type"));
 
@@ -54,8 +52,8 @@ public sealed class Lab
 
         var nack = IntegrationEnvelope<string>.Create(
             result.Reason!, "pipeline", "notification.nack");
-        await _output.PublishAsync(nack, "nack-topic");
-        _output.AssertReceivedOnTopic("nack-topic", 1);
+        await nats.PublishAsync(nack, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
 
@@ -93,6 +91,10 @@ public sealed class Lab
     [Test]
     public async Task FullNotificationFlow_ValidateLogPublish()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t48-flow");
+        var ackTopic = AspireFixture.UniqueTopic("t48-flow-ack");
+        var nackTopic = AspireFixture.UniqueTopic("t48-flow-nack");
+
         var validator = new DefaultMessageValidationService();
         var logger = new DefaultMessageLoggingService(
             NullLogger<DefaultMessageLoggingService>.Instance);
@@ -103,8 +105,8 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             validation.IsValid ? "ack" : "nack", "pipeline", "notification.result");
-        await _output.PublishAsync(envelope, validation.IsValid ? "ack-topic" : "nack-topic");
+        await nats.PublishAsync(envelope, validation.IsValid ? ackTopic : nackTopic, default);
 
-        _output.AssertReceivedOnTopic("ack-topic", 1);
+        nats.AssertReceivedOnTopic(ackTopic, 1);
     }
 }

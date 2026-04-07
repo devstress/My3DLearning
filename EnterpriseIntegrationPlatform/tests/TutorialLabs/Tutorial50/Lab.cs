@@ -3,7 +3,8 @@
 // ============================================================================
 // EIP Pattern: Cross-cutting best practices integration.
 // E2E: Combine envelope expiration, sanitization, tenancy, and metadata
-// with MockEndpoint to demonstrate production-ready message flows.
+// with NatsBrokerEndpoint (real NATS JetStream via Aspire) to demonstrate
+// production-ready message flows.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,45 +18,42 @@ namespace TutorialLabs.Tutorial50;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("bp-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
     // ── 1. Message Expiration ────────────────────────────────────────
 
     [Test]
     public async Task ExpiredMessage_NotPublished()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t50-expired");
+        var topic = AspireFixture.UniqueTopic("t50-active");
+
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
         {
             ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-5),
         };
 
         if (!envelope.IsExpired)
-            await _output.PublishAsync(envelope, "active-messages");
+            await nats.PublishAsync(envelope, topic, default);
 
         Assert.That(envelope.IsExpired, Is.True);
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
     [Test]
     public async Task ValidMessage_Published()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t50-valid");
+        var topic = AspireFixture.UniqueTopic("t50-active");
+
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
         {
             ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
         };
 
         if (!envelope.IsExpired)
-            await _output.PublishAsync(envelope, "active-messages");
+            await nats.PublishAsync(envelope, topic, default);
 
         Assert.That(envelope.IsExpired, Is.False);
-        _output.AssertReceivedOnTopic("active-messages", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
 
@@ -93,6 +91,9 @@ public sealed class Lab
     [Test]
     public async Task Metadata_RoundTrip_PublishedWithEnvelope()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t50-metadata");
+        var topic = AspireFixture.UniqueTopic("t50-metadata");
+
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
         {
             Metadata = new Dictionary<string, string>
@@ -103,10 +104,10 @@ public sealed class Lab
             },
         };
 
-        await _output.PublishAsync(envelope, "metadata-test");
+        await nats.PublishAsync(envelope, topic, default);
 
-        _output.AssertReceivedOnTopic("metadata-test", 1);
-        var received = _output.GetReceived<string>();
+        nats.AssertReceivedOnTopic(topic, 1);
+        var received = nats.GetReceived<string>();
         Assert.That(received.Metadata["tenantId"], Is.EqualTo("tenant-a"));
         Assert.That(received.Metadata, Has.Count.EqualTo(3));
     }
