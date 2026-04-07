@@ -1,6 +1,13 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Contracts/Contracts.csproj" />
+    <Project Path="src/Models3D/Models3D.csproj" />
+    <Project Path="src/Land/Land.csproj" />
+    <Project Path="src/SitePlacement/SitePlacement.csproj" />
+    <Project Path="src/Quoting/Quoting.csproj" />
+    <Project Path="src/Marketplace/Marketplace.csproj" />
+    <Project Path="src/Compliance/Compliance.csproj" />
+    <Project Path="src/Platform.Api/Platform.Api.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/UnitTests/UnitTests.csproj" />

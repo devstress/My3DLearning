@@ -20,6 +20,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Models3D\Models3D.csproj" />
+    <ProjectReference Include="..\..\src\Land\Land.csproj" />
+    <ProjectReference Include="..\..\src\SitePlacement\SitePlacement.csproj" />
+    <ProjectReference Include="..\..\src\Quoting\Quoting.csproj" />
+    <ProjectReference Include="..\..\src\Marketplace\Marketplace.csproj" />
+    <ProjectReference Include="..\..\src\Compliance\Compliance.csproj" />
   </ItemGroup>
 
   <ItemGroup>

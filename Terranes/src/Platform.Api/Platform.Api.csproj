@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Models3D\Models3D.csproj" />
+    <ProjectReference Include="..\Land\Land.csproj" />
+    <ProjectReference Include="..\SitePlacement\SitePlacement.csproj" />
+    <ProjectReference Include="..\Quoting\Quoting.csproj" />
+    <ProjectReference Include="..\Marketplace\Marketplace.csproj" />
+    <ProjectReference Include="..\Compliance\Compliance.csproj" />
+  </ItemGroup>
+</Project>

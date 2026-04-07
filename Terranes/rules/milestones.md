@@ -26,20 +26,9 @@
 
 1 src project (Contracts). Initial solution scaffold with rules, docs, and test infrastructure.
 
----
+✅ Phase 2 complete — see `rules/completion-log.md` for full history.
 
-## Phase 2 — Core Platform Services
-
-**Goal:** Build the core service layer for 3D model management, land data integration, quoting engine, and marketplace.
-
-| Chunk | Scope | Status |
-|-------|-------|--------|
-| 002 | 3D Model Service — model upload, storage, metadata, format validation | not-started |
-| 003 | Land Data Service — government land data integration, block analysis, zoning lookup | not-started |
-| 004 | Site Placement Engine — test-fit 3D models onto land blocks with real dimensions | not-started |
-| 005 | Quoting Engine — aggregate quotes from builders, landscapers, furniture, smart home | not-started |
-| 006 | Marketplace Service — home listings, search, filtering, agent/owner management | not-started |
-| 007 | Compliance Engine — AI-powered building regulation checks per jurisdiction | not-started |
+6 src projects (Models3D, Land, SitePlacement, Quoting, Marketplace, Compliance) + Platform.Api. Core platform services with real in-memory implementations, validation, and REST API.
 
 ---
 
@@ -87,7 +76,7 @@
 
 ## Next Chunk
 
-**Chunk 002** — 3D Model Service (Phase 2)
+**Chunk 008** — Builder Integration (Phase 3)
 
 ---
 
