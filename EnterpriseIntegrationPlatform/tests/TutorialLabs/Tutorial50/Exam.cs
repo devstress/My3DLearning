@@ -3,7 +3,7 @@
 // ============================================================================
 // E2E challenges: security + tenancy + expiration combined flow,
 // priority-based processing, and cross-cutting concern integration
-// via MockEndpoint.
+// via NatsBrokerEndpoint (real NATS JetStream via Aspire).
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -20,7 +20,9 @@ public sealed class Exam
     [Test]
     public async Task Challenge1_SecurityTenancyFlow_EndToEnd()
     {
-        await using var output = new MockEndpoint("e2e");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t50-exam-e2e");
+        var topic = AspireFixture.UniqueTopic("t50-exam-tenant");
+
         var envelope = IntegrationEnvelope<string>.Create(
             "<script>alert('xss')</script> Order data", "OrderService", "order.created") with
         {
@@ -38,14 +40,16 @@ public sealed class Exam
 
         var sanitized = IntegrationEnvelope<string>.Create(
             clean, envelope.Source, envelope.MessageType);
-        await output.PublishAsync(sanitized, $"tenant.{tenant.TenantId}");
-        output.AssertReceivedOnTopic("tenant.premium-corp", 1);
+        await nats.PublishAsync(sanitized, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task Challenge2_ExpirationPriority_ProcessesOnlyValid()
     {
-        await using var output = new MockEndpoint("priority");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t50-exam-priority");
+        var topic = AspireFixture.UniqueTopic("t50-exam-processed");
+
         var urgent = IntegrationEnvelope<string>.Create("urgent", "Alert", "alert.fired") with
         {
             Priority = MessagePriority.Critical,
@@ -63,16 +67,18 @@ public sealed class Exam
             .ToList();
 
         foreach (var env in toProcess)
-            await output.PublishAsync(env, "processed");
+            await nats.PublishAsync(env, topic, default);
 
         Assert.That(toProcess, Has.Count.EqualTo(1));
-        output.AssertReceivedOnTopic("processed", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task Challenge3_CrossCuttingFlow_SanitizeTenantPublish()
     {
-        await using var output = new MockEndpoint("cross");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t50-exam-cross");
+        var topic = AspireFixture.UniqueTopic("t50-exam-tenant-pub");
+
         var envelope = IntegrationEnvelope<string>.Create(
             "SELECT * FROM users; --", "External", "data.imported") with
         {
@@ -94,7 +100,7 @@ public sealed class Exam
         Assert.Throws<TenantIsolationException>(() => guard.Enforce(envelope, "other-tenant"));
 
         var result = IntegrationEnvelope<string>.Create(clean, "pipeline", "data.processed");
-        await output.PublishAsync(result, $"tenant.{tenant.TenantId}");
-        output.AssertReceivedOnTopic("tenant.acme-inc", 1);
+        await nats.PublishAsync(result, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 }

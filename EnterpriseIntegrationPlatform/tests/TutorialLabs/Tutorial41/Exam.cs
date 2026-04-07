@@ -3,7 +3,8 @@
 // ============================================================================
 // EIP Pattern: Message State Tracking
 // E2E: Full lifecycle recording, multi-message business-key correlation,
-//      and message snapshot creation — all published through MockEndpoint.
+//      and message snapshot creation — all published through NatsBrokerEndpoint
+//      (real NATS JetStream via Aspire).
 // ============================================================================
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
@@ -20,7 +21,9 @@ public sealed class Exam
     [Test]
     public async Task Challenge1_FullMessageLifecycle_RecordAllStages_QueryAndPublish()
     {
-        await using var output = new MockEndpoint("exam-lifecycle");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t41-exam-lifecycle");
+        var topic = AspireFixture.UniqueTopic("t41-exam-audit-trail");
+
         var store = new InMemoryMessageStateStore();
         var corrId = Guid.NewGuid();
 
@@ -57,16 +60,18 @@ public sealed class Exam
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 $"{evt.Stage}:{evt.Status}", "state-store", "lifecycle.event");
-            await output.PublishAsync(envelope, "audit-trail", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        output.AssertReceivedOnTopic("audit-trail", 4);
+        nats.AssertReceivedOnTopic(topic, 4);
     }
 
     [Test]
     public async Task Challenge2_MultipleMessagesSharedBusinessKey_QueryAndPublish()
     {
-        await using var output = new MockEndpoint("exam-bizkey");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t41-exam-bizkey");
+        var topic = AspireFixture.UniqueTopic("t41-exam-bizkey-audit");
+
         var store = new InMemoryMessageStateStore();
 
         var corr1 = Guid.NewGuid();
@@ -92,16 +97,17 @@ public sealed class Exam
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 evt.Stage, "state-store", "bizkey.result");
-            await output.PublishAsync(envelope, "bizkey-audit", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        output.AssertReceivedOnTopic("bizkey-audit", 2);
+        nats.AssertReceivedOnTopic(topic, 2);
     }
 
     [Test]
     public async Task Challenge3_MessageStateSnapshot_CreateAndPublish()
     {
-        await using var output = new MockEndpoint("exam-snapshot");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t41-exam-snapshot");
+        var topic = AspireFixture.UniqueTopic("t41-exam-snapshots");
 
         var log = new MockObservabilityEventLog();
         var traceAnalyzer = new MockTraceAnalyzer();
@@ -121,7 +127,7 @@ public sealed class Exam
 
         var result = IntegrationEnvelope<string>.Create(
             $"{snapshot.CurrentStage}:{snapshot.DeliveryStatus}", "inspector", "snapshot.created");
-        await output.PublishAsync(result, "snapshots", default);
-        output.AssertReceivedOnTopic("snapshots", 1);
+        await nats.PublishAsync(result, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 }

@@ -2,7 +2,7 @@
 // Tutorial 49 – Testing Integrations (Lab)
 // ============================================================================
 // EIP Pattern: Testing patterns for integration infrastructure.
-// E2E: Demonstrate MockEndpoint and AspireIntegrationTestHost usage for
+// E2E: Demonstrate NatsBrokerEndpoint (real NATS JetStream via Aspire) usage for
 // integration testing with real IntegrationEnvelope, FaultEnvelope, RoutingSlip.
 // ============================================================================
 
@@ -15,40 +15,42 @@ namespace TutorialLabs.Tutorial49;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("test-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
+    // ── 1. NatsBrokerEndpoint Assertions ───────────────────────────────────
 
     [Test]
-    public async Task MockEndpoint_CapturesPublishedMessages()
+    public async Task NatsBrokerEndpoint_CapturesPublishedMessages()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t49-capture");
+        var topic = AspireFixture.UniqueTopic("t49-capture");
         var envelope = IntegrationEnvelope<string>.Create("payload", "svc", "test.event");
-        await _output.PublishAsync(envelope, "test-topic");
+        await nats.PublishAsync(envelope, topic, default);
 
-        _output.AssertReceivedOnTopic("test-topic", 1);
-        var received = _output.GetReceived<string>();
+        nats.AssertReceivedOnTopic(topic, 1);
+        var received = nats.GetReceived<string>();
         Assert.That(received.Payload, Is.EqualTo("payload"));
     }
 
     [Test]
-    public async Task MockEndpoint_TracksMultipleTopics()
+    public async Task NatsBrokerEndpoint_TracksMultipleTopics()
     {
-        await _output.PublishAsync(
-            IntegrationEnvelope<string>.Create("a", "svc", "type.a"), "topic-a");
-        await _output.PublishAsync(
-            IntegrationEnvelope<string>.Create("b", "svc", "type.b"), "topic-b");
-        await _output.PublishAsync(
-            IntegrationEnvelope<string>.Create("c", "svc", "type.a"), "topic-a");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t49-multi");
+        var topicA = AspireFixture.UniqueTopic("t49-topic-a");
+        var topicB = AspireFixture.UniqueTopic("t49-topic-b");
+        await nats.PublishAsync(
+            IntegrationEnvelope<string>.Create("a", "svc", "type.a"), topicA, default);
+        await nats.PublishAsync(
+            IntegrationEnvelope<string>.Create("b", "svc", "type.b"), topicB, default);
+        await nats.PublishAsync(
+            IntegrationEnvelope<string>.Create("c", "svc", "type.a"), topicA, default);
 
-        _output.AssertReceivedCount(3);
-        _output.AssertReceivedOnTopic("topic-a", 2);
-        _output.AssertReceivedOnTopic("topic-b", 1);
-        Assert.That(_output.GetReceivedTopics(), Has.Count.EqualTo(2));
+        nats.AssertReceivedCount(3);
+        nats.AssertReceivedOnTopic(topicA, 2);
+        nats.AssertReceivedOnTopic(topicB, 1);
+        Assert.That(nats.GetReceivedTopics(), Has.Count.EqualTo(2));
     }
+
+
+    // ── 2. Envelope & Fault Contracts ────────────────────────────────
 
     [Test]
     public void IntegrationEnvelope_Create_SetsAllFields()
@@ -85,6 +87,9 @@ public sealed class Lab
         Assert.That(fault.FaultReason, Is.EqualTo("Invalid schema"));
         Assert.That(fault.RetryCount, Is.EqualTo(3));
     }
+
+
+    // ── 3. Routing Slip ──────────────────────────────────────────────
 
     [Test]
     public void RoutingSlip_Advance_MovesToNextStep()

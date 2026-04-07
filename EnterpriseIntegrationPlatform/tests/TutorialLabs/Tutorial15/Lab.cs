@@ -2,8 +2,9 @@
 // Tutorial 15 – Message Translator (Lab)
 // ============================================================================
 // EIP Pattern: Message Translator
-// E2E: Wire real MessageTranslator with MockPayloadTransform and
-// MockEndpoint, verify payload transformation and envelope publishing.
+// Real Integrations: Wire real MessageTranslator with NatsBrokerEndpoint
+// (real NATS JetStream via Aspire) as producer, verify payload
+// transformation and envelope publishing.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -19,37 +20,40 @@ namespace TutorialLabs.Tutorial15;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("translator-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
+    // ── 1. Core Translation ──────────────────────────────────────────
 
     [Test]
     public async Task Translate_TransformsPayload_PublishesToTarget()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t15-core");
+        var topic = AspireFixture.UniqueTopic("t15-translated");
+
         var transform = new MockPayloadTransform<string, string>(input => input.ToUpperInvariant());
 
-        var translator = CreateTranslator(transform, "translated-topic");
+        var translator = CreateTranslator(nats, transform, topic);
         var envelope = IntegrationEnvelope<string>.Create(
             "hello", "SourceSvc", "input.type");
 
         var result = await translator.TranslateAsync(envelope);
 
         Assert.That(result.TranslatedEnvelope.Payload, Is.EqualTo("HELLO"));
-        Assert.That(result.TargetTopic, Is.EqualTo("translated-topic"));
+        Assert.That(result.TargetTopic, Is.EqualTo(topic));
         Assert.That(result.SourceMessageId, Is.EqualTo(envelope.MessageId));
-        _output.AssertReceivedOnTopic("translated-topic", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
+
+
+    // ── 2. Envelope Fidelity ─────────────────────────────────────────
 
     [Test]
     public async Task Translate_PreservesCorrelationId()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t15-corr");
+        var topic = AspireFixture.UniqueTopic("t15-corr");
+
         var transform = new MockPayloadTransform<string, string>(_ => "out");
 
-        var translator = CreateTranslator(transform, "target");
+        var translator = CreateTranslator(nats, transform, topic);
         var envelope = IntegrationEnvelope<string>.Create("in", "Svc", "type");
 
         var result = await translator.TranslateAsync(envelope);
@@ -61,9 +65,12 @@ public sealed class Lab
     [Test]
     public async Task Translate_SetsCausationIdToSourceMessageId()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t15-cause");
+        var topic = AspireFixture.UniqueTopic("t15-cause");
+
         var transform = new MockPayloadTransform<string, string>(_ => "out");
 
-        var translator = CreateTranslator(transform, "target");
+        var translator = CreateTranslator(nats, transform, topic);
         var envelope = IntegrationEnvelope<string>.Create("in", "Svc", "type");
 
         var result = await translator.TranslateAsync(envelope);
@@ -75,16 +82,19 @@ public sealed class Lab
     [Test]
     public async Task Translate_OverridesSourceAndMessageType()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t15-override");
+        var topic = AspireFixture.UniqueTopic("t15-override");
+
         var transform = new MockPayloadTransform<string, string>(_ => "out");
 
         var options = Options.Create(new TranslatorOptions
         {
-            TargetTopic = "target",
+            TargetTopic = topic,
             TargetSource = "NewSource",
             TargetMessageType = "new.type",
         });
         var translator = new MessageTranslator<string, string>(
-            transform, _output, options,
+            transform, nats, options,
             NullLogger<MessageTranslator<string, string>>.Instance);
 
         var envelope = IntegrationEnvelope<string>.Create("in", "OldSource", "old.type");
@@ -92,15 +102,21 @@ public sealed class Lab
 
         Assert.That(result.TranslatedEnvelope.Source, Is.EqualTo("NewSource"));
         Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("new.type"));
-        _output.AssertReceivedOnTopic("target", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
+
+
+    // ── 3. Validation & E2E ──────────────────────────────────────────
 
     [Test]
     public async Task Translate_PreservesMetadata()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t15-meta");
+        var topic = AspireFixture.UniqueTopic("t15-meta");
+
         var transform = new MockPayloadTransform<string, string>(_ => "out");
 
-        var translator = CreateTranslator(transform, "target");
+        var translator = CreateTranslator(nats, transform, topic);
         var envelope = IntegrationEnvelope<string>.Create("in", "Svc", "type") with
         {
             Metadata = new Dictionary<string, string>
@@ -119,28 +135,31 @@ public sealed class Lab
     [Test]
     public async Task Translate_NoTargetTopic_ThrowsInvalidOperation()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t15-notopic");
+
         var transform = new MockPayloadTransform<string, string>(_ => "out");
         var options = Options.Create(new TranslatorOptions { TargetTopic = "" });
         var translator = new MessageTranslator<string, string>(
-            transform, _output, options,
+            transform, nats, options,
             NullLogger<MessageTranslator<string, string>>.Instance);
 
         var envelope = IntegrationEnvelope<string>.Create("in", "Svc", "type");
 
         Assert.ThrowsAsync<InvalidOperationException>(
             async () => await translator.TranslateAsync(envelope));
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
-    private MessageTranslator<string, string> CreateTranslator(
-        IPayloadTransform<string, string> transform, string targetTopic)
+    private static MessageTranslator<string, string> CreateTranslator(
+        NatsBrokerEndpoint nats, IPayloadTransform<string, string> transform,
+        string targetTopic)
     {
         var options = Options.Create(new TranslatorOptions
         {
             TargetTopic = targetTopic,
         });
         return new MessageTranslator<string, string>(
-            transform, _output, options,
+            transform, nats, options,
             NullLogger<MessageTranslator<string, string>>.Instance);
     }
 }

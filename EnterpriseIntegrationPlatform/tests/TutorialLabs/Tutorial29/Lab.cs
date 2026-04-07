@@ -2,7 +2,8 @@
 // Tutorial 29 – Throttle and Rate Limiting (Lab)
 // ============================================================================
 // EIP Pattern: Throttle.
-// E2E: TokenBucketThrottle + MockEndpoint.
+// Real Integrations: TokenBucketThrottle + NatsBrokerEndpoint (real NATS
+// JetStream via Aspire).
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,17 +18,13 @@ namespace TutorialLabs.Tutorial29;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("throttle-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
+    // ── 1. Token Acquisition ─────────────────────────────────────────
 
     [Test]
     public async Task Acquire_WithTokens_IsPermitted()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t29-permitted");
+        var topic = AspireFixture.UniqueTopic("t29-permitted");
         using var throttle = CreateThrottle(burstCapacity: 5);
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "evt");
 
@@ -36,13 +33,15 @@ public sealed class Lab
         Assert.That(result.Permitted, Is.True);
         Assert.That(result.RejectionReason, Is.Null);
 
-        await _output.PublishAsync(envelope, "permitted");
-        _output.AssertReceivedOnTopic("permitted", 1);
+        await nats.PublishAsync(envelope, topic);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task Acquire_ExhaustsTokens_StillPermittedUntilEmpty()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t29-exhaust");
+        var topic = AspireFixture.UniqueTopic("t29-processed");
         using var throttle = CreateThrottle(burstCapacity: 3, refillRate: 0);
         var permitted = 0;
 
@@ -53,56 +52,68 @@ public sealed class Lab
             if (result.Permitted)
             {
                 permitted++;
-                await _output.PublishAsync(env, "processed");
+                await nats.PublishAsync(env, topic);
             }
         }
 
         Assert.That(permitted, Is.EqualTo(3));
-        _output.AssertReceivedOnTopic("processed", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
     }
+
+
+    // ── 2. Rejection ─────────────────────────────────────────────────
 
     [Test]
     public async Task Acquire_RejectOnBackpressure_RejectsWhenEmpty()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t29-reject");
+        var topic = AspireFixture.UniqueTopic("t29-allowed");
         using var throttle = CreateThrottle(burstCapacity: 1, refillRate: 0, rejectOnBackpressure: true);
 
         var env1 = IntegrationEnvelope<string>.Create("first", "Svc", "evt");
         var r1 = await throttle.AcquireAsync(env1);
         Assert.That(r1.Permitted, Is.True);
-        await _output.PublishAsync(env1, "allowed");
+        await nats.PublishAsync(env1, topic);
 
         var env2 = IntegrationEnvelope<string>.Create("second", "Svc", "evt");
         var r2 = await throttle.AcquireAsync(env2);
         Assert.That(r2.Permitted, Is.False);
         Assert.That(r2.RejectionReason, Is.Not.Null);
 
-        _output.AssertReceivedOnTopic("allowed", 1);
-        _output.AssertReceivedCount(1);
+        nats.AssertReceivedOnTopic(topic, 1);
+        nats.AssertReceivedCount(1);
     }
 
     [Test]
     public async Task AvailableTokens_DecrementsOnAcquire()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t29-decrement");
+        var topic = AspireFixture.UniqueTopic("t29-topic");
         using var throttle = CreateThrottle(burstCapacity: 5, refillRate: 0);
         var initial = throttle.AvailableTokens;
         Assert.That(initial, Is.EqualTo(5));
 
         var env = IntegrationEnvelope<string>.Create("data", "Svc", "evt");
         await throttle.AcquireAsync(env);
-        await _output.PublishAsync(env, "topic");
+        await nats.PublishAsync(env, topic);
 
         Assert.That(throttle.AvailableTokens, Is.EqualTo(4));
-        _output.AssertReceivedOnTopic("topic", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
+
+
+    // ── 3. Metrics ───────────────────────────────────────────────────
 
     [Test]
     public async Task GetMetrics_ReflectsAcquireAndReject()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t29-metrics");
+        var topic = AspireFixture.UniqueTopic("t29-ok");
         using var throttle = CreateThrottle(burstCapacity: 1, refillRate: 0, rejectOnBackpressure: true);
 
         var env1 = IntegrationEnvelope<string>.Create("a", "Svc", "evt");
         await throttle.AcquireAsync(env1);
-        await _output.PublishAsync(env1, "ok");
+        await nats.PublishAsync(env1, topic);
 
         var env2 = IntegrationEnvelope<string>.Create("b", "Svc", "evt");
         await throttle.AcquireAsync(env2);
@@ -112,22 +123,24 @@ public sealed class Lab
         Assert.That(metrics.TotalRejected, Is.EqualTo(1));
         Assert.That(metrics.BurstCapacity, Is.EqualTo(1));
 
-        _output.AssertReceivedOnTopic("ok", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task GetMetrics_RefillRate_MatchesConfig()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t29-refill");
+        var topic = AspireFixture.UniqueTopic("t29-topic");
         using var throttle = CreateThrottle(burstCapacity: 10, refillRate: 50);
 
         var env = IntegrationEnvelope<string>.Create("data", "Svc", "evt");
         await throttle.AcquireAsync(env);
-        await _output.PublishAsync(env, "topic");
+        await nats.PublishAsync(env, topic);
 
         var metrics = throttle.GetMetrics();
         Assert.That(metrics.RefillRate, Is.EqualTo(50));
         Assert.That(metrics.BurstCapacity, Is.EqualTo(10));
-        _output.AssertReceivedOnTopic("topic", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     private static TokenBucketThrottle CreateThrottle(

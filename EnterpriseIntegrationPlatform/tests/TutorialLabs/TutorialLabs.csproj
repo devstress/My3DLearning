@@ -4,12 +4,16 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit3TestAdapter" />
     <PackageReference Include="NUnit.Analyzers" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="MailKit" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Contracts\Contracts.csproj" />
@@ -17,6 +21,7 @@
     <ProjectReference Include="..\..\src\Ingestion.Kafka\Ingestion.Kafka.csproj" />
     <ProjectReference Include="..\..\src\Ingestion.Nats\Ingestion.Nats.csproj" />
     <ProjectReference Include="..\..\src\Ingestion.Pulsar\Ingestion.Pulsar.csproj" />
+    <ProjectReference Include="..\..\src\Ingestion.Postgres\Ingestion.Postgres.csproj" />
     <ProjectReference Include="..\..\src\Processing.Routing\Processing.Routing.csproj" />
     <ProjectReference Include="..\..\src\Processing.Translator\Processing.Translator.csproj" />
     <ProjectReference Include="..\..\src\Processing.Transform\Processing.Transform.csproj" />
@@ -57,5 +62,6 @@
     <ProjectReference Include="..\..\src\AI.RagFlow\AI.RagFlow.csproj" />
     <ProjectReference Include="..\..\src\Testing\Testing.csproj" />
     <ProjectReference Include="..\..\src\AI.RagKnowledge\AI.RagKnowledge.csproj" />
+    <ProjectReference Include="..\TestAppHost\TestAppHost.csproj" />
   </ItemGroup>
 </Project>

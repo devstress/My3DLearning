@@ -2,15 +2,16 @@
 // Tutorial 21 – Aggregator (Lab)
 // ============================================================================
 // EIP Pattern: Aggregator.
-// E2E: Wire real MessageAggregator with InMemoryMessageAggregateStore,
-// CountCompletionStrategy, MockAggregationStrategy, and MockEndpoint.
+// Real Integrations: MessageAggregator with InMemoryMessageAggregateStore,
+// CountCompletionStrategy, MockAggregationStrategy, and NatsBrokerEndpoint
+// (real NATS JetStream via Aspire).
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Aggregator;
+using EnterpriseIntegrationPlatform.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -19,18 +20,14 @@ namespace TutorialLabs.Tutorial21;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("agg-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
+    // ── 1. Group Completion ──────────────────────────────────────────
 
     [Test]
     public async Task Aggregate_SingleMessage_GroupNotComplete()
     {
-        var aggregator = CreateAggregator(expectedCount: 3);
+        await using var nats = AspireFixture.CreateNatsEndpoint("t21-single");
+        var topic = AspireFixture.UniqueTopic("t21-agg");
+        var aggregator = CreateAggregator(nats, topic, expectedCount: 3);
         var envelope = IntegrationEnvelope<string>.Create("item1", "svc", "order.line");
 
         var result = await aggregator.AggregateAsync(envelope);
@@ -38,14 +35,16 @@ public sealed class Lab
         Assert.That(result.IsComplete, Is.False);
         Assert.That(result.ReceivedCount, Is.EqualTo(1));
         Assert.That(result.AggregateEnvelope, Is.Null);
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
     [Test]
     public async Task Aggregate_ReachesCount_CompletesAndPublishes()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t21-complete");
+        var topic = AspireFixture.UniqueTopic("t21-agg");
         var correlationId = Guid.NewGuid();
-        var aggregator = CreateAggregator(expectedCount: 2);
+        var aggregator = CreateAggregator(nats, topic, expectedCount: 2);
 
         var e1 = IntegrationEnvelope<string>.Create("a", "svc", "line", correlationId);
         var e2 = IntegrationEnvelope<string>.Create("b", "svc", "line", correlationId);
@@ -56,14 +55,19 @@ public sealed class Lab
         Assert.That(result.IsComplete, Is.True);
         Assert.That(result.ReceivedCount, Is.EqualTo(2));
         Assert.That(result.AggregateEnvelope, Is.Not.Null);
-        _output.AssertReceivedOnTopic("aggregated-topic", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
+
+
+    // ── 2. Correlation & Isolation ───────────────────────────────────
 
     [Test]
     public async Task Aggregate_PreservesCorrelationId()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t21-corr");
+        var topic = AspireFixture.UniqueTopic("t21-agg");
         var correlationId = Guid.NewGuid();
-        var aggregator = CreateAggregator(expectedCount: 2);
+        var aggregator = CreateAggregator(nats, topic, expectedCount: 2);
 
         var e1 = IntegrationEnvelope<string>.Create("a", "svc", "line", correlationId);
         var e2 = IntegrationEnvelope<string>.Create("b", "svc", "line", correlationId);
@@ -78,9 +82,11 @@ public sealed class Lab
     [Test]
     public async Task Aggregate_DifferentCorrelationIds_FormSeparateGroups()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t21-groups");
+        var topic = AspireFixture.UniqueTopic("t21-agg");
         var corr1 = Guid.NewGuid();
         var corr2 = Guid.NewGuid();
-        var aggregator = CreateAggregator(expectedCount: 2);
+        var aggregator = CreateAggregator(nats, topic, expectedCount: 2);
 
         var e1a = IntegrationEnvelope<string>.Create("a1", "svc", "line", corr1);
         var e2a = IntegrationEnvelope<string>.Create("a2", "svc", "line", corr2);
@@ -92,14 +98,16 @@ public sealed class Lab
         Assert.That(r2.IsComplete, Is.False);
         Assert.That(r1.ReceivedCount, Is.EqualTo(1));
         Assert.That(r2.ReceivedCount, Is.EqualTo(1));
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
     [Test]
     public async Task Aggregate_CountCompletion_ExactThreshold()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t21-threshold");
+        var topic = AspireFixture.UniqueTopic("t21-agg");
         var correlationId = Guid.NewGuid();
-        var aggregator = CreateAggregator(expectedCount: 3);
+        var aggregator = CreateAggregator(nats, topic, expectedCount: 3);
 
         var e1 = IntegrationEnvelope<string>.Create("x", "svc", "t", correlationId);
         var e2 = IntegrationEnvelope<string>.Create("y", "svc", "t", correlationId);
@@ -113,14 +121,19 @@ public sealed class Lab
         Assert.That(r2.IsComplete, Is.False);
         Assert.That(r3.IsComplete, Is.True);
         Assert.That(r3.ReceivedCount, Is.EqualTo(3));
-        _output.AssertReceivedOnTopic("aggregated-topic", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
+
+
+    // ── 3. Merge Strategies ──────────────────────────────────────────
 
     [Test]
     public async Task Aggregate_MergesMetadata_FromAllEnvelopes()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t21-meta");
+        var topic = AspireFixture.UniqueTopic("t21-agg");
         var correlationId = Guid.NewGuid();
-        var aggregator = CreateAggregator(expectedCount: 2);
+        var aggregator = CreateAggregator(nats, topic, expectedCount: 2);
 
         var e1 = IntegrationEnvelope<string>.Create("a", "svc", "t", correlationId) with
         {
@@ -142,8 +155,10 @@ public sealed class Lab
     [Test]
     public async Task Aggregate_UsesHighestPriority()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t21-prio");
+        var topic = AspireFixture.UniqueTopic("t21-agg");
         var correlationId = Guid.NewGuid();
-        var aggregator = CreateAggregator(expectedCount: 2);
+        var aggregator = CreateAggregator(nats, topic, expectedCount: 2);
 
         var e1 = IntegrationEnvelope<string>.Create("a", "svc", "t", correlationId) with
         {
@@ -160,7 +175,8 @@ public sealed class Lab
         Assert.That(result.AggregateEnvelope!.Priority, Is.EqualTo(MessagePriority.High));
     }
 
-    private MessageAggregator<string, string> CreateAggregator(int expectedCount)
+    private static MessageAggregator<string, string> CreateAggregator(
+        NatsBrokerEndpoint nats, string topic, int expectedCount)
     {
         var store = new InMemoryMessageAggregateStore<string>();
         var completion = new CountCompletionStrategy<string>(expectedCount);
@@ -168,12 +184,12 @@ public sealed class Lab
 
         var options = Options.Create(new AggregatorOptions
         {
-            TargetTopic = "aggregated-topic",
+            TargetTopic = topic,
             ExpectedCount = expectedCount,
         });
 
         return new MessageAggregator<string, string>(
-            store, completion, strategy, _output, options,
+            store, completion, strategy, nats, options,
             NullLogger<MessageAggregator<string, string>>.Instance);
     }
 }

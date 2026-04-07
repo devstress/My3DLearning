@@ -1,124 +1,129 @@
 # Tutorial 03 — Your First Message
 
-Create an `IntegrationEnvelope<T>`, publish it through a mocked broker, and consume it on the other side using NSubstitute.
+Create an `IntegrationEnvelope<T>`, understand its anatomy (auto-generated identity, causation chains, priority, metadata, expiration), and deliver messages through Point-to-Point and Publish-Subscribe channels using MockEndpoint for verified end-to-end testing.
 
 ## Key Types
 
 ```csharp
-// src/Contracts/IntegrationEnvelope.cs — static factory creates envelopes with auto-generated IDs
+// src/Contracts/IntegrationEnvelope.cs — canonical message wrapper
 public record IntegrationEnvelope<T>
 {
-    public static IntegrationEnvelope<T> Create(T payload, string source, string messageType,
-        Guid? correlationId = null);
-    // MessageId, CorrelationId, Timestamp auto-generated
+    public required Guid MessageId { get; init; }
+    public required Guid CorrelationId { get; init; }
+    public Guid? CausationId { get; init; }              // parent→child lineage
+    public required DateTimeOffset Timestamp { get; init; }
+    public required string Source { get; init; }
+    public required string MessageType { get; init; }
+    public string SchemaVersion { get; init; } = "1.0";
+    public MessagePriority Priority { get; init; } = MessagePriority.Normal;
+    public required T Payload { get; init; }
+    public Dictionary<string, string> Metadata { get; init; } = new();
+    public DateTimeOffset? ExpiresAt { get; init; }       // Message Expiration
+    public int? SequenceNumber { get; init; }             // Splitter position
+    public int? TotalCount { get; init; }
+    public MessageIntent? Intent { get; init; }           // Command/Document/Event
+    public bool IsExpired => ExpiresAt.HasValue && DateTimeOffset.UtcNow > ExpiresAt.Value;
+
+    public static IntegrationEnvelope<T> Create(
+        T payload, string source, string messageType,
+        Guid? correlationId = null, Guid? causationId = null);
 }
 
-// src/Ingestion/IMessageBrokerProducer.cs
-public interface IMessageBrokerProducer
+// src/Ingestion/Channels/PointToPointChannel.cs — queue semantics
+public sealed class PointToPointChannel : IPointToPointChannel
 {
-    Task PublishAsync<T>(IntegrationEnvelope<T> envelope, string topic, CancellationToken ct = default);
+    // Each message delivered to exactly one consumer in the group
+    Task SendAsync<T>(IntegrationEnvelope<T> envelope, string channel, CancellationToken ct);
 }
 
-// src/Ingestion/IMessageBrokerConsumer.cs
-public interface IMessageBrokerConsumer : IAsyncDisposable
+// src/Ingestion/Channels/PublishSubscribeChannel.cs — fan-out delivery
+public sealed class PublishSubscribeChannel : IPublishSubscribeChannel
 {
-    Task SubscribeAsync<T>(string topic, string consumerGroup,
-        Func<IntegrationEnvelope<T>, Task> handler, CancellationToken ct = default);
+    // Every subscriber receives every message
+    Task PublishAsync<T>(IntegrationEnvelope<T> envelope, string channel, CancellationToken ct);
 }
 ```
 
 ## Exercises
 
-### 1. Create an envelope with a string payload
+### 1. Create an envelope and verify auto-generated identity fields
 
 ```csharp
 var envelope = IntegrationEnvelope<string>.Create(
-    payload: "Hello, Messaging!",
-    source: "Tutorial03",
-    messageType: "greeting");
+    "Hello, Messaging!", "Tutorial03", "greeting");
 
-Assert.That(envelope.Payload, Is.EqualTo("Hello, Messaging!"));
-Assert.That(envelope.Source, Is.EqualTo("Tutorial03"));
-Assert.That(envelope.MessageType, Is.EqualTo("greeting"));
+// MessageId, CorrelationId, Timestamp are auto-generated
 Assert.That(envelope.MessageId, Is.Not.EqualTo(Guid.Empty));
 Assert.That(envelope.CorrelationId, Is.Not.EqualTo(Guid.Empty));
+Assert.That(envelope.Timestamp, Is.GreaterThan(DateTimeOffset.MinValue));
 ```
 
-### 2. Create an envelope with a domain object payload
+### 2. Build a causation chain (parent→child lineage)
 
 ```csharp
-public sealed record OrderPayload(string OrderId, string Product, int Quantity);
+var parent = IntegrationEnvelope<string>.Create(
+    "original-order", "OrderService", "order.created");
 
-var order = new OrderPayload("ORD-100", "Gadget", 3);
+var child = IntegrationEnvelope<string>.Create(
+    "order-validated", "ValidationService", "order.validated",
+    correlationId: parent.CorrelationId,
+    causationId: parent.MessageId);
 
-var envelope = IntegrationEnvelope<OrderPayload>.Create(
-    payload: order,
-    source: "OrderService",
-    messageType: "order.created");
-
-Assert.That(envelope.Payload, Is.EqualTo(order));
-Assert.That(envelope.Payload.OrderId, Is.EqualTo("ORD-100"));
-Assert.That(envelope.Payload.Product, Is.EqualTo("Gadget"));
-Assert.That(envelope.Payload.Quantity, Is.EqualTo(3));
+// Child references parent; both share the same CorrelationId
+Assert.That(child.CausationId, Is.EqualTo(parent.MessageId));
+Assert.That(child.CorrelationId, Is.EqualTo(parent.CorrelationId));
 ```
 
-### 3. Publish through a mocked producer and verify the call
+### 3. Set priority, intent, and expiration
 
 ```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
+var urgentCommand = IntegrationEnvelope<string>.Create(
+    "shutdown-now", "OpsService", "infra.command") with
+{
+    Priority = MessagePriority.Critical,
+    Intent = MessageIntent.Command,
+    ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
+};
+
+Assert.That(urgentCommand.Priority, Is.EqualTo(MessagePriority.Critical));
+Assert.That(urgentCommand.IsExpired, Is.False);
+```
+
+### 4. Point-to-Point channel — queue delivery
+
+```csharp
+var output = new MockEndpoint("output");
+var channel = new PointToPointChannel(
+    output, output, NullLogger<PointToPointChannel>.Instance);
 
 var envelope = IntegrationEnvelope<string>.Create(
-    "first-message", "Tutorial03", "demo.publish");
+    "order-created", "OrderService", "order.created");
 
-await producer.PublishAsync(envelope, "demo-topic");
+await channel.SendAsync(envelope, "orders-queue", CancellationToken.None);
 
-await producer.Received(1).PublishAsync(
-    Arg.Is<IntegrationEnvelope<string>>(e => e.Payload == "first-message"),
-    Arg.Is("demo-topic"),
-    Arg.Any<CancellationToken>());
+output.AssertReceivedCount(1);
+Assert.That(output.GetReceived<string>().Payload, Is.EqualTo("order-created"));
 ```
 
-### 4. Subscribe with a mocked consumer and simulate message delivery
+### 5. Publish-Subscribe channel — fan-out to multiple subscribers
 
 ```csharp
-var consumer = Substitute.For<IMessageBrokerConsumer>();
-Func<IntegrationEnvelope<string>, Task>? capturedHandler = null;
+var sub1 = new MockEndpoint("subscriber-1");
+var sub2 = new MockEndpoint("subscriber-2");
 
-consumer.SubscribeAsync<string>(
-        Arg.Any<string>(), Arg.Any<string>(),
-        Arg.Do<Func<IntegrationEnvelope<string>, Task>>(h => capturedHandler = h),
-        Arg.Any<CancellationToken>())
-    .Returns(Task.CompletedTask);
-
-await consumer.SubscribeAsync<string>(
-    "demo-topic", "demo-group", msg => Task.CompletedTask);
+var ch1 = new PublishSubscribeChannel(
+    sub1, sub1, NullLogger<PublishSubscribeChannel>.Instance);
+var ch2 = new PublishSubscribeChannel(
+    sub2, sub2, NullLogger<PublishSubscribeChannel>.Instance);
 
 var envelope = IntegrationEnvelope<string>.Create(
-    "consumed-payload", "Producer", "demo.event");
+    "price-updated", "PricingService", "price.changed");
 
-Assert.That(capturedHandler, Is.Not.Null);
+await ch1.PublishAsync(envelope, "price-events", CancellationToken.None);
+await ch2.PublishAsync(envelope, "price-events", CancellationToken.None);
 
-IntegrationEnvelope<string>? received = null;
-capturedHandler = msg => { received = msg; return Task.CompletedTask; };
-await capturedHandler(envelope);
-
-Assert.That(received, Is.Not.Null);
-Assert.That(received!.Payload, Is.EqualTo("consumed-payload"));
-```
-
-### 5. Verify subscribe was called with correct topic and consumer group
-
-```csharp
-var consumer = Substitute.For<IMessageBrokerConsumer>();
-
-await consumer.SubscribeAsync<string>(
-    "events-topic", "my-consumer-group", _ => Task.CompletedTask);
-
-await consumer.Received(1).SubscribeAsync<string>(
-    Arg.Is("events-topic"),
-    Arg.Is("my-consumer-group"),
-    Arg.Any<Func<IntegrationEnvelope<string>, Task>>(),
-    Arg.Any<CancellationToken>());
+sub1.AssertReceivedCount(1);
+sub2.AssertReceivedCount(1);
 ```
 
 ## Lab

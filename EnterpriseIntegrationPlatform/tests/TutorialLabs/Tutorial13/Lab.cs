@@ -2,8 +2,9 @@
 // Tutorial 13 – Routing Slip (Lab)
 // ============================================================================
 // EIP Pattern: Routing Slip
-// E2E: Wire real RoutingSlipRouter with test step handlers + MockEndpoint,
-// execute steps sequentially, verify forwarding to destination topics.
+// Real Integrations: Wire real RoutingSlipRouter with NatsBrokerEndpoint
+// (real NATS JetStream via Aspire) as producer, execute steps sequentially,
+// verify forwarding to destination topics.
 // ============================================================================
 
 using System.Text.Json;
@@ -18,35 +19,34 @@ namespace TutorialLabs.Tutorial13;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("routing-slip-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
+    // ── 1. Single-Step Execution ───────────────────────────────────────
 
     [Test]
     public async Task ExecuteStep_SingleStep_SucceedsAndForwards()
     {
-        var router = CreateRouter(new AlwaysSucceedHandler("Validate"));
+        await using var nats = AspireFixture.CreateNatsEndpoint("t13-single");
+        var topic = AspireFixture.UniqueTopic("t13-validated");
+
+        var router = CreateRouter(nats, new AlwaysSucceedHandler("Validate"));
         var envelope = CreateEnvelopeWithSlip(
-            new RoutingSlipStep("Validate", "validated-topic"));
+            new RoutingSlipStep("Validate", topic));
 
         var result = await router.ExecuteCurrentStepAsync(envelope);
 
         Assert.That(result.StepName, Is.EqualTo("Validate"));
         Assert.That(result.Succeeded, Is.True);
         Assert.That(result.FailureReason, Is.Null);
-        Assert.That(result.ForwardedToTopic, Is.EqualTo("validated-topic"));
+        Assert.That(result.ForwardedToTopic, Is.EqualTo(topic));
         Assert.That(result.RemainingSlip.IsComplete, Is.True);
-        _output.AssertReceivedOnTopic("validated-topic", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task ExecuteStep_NoDestination_CompletesInProcess()
     {
-        var router = CreateRouter(new AlwaysSucceedHandler("Enrich"));
+        await using var nats = AspireFixture.CreateNatsEndpoint("t13-nodest");
+
+        var router = CreateRouter(nats, new AlwaysSucceedHandler("Enrich"));
         var envelope = CreateEnvelopeWithSlip(
             new RoutingSlipStep("Enrich"));
 
@@ -54,48 +54,62 @@ public sealed class Lab
 
         Assert.That(result.Succeeded, Is.True);
         Assert.That(result.ForwardedToTopic, Is.Null);
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
+
+    // ── 2. Error Handling ──────────────────────────────────────────────
 
     [Test]
     public async Task ExecuteStep_HandlerFails_ReturnsFalseResult()
     {
-        var router = CreateRouter(new AlwaysFailHandler("Transform"));
+        await using var nats = AspireFixture.CreateNatsEndpoint("t13-fail");
+        var topic = AspireFixture.UniqueTopic("t13-transformed");
+
+        var router = CreateRouter(nats, new AlwaysFailHandler("Transform"));
         var envelope = CreateEnvelopeWithSlip(
-            new RoutingSlipStep("Transform", "transformed-topic"));
+            new RoutingSlipStep("Transform", topic));
 
         var result = await router.ExecuteCurrentStepAsync(envelope);
 
         Assert.That(result.StepName, Is.EqualTo("Transform"));
         Assert.That(result.Succeeded, Is.False);
         Assert.That(result.FailureReason, Is.Not.Null);
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
     [Test]
     public async Task ExecuteStep_NoHandlerRegistered_FailsGracefully()
     {
-        var router = CreateRouter(new AlwaysSucceedHandler("Other"));
+        await using var nats = AspireFixture.CreateNatsEndpoint("t13-nohandler");
+        var topic = AspireFixture.UniqueTopic("t13-dest");
+
+        var router = CreateRouter(nats, new AlwaysSucceedHandler("Other"));
         var envelope = CreateEnvelopeWithSlip(
-            new RoutingSlipStep("NonExistent", "dest-topic"));
+            new RoutingSlipStep("NonExistent", topic));
 
         var result = await router.ExecuteCurrentStepAsync(envelope);
 
         Assert.That(result.Succeeded, Is.False);
         Assert.That(result.FailureReason, Does.Contain("NonExistent"));
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
+
+    // ── 3. Multi-Step & Parameters ────────────────────────────────────
 
     [Test]
     public async Task ExecuteStep_MultiStepSlip_AdvancesCorrectly()
     {
-        var router = CreateRouter(
+        await using var nats = AspireFixture.CreateNatsEndpoint("t13-multi");
+        var step1Topic = AspireFixture.UniqueTopic("t13-step1");
+        var step2Topic = AspireFixture.UniqueTopic("t13-step2");
+
+        var router = CreateRouter(nats,
             new AlwaysSucceedHandler("Step1"),
             new AlwaysSucceedHandler("Step2"));
 
         var envelope = CreateEnvelopeWithSlip(
-            new RoutingSlipStep("Step1", "step1-out"),
-            new RoutingSlipStep("Step2", "step2-out"));
+            new RoutingSlipStep("Step1", step1Topic),
+            new RoutingSlipStep("Step2", step2Topic));
 
         var result1 = await router.ExecuteCurrentStepAsync(envelope);
 
@@ -103,14 +117,17 @@ public sealed class Lab
         Assert.That(result1.Succeeded, Is.True);
         Assert.That(result1.RemainingSlip.Steps, Has.Count.EqualTo(1));
         Assert.That(result1.RemainingSlip.CurrentStep!.StepName, Is.EqualTo("Step2"));
-        _output.AssertReceivedOnTopic("step1-out", 1);
+        nats.AssertReceivedOnTopic(step1Topic, 1);
     }
 
     [Test]
     public async Task ExecuteStep_WithParameters_PassesParametersToHandler()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t13-params");
+        var topic = AspireFixture.UniqueTopic("t13-configured");
+
         var handler = new ParameterCapturingHandler("Configure");
-        var router = CreateRouter(handler);
+        var router = CreateRouter(nats, handler);
 
         var parameters = new Dictionary<string, string>
         {
@@ -118,7 +135,7 @@ public sealed class Lab
             ["compress"] = "true",
         };
         var envelope = CreateEnvelopeWithSlip(
-            new RoutingSlipStep("Configure", "configured-topic", parameters));
+            new RoutingSlipStep("Configure", topic, parameters));
 
         var result = await router.ExecuteCurrentStepAsync(envelope);
 
@@ -126,13 +143,14 @@ public sealed class Lab
         Assert.That(handler.CapturedParameters, Is.Not.Null);
         Assert.That(handler.CapturedParameters!["format"], Is.EqualTo("json"));
         Assert.That(handler.CapturedParameters["compress"], Is.EqualTo("true"));
-        _output.AssertReceivedOnTopic("configured-topic", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
 
-    private RoutingSlipRouter CreateRouter(params IRoutingSlipStepHandler[] handlers) =>
-        new(handlers, _output, NullLogger<RoutingSlipRouter>.Instance);
+    private static RoutingSlipRouter CreateRouter(
+        NatsBrokerEndpoint nats, params IRoutingSlipStepHandler[] handlers) =>
+        new(handlers, nats, NullLogger<RoutingSlipRouter>.Instance);
 
     private static IntegrationEnvelope<string> CreateEnvelopeWithSlip(
         params RoutingSlipStep[] steps)

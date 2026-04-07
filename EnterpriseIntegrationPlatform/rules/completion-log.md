@@ -4,6 +4,101 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 109 – Routing + Advanced EIP Patterns on Postgres
+
+- **Date**: 2026-04-07
+- **Phase**: 28 — PostgreSQL Message Broker (EIP-Complete, ≤ 5k TPS)
+- **Status**: done
+- **Goal**: Integration tests proving all EIP routing and advanced patterns work when wired to a real PostgreSQL message broker via PostgresBrokerEndpoint.
+- **Architecture**:
+  - `PostgresRoutingIntegrationTests` (7 tests): ContentBasedRouter (MessageType + Metadata + Regex), MessageFilter, RecipientListRouter, DynamicRouter (register + route), Detour (activate/deactivate)
+  - `PostgresAdvancedEipTests` (7 tests): Splitter (split + causation chain), DeadLetterPublisher (single + multi-reason), Resequencer (out-of-order → in-order + publish), Retry + DLQ pipeline, Aggregator (count completion + concat), full pipeline (Splitter → Router → DLQ)
+  - All tests use unique topics (Guid-based) to prevent cross-test interference
+  - All tests Docker-gated: Assert.Ignore when Aspire Postgres container unavailable
+- **Files created**:
+  - `tests/TutorialLabs/InfrastructureTests/PostgresRoutingIntegrationTests.cs` (7 tests)
+  - `tests/TutorialLabs/InfrastructureTests/PostgresAdvancedEipTests.cs` (7 tests)
+- **Files modified**:
+  - `rules/milestones.md` — Phase 28 complete, no remaining chunks
+- **Test counts**: 38 BrokerAgnosticTests pass. 14 new Postgres integration tests (Docker-gated). 49 src projects, 0 errors, 0 warnings.
+
+## Chunk 108 – DI Wiring + Aspire Postgres Container + PostgresBrokerEndpoint
+
+- **Date**: 2026-04-07
+- **Phase**: 28 — PostgreSQL Message Broker (EIP-Complete, ≤ 5k TPS)
+- **Status**: done
+- **Goal**: Add Postgres container to Aspire TestAppHost, create PostgresBrokerEndpoint test helper (mirrors NatsBrokerEndpoint), add Postgres connectivity integration tests.
+- **Architecture**:
+  - Postgres 17 container added to `tests/TestAppHost/Program.cs` with EIP database credentials
+  - `SharedTestAppHost.GetPostgresConnectionStringAsync()` returns connection string from Aspire endpoint
+  - `AspireFixture.PostgresConnectionString` exposed for all test fixtures
+  - `AspireFixture.CreatePostgresEndpoint(name)` factory method (mirrors CreateNatsEndpoint)
+  - `PostgresBrokerEndpoint` wraps real `PostgresBrokerProducer`/`PostgresBrokerConsumer` with MockEndpoint-compatible assertion API (AssertReceivedCount, AssertReceivedOnTopic, WaitForConsumedAsync, etc.)
+  - 3 new connectivity tests: publish+poll round-trip, producer capture assertions, event-driven subscribe+receive
+  - TutorialLabs csproj now references Ingestion.Postgres
+- **Files created**:
+  - `tests/TutorialLabs/Infrastructure/PostgresBrokerEndpoint.cs`
+- **Files modified**:
+  - `tests/TestAppHost/Program.cs` — Added Postgres 17 container
+  - `tests/TutorialLabs/Infrastructure/SharedNatsFixture.cs` — Added `GetPostgresConnectionStringAsync()`
+  - `tests/TutorialLabs/Infrastructure/AspireFixture.cs` — Added `PostgresConnectionString` property + `CreatePostgresEndpoint()`
+  - `tests/TutorialLabs/InfrastructureTests/ConnectivityTests.cs` — Added 3 Postgres connectivity tests
+  - `tests/TutorialLabs/TutorialLabs.csproj` — Added Ingestion.Postgres project reference
+- **Test counts**: 38 BrokerAgnosticTests pass. 522+ TutorialLabs tests + 3 new Postgres connectivity tests (Docker-gated). 49 src projects, 0 errors, 0 warnings.
+
+## Chunk 107 – Broker-Agnostic EIP Integration Tests (DLQ, Retry, Channels, Routing, Splitter, Aggregator)
+
+- **Date**: 2026-04-07
+- **Phase**: 28 — PostgreSQL Message Broker (EIP-Complete, ≤ 5k TPS)
+- **Status**: done
+- **Goal**: Create comprehensive integration tests proving all EIP components (DLQ, retry, routing, channels, splitter, aggregator) work identically with ANY broker via IMessageBrokerProducer/IMessageBrokerConsumer.
+- **Architecture**:
+  - New `tests/BrokerAgnosticTests/` project: 38 NUnit tests across 5 test files
+  - All tests use MockEndpoint (IMessageBrokerProducer + IMessageBrokerConsumer) — swap for Postgres/NATS/Kafka/Pulsar and tests pass unchanged
+  - Covers: DeadLetterPublisher (routing, correlation, wrapping, multi-reason), ExponentialBackoffRetryPolicy (success, retry, exhaustion, backoff, cancellation), PointToPointChannel, PublishSubscribeChannel, DatatypeChannel, InvalidMessageChannel, MessagingBridge (forwarding + deduplication), ContentBasedRouter (message type, source, metadata, regex, priority), MessageFilter, Splitter (split + causation chain), Aggregator (group completion + separate groups)
+  - BrokerInterchangeabilityTests: full pipeline (Ingest→Route→Split), Route→DLQ, Channel→Route→Invalid, bridge between two brokers
+- **Files created**:
+  - `tests/BrokerAgnosticTests/BrokerAgnosticTests.csproj`
+  - `tests/BrokerAgnosticTests/DeadLetterTests.cs` (5 tests)
+  - `tests/BrokerAgnosticTests/RetryPolicyTests.cs` (6 tests)
+  - `tests/BrokerAgnosticTests/ChannelTests.cs` (12 tests)
+  - `tests/BrokerAgnosticTests/RoutingTests.cs` (7 tests)
+  - `tests/BrokerAgnosticTests/SplitterAggregatorTests.cs` (5 tests)
+  - `tests/BrokerAgnosticTests/BrokerInterchangeabilityTests.cs` (5 tests — 3 full pipelines + enum check + bridge)
+- **Files modified**:
+  - `EnterpriseIntegrationPlatform.sln` — Added BrokerAgnosticTests project
+- **Test counts**: 38 BrokerAgnosticTests pass. 522 TutorialLabs tests unchanged. 49 src projects, 0 errors, 0 warnings.
+
+## Chunks 103–106 – PostgreSQL Message Broker (Ingestion.Postgres)
+
+- **Date**: 2026-04-07
+- **Phase**: 28 — PostgreSQL Message Broker (EIP-Complete, ≤ 5k TPS)
+- **Status**: done
+- **Goal**: Add PostgreSQL as a fourth production message broker, implementing all EIP interfaces (IMessageBrokerProducer, IMessageBrokerConsumer, IEventDrivenConsumer, IPollingConsumer, ISelectiveConsumer, ITransactionalClient) so all existing EIP components work unchanged.
+- **Architecture**:
+  - `BrokerType.Postgres = 3` added to enum
+  - `eip_messages` table with pg_notify trigger for low-latency delivery
+  - `eip_subscriptions` with `SELECT … FOR UPDATE SKIP LOCKED` for competing consumers
+  - `eip_dead_letters` table for DLQ
+  - `eip_durable_subscribers` with auto-fanout trigger
+  - Native ACID transactions via `NpgsqlTransaction`
+- **Files created**:
+  - `src/Ingestion.Postgres/Ingestion.Postgres.csproj`
+  - `src/Ingestion.Postgres/PostgresBrokerProducer.cs`
+  - `src/Ingestion.Postgres/PostgresBrokerConsumer.cs`
+  - `src/Ingestion.Postgres/PostgresTransactionalClient.cs`
+  - `src/Ingestion.Postgres/PostgresConnectionFactory.cs`
+  - `src/Ingestion.Postgres/PostgresBrokerOptions.cs`
+  - `src/Ingestion.Postgres/PostgresServiceExtensions.cs`
+  - `src/Ingestion.Postgres/Schema/001_create_tables.sql`
+- **Files modified**:
+  - `src/Ingestion/BrokerType.cs` — Added `Postgres = 3`
+  - `src/Ingestion/BrokerOptions.cs` — Added Postgres connection string doc
+  - `src/Ingestion/IngestionServiceExtensions.cs` — Registered Postgres in BrokerRegistrations
+  - `Directory.Packages.props` — Added `Npgsql 9.0.3`
+  - `EnterpriseIntegrationPlatform.sln` — Added Ingestion.Postgres project
+- **Test counts**: 522 TutorialLabs tests unchanged. Full solution builds: 49 src projects, 0 errors, 0 warnings.
+
 ## Chunk 102 – Update tutorials/README.md
 
 - **Date**: 2026-04-06

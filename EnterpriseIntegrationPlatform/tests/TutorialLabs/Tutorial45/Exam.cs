@@ -3,7 +3,8 @@
 // ============================================================================
 // EIP Pattern: Profiling
 // E2E: Multi-snapshot analysis, delta metric tracking, and full profiling
-//      session lifecycle — all published through MockEndpoint.
+//      session lifecycle — all published through NatsBrokerEndpoint
+//      (real NATS JetStream via Aspire).
 // ============================================================================
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -20,7 +21,9 @@ public sealed class Exam
     [Test]
     public async Task Challenge1_MultipleSnapshots_TimeRangeQuery_PublishAnalysis()
     {
-        await using var output = new MockEndpoint("exam-profiler-range");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t45-exam-range");
+        var topic = AspireFixture.UniqueTopic("t45-exam-analysis-results");
+
         var profiler = new ContinuousProfiler(
             NullLogger<ContinuousProfiler>.Instance,
             Options.Create(new ProfilingOptions()));
@@ -48,16 +51,18 @@ public sealed class Exam
             var envelope = IntegrationEnvelope<string>.Create(
                 $"{snap.Label}|threads:{snap.Cpu.ThreadCount}|ws:{snap.Memory.WorkingSetBytes}",
                 "profiler", "snapshot.analysis");
-            await output.PublishAsync(envelope, "analysis-results", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        output.AssertReceivedOnTopic("analysis-results", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
     }
 
     [Test]
     public async Task Challenge2_SnapshotDeltaMetrics_CpuUsageTracking()
     {
-        await using var output = new MockEndpoint("exam-profiler-delta");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t45-exam-delta");
+        var topic = AspireFixture.UniqueTopic("t45-exam-delta-results");
+
         var profiler = new ContinuousProfiler(
             NullLogger<ContinuousProfiler>.Instance,
             Options.Create(new ProfilingOptions()));
@@ -75,14 +80,16 @@ public sealed class Exam
             $"cpu-delta-available:{second.Cpu.CpuUsagePercent is not null}|" +
             $"alloc-delta-available:{second.Memory.AllocationRateBytesPerSecond is not null}",
             "profiler", "delta.metrics");
-        await output.PublishAsync(envelope, "delta-results", default);
-        output.AssertReceivedOnTopic("delta-results", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task Challenge3_ProfilingSessionLifecycle_PublishAllSnapshots()
     {
-        await using var output = new MockEndpoint("exam-profiler-session");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t45-exam-session");
+        var topic = AspireFixture.UniqueTopic("t45-exam-session-stream");
+
         var profiler = new ContinuousProfiler(
             NullLogger<ContinuousProfiler>.Instance,
             Options.Create(new ProfilingOptions { MaxRetainedSnapshots = 5 }));
@@ -109,12 +116,12 @@ public sealed class Exam
             var envelope = IntegrationEnvelope<string>.Create(
                 $"{snap.Label}|gc-gen2:{snap.Gc.Gen2Collections}",
                 "profiler", "session.snapshot");
-            await output.PublishAsync(envelope, "session-stream", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        output.AssertReceivedOnTopic("session-stream", 5);
+        nats.AssertReceivedOnTopic(topic, 5);
 
-        var all = output.GetAllReceived<string>("session-stream");
+        var all = nats.GetAllReceived<string>(topic);
         Assert.That(all[0].Payload, Does.StartWith("startup|"));
         Assert.That(all[4].Payload, Does.StartWith("cooldown|"));
     }

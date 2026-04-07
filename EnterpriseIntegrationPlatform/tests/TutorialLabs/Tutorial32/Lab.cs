@@ -23,6 +23,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Tenant Resolution ─────────────────────────────────────────
+
     [Test]
     public async Task ResolveFromMetadata_ReturnsTenantContext()
     {
@@ -62,6 +65,9 @@ public sealed class Lab
         Assert.That(ctx.TenantId, Is.EqualTo("tenant-42"));
         await Task.CompletedTask;
     }
+
+
+    // ── 2. Tenant Isolation ──────────────────────────────────────────
 
     [Test]
     public async Task ResolveFromString_NullOrWhitespace_ReturnsAnonymous()

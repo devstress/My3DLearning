@@ -24,6 +24,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Input Sanitization ────────────────────────────────────────
+
     [Test]
     public async Task Sanitizer_RemovesScriptTags()
     {
@@ -61,6 +64,9 @@ public sealed class Lab
         await Task.CompletedTask;
     }
 
+
+    // ── 2. Payload Size Enforcement ──────────────────────────────────
+
     [Test]
     public async Task PayloadSizeGuard_AllowsUnderLimit()
     {
@@ -84,6 +90,9 @@ public sealed class Lab
         Assert.That(ex.ActualBytes, Is.GreaterThan(10));
         await Task.CompletedTask;
     }
+
+
+    // ── 3. End-to-End Security Pipeline ──────────────────────────────
 
     [Test]
     public async Task SanitizedMessage_PublishedToMockEndpoint()

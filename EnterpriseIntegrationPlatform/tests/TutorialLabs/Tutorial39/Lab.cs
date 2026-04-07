@@ -26,6 +26,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _bus.DisposeAsync();
 
+
+    // ── 1. Smart Proxy – Request Tracking ────────────────────────────
+
     [Test]
     public void SmartProxy_TrackRequest_IncrementsOutstanding()
     {
@@ -57,6 +60,9 @@ public sealed class Lab
         Assert.That(correlation.RequestMessageId, Is.EqualTo(request.MessageId));
         Assert.That(proxy.OutstandingCount, Is.EqualTo(0));
     }
+
+
+    // ── 2. Control Bus – Publish & Subscribe ─────────────────────────
 
     [Test]
     public void SmartProxy_CorrelateReply_ReturnsNull_ForUnknown()
@@ -98,6 +104,9 @@ public sealed class Lab
         Assert.That(result.ControlTopic, Is.EqualTo("eip.control"));
         _bus.AssertReceivedOnTopic("eip.control", 1);
     }
+
+
+    // ── 3. End-to-End Roundtrip ──────────────────────────────────────
 
     [Test]
     public async Task ControlBus_Subscribe_MockEndpoint_DeliversCommand()

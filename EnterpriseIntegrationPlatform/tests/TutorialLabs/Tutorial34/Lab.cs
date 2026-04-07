@@ -35,6 +35,9 @@ public sealed class Lab
             Options.Create(new HttpConnectorOptions { BaseUrl = baseUrl }),
             NullLogger<HttpConnectorAdapter>.Instance);
 
+
+    // ── 1. Adapter Identity ──────────────────────────────────────────
+
     [Test]
     public async Task Adapter_NameAndType_AreCorrect()
     {
@@ -62,6 +65,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "http-results", default);
         _output.AssertReceivedOnTopic("http-results", 1);
     }
+
+
+    // ── 2. Token Cache Lifecycle ─────────────────────────────────────
 
     [Test]
     public async Task SendAsync_Failure_ReturnsFailResult()
@@ -102,6 +108,9 @@ public sealed class Lab
         Assert.That(token, Is.EqualTo("my-token"));
         await Task.CompletedTask;
     }
+
+
+    // ── 3. Configuration Defaults ────────────────────────────────────
 
     [Test]
     public async Task TokenCache_Expired_ReturnsFalse()

@@ -2,8 +2,9 @@
 // Tutorial 47 – Saga Compensation (Lab)
 // ============================================================================
 // EIP Pattern: Saga / Compensation.
-// E2E: Wire DefaultCompensationActivityService with MockEndpoint to
-// demonstrate compensation notifications published after each step.
+// E2E: Wire DefaultCompensationActivityService with NatsBrokerEndpoint
+// (real NATS JetStream via Aspire) to demonstrate compensation
+// notifications published after each step.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Activities;
@@ -18,13 +19,7 @@ namespace TutorialLabs.Tutorial47;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("saga-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
+    // ── 1. Compensation Execution ────────────────────────────────────
 
     [Test]
     public async Task CompensateAsync_SingleStep_ReturnsTrue()
@@ -40,6 +35,8 @@ public sealed class Lab
     [Test]
     public async Task CompensateAsync_MultipleSteps_AllReturnTrue()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t47-multi");
+        var topic = AspireFixture.UniqueTopic("t47-compensations");
         var svc = new DefaultCompensationActivityService(
             NullLogger<DefaultCompensationActivityService>.Instance);
 
@@ -50,18 +47,23 @@ public sealed class Lab
         {
             var ok = await svc.CompensateAsync(corrId, step);
             Assert.That(ok, Is.True);
-            // Publish compensation notification to MockEndpoint
+            // Publish compensation notification to NatsBrokerEndpoint
             var notification = IntegrationEnvelope<string>.Create(
                 $"compensated:{step}", "saga", "saga.compensated");
-            await _output.PublishAsync(notification, "saga-compensations");
+            await nats.PublishAsync(notification, topic, default);
         }
 
-        _output.AssertReceivedOnTopic("saga-compensations", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
     }
+
+
+    // ── 2. Failure Detection ─────────────────────────────────────────
 
     [Test]
     public async Task MockCompensation_FailureDetected_NackPublished()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t47-failure");
+        var topic = AspireFixture.UniqueTopic("t47-failures");
         var mock = new MockCompensationActivityService()
             .WithStepResult("persist", false);
 
@@ -72,12 +74,15 @@ public sealed class Lab
         {
             var nack = IntegrationEnvelope<string>.Create(
                 "persist-failed", "saga", "saga.compensation.failed");
-            await _output.PublishAsync(nack, "saga-failures");
+            await nats.PublishAsync(nack, topic, default);
         }
 
         Assert.That(result, Is.False);
-        _output.AssertReceivedOnTopic("saga-failures", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
+
+
+    // ── 3. Pipeline Result & Workflow Types ──────────────────────────
 
     [Test]
     public void IntegrationPipelineResult_FailureHasReason()

@@ -2,8 +2,9 @@
 // Tutorial 16 – Transform Pipeline (Lab)
 // ============================================================================
 // EIP Pattern: Pipes and Filters (Transform variant).
-// E2E: TransformPipeline with real ITransformStep implementations, verify
-// transformed payload, step count, metadata, and publish results via MockEndpoint.
+// Real Integrations: TransformPipeline with real ITransformStep implementations,
+// verify transformed payload, step count, metadata, and publish results via
+// NatsBrokerEndpoint (real NATS JetStream via Aspire).
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -58,13 +59,7 @@ internal sealed class FailingStep : ITransformStep
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("transform-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
+    // ── 1. Single & Multi-Step Transforms ────────────────────────────
 
     [Test]
     public async Task Pipeline_SingleStep_TransformsPayload()
@@ -92,6 +87,9 @@ public sealed class Lab
         Assert.That(result.Payload, Is.EqualTo("[TRANSFORMED] ORDER DATA"));
         Assert.That(result.StepsApplied, Is.EqualTo(2));
     }
+
+
+    // ── 2. Pipeline Configuration & Error Handling ───────────────────
 
     [Test]
     public async Task Pipeline_Disabled_ReturnsInputUnchanged()
@@ -141,9 +139,15 @@ public sealed class Lab
             () => pipeline.ExecuteAsync("this is too long", "text/plain"));
     }
 
+
+    // ── 3. End-to-End Integration (Real NATS) ────────────────────────
+
     [Test]
-    public async Task Pipeline_E2E_PublishTransformedToMockEndpoint()
+    public async Task Pipeline_E2E_PublishTransformedToNatsEndpoint()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t16-e2e");
+        var topic = AspireFixture.UniqueTopic("t16-transformed");
+
         var pipeline = CreatePipeline(new ITransformStep[]
         {
             new UpperCaseStep(),
@@ -154,10 +158,10 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             result.Payload, "TransformService", "transform.completed");
-        await _output.PublishAsync(envelope, "transformed-topic", CancellationToken.None);
+        await nats.PublishAsync(envelope, topic, CancellationToken.None);
 
-        _output.AssertReceivedOnTopic("transformed-topic", 1);
-        var received = _output.GetReceived<string>();
+        nats.AssertReceivedOnTopic(topic, 1);
+        var received = nats.GetReceived<string>();
         Assert.That(received.Payload, Does.StartWith("MSG:"));
     }
 

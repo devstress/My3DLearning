@@ -2,8 +2,9 @@
 // Tutorial 27 – Resequencer (Lab)
 // ============================================================================
 // EIP Pattern: Resequencer.
-// E2E: MessageResequencer buffers out-of-order messages, releases in sequence,
-// then publishes results to MockEndpoint.
+// Real Integrations: MessageResequencer buffers out-of-order messages, releases
+// in sequence, then publishes results to NatsBrokerEndpoint (real NATS
+// JetStream via Aspire).
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -18,17 +19,13 @@ namespace TutorialLabs.Tutorial27;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("reseq-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
+    // ── 1. Ordering ──────────────────────────────────────────────────
 
     [Test]
     public async Task Accept_InOrder_ReleasesAllWhenComplete()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t27-inorder");
+        var topic = AspireFixture.UniqueTopic("t27-ordered");
         var resequencer = CreateResequencer();
         var correlationId = Guid.NewGuid();
 
@@ -41,14 +38,16 @@ public sealed class Lab
         Assert.That(result2, Has.Count.EqualTo(2));
 
         foreach (var env in result2)
-            await _output.PublishAsync(env, "ordered-topic");
+            await nats.PublishAsync(env, topic);
 
-        _output.AssertReceivedOnTopic("ordered-topic", 2);
+        nats.AssertReceivedOnTopic(topic, 2);
     }
 
     [Test]
     public async Task Accept_OutOfOrder_ReleasesInCorrectSequence()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t27-outoforder");
+        var topic = AspireFixture.UniqueTopic("t27-ordered");
         var resequencer = CreateResequencer();
         var correlationId = Guid.NewGuid();
 
@@ -66,10 +65,13 @@ public sealed class Lab
         Assert.That(released[2].Payload, Is.EqualTo("third"));
 
         foreach (var env in released)
-            await _output.PublishAsync(env, "ordered-topic");
+            await nats.PublishAsync(env, topic);
 
-        _output.AssertReceivedOnTopic("ordered-topic", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
     }
+
+
+    // ── 2. Validation ────────────────────────────────────────────────
 
     [Test]
     public void Accept_DuplicateSequenceNumber_IsIgnored()
@@ -96,9 +98,14 @@ public sealed class Lab
         Assert.Throws<ArgumentException>(() => resequencer.Accept(envelope));
     }
 
+
+    // ── 3. Timeout & State ───────────────────────────────────────────
+
     [Test]
     public async Task ReleaseOnTimeout_IncompleteSequence_ReleasesBuffered()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t27-timeout");
+        var topic = AspireFixture.UniqueTopic("t27-timeout");
         var resequencer = CreateResequencer();
         var correlationId = Guid.NewGuid();
 
@@ -111,9 +118,9 @@ public sealed class Lab
         Assert.That(released[1].SequenceNumber, Is.EqualTo(2));
 
         foreach (var env in released)
-            await _output.PublishAsync(env, "timeout-topic");
+            await nats.PublishAsync(env, topic);
 
-        _output.AssertReceivedOnTopic("timeout-topic", 2);
+        nats.AssertReceivedOnTopic(topic, 2);
         Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(0));
     }
 

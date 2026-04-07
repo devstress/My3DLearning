@@ -2,9 +2,9 @@
 // Tutorial 14 – Process Manager (Lab)
 // ============================================================================
 // EIP Pattern: Process Manager
-// E2E: PipelineOrchestrator converts IntegrationEnvelope to pipeline input
-// and dispatches to Temporal. Uses MockTemporalWorkflowDispatcher since
-// Temporal requires a real server.
+// Real Integrations: PipelineOrchestrator converts IntegrationEnvelope to
+// pipeline input and dispatches to Temporal. Uses MockTemporalWorkflowDispatcher
+// since Temporal requires a real server (no NatsBrokerEndpoint needed here).
 // ============================================================================
 
 using System.Text.Json;
@@ -21,33 +21,32 @@ namespace TutorialLabs.Tutorial14;
 [TestFixture]
 public sealed class Lab
 {
-    private MockTemporalWorkflowDispatcher _dispatcher = null!;
-
-    [SetUp]
-    public void SetUp() => _dispatcher = new MockTemporalWorkflowDispatcher();
+    // ── 1. Workflow Dispatching ────────────────────────────────────────
 
     [Test]
     public async Task ProcessAsync_DispatchesCorrectWorkflowId()
     {
-        var orchestrator = CreateOrchestrator();
+        var dispatcher = new MockTemporalWorkflowDispatcher();
+        var orchestrator = CreateOrchestrator(dispatcher);
         var envelope = CreateEnvelope("order-data", "OrderService", "order.created");
 
-        _dispatcher.ReturnsSuccess();
+        dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
-        Assert.That(_dispatcher.LastWorkflowId, Is.EqualTo($"integration-{envelope.MessageId}"));
+        Assert.That(dispatcher.LastWorkflowId, Is.EqualTo($"integration-{envelope.MessageId}"));
     }
 
     [Test]
     public async Task ProcessAsync_MapsEnvelopeFieldsToInput()
     {
-        var orchestrator = CreateOrchestrator();
+        var dispatcher = new MockTemporalWorkflowDispatcher();
+        var orchestrator = CreateOrchestrator(dispatcher);
         var envelope = CreateEnvelope("payload-data", "TestSource", "test.type");
 
-        _dispatcher.ReturnsSuccess();
+        dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
-        var capturedInput = _dispatcher.LastInput;
+        var capturedInput = dispatcher.LastInput;
         Assert.That(capturedInput, Is.Not.Null);
         Assert.That(capturedInput!.MessageId, Is.EqualTo(envelope.MessageId));
         Assert.That(capturedInput.CorrelationId, Is.EqualTo(envelope.CorrelationId));
@@ -55,18 +54,21 @@ public sealed class Lab
         Assert.That(capturedInput.MessageType, Is.EqualTo("test.type"));
     }
 
+    // ── 2. Envelope-to-Input Mapping ──────────────────────────────────
+
     [Test]
     public async Task ProcessAsync_SerializesPayloadAsJson()
     {
-        var orchestrator = CreateOrchestrator();
+        var dispatcher = new MockTemporalWorkflowDispatcher();
+        var orchestrator = CreateOrchestrator(dispatcher);
         var json = JsonSerializer.Deserialize<JsonElement>("{\"key\":\"value\"}");
         var envelope = IntegrationEnvelope<JsonElement>.Create(
             json, "Svc", "test.type");
 
-        _dispatcher.ReturnsSuccess();
+        dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
-        var capturedInput = _dispatcher.LastInput;
+        var capturedInput = dispatcher.LastInput;
         Assert.That(capturedInput!.PayloadJson, Does.Contain("key"));
         Assert.That(capturedInput.PayloadJson, Does.Contain("value"));
     }
@@ -74,7 +76,8 @@ public sealed class Lab
     [Test]
     public async Task ProcessAsync_WithMetadata_SerializesMetadataJson()
     {
-        var orchestrator = CreateOrchestrator();
+        var dispatcher = new MockTemporalWorkflowDispatcher();
+        var orchestrator = CreateOrchestrator(dispatcher);
         var envelope = CreateEnvelope("data", "Svc", "test.type") with
         {
             Metadata = new Dictionary<string, string>
@@ -84,45 +87,50 @@ public sealed class Lab
             },
         };
 
-        _dispatcher.ReturnsSuccess();
+        dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
-        var capturedInput = _dispatcher.LastInput;
+        var capturedInput = dispatcher.LastInput;
         Assert.That(capturedInput!.MetadataJson, Is.Not.Null);
         Assert.That(capturedInput.MetadataJson, Does.Contain("region"));
         Assert.That(capturedInput.MetadataJson, Does.Contain("us-east"));
     }
 
+    // ── 3. Pipeline Options ───────────────────────────────────────────
+
     [Test]
     public async Task ProcessAsync_EmptyMetadata_SetsMetadataJsonNull()
     {
-        var orchestrator = CreateOrchestrator();
+        var dispatcher = new MockTemporalWorkflowDispatcher();
+        var orchestrator = CreateOrchestrator(dispatcher);
         var envelope = CreateEnvelope("data", "Svc", "test.type");
 
-        _dispatcher.ReturnsSuccess();
+        dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
-        var capturedInput = _dispatcher.LastInput;
+        var capturedInput = dispatcher.LastInput;
         Assert.That(capturedInput!.MetadataJson, Is.Null);
     }
 
     [Test]
     public async Task ProcessAsync_SetsAckAndNackSubjectsFromOptions()
     {
-        var orchestrator = CreateOrchestrator();
+        var dispatcher = new MockTemporalWorkflowDispatcher();
+        var orchestrator = CreateOrchestrator(dispatcher);
         var envelope = CreateEnvelope("data", "Svc", "test.type");
 
-        _dispatcher.ReturnsSuccess();
+        dispatcher.ReturnsSuccess();
         await orchestrator.ProcessAsync(envelope);
 
-        var capturedInput = _dispatcher.LastInput;
+        var capturedInput = dispatcher.LastInput;
         Assert.That(capturedInput!.AckSubject, Is.EqualTo("integration.ack"));
         Assert.That(capturedInput.NackSubject, Is.EqualTo("integration.nack"));
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
 
-    private PipelineOrchestrator CreateOrchestrator()
+    private static PipelineOrchestrator CreateOrchestrator(
+        MockTemporalWorkflowDispatcher dispatcher)
     {
         var options = Options.Create(new PipelineOptions
         {
@@ -130,7 +138,7 @@ public sealed class Lab
             NackSubject = "integration.nack",
         });
         return new PipelineOrchestrator(
-            _dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
+            dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
     }
 
     private static IntegrationEnvelope<JsonElement> CreateEnvelope(

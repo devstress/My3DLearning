@@ -30,6 +30,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _input.DisposeAsync();
 
+
+    // ── 1. Event Recording ───────────────────────────────────────────
+
     [Test]
     public async Task RecordAndRetrieve_ByCorrelationId()
     {
@@ -56,6 +59,9 @@ public sealed class Lab
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results[0].BusinessKey, Is.EqualTo("ORD-123"));
     }
+
+
+    // ── 2. Trace Context Propagation ─────────────────────────────────
 
     [Test]
     public async Task GetLatestByCorrelationId_ReturnsNewestEvent()
@@ -104,6 +110,9 @@ public sealed class Lab
         Assert.That(enriched, Is.Not.Null);
         Assert.That(enriched.MessageId, Is.EqualTo(envelope.MessageId));
     }
+
+
+    // ── 3. Multi-Stage Tracking ──────────────────────────────────────
 
     [Test]
     public async Task MultipleStages_OrderedByRecordedAt()

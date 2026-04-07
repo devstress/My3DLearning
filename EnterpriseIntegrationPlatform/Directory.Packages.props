@@ -5,6 +5,7 @@
   <ItemGroup>
     <!-- Aspire -->
     <PackageVersion Include="Aspire.Hosting" Version="13.1.2" />
+    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.1.2" />
     <!-- Service Defaults -->
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.1.0" />
@@ -46,6 +47,8 @@
     <!-- Health Checks -->
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="10.0.5" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.5" />
+    <!-- PostgreSQL message broker -->
+    <PackageVersion Include="Npgsql" Version="9.0.3" />
     <!-- Connectors -->
     <PackageVersion Include="SSH.NET" Version="2024.2.0" />
     <PackageVersion Include="MailKit" Version="4.15.1" />

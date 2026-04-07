@@ -3,7 +3,8 @@
 // ============================================================================
 // EIP Pattern: Failover / Failback.
 // E2E: InMemoryFailoverManager — register regions, failover, failback,
-//      health-check updates, publish results to MockEndpoint.
+//      health-check updates, publish results to NatsBrokerEndpoint
+//      (real NATS JetStream via Aspire).
 // ============================================================================
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.DisasterRecovery;
@@ -17,21 +18,19 @@ namespace TutorialLabs.Tutorial44;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("dr-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
     private static InMemoryFailoverManager CreateManager() =>
         new(NullLogger<InMemoryFailoverManager>.Instance,
             Options.Create(new DisasterRecoveryOptions()));
 
+
+    // ── 1. Region Registration ───────────────────────────────────────
+
     [Test]
-    public async Task RegisterRegions_PublishTopologyToMockEndpoint()
+    public async Task RegisterRegions_PublishTopologyToNatsBrokerEndpoint()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t44-register");
+        var topic = AspireFixture.UniqueTopic("t44-topology");
+
         var mgr = CreateManager();
 
         await mgr.RegisterRegionAsync(new RegionInfo
@@ -52,15 +51,18 @@ public sealed class Lab
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 $"{region.RegionId}:{region.State}", "dr-manager", "topology.registered");
-            await _output.PublishAsync(envelope, "topology", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        _output.AssertReceivedOnTopic("topology", 2);
+        nats.AssertReceivedOnTopic(topic, 2);
     }
 
     [Test]
     public async Task Failover_PromotesTarget_PublishResult()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t44-failover");
+        var topic = AspireFixture.UniqueTopic("t44-failover-events");
+
         var mgr = CreateManager();
 
         await mgr.RegisterRegionAsync(new RegionInfo
@@ -84,13 +86,19 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             $"promoted:{result.PromotedRegionId}", "dr-manager", "failover.complete");
-        await _output.PublishAsync(envelope, "failover-events", default);
-        _output.AssertReceivedOnTopic("failover-events", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
+
+
+    // ── 2. Failover Operations ───────────────────────────────────────
 
     [Test]
     public async Task FailoverToUnknownRegion_PublishError()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t44-unknown");
+        var topic = AspireFixture.UniqueTopic("t44-failover-errors-unknown");
+
         var mgr = CreateManager();
 
         await mgr.RegisterRegionAsync(new RegionInfo
@@ -105,13 +113,16 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             result.ErrorMessage!, "dr-manager", "failover.error");
-        await _output.PublishAsync(envelope, "failover-errors", default);
-        _output.AssertReceivedOnTopic("failover-errors", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task FailoverToSameRegion_PublishError()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t44-same-region");
+        var topic = AspireFixture.UniqueTopic("t44-failover-errors-same");
+
         var mgr = CreateManager();
 
         await mgr.RegisterRegionAsync(new RegionInfo
@@ -126,13 +137,16 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             result.ErrorMessage!, "dr-manager", "failover.noop");
-        await _output.PublishAsync(envelope, "failover-errors", default);
-        _output.AssertReceivedOnTopic("failover-errors", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task FailbackRestoresOriginalPrimary_PublishResult()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t44-failback");
+        var topic = AspireFixture.UniqueTopic("t44-failback-events");
+
         var mgr = CreateManager();
 
         await mgr.RegisterRegionAsync(new RegionInfo
@@ -155,13 +169,19 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             $"restored:{primary.RegionId}", "dr-manager", "failback.complete");
-        await _output.PublishAsync(envelope, "failback-events", default);
-        _output.AssertReceivedOnTopic("failback-events", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
+
+
+    // ── 3. Health Monitoring ─────────────────────────────────────────
 
     [Test]
     public async Task UpdateHealthCheck_PublishTimestampChange()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t44-health");
+        var topic = AspireFixture.UniqueTopic("t44-health-events");
+
         var mgr = CreateManager();
 
         await mgr.RegisterRegionAsync(new RegionInfo
@@ -178,13 +198,16 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             $"healthcheck:{region.RegionId}", "dr-manager", "health.updated");
-        await _output.PublishAsync(envelope, "health-events", default);
-        _output.AssertReceivedOnTopic("health-events", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task GetAllRegions_PublishRegionStates()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t44-all-regions");
+        var topic = AspireFixture.UniqueTopic("t44-region-inventory");
+
         var mgr = CreateManager();
 
         await mgr.RegisterRegionAsync(new RegionInfo
@@ -210,10 +233,10 @@ public sealed class Lab
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 $"{region.RegionId}:{region.State}", "dr-manager", "region.state");
-            await _output.PublishAsync(envelope, "region-inventory", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        _output.AssertReceivedOnTopic("region-inventory", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
 
         var primary = await mgr.GetPrimaryAsync();
         Assert.That(primary!.RegionId, Is.EqualTo("us-east-1"));

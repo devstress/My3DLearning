@@ -4,7 +4,7 @@
 // EIP Pattern: Environment Cascade + Configuration Resolution.
 // E2E: EnvironmentOverrideProvider backed by InMemoryConfigurationStore —
 //      resolve config per environment, fall back to default, publish
-//      resolved values to MockEndpoint.
+//      resolved values to NatsBrokerEndpoint (real NATS JetStream via Aspire).
 // ============================================================================
 using EnterpriseIntegrationPlatform.Configuration;
 using EnterpriseIntegrationPlatform.Contracts;
@@ -16,28 +16,31 @@ namespace TutorialLabs.Tutorial43;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
     private ConfigurationChangeNotifier _notifier = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _output = new MockEndpoint("deploy-out");
         _notifier = new ConfigurationChangeNotifier();
     }
 
     [TearDown]
-    public async Task TearDown()
+    public void TearDown()
     {
         _notifier.Dispose();
-        await _output.DisposeAsync();
     }
 
     private InMemoryConfigurationStore CreateStore() => new(_notifier);
 
+
+    // ── 1. Environment Resolution ────────────────────────────────────
+
     [Test]
     public async Task EnvironmentOverride_ResolvesSpecificEnvironment()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t43-resolve-env");
+        var topic = AspireFixture.UniqueTopic("t43-resolved-config");
+
         var store = CreateStore();
         await store.SetAsync(new ConfigurationEntry("Database:Host", "localhost", "default"));
         await store.SetAsync(new ConfigurationEntry("Database:Host", "prod-db.internal", "prod"));
@@ -50,13 +53,16 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             resolved.Value, "config-resolver", "config.resolved");
-        await _output.PublishAsync(envelope, "resolved-config", default);
-        _output.AssertReceivedOnTopic("resolved-config", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task EnvironmentOverride_FallsBackToDefault()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t43-fallback");
+        var topic = AspireFixture.UniqueTopic("t43-fallback-config");
+
         var store = CreateStore();
         await store.SetAsync(new ConfigurationEntry("Cache:Ttl", "300", "default"));
 
@@ -69,13 +75,19 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             resolved.Value, "config-resolver", "config.fallback");
-        await _output.PublishAsync(envelope, "fallback-config", default);
-        _output.AssertReceivedOnTopic("fallback-config", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
+
+
+    // ── 2. Batch Resolution ──────────────────────────────────────────
 
     [Test]
     public async Task EnvironmentOverride_ReturnsNull_WhenNotFound()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t43-notfound");
+        var topic = AspireFixture.UniqueTopic("t43-missing-config");
+
         var store = CreateStore();
         var provider = new EnvironmentOverrideProvider(store);
 
@@ -84,13 +96,16 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             "not-found", "config-resolver", "config.missing");
-        await _output.PublishAsync(envelope, "missing-config", default);
-        _output.AssertReceivedOnTopic("missing-config", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task EnvironmentOverride_ResolveMany_PublishResults()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t43-resolve-many");
+        var topic = AspireFixture.UniqueTopic("t43-batch-config");
+
         var store = CreateStore();
         await store.SetAsync(new ConfigurationEntry("App:Name", "MyApp", "default"));
         await store.SetAsync(new ConfigurationEntry("App:Version", "2.0", "prod"));
@@ -107,21 +122,33 @@ public sealed class Lab
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 $"{kvp.Key}={kvp.Value.Value}", "config-resolver", "config.batch");
-            await _output.PublishAsync(envelope, "batch-config", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        _output.AssertReceivedOnTopic("batch-config", 2);
+        nats.AssertReceivedOnTopic(topic, 2);
     }
+
+
+    // ── 3. Variable Fallback ─────────────────────────────────────────
 
     [Test]
     public async Task ConfigCascade_DevStagingProd_PublishResolved()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t43-cascade");
+
         var store = CreateStore();
         await store.SetAsync(new ConfigurationEntry("Broker:Url", "nats://localhost:4222", "default"));
         await store.SetAsync(new ConfigurationEntry("Broker:Url", "nats://staging:4222", "staging"));
         await store.SetAsync(new ConfigurationEntry("Broker:Url", "nats://prod:4222", "prod"));
 
         var provider = new EnvironmentOverrideProvider(store);
+
+        var topics = new Dictionary<string, string>
+        {
+            ["dev"] = AspireFixture.UniqueTopic("t43-deploy-dev"),
+            ["staging"] = AspireFixture.UniqueTopic("t43-deploy-staging"),
+            ["prod"] = AspireFixture.UniqueTopic("t43-deploy-prod"),
+        };
 
         var environments = new[] { "dev", "staging", "prod" };
         foreach (var env in environments)
@@ -131,26 +158,29 @@ public sealed class Lab
 
             var envelope = IntegrationEnvelope<string>.Create(
                 resolved!.Value, "config-resolver", "config.cascade");
-            await _output.PublishAsync(envelope, $"deploy-{env}", default);
+            await nats.PublishAsync(envelope, topics[env], default);
         }
 
         // dev falls back to default
-        var devMsg = _output.GetAllReceived<string>("deploy-dev");
+        var devMsg = nats.GetAllReceived<string>(topics["dev"]);
         Assert.That(devMsg[0].Payload, Is.EqualTo("nats://localhost:4222"));
 
-        _output.AssertReceivedOnTopic("deploy-staging", 1);
-        _output.AssertReceivedOnTopic("deploy-prod", 1);
+        nats.AssertReceivedOnTopic(topics["staging"], 1);
+        nats.AssertReceivedOnTopic(topics["prod"], 1);
     }
 
     [Test]
     public async Task EnvironmentVariable_ResolveFromEnvVar()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t43-envvar");
+        var topic = AspireFixture.UniqueTopic("t43-envvar-results");
+
         var resolved = EnvironmentOverrideProvider.ResolveFromEnvironmentVariable("NonExistent:Key");
         Assert.That(resolved, Is.Null);
 
         var envelope = IntegrationEnvelope<string>.Create(
             "env-var-check", "config-resolver", "config.envvar");
-        await _output.PublishAsync(envelope, "envvar-results", default);
-        _output.AssertReceivedOnTopic("envvar-results", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 }

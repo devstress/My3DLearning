@@ -1,113 +1,117 @@
-# Tutorial 02 — Setting Up Your Environment
+# Tutorial 02 — Temporal.io Workflow Orchestration
 
-Verify your .NET 10 environment by confirming that all core platform types, enums, and namespaces are present and correctly structured.
+Orchestrate multi-step integration pipelines with Temporal.io — durable workflows that survive crashes, enforce all-or-nothing semantics, and scale horizontally via task queues. This tutorial covers the saga pattern, fan-out/split, and the scalability model that makes Temporal the backbone of reliable integrations.
 
 ## Key Types
 
 ```csharp
-// src/Contracts/IntegrationEnvelope.cs
-public record IntegrationEnvelope<T> { /* ... */ }
-
-// src/Contracts/MessagePriority.cs
-public enum MessagePriority { Low = 0, Normal = 1, High = 2, Critical = 3 }
-
-// src/Contracts/MessageIntent.cs
-public enum MessageIntent { Command = 0, Document = 1, Event = 2 }
-
-// src/Contracts/MessageHeaders.cs
-public static class MessageHeaders
+// src/Demo.Pipeline/ITemporalWorkflowDispatcher.cs — dispatches workflows to Temporal
+public interface ITemporalWorkflowDispatcher
 {
-    public const string TraceId = "trace-id";
-    public const string ContentType = "content-type";
-    public const string SourceTopic = "source-topic";
-    // ... 13 well-known header keys
+    Task<IntegrationPipelineResult> DispatchAsync(
+        IntegrationPipelineInput input,
+        string workflowId,
+        CancellationToken cancellationToken = default);
 }
 
-// src/Ingestion/IMessageBrokerProducer.cs
-public interface IMessageBrokerProducer { /* ... */ }
-
-// src/Ingestion/IMessageBrokerConsumer.cs
-public interface IMessageBrokerConsumer : IAsyncDisposable { /* ... */ }
-
-// src/Ingestion/BrokerOptions.cs
-public sealed class BrokerOptions
+// src/Demo.Pipeline/PipelineOrchestrator.cs — converts envelopes to workflow input
+public sealed class PipelineOrchestrator : IPipelineOrchestrator
 {
-    public BrokerType BrokerType { get; set; } = BrokerType.NatsJetStream;
-    public string ConnectionString { get; set; } = string.Empty;
-    public int TransactionTimeoutSeconds { get; set; } = 30;
+    // Maps IntegrationEnvelope<JsonElement> to IntegrationPipelineInput,
+    // assigns deterministic workflow ID ("integration-{messageId}"),
+    // and dispatches to Temporal
+    Task ProcessAsync(IntegrationEnvelope<JsonElement> envelope, CancellationToken ct);
 }
 
-// src/Ingestion/BrokerType.cs
-public enum BrokerType { NatsJetStream = 0, Kafka = 1, Pulsar = 2 }
+// src/Activities/IntegrationPipelineInput.cs — workflow input contract
+public sealed record IntegrationPipelineInput(
+    Guid MessageId, Guid CorrelationId, Guid? CausationId,
+    DateTimeOffset Timestamp, string Source, string MessageType,
+    string SchemaVersion, int Priority, string PayloadJson,
+    string? MetadataJson, string AckSubject, string NackSubject,
+    bool NotificationsEnabled = false);
+
+// src/Workflow.Temporal/Workflows/AtomicPipelineWorkflow.cs — saga with compensation
+[Workflow]
+public class AtomicPipelineWorkflow
+{
+    // Persist → Validate → Deliver/Compensate — all-or-nothing with rollback
+}
+
+// src/Workflow.Temporal/TemporalOptions.cs — worker scalability settings
+public sealed class TemporalOptions
+{
+    public string TaskQueue { get; set; } = "integration-workflows";
+    public string Namespace { get; set; } = "default";
+    public string ServerAddress { get; set; } = "localhost:15233";
+}
 ```
 
 ## Exercises
 
-### 1. Verify core types exist
+### 1. Dispatch a workflow and verify envelope-to-input mapping
 
 ```csharp
-var envelopeType = typeof(IntegrationEnvelope<string>);
-Assert.That(envelopeType, Is.Not.Null);
-Assert.That(envelopeType.IsGenericType || envelopeType.IsClass, Is.True);
+var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
+var orchestrator = new PipelineOrchestrator(dispatcher, Options.Create(new PipelineOptions()),
+    NullLogger<PipelineOrchestrator>.Instance);
 
-var producerType = typeof(IMessageBrokerProducer);
-Assert.That(producerType.IsInterface, Is.True);
+var json = JsonSerializer.Deserialize<JsonElement>("{\"orderId\":\"ORD-100\"}");
+var envelope = IntegrationEnvelope<JsonElement>.Create(json, "OrderService", "order.created");
 
-var consumerType = typeof(IMessageBrokerConsumer);
-Assert.That(consumerType.IsInterface, Is.True);
-Assert.That(typeof(IAsyncDisposable).IsAssignableFrom(consumerType), Is.True);
+await orchestrator.ProcessAsync(envelope);
+// dispatcher.LastInput.MessageId == envelope.MessageId
+// dispatcher.LastInput.Source == "OrderService"
 ```
 
-### 2. Verify BrokerType enum has exactly three values
+### 2. Saga pattern — success and failure paths
 
 ```csharp
-Assert.That(Enum.IsDefined(typeof(BrokerType), BrokerType.NatsJetStream), Is.True);
-Assert.That(Enum.IsDefined(typeof(BrokerType), BrokerType.Kafka), Is.True);
-Assert.That(Enum.IsDefined(typeof(BrokerType), BrokerType.Pulsar), Is.True);
+// Success path: workflow completes, Ack published
+dispatcher.ReturnsSuccess();
+await orchestrator.ProcessAsync(successEnvelope);
 
-var values = Enum.GetValues<BrokerType>();
-Assert.That(values, Has.Length.EqualTo(3));
+// Failure path: workflow fails, compensation + Nack
+dispatcher.ReturnsFailure("Validation failed");
+await orchestrator.ProcessAsync(failureEnvelope);
 ```
 
-### 3. Verify MessagePriority ordinal values
+### 3. Custom compensation with step tracking
 
 ```csharp
-Assert.That((int)MessagePriority.Low, Is.EqualTo(0));
-Assert.That((int)MessagePriority.Normal, Is.EqualTo(1));
-Assert.That((int)MessagePriority.High, Is.EqualTo(2));
-Assert.That((int)MessagePriority.Critical, Is.EqualTo(3));
-
-var values = Enum.GetValues<MessagePriority>();
-Assert.That(values, Has.Length.EqualTo(4));
+dispatcher.OnDispatch((input, workflowId) =>
+{
+    // Simulate: steps complete forward, then compensate in reverse (LIFO)
+    var completed = new List<string> { "Persist", "Validate" };
+    completed.Reverse(); // Compensate: Validate first, then Persist
+    return new IntegrationPipelineResult(input.MessageId, false, "Schema mismatch");
+});
 ```
 
-### 4. Verify Contracts namespace contains expected types
+### 4. Fan-out: split batch into parallel workflows
 
 ```csharp
-var assembly = typeof(IntegrationEnvelope<>).Assembly;
-var typeNames = assembly.GetTypes()
-    .Where(t => t.Namespace == "EnterpriseIntegrationPlatform.Contracts")
-    .Select(t => t.Name)
-    .ToList();
-
-Assert.That(typeNames, Does.Contain("MessagePriority"));
-Assert.That(typeNames, Does.Contain("MessageIntent"));
-Assert.That(typeNames, Does.Contain("MessageHeaders"));
+var orderLines = new[] { "{\"sku\":\"A\"}", "{\"sku\":\"B\"}", "{\"sku\":\"C\"}" };
+foreach (var line in orderLines)
+{
+    var json = JsonSerializer.Deserialize<JsonElement>(line);
+    var envelope = IntegrationEnvelope<JsonElement>.Create(json, "Splitter", "order.line");
+    await orchestrator.ProcessAsync(envelope);
+}
+// dispatcher.DispatchCount == 3 — three independent workflow executions
 ```
 
-### 5. Verify Ingestion namespace contains expected types
+### 5. Scalability settings — task queues, timeouts, namespaces
 
 ```csharp
-var assembly = typeof(IMessageBrokerProducer).Assembly;
-var typeNames = assembly.GetTypes()
-    .Where(t => t.Namespace == "EnterpriseIntegrationPlatform.Ingestion")
-    .Select(t => t.Name)
-    .ToList();
+var options = new TemporalOptions();
+// options.TaskQueue = "integration-workflows"  ← which worker pool processes this
+// options.Namespace = "default"                ← multi-tenancy isolation
+// options.ServerAddress = "localhost:15233"     ← Temporal cluster gRPC
 
-Assert.That(typeNames, Does.Contain("IMessageBrokerProducer"));
-Assert.That(typeNames, Does.Contain("IMessageBrokerConsumer"));
-Assert.That(typeNames, Does.Contain("BrokerOptions"));
-Assert.That(typeNames, Does.Contain("BrokerType"));
+var pipelineOptions = new PipelineOptions();
+// pipelineOptions.WorkflowTimeout = TimeSpan.FromMinutes(5) ← max execution time
+// pipelineOptions.TemporalTaskQueue = "integration-workflows"
 ```
 
 ## Lab

@@ -40,6 +40,9 @@ public sealed class Lab
             Options.Create(new SftpConnectorOptions { RootPath = rootPath }),
             NullLogger<SftpConnector>.Instance);
 
+
+    // ── 1. Configuration Defaults ────────────────────────────────────
+
     [Test]
     public async Task SftpConnectorOptions_Defaults()
     {
@@ -68,6 +71,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "upload-results", default);
         _output.AssertReceivedOnTopic("upload-results", 1);
     }
+
+
+    // ── 2. Core File Operations ──────────────────────────────────────
 
     [Test]
     public async Task Download_DelegatesToPoolAndClient()
@@ -109,6 +115,9 @@ public sealed class Lab
         Assert.That(client.UploadCount, Is.EqualTo(2));
         Assert.That(client.UploadedPaths.Any(p => p.EndsWith(".meta")), Is.True);
     }
+
+
+    // ── 3. Upload Lifecycle ──────────────────────────────────────────
 
     [Test]
     public async Task PoolRelease_CalledAfterUpload()

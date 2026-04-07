@@ -1,9 +1,10 @@
 // ============================================================================
 // Tutorial 04 – Integration Envelope (Exam)
 // ============================================================================
-// EIP Pattern: Envelope Wrapper
-// End-to-End: Full metadata through PointToPointChannel, multi-hop causation
-// chains, and split-message sequences — all verified at MockEndpoint output.
+// EIP Patterns: Envelope Wrapper, Fault Message, Message History
+// End-to-End: FaultEnvelope lifecycle with exception capture and retry
+// exhaustion, multi-hop causation chain through PointToPointChannel, and
+// split-sequence reassembly with full metadata verification.
 // ============================================================================
 
 using NUnit.Framework;
@@ -17,97 +18,126 @@ namespace TutorialLabs.Tutorial04;
 [TestFixture]
 public sealed class Exam
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp()
-    {
-        _output = new MockEndpoint("output");
-    }
-
-    [TearDown]
-    public async Task TearDown()
-    {
-        await _output.DisposeAsync();
-    }
+    // ── Challenge 1: FaultEnvelope Lifecycle ─────────────────────────────
 
     [Test]
-    public async Task EndToEnd_FullMetadata_ThroughPointToPointChannel()
+    public void Challenge1_FaultEnvelope_RetryExhaustion()
     {
-        var channel = new PointToPointChannel(
-            _output, _output, NullLogger<PointToPointChannel>.Instance);
-
-        var envelope = IntegrationEnvelope<string>.Create(
-            "full-metadata", "MetadataService", "metadata.test") with
+        // Simulate retry exhaustion: message fails 3 times, then generates
+        // a FaultEnvelope capturing the final exception and all retry attempts.
+        // Verify every field is correctly populated for dead-letter routing.
+        var original = IntegrationEnvelope<string>.Create(
+            "{\"orderId\":\"ORD-999\"}", "IngestService", "order.created") with
         {
             Priority = MessagePriority.High,
             Intent = MessageIntent.Command,
-            ReplyTo = "reply-topic",
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(30),
-            SequenceNumber = 0,
-            TotalCount = 1,
-            Metadata = new Dictionary<string, string>
-            {
-                [MessageHeaders.TraceId] = "trace-001",
-                [MessageHeaders.SpanId] = "span-001",
-                [MessageHeaders.ContentType] = "application/json",
-            },
         };
 
-        await channel.SendAsync(envelope, "metadata-queue", CancellationToken.None);
+        var exception = new TimeoutException("Database connection timeout after 30s");
+        var fault = FaultEnvelope.Create(
+            original, "PersistenceService",
+            "Retry exhaustion after 3 attempts", 3, exception);
 
-        _output.AssertReceivedCount(1);
-        var received = _output.GetReceived<string>();
-        Assert.That(received.Priority, Is.EqualTo(MessagePriority.High));
-        Assert.That(received.ReplyTo, Is.EqualTo("reply-topic"));
-        Assert.That(received.Metadata[MessageHeaders.TraceId], Is.EqualTo("trace-001"));
-        Assert.That(received.ExpiresAt, Is.Not.Null);
+        // Identity preserved from original
+        Assert.That(fault.OriginalMessageId, Is.EqualTo(original.MessageId));
+        Assert.That(fault.CorrelationId, Is.EqualTo(original.CorrelationId));
+        Assert.That(fault.OriginalMessageType, Is.EqualTo("order.created"));
+
+        // Fault-specific fields
+        Assert.That(fault.FaultId, Is.Not.EqualTo(Guid.Empty));
+        Assert.That(fault.FaultedBy, Is.EqualTo("PersistenceService"));
+        Assert.That(fault.RetryCount, Is.EqualTo(3));
+        Assert.That(fault.FaultedAt.Date, Is.EqualTo(DateTimeOffset.UtcNow.Date));
+
+        // Exception captured for diagnostics
+        Assert.That(fault.ErrorDetails, Does.Contain("TimeoutException"));
+        Assert.That(fault.ErrorDetails, Does.Contain("Database connection timeout"));
+
+        // Each FaultEnvelope gets its own unique FaultId
+        var fault2 = FaultEnvelope.Create(
+            original, "PersistenceService", "Second failure", 4);
+        Assert.That(fault2.FaultId, Is.Not.EqualTo(fault.FaultId));
     }
 
+    // ── Challenge 2: Multi-Hop Causation Through Channel ────────────────
+
     [Test]
-    public async Task EndToEnd_MultiHopCausation_AllLinksPreserved()
+    public async Task Challenge2_CausationChain_ThreeHopsThroughChannel()
     {
-        var envelopeA = IntegrationEnvelope<string>.Create(
+        // Build a three-hop causation chain where each message is delivered
+        // through a PointToPointChannel: Command → Event → Document.
+        // Verify the full causation lineage and shared CorrelationId.
+        var output = new MockEndpoint("chain");
+        var channel = new PointToPointChannel(
+            output, output, NullLogger<PointToPointChannel>.Instance);
+
+        // Hop 1: Command originates the business transaction
+        var command = IntegrationEnvelope<string>.Create(
             "PlaceOrder", "WebApp", "order.place") with
         {
             Intent = MessageIntent.Command,
         };
+        await channel.SendAsync(command, "commands", CancellationToken.None);
 
-        var envelopeB = IntegrationEnvelope<string>.Create(
+        // Hop 2: Event reports the command was processed
+        var evt = IntegrationEnvelope<string>.Create(
             "OrderPlaced", "OrderService", "order.placed",
-            correlationId: envelopeA.CorrelationId,
-            causationId: envelopeA.MessageId) with
+            correlationId: command.CorrelationId,
+            causationId: command.MessageId) with
         {
             Intent = MessageIntent.Event,
         };
+        await channel.SendAsync(evt, "events", CancellationToken.None);
 
-        var envelopeC = IntegrationEnvelope<string>.Create(
+        // Hop 3: Document generated as a side effect
+        var doc = IntegrationEnvelope<string>.Create(
             "InvoiceGenerated", "BillingService", "invoice.generated",
-            correlationId: envelopeA.CorrelationId,
-            causationId: envelopeB.MessageId) with
+            correlationId: command.CorrelationId,
+            causationId: evt.MessageId) with
         {
             Intent = MessageIntent.Document,
         };
+        await channel.SendAsync(doc, "documents", CancellationToken.None);
 
-        await _output.PublishAsync(envelopeA, "commands");
-        await _output.PublishAsync(envelopeB, "events");
-        await _output.PublishAsync(envelopeC, "documents");
+        output.AssertReceivedCount(3);
+        var rCmd = output.GetReceived<string>(0);
+        var rEvt = output.GetReceived<string>(1);
+        var rDoc = output.GetReceived<string>(2);
 
-        _output.AssertReceivedCount(3);
-        var rA = _output.GetReceived<string>(0);
-        var rB = _output.GetReceived<string>(1);
-        var rC = _output.GetReceived<string>(2);
+        // Causation chain: Command → Event → Document
+        Assert.That(rCmd.CausationId, Is.Null);
+        Assert.That(rEvt.CausationId, Is.EqualTo(rCmd.MessageId));
+        Assert.That(rDoc.CausationId, Is.EqualTo(rEvt.MessageId));
 
-        Assert.That(rA.CausationId, Is.Null);
-        Assert.That(rB.CausationId, Is.EqualTo(rA.MessageId));
-        Assert.That(rC.CausationId, Is.EqualTo(rB.MessageId));
-        Assert.That(rB.CorrelationId, Is.EqualTo(rA.CorrelationId));
-        Assert.That(rC.CorrelationId, Is.EqualTo(rA.CorrelationId));
+        // All share the same business transaction correlation
+        Assert.That(rEvt.CorrelationId, Is.EqualTo(rCmd.CorrelationId));
+        Assert.That(rDoc.CorrelationId, Is.EqualTo(rCmd.CorrelationId));
+
+        // Each has the correct intent
+        Assert.That(rCmd.Intent, Is.EqualTo(MessageIntent.Command));
+        Assert.That(rEvt.Intent, Is.EqualTo(MessageIntent.Event));
+        Assert.That(rDoc.Intent, Is.EqualTo(MessageIntent.Document));
+
+        // Routed to correct topics
+        output.AssertReceivedOnTopic("commands", 1);
+        output.AssertReceivedOnTopic("events", 1);
+        output.AssertReceivedOnTopic("documents", 1);
+
+        await output.DisposeAsync();
     }
 
+    // ── Challenge 3: Split Sequence with Full Metadata ──────────────────
+
     [Test]
-    public async Task EndToEnd_SplitSequence_AllPartsPreserved()
+    public async Task Challenge3_SplitSequence_AllPartsWithMetadataPreserved()
     {
+        // A Splitter produces a sequence of messages: each carries
+        // SequenceNumber, TotalCount, shared CorrelationId, and custom
+        // metadata. All must survive delivery through a real channel.
+        var output = new MockEndpoint("split");
+        var channel = new PointToPointChannel(
+            output, output, NullLogger<PointToPointChannel>.Instance);
+
         var correlationId = Guid.NewGuid();
         const int total = 5;
 
@@ -119,12 +149,18 @@ public sealed class Exam
             {
                 SequenceNumber = i,
                 TotalCount = total,
+                Priority = MessagePriority.High,
+                Metadata = new Dictionary<string, string>
+                {
+                    [MessageHeaders.SequenceNumber] = i.ToString(),
+                    [MessageHeaders.TotalCount] = total.ToString(),
+                },
             };
-            await _output.PublishAsync(part, "chunks");
+            await channel.SendAsync(part, "chunks", CancellationToken.None);
         }
 
-        _output.AssertReceivedCount(total);
-        var all = _output.GetAllReceived<string>("chunks");
+        output.AssertReceivedCount(total);
+        var all = output.GetAllReceived<string>("chunks");
 
         for (var i = 0; i < total; i++)
         {
@@ -132,6 +168,10 @@ public sealed class Exam
             Assert.That(all[i].TotalCount, Is.EqualTo(total));
             Assert.That(all[i].Payload, Is.EqualTo($"chunk-{i}"));
             Assert.That(all[i].CorrelationId, Is.EqualTo(correlationId));
+            Assert.That(all[i].Priority, Is.EqualTo(MessagePriority.High));
+            Assert.That(all[i].Metadata[MessageHeaders.SequenceNumber], Is.EqualTo(i.ToString()));
         }
+
+        await output.DisposeAsync();
     }
 }

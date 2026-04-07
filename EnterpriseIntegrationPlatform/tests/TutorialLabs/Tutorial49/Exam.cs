@@ -2,7 +2,7 @@
 // Tutorial 49 – Testing Integrations (Exam)
 // ============================================================================
 // E2E challenges: causation chain verification, fault envelope with exception,
-// and full routing slip lifecycle via MockEndpoint.
+// and full routing slip lifecycle via NatsBrokerEndpoint (real NATS JetStream via Aspire).
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,18 +17,19 @@ public sealed class Exam
     [Test]
     public async Task Challenge1_CausationChain_ThreeGenerationsPublished()
     {
-        await using var output = new MockEndpoint("chain");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t49-exam-chain");
+        var topic = AspireFixture.UniqueTopic("t49-exam-events");
         var gp = IntegrationEnvelope<string>.Create("gp", "SvcA", "event.a");
         var parent = IntegrationEnvelope<string>.Create(
             "p", "SvcB", "event.b", correlationId: gp.CorrelationId, causationId: gp.MessageId);
         var child = IntegrationEnvelope<string>.Create(
             "c", "SvcC", "event.c", correlationId: gp.CorrelationId, causationId: parent.MessageId);
 
-        await output.PublishAsync(gp, "events");
-        await output.PublishAsync(parent, "events");
-        await output.PublishAsync(child, "events");
+        await nats.PublishAsync(gp, topic, default);
+        await nats.PublishAsync(parent, topic, default);
+        await nats.PublishAsync(child, topic, default);
 
-        output.AssertReceivedOnTopic("events", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
         Assert.That(parent.CausationId, Is.EqualTo(gp.MessageId));
         Assert.That(child.CausationId, Is.EqualTo(parent.MessageId));
         Assert.That(child.CorrelationId, Is.EqualTo(gp.CorrelationId));
@@ -51,7 +52,8 @@ public sealed class Exam
     [Test]
     public async Task Challenge3_RoutingSlipLifecycle_PublishesEachStep()
     {
-        await using var output = new MockEndpoint("slip");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t49-exam-slip");
+        var topic = AspireFixture.UniqueTopic("t49-exam-steps");
         var slip = new RoutingSlip(
         [
             new RoutingSlipStep("validate", "t1"),
@@ -64,13 +66,13 @@ public sealed class Exam
         while (!slip.IsComplete)
         {
             visited.Add(slip.CurrentStep!.StepName);
-            await output.PublishAsync(
+            await nats.PublishAsync(
                 IntegrationEnvelope<string>.Create(slip.CurrentStep.StepName, "test", "step.done"),
-                "step-events");
+                topic, default);
             slip = slip.Advance();
         }
 
         Assert.That(visited, Is.EqualTo(new[] { "validate", "enrich", "transform", "route" }));
-        output.AssertReceivedCount(4);
+        nats.AssertReceivedCount(4);
     }
 }

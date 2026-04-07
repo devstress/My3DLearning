@@ -2,7 +2,8 @@
 // Tutorial 48 – Notification Use Cases (Exam)
 // ============================================================================
 // E2E challenges: conditional ack/nack, multi-message notification batch,
-// and persistence activity flow via MockEndpoint.
+// and persistence activity flow via NatsBrokerEndpoint (real NATS JetStream
+// via Aspire).
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Activities;
@@ -20,41 +21,45 @@ public sealed class Exam
     [Test]
     public async Task Challenge1_ConditionalAckNack_CorrectTopics()
     {
-        await using var output = new MockEndpoint("cond");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t48-exam-cond");
+        var ackTopic = AspireFixture.UniqueTopic("t48-exam-ack");
+        var nackTopic = AspireFixture.UniqueTopic("t48-exam-nack");
         var validator = new DefaultMessageValidationService();
 
         // Valid message → ack
         var r1 = await validator.ValidateAsync("order.created", "{\"id\":1}");
-        await output.PublishAsync(
+        await nats.PublishAsync(
             IntegrationEnvelope<string>.Create("ok", "pipeline", "notification"),
-            r1.IsValid ? "ack" : "nack");
+            r1.IsValid ? ackTopic : nackTopic, default);
 
-        output.AssertReceivedOnTopic("ack", 1);
-        output.AssertReceivedCount(1);
+        nats.AssertReceivedOnTopic(ackTopic, 1);
+        nats.AssertReceivedCount(1);
     }
 
     [Test]
     public async Task Challenge2_BatchNotification_MultipleMessages()
     {
-        await using var output = new MockEndpoint("batch");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t48-exam-batch");
+        var topic = AspireFixture.UniqueTopic("t48-exam-batch-ack");
         var validator = new DefaultMessageValidationService();
 
         for (var i = 0; i < 5; i++)
         {
             var r = await validator.ValidateAsync("order.created", $"{{\"id\":{i}}}");
-            await output.PublishAsync(
+            await nats.PublishAsync(
                 IntegrationEnvelope<string>.Create($"msg-{i}", "pipeline", "batch.notify"),
-                "batch-ack");
+                topic, default);
         }
 
-        output.AssertReceivedCount(5);
-        output.AssertReceivedOnTopic("batch-ack", 5);
+        nats.AssertReceivedCount(5);
+        nats.AssertReceivedOnTopic(topic, 5);
     }
 
     [Test]
     public async Task Challenge3_PersistenceActivity_SaveAndUpdate()
     {
-        await using var output = new MockEndpoint("persist");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t48-exam-persist");
+        var topic = AspireFixture.UniqueTopic("t48-exam-delivery");
         var persistence = new MockPersistenceActivityService();
 
         var input = new IntegrationPipelineInput(
@@ -67,11 +72,11 @@ public sealed class Exam
             "Delivered", CancellationToken.None);
 
         // Publish delivery confirmation
-        await output.PublishAsync(
+        await nats.PublishAsync(
             IntegrationEnvelope<string>.Create("Delivered", "pipeline", "delivery.status"),
-            "delivery-confirmations");
+            topic, default);
 
         persistence.AssertSaveCount(1);
-        output.AssertReceivedOnTopic("delivery-confirmations", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 }

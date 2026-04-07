@@ -3,7 +3,8 @@
 // ============================================================================
 // EIP Pattern: Environment Cascade + Configuration Resolution
 // E2E: Full config cascade across all levels, multi-key resolution, and
-//      deployment-scenario configuration — all via MockEndpoint.
+//      deployment-scenario configuration — all via NatsBrokerEndpoint
+//      (real NATS JetStream via Aspire).
 // ============================================================================
 using EnterpriseIntegrationPlatform.Configuration;
 using EnterpriseIntegrationPlatform.Contracts;
@@ -16,10 +17,12 @@ namespace TutorialLabs.Tutorial43;
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_FullConfigCascade_WithMockEndpoint()
+    public async Task Challenge1_FullConfigCascade_WithNatsBrokerEndpoint()
     {
         using var notifier = new ConfigurationChangeNotifier();
-        await using var output = new MockEndpoint("exam-cascade");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t43-exam-cascade");
+        var topic = AspireFixture.UniqueTopic("t43-exam-cascade-results");
+
         var store = new InMemoryConfigurationStore(notifier);
 
         // Set up cascade: default → environment-specific
@@ -44,17 +47,19 @@ public sealed class Exam
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 $"{entry!.Key}={entry.Value}", "config-resolver", "config.cascade");
-            await output.PublishAsync(envelope, "cascade-results", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        output.AssertReceivedOnTopic("cascade-results", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
     }
 
     [Test]
     public async Task Challenge2_MultiKeyResolution_AcrossEnvironments()
     {
         using var notifier = new ConfigurationChangeNotifier();
-        await using var output = new MockEndpoint("exam-multikey");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t43-exam-multikey");
+        var topic = AspireFixture.UniqueTopic("t43-exam-prod-config");
+
         var store = new InMemoryConfigurationStore(notifier);
 
         await store.SetAsync(new ConfigurationEntry("Broker:Url", "nats://localhost:4222", "default"));
@@ -76,17 +81,19 @@ public sealed class Exam
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 $"{kvp.Key}={kvp.Value.Value}", "config-resolver", "config.multi");
-            await output.PublishAsync(envelope, "prod-config", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        output.AssertReceivedOnTopic("prod-config", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
     }
 
     [Test]
     public async Task Challenge3_DeploymentConfigScenario_PublishAllResolved()
     {
         using var notifier = new ConfigurationChangeNotifier();
-        await using var output = new MockEndpoint("exam-deploy");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t43-exam-deploy");
+        var topic = AspireFixture.UniqueTopic("t43-exam-deploy-manifest");
+
         var store = new InMemoryConfigurationStore(notifier);
 
         // Simulate K8s-style config: defaults + per-namespace overrides
@@ -112,9 +119,9 @@ public sealed class Exam
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 kvp.Value.Value, "deployer", "deploy.config");
-            await output.PublishAsync(envelope, "deploy-manifest", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        output.AssertReceivedOnTopic("deploy-manifest", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
     }
 }
