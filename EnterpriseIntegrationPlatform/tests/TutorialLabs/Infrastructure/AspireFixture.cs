@@ -6,17 +6,17 @@
 // NatsBrokerEndpoint from the NATS URL. Tests that need Temporal use the
 // real Temporal address.
 //
-// Usage: [SetUpFixture] at the TutorialLabs level ensures the Aspire host
-// starts once per test run (not per test class).
+// This [SetUpFixture] is in the global (no) namespace so it applies to ALL
+// test classes in the assembly. It starts once per test run.
 // ============================================================================
 
 using NUnit.Framework;
-
-namespace TutorialLabs.Infrastructure;
+using TutorialLabs.Infrastructure;
 
 /// <summary>
 /// NUnit SetUpFixture that starts the Aspire TestAppHost once per test run.
 /// All tutorials share the same infrastructure containers.
+/// Placed in the global namespace so it applies to all test fixtures.
 /// </summary>
 [SetUpFixture]
 public sealed class AspireFixture
