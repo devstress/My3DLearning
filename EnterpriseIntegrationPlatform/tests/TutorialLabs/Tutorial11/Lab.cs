@@ -2,8 +2,9 @@
 // Tutorial 11 – Dynamic Router (Lab)
 // ============================================================================
 // EIP Pattern: Dynamic Router
-// E2E: Wire real DynamicRouter with MockEndpoint as producer, register/
-// unregister routes at runtime, verify routing decisions and message delivery.
+// Real Integrations: Wire real DynamicRouter with NatsBrokerEndpoint (real
+// NATS JetStream via Aspire), register/unregister routes at runtime, verify
+// routing decisions and message delivery through real broker.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -18,85 +19,85 @@ namespace TutorialLabs.Tutorial11;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("dynamic-router-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
-    // ── 1. Route Resolution ──────────────────────────────────────────
+    // ── 1. Route Resolution (Real NATS) ──────────────────────────────
 
     [Test]
     public async Task Route_RegisteredKey_RoutesToDestination()
     {
-        var router = CreateRouter();
-        await router.RegisterAsync("order.created", "orders-topic");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t11-reg");
+        var targetTopic = AspireFixture.UniqueTopic("t11-orders");
+        var router = CreateRouter(nats);
+        await router.RegisterAsync("order.created", targetTopic);
 
         var envelope = IntegrationEnvelope<string>.Create(
             "order-data", "OrderService", "order.created");
         var decision = await router.RouteAsync(envelope);
 
-        Assert.That(decision.Destination, Is.EqualTo("orders-topic"));
+        Assert.That(decision.Destination, Is.EqualTo(targetTopic));
         Assert.That(decision.IsFallback, Is.False);
         Assert.That(decision.MatchedEntry, Is.Not.Null);
         Assert.That(decision.ConditionValue, Is.EqualTo("order.created"));
-        _output.AssertReceivedOnTopic("orders-topic", 1);
+        nats.AssertReceivedOnTopic(targetTopic, 1);
     }
 
     [Test]
     public async Task Route_UnregisteredKey_FallsBackToDefault()
     {
-        var router = CreateRouter(fallback: "dead-letter");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t11-fallback");
+        var fallback = AspireFixture.UniqueTopic("t11-dl");
+        var router = CreateRouter(nats, fallback: fallback);
         await router.RegisterAsync("order.created", "orders-topic");
 
         var envelope = IntegrationEnvelope<string>.Create(
             "unknown", "Svc", "unknown.event");
         var decision = await router.RouteAsync(envelope);
 
-        Assert.That(decision.Destination, Is.EqualTo("dead-letter"));
+        Assert.That(decision.Destination, Is.EqualTo(fallback));
         Assert.That(decision.IsFallback, Is.True);
         Assert.That(decision.MatchedEntry, Is.Null);
-        _output.AssertReceivedOnTopic("dead-letter", 1);
+        nats.AssertReceivedOnTopic(fallback, 1);
     }
 
     [Test]
     public async Task Route_NoMatchNoFallback_ThrowsInvalidOperation()
     {
-        var router = CreateRouter(fallback: null);
+        await using var nats = AspireFixture.CreateNatsEndpoint("t11-nofb");
+        var router = CreateRouter(nats, fallback: null);
 
         var envelope = IntegrationEnvelope<string>.Create(
             "data", "Svc", "no.match");
 
         Assert.ThrowsAsync<InvalidOperationException>(
             async () => await router.RouteAsync(envelope));
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
 
-    // ── 2. Runtime Route Management ──────────────────────────────────
+    // ── 2. Runtime Route Management (Real NATS) ──────────────────────
 
     [Test]
     public async Task Register_UpdatesExistingRoute()
     {
-        var router = CreateRouter();
+        await using var nats = AspireFixture.CreateNatsEndpoint("t11-update");
+        var newTopic = AspireFixture.UniqueTopic("t11-new");
+        var router = CreateRouter(nats);
         await router.RegisterAsync("order.created", "old-topic");
-        await router.RegisterAsync("order.created", "new-topic");
+        await router.RegisterAsync("order.created", newTopic);
 
         var envelope = IntegrationEnvelope<string>.Create(
             "data", "Svc", "order.created");
         var decision = await router.RouteAsync(envelope);
 
-        Assert.That(decision.Destination, Is.EqualTo("new-topic"));
-        _output.AssertReceivedOnTopic("new-topic", 1);
+        Assert.That(decision.Destination, Is.EqualTo(newTopic));
+        nats.AssertReceivedOnTopic(newTopic, 1);
     }
 
     [Test]
     public async Task Unregister_RemovesRoute_FallsBack()
     {
-        var router = CreateRouter(fallback: "fallback-topic");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t11-unreg");
+        var fallback = AspireFixture.UniqueTopic("t11-fb");
+        var router = CreateRouter(nats, fallback: fallback);
         await router.RegisterAsync("order.created", "orders-topic");
         var removed = await router.UnregisterAsync("order.created");
 
@@ -107,13 +108,14 @@ public sealed class Lab
         var decision = await router.RouteAsync(envelope);
 
         Assert.That(decision.IsFallback, Is.True);
-        _output.AssertReceivedOnTopic("fallback-topic", 1);
+        nats.AssertReceivedOnTopic(fallback, 1);
     }
 
     [Test]
     public async Task Unregister_NonExistentKey_ReturnsFalse()
     {
-        var router = CreateRouter();
+        await using var nats = AspireFixture.CreateNatsEndpoint("t11-nokey");
+        var router = CreateRouter(nats);
 
         var removed = await router.UnregisterAsync("no-such-key");
 
@@ -126,7 +128,8 @@ public sealed class Lab
     [Test]
     public async Task GetRoutingTable_ReturnsSnapshot()
     {
-        var router = CreateRouter();
+        await using var nats = AspireFixture.CreateNatsEndpoint("t11-table");
+        var router = CreateRouter(nats);
         await router.RegisterAsync("order.created", "orders-topic", "participant-1");
         await router.RegisterAsync("payment.received", "payments-topic", "participant-2");
 
@@ -138,7 +141,8 @@ public sealed class Lab
         Assert.That(table["order.created"].ParticipantId, Is.EqualTo("participant-1"));
     }
 
-    private DynamicRouter CreateRouter(string? fallback = "catch-all")
+    private static DynamicRouter CreateRouter(
+        NatsBrokerEndpoint nats, string? fallback = "catch-all")
     {
         var options = Options.Create(new DynamicRouterOptions
         {
@@ -147,6 +151,6 @@ public sealed class Lab
             CaseInsensitive = true,
         });
         return new DynamicRouter(
-            _output, options, NullLogger<DynamicRouter>.Instance);
+            nats, options, NullLogger<DynamicRouter>.Instance);
     }
 }

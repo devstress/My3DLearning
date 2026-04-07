@@ -2,10 +2,9 @@
 // Tutorial 10 – Message Filter (Lab)
 // ============================================================================
 // EIP Pattern: Message Filter
-// End-to-End: Wire real MessageFilter with MockEndpoint, configure accept/
-// reject conditions using RuleCondition operators (Equals, Contains, In, Or),
-// verify messages arrive at output/discard topics, test silent discard when
-// no DiscardTopic is configured, and multi-condition logic.
+// Real Integrations: Wire real MessageFilter with NatsBrokerEndpoint (real
+// NATS JetStream via Aspire), configure accept/reject conditions using
+// RuleCondition operators, verify messages arrive at output/discard topics.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -21,73 +20,72 @@ namespace TutorialLabs.Tutorial10;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("filter-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-    // ── 1. Accept & Reject ──────────────────────────────────────────────
+    // ── 1. Accept & Reject (Real NATS) ──────────────────────────────────
 
     [Test]
     public async Task Filter_Accept_PublishesToOutputTopic()
     {
-        // When all conditions match, the message passes to OutputTopic.
-        var filter = CreateFilter("order.created", "orders-accepted", "orders-rejected");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t10-accept");
+        var outputTopic = AspireFixture.UniqueTopic("t10-accepted");
+        var discardTopic = AspireFixture.UniqueTopic("t10-rejected");
+
+        var filter = CreateFilter(nats, "order.created", outputTopic, discardTopic);
 
         var envelope = IntegrationEnvelope<string>.Create(
             "valid-order", "OrderService", "order.created");
         var result = await filter.FilterAsync(envelope);
 
         Assert.That(result.Passed, Is.True);
-        Assert.That(result.OutputTopic, Is.EqualTo("orders-accepted"));
-        _output.AssertReceivedOnTopic("orders-accepted", 1);
+        Assert.That(result.OutputTopic, Is.EqualTo(outputTopic));
+        nats.AssertReceivedOnTopic(outputTopic, 1);
     }
 
     [Test]
     public async Task Filter_Reject_PublishesToDiscardTopic()
     {
-        // When conditions don't match and a DiscardTopic is configured,
-        // the message routes to the discard topic for investigation.
-        var filter = CreateFilter("order.created", "orders-accepted", "orders-rejected");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t10-reject");
+        var outputTopic = AspireFixture.UniqueTopic("t10-out");
+        var discardTopic = AspireFixture.UniqueTopic("t10-disc");
+
+        var filter = CreateFilter(nats, "order.created", outputTopic, discardTopic);
 
         var envelope = IntegrationEnvelope<string>.Create(
             "unknown", "UnknownService", "unknown.event");
         var result = await filter.FilterAsync(envelope);
 
         Assert.That(result.Passed, Is.False);
-        Assert.That(result.OutputTopic, Is.EqualTo("orders-rejected"));
-        _output.AssertReceivedOnTopic("orders-rejected", 1);
+        Assert.That(result.OutputTopic, Is.EqualTo(discardTopic));
+        nats.AssertReceivedOnTopic(discardTopic, 1);
     }
 
     [Test]
     public async Task Filter_NoConditions_PassThrough()
     {
-        // No conditions = all messages pass. This is the identity filter.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t10-pass");
+        var outputTopic = AspireFixture.UniqueTopic("t10-passthru");
+
         var options = Options.Create(new MessageFilterOptions
         {
             Conditions = [],
-            OutputTopic = "pass-through",
+            OutputTopic = outputTopic,
         });
         var filter = new MessageFilter(
-            _output, options, NullLogger<MessageFilter>.Instance);
+            nats, options, NullLogger<MessageFilter>.Instance);
 
         var envelope = IntegrationEnvelope<string>.Create("any", "svc", "any.type");
         var result = await filter.FilterAsync(envelope);
 
         Assert.That(result.Passed, Is.True);
-        _output.AssertReceivedOnTopic("pass-through", 1);
+        nats.AssertReceivedOnTopic(outputTopic, 1);
     }
 
-    // ── 2. Silent Discard & Source Filtering ────────────────────────────
+    // ── 2. Silent Discard & Source Filtering (Real NATS) ────────────────
 
     [Test]
     public async Task Filter_SilentDiscard_NoPublishWhenNoDiscardTopic()
     {
-        // Without a DiscardTopic, rejected messages are silently dropped.
-        // No message is published anywhere — the filter absorbs it.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t10-silent");
+
         var options = Options.Create(new MessageFilterOptions
         {
             Conditions =
@@ -103,7 +101,7 @@ public sealed class Lab
             OutputTopic = "output-topic",
         });
         var filter = new MessageFilter(
-            _output, options, NullLogger<MessageFilter>.Instance);
+            nats, options, NullLogger<MessageFilter>.Instance);
 
         var envelope = IntegrationEnvelope<string>.Create(
             "wrong", "svc", "wrong.type");
@@ -112,13 +110,16 @@ public sealed class Lab
         Assert.That(result.Passed, Is.False);
         Assert.That(result.OutputTopic, Is.Null);
         Assert.That(result.Reason, Does.Contain("silently discarded"));
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
     [Test]
     public async Task Filter_BySource_AcceptsAndRejects()
     {
-        // Source-based filtering: only messages from TrustedService pass.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t10-source");
+        var trustedTopic = AspireFixture.UniqueTopic("t10-trusted");
+        var untrustedTopic = AspireFixture.UniqueTopic("t10-untrusted");
+
         var options = Options.Create(new MessageFilterOptions
         {
             Conditions =
@@ -131,11 +132,11 @@ public sealed class Lab
                 },
             ],
             Logic = RuleLogicOperator.And,
-            OutputTopic = "trusted-out",
-            DiscardTopic = "untrusted-dlq",
+            OutputTopic = trustedTopic,
+            DiscardTopic = untrustedTopic,
         });
         var filter = new MessageFilter(
-            _output, options, NullLogger<MessageFilter>.Instance);
+            nats, options, NullLogger<MessageFilter>.Instance);
 
         var trusted = IntegrationEnvelope<string>.Create(
             "data", "TrustedService", "data.event");
@@ -145,17 +146,19 @@ public sealed class Lab
         Assert.That((await filter.FilterAsync(trusted)).Passed, Is.True);
         Assert.That((await filter.FilterAsync(untrusted)).Passed, Is.False);
 
-        _output.AssertReceivedOnTopic("trusted-out", 1);
-        _output.AssertReceivedOnTopic("untrusted-dlq", 1);
+        nats.AssertReceivedOnTopic(trustedTopic, 1);
+        nats.AssertReceivedOnTopic(untrustedTopic, 1);
     }
 
-    // ── 3. Advanced Operators ───────────────────────────────────────────
+    // ── 3. Advanced Operators (Real NATS) ───────────────────────────────
 
     [Test]
     public async Task Filter_InOperator_MatchesAnyOfCommaSeparatedValues()
     {
-        // In operator: comma-separated list of allowed values (case-insensitive).
-        // Any match passes; no match rejects.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t10-in");
+        var partnerTopic = AspireFixture.UniqueTopic("t10-partners");
+        var rejectedTopic = AspireFixture.UniqueTopic("t10-reject");
+
         var options = Options.Create(new MessageFilterOptions
         {
             Conditions =
@@ -168,11 +171,11 @@ public sealed class Lab
                 },
             ],
             Logic = RuleLogicOperator.And,
-            OutputTopic = "partners",
-            DiscardTopic = "rejected",
+            OutputTopic = partnerTopic,
+            DiscardTopic = rejectedTopic,
         });
         var filter = new MessageFilter(
-            _output, options, NullLogger<MessageFilter>.Instance);
+            nats, options, NullLogger<MessageFilter>.Instance);
 
         var a = IntegrationEnvelope<string>.Create("d", "PartnerA", "ev");
         var b = IntegrationEnvelope<string>.Create("d", "PartnerB", "ev");
@@ -182,15 +185,17 @@ public sealed class Lab
         Assert.That((await filter.FilterAsync(b)).Passed, Is.True);
         Assert.That((await filter.FilterAsync(c)).Passed, Is.False);
 
-        _output.AssertReceivedOnTopic("partners", 2);
-        _output.AssertReceivedOnTopic("rejected", 1);
+        nats.AssertReceivedOnTopic(partnerTopic, 2);
+        nats.AssertReceivedOnTopic(rejectedTopic, 1);
     }
 
     [Test]
     public async Task Filter_OrLogic_EitherConditionSuffices()
     {
-        // Or logic: at least one condition must match for the message to pass.
-        // This enables "priority override" or "VIP" fast-lane patterns.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t10-or");
+        var fastLane = AspireFixture.UniqueTopic("t10-fast");
+        var standard = AspireFixture.UniqueTopic("t10-std");
+
         var options = Options.Create(new MessageFilterOptions
         {
             Conditions =
@@ -209,11 +214,11 @@ public sealed class Lab
                 },
             ],
             Logic = RuleLogicOperator.Or,
-            OutputTopic = "fast-lane",
-            DiscardTopic = "standard",
+            OutputTopic = fastLane,
+            DiscardTopic = standard,
         });
         var filter = new MessageFilter(
-            _output, options, NullLogger<MessageFilter>.Instance);
+            nats, options, NullLogger<MessageFilter>.Instance);
 
         var overrideMsg = IntegrationEnvelope<string>.Create("d", "svc", "ev") with
             { Metadata = new Dictionary<string, string> { ["priority-override"] = "true" } };
@@ -226,11 +231,12 @@ public sealed class Lab
         Assert.That((await filter.FilterAsync(vipMsg)).Passed, Is.True);
         Assert.That((await filter.FilterAsync(normalMsg)).Passed, Is.False);
 
-        _output.AssertReceivedOnTopic("fast-lane", 2);
-        _output.AssertReceivedOnTopic("standard", 1);
+        nats.AssertReceivedOnTopic(fastLane, 2);
+        nats.AssertReceivedOnTopic(standard, 1);
     }
 
-    private MessageFilter CreateFilter(string acceptType, string outputTopic, string discardTopic)
+    private static MessageFilter CreateFilter(
+        NatsBrokerEndpoint nats, string acceptType, string outputTopic, string discardTopic)
     {
         var options = Options.Create(new MessageFilterOptions
         {
@@ -247,6 +253,6 @@ public sealed class Lab
             OutputTopic = outputTopic,
             DiscardTopic = discardTopic,
         });
-        return new MessageFilter(_output, options, NullLogger<MessageFilter>.Instance);
+        return new MessageFilter(nats, options, NullLogger<MessageFilter>.Instance);
     }
 }
