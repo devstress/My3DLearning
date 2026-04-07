@@ -1,10 +1,22 @@
 // ============================================================================
-// Tutorial 04 – Integration Envelope (Exam)
+// Tutorial 04 – Integration Envelope (Exam · Assessment Challenges)
 // ============================================================================
-// EIP Patterns: Envelope Wrapper, Fault Message, Message History
-// End-to-End: FaultEnvelope lifecycle with exception capture and retry
-// exhaustion, multi-hop causation chain through PointToPointChannel, and
-// split-sequence reassembly with full metadata verification.
+// PURPOSE: Prove you can apply envelope patterns in realistic integration
+//          scenarios — fault handling, multi-hop causation, and split-sequence
+//          reassembly. Each challenge is progressively harder.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — FaultEnvelope lifecycle with retry exhaustion
+//   🟡 Intermediate — Multi-hop causation chain through PointToPointChannel
+//   🔴 Advanced     — Split-sequence reassembly with full metadata verification
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint / PointToPointChannel
 // ============================================================================
 
 using NUnit.Framework;
@@ -18,10 +30,19 @@ namespace TutorialLabs.Tutorial04;
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: FaultEnvelope Lifecycle ─────────────────────────────
+    // ── 🟢 STARTER — FaultEnvelope Lifecycle with Retry Exhaustion ─────
+    //
+    // SCENARIO: A message fails processing 3 times due to database timeouts.
+    // After retry exhaustion, a FaultEnvelope is created capturing the
+    // original message identity, the final exception details, and the retry
+    // count — ready for dead-letter queue routing and later replay.
+    //
+    // WHAT YOU PROVE: You can create a FaultEnvelope that preserves
+    // correlation from the original message and captures exception details.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public void Challenge1_FaultEnvelope_RetryExhaustion()
+    public void Starter_FaultEnvelope_RetryExhaustion()
     {
         // Simulate retry exhaustion: message fails 3 times, then generates
         // a FaultEnvelope capturing the final exception and all retry attempts.
@@ -59,10 +80,21 @@ public sealed class Exam
         Assert.That(fault2.FaultId, Is.Not.EqualTo(fault.FaultId));
     }
 
-    // ── Challenge 2: Multi-Hop Causation Through Channel ────────────────
+    // ── 🟡 INTERMEDIATE — Multi-Hop Causation Through Channel ─────────
+    //
+    // SCENARIO: A web application submits a "PlaceOrder" command (hop 1).
+    // The order service processes it and emits an "OrderPlaced" event
+    // (hop 2). The billing service reacts and generates an invoice document
+    // (hop 3). Each message flows through a PointToPointChannel with the
+    // correct causation chain and message intent.
+    //
+    // WHAT YOU PROVE: You can build a three-hop causation chain where
+    // Command → Event → Document flows through channels with correct
+    // lineage and intent at each hop.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public async Task Challenge2_CausationChain_ThreeHopsThroughChannel()
+    public async Task Intermediate_CausationChain_ThreeHopsThroughChannel()
     {
         // Build a three-hop causation chain where each message is delivered
         // through a PointToPointChannel: Command → Event → Document.
@@ -126,10 +158,19 @@ public sealed class Exam
         await output.DisposeAsync();
     }
 
-    // ── Challenge 3: Split Sequence with Full Metadata ──────────────────
+    // ── 🔴 ADVANCED — Split Sequence with Full Metadata ────────────────
+    //
+    // SCENARIO: A Splitter decomposes a large dataset into 5 chunks, each
+    // carrying SequenceNumber, TotalCount, shared CorrelationId, High
+    // priority, and custom metadata headers. All chunks must survive
+    // delivery through a PointToPointChannel with every field intact.
+    //
+    // WHAT YOU PROVE: You can produce a complete split sequence with full
+    // metadata and verify reassembly-ready delivery through a channel.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public async Task Challenge3_SplitSequence_AllPartsWithMetadataPreserved()
+    public async Task Advanced_SplitSequence_AllPartsWithMetadataPreserved()
     {
         // A Splitter produces a sequence of messages: each carries
         // SequenceNumber, TotalCount, shared CorrelationId, and custom

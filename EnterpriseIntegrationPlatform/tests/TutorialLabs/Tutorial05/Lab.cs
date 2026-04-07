@@ -1,10 +1,22 @@
 // ============================================================================
-// Tutorial 05 – Message Brokers (Lab)
+// Tutorial 05 – Message Brokers (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Message Endpoint, Event-Driven Consumer, Polling Consumer,
-//              Selective Consumer
-// Real Integrations: Publishing and consumer pattern tests use real NATS
-// JetStream via Aspire. BrokerOptions configuration tests are pure data.
+// PURPOSE: Run each test in order to see how broker configuration,
+//          protocol-agnostic publishing, and consumer patterns work through
+//          real NATS JetStream via Aspire. Read the code and comments to
+//          understand each concept before moving to the Exam.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. BrokerOptions defaults — NatsJetStream, 30s timeout, section name
+//   2. BrokerType enum — all four supported protocols
+//   3. Protocol-agnostic publish — message delivered via abstraction
+//   4. Multi-topic routing — per-topic delivery verification
+//   5. Event-driven consumer — push-based handler triggered on arrival
+//   6. Polling consumer — batch retrieval with max-message limit
+//   7. Selective consumer — predicate-based priority filtering
+//   8. Multiple handlers — independent subscription handlers all invoked
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using NUnit.Framework;

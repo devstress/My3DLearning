@@ -1,10 +1,22 @@
 // ============================================================================
-// Tutorial 03 – Your First Message (Exam)
+// Tutorial 03 – Your First Message (Exam · Assessment Challenges)
 // ============================================================================
-// EIP Patterns: Message, Message Channel, Causation Chain, Message Expiration
-// End-to-End: Advanced message construction — three-generation causation chain,
-// Point-to-Point vs Publish-Subscribe channel semantics verification, and
-// message lifecycle with priority, intent, and expiration.
+// PURPOSE: Prove you can apply envelope construction, causation chains, and
+//          channel semantics in realistic integration scenarios. Each challenge
+//          is progressively harder and builds on concepts from the Lab.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Three-generation causation chain with shared CorrelationId
+//   🟡 Intermediate — P2P vs PubSub delivery semantics side-by-side
+//   🔴 Advanced     — Priority, intent, expiration, and metadata lifecycle
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint / PointToPointChannel / PublishSubscribeChannel
 // ============================================================================
 
 using NUnit.Framework;
@@ -18,10 +30,20 @@ namespace TutorialLabs.Tutorial03;
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Three-Generation Causation Chain ────────────────────
+    // ── 🟢 STARTER — Three-Generation Causation Chain ──────────────────
+    //
+    // SCENARIO: An e-commerce platform processes an order through three
+    // services: OrderService creates it, ValidationService validates it,
+    // FulfillmentService ships it. Each message must carry the correct
+    // causation lineage so distributed tracing can reconstruct the flow.
+    //
+    // WHAT YOU PROVE: You can build a multi-generation causation chain
+    // where all messages share a CorrelationId and each child references
+    // its parent via CausationId.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public async Task Challenge1_CausationChain_ThreeGenerationLineage()
+    public async Task Starter_CausationChain_ThreeGenerationLineage()
     {
         // Build a three-generation message lineage:
         //   Order.Created → Order.Validated → Order.Fulfilled
@@ -65,10 +87,19 @@ public sealed class Exam
         await output.DisposeAsync();
     }
 
-    // ── Challenge 2: P2P vs Pub/Sub Channel Semantics ───────────────────
+    // ── 🟡 INTERMEDIATE — P2P vs Pub/Sub Channel Semantics ────────────
+    //
+    // SCENARIO: A platform uses P2P channels for commands (one consumer per
+    // message) and PubSub channels for events (all subscribers receive).
+    // You must demonstrate both patterns side-by-side and verify the
+    // fundamental delivery difference.
+    //
+    // WHAT YOU PROVE: You understand the semantic difference between P2P
+    // (queue) and PubSub (fan-out) channels and can wire both correctly.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public async Task Challenge2_PointToPointVsPubSub_ChannelSemantics()
+    public async Task Intermediate_PointToPointVsPubSub_ChannelSemantics()
     {
         // Demonstrate the fundamental difference:
         // - Point-to-Point: one consumer receives each message
@@ -114,10 +145,20 @@ public sealed class Exam
         await pubSubB.DisposeAsync();
     }
 
-    // ── Challenge 3: Priority, Intent, and Expiration Lifecycle ──────────
+    // ── 🔴 ADVANCED — Priority, Intent, and Expiration Lifecycle ───────
+    //
+    // SCENARIO: An operations platform processes messages at different
+    // priority levels: a critical infrastructure command (expires in 1hr),
+    // a low-priority background report (no expiration), and an already-
+    // expired price update event. All must be delivered with correct
+    // priority, intent, expiration status, and metadata preserved.
+    //
+    // WHAT YOU PROVE: You can construct envelopes with full lifecycle
+    // properties and verify they survive delivery without data loss.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public async Task Challenge3_PriorityExpiration_MessageLifecycle()
+    public async Task Advanced_PriorityExpiration_MessageLifecycle()
     {
         // Build messages with different priorities and intents,
         // verify expiration logic, and confirm metadata survives delivery.

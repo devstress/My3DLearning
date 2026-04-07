@@ -1,10 +1,22 @@
 // ============================================================================
-// Tutorial 02 – Temporal.io Workflow Orchestration (Exam)
+// Tutorial 02 – Temporal.io Workflow Orchestration (Exam · Assessment Challenges)
 // ============================================================================
-// EIP Patterns: Process Manager, Saga (Compensation), Scatter-Gather
-// End-to-End: Advanced Temporal patterns — atomic pipeline orchestration,
-// saga compensation with step-level rollback, parallel fan-out with result
-// aggregation, and notification-enabled workflows.
+// PURPOSE: Prove you can apply Temporal workflow orchestration in realistic
+//          scenarios. Each challenge is progressively harder and builds on
+//          concepts from the Lab.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Multi-step saga with LIFO compensation tracking
+//   🟡 Intermediate — Fan-out with per-workflow success/failure aggregation
+//   🔴 Advanced     — Notification-enabled workflow with custom Ack/Nack via DI
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockTemporalWorkflowDispatcher / AspireIntegrationTestHost
 // ============================================================================
 
 using System.Text.Json;
@@ -23,10 +35,19 @@ namespace TutorialLabs.Tutorial02;
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Multi-Step Saga with Compensation Tracking ──────────
+    // ── 🟢 STARTER — Multi-Step Saga with Compensation Tracking ────────
+    //
+    // SCENARIO: A 4-step integration pipeline processes an incoming message.
+    // Step 3 (Enrich) fails after steps 1 (Persist) and 2 (ValidateSchema)
+    // have completed. The saga must compensate completed steps in reverse
+    // order (LIFO) to maintain data consistency.
+    //
+    // WHAT YOU PROVE: You understand saga compensation — forward steps are
+    // tracked, and on failure, completed steps are rolled back in reverse.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public async Task Challenge1_SagaCompensation_TracksStepsAndRollsBack()
+    public async Task Starter_SagaCompensation_TracksStepsAndRollsBack()
     {
         // Simulate a 4-step saga where step 3 fails.
         // Steps 1 and 2 must be compensated in reverse order.
@@ -78,10 +99,19 @@ public sealed class Exam
         Assert.That(compensatedSteps[1], Is.EqualTo("Compensate:Persist"));
     }
 
-    // ── Challenge 2: Fan-Out with Result Aggregation ────────────────────
+    // ── 🟡 INTERMEDIATE — Fan-Out with Result Aggregation ──────────────
+    //
+    // SCENARIO: An order containing multiple line items is split into
+    // independent Temporal workflows — one per SKU. Each workflow validates
+    // its SKU independently (SKU-002 is discontinued and fails). Results
+    // are aggregated to determine overall order status.
+    //
+    // WHAT YOU PROVE: You can fan out messages into parallel workflows,
+    // handle mixed success/failure results, and aggregate outcomes.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public async Task Challenge2_FanOut_AggregatesResultsFromParallelWorkflows()
+    public async Task Intermediate_FanOut_AggregatesResultsFromParallelWorkflows()
     {
         // Pattern: Split an order into line items, dispatch each as an
         // independent Temporal workflow, aggregate results.
@@ -133,10 +163,19 @@ public sealed class Exam
         Assert.That(results.Single(r => !r.Success).Sku, Is.EqualTo("SKU-002"));
     }
 
-    // ── Challenge 3: Notification-Enabled Workflow ──────────────────────
+    // ── 🔴 ADVANCED — Notification-Enabled Workflow via DI ─────────────
+    //
+    // SCENARIO: A notification service completes an order and publishes
+    // Ack/Nack to custom NATS subjects configured via DI. The full
+    // AspireIntegrationTestHost DI container must wire PipelineOrchestrator
+    // with the mock dispatcher and custom PipelineOptions.
+    //
+    // WHAT YOU PROVE: You can configure notification-enabled workflows
+    // end-to-end through DI, with custom Ack/Nack subject routing.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public async Task Challenge3_NotificationsEnabled_AckSubjectConfigured()
+    public async Task Advanced_NotificationsEnabled_AckSubjectConfigured()
     {
         // When NotificationsEnabled=true, the workflow publishes Ack/Nack
         // to configurable NATS subjects. This tests the subject wiring.

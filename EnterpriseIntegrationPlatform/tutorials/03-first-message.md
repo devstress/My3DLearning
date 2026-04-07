@@ -2,6 +2,17 @@
 
 Create an `IntegrationEnvelope<T>`, understand its anatomy (auto-generated identity, causation chains, priority, metadata, expiration), and deliver messages through Point-to-Point and Publish-Subscribe channels using MockEndpoint for verified end-to-end testing.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Create an `IntegrationEnvelope<T>` with auto-generated `MessageId`, `CorrelationId`, and `Timestamp`
+2. Build parent→child causation chains using `CausationId` and shared `CorrelationId`
+3. Set priority, intent, schema version, and expiration on an envelope
+4. Attach metadata key-value pairs and sequence numbers to messages
+5. Send messages through a `PointToPointChannel` and verify single-consumer delivery
+6. Fan out messages through a `PublishSubscribeChannel` and verify all subscribers receive
+
 ## Key Types
 
 ```csharp
@@ -44,99 +55,47 @@ public sealed class PublishSubscribeChannel : IPublishSubscribeChannel
 }
 ```
 
-## Exercises
+---
 
-### 1. Create an envelope and verify auto-generated identity fields
+## Lab — Guided Practice
 
-```csharp
-var envelope = IntegrationEnvelope<string>.Create(
-    "Hello, Messaging!", "Tutorial03", "greeting");
+> **Purpose:** Run each test in order to see how envelopes are constructed, how
+> metadata and lifecycle properties work, and how messages flow through real
+> NATS JetStream channels via `NatsBrokerEndpoint`.
 
-// MessageId, CorrelationId, Timestamp are auto-generated
-Assert.That(envelope.MessageId, Is.Not.EqualTo(Guid.Empty));
-Assert.That(envelope.CorrelationId, Is.Not.EqualTo(Guid.Empty));
-Assert.That(envelope.Timestamp, Is.GreaterThan(DateTimeOffset.MinValue));
-```
+| # | Test | Concept |
+|---|------|---------|
+| 1 | `Envelope_FactoryAutoGeneratesIdentityFields` | Auto-generated MessageId, CorrelationId, Timestamp |
+| 2 | `Envelope_DomainObjectPayload_PreservedEndToEnd` | Typed record payload survives publish → receive |
+| 3 | `Envelope_CausationId_LinksChildToParent` | Parent→child causation chain |
+| 4 | `Envelope_PriorityIntentSchemaVersion_DefaultsAndOverrides` | Defaults and `with` overrides for priority/intent |
+| 5 | `Envelope_Metadata_KeyValuePairsFlowWithMessage` | Metadata dictionary through real NATS |
+| 6 | `Envelope_ExpiresAt_IsExpiredProperty` | Message expiration pattern |
+| 7 | `Envelope_SequenceNumbers_SplitBatchTracking` | SequenceNumber + TotalCount for batch tracking |
+| 8 | `PointToPointChannel_SendToQueue_SingleDelivery` | P2P channel — single consumer delivery |
+| 9 | `PublishSubscribeChannel_FanOut_AllSubscribersReceive` | PubSub channel — fan-out to all subscribers |
+| 10 | `TopicRouting_MessagesDeliveredToCorrectTopics` | Topic-based routing through real NATS |
 
-### 2. Build a causation chain (parent→child lineage)
-
-```csharp
-var parent = IntegrationEnvelope<string>.Create(
-    "original-order", "OrderService", "order.created");
-
-var child = IntegrationEnvelope<string>.Create(
-    "order-validated", "ValidationService", "order.validated",
-    correlationId: parent.CorrelationId,
-    causationId: parent.MessageId);
-
-// Child references parent; both share the same CorrelationId
-Assert.That(child.CausationId, Is.EqualTo(parent.MessageId));
-Assert.That(child.CorrelationId, Is.EqualTo(parent.CorrelationId));
-```
-
-### 3. Set priority, intent, and expiration
-
-```csharp
-var urgentCommand = IntegrationEnvelope<string>.Create(
-    "shutdown-now", "OpsService", "infra.command") with
-{
-    Priority = MessagePriority.Critical,
-    Intent = MessageIntent.Command,
-    ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
-};
-
-Assert.That(urgentCommand.Priority, Is.EqualTo(MessagePriority.Critical));
-Assert.That(urgentCommand.IsExpired, Is.False);
-```
-
-### 4. Point-to-Point channel — queue delivery
-
-```csharp
-var output = new MockEndpoint("output");
-var channel = new PointToPointChannel(
-    output, output, NullLogger<PointToPointChannel>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "order-created", "OrderService", "order.created");
-
-await channel.SendAsync(envelope, "orders-queue", CancellationToken.None);
-
-output.AssertReceivedCount(1);
-Assert.That(output.GetReceived<string>().Payload, Is.EqualTo("order-created"));
-```
-
-### 5. Publish-Subscribe channel — fan-out to multiple subscribers
-
-```csharp
-var sub1 = new MockEndpoint("subscriber-1");
-var sub2 = new MockEndpoint("subscriber-2");
-
-var ch1 = new PublishSubscribeChannel(
-    sub1, sub1, NullLogger<PublishSubscribeChannel>.Instance);
-var ch2 = new PublishSubscribeChannel(
-    sub2, sub2, NullLogger<PublishSubscribeChannel>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "price-updated", "PricingService", "price.changed");
-
-await ch1.PublishAsync(envelope, "price-events", CancellationToken.None);
-await ch2.PublishAsync(envelope, "price-events", CancellationToken.None);
-
-sub1.AssertReceivedCount(1);
-sub2.AssertReceivedCount(1);
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial03/Lab.cs`](../tests/TutorialLabs/Tutorial03/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial03/Lab.cs`](../tests/TutorialLabs/Tutorial03/Lab.cs)
 
 ```bash
 dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial03.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial03/Exam.cs`](../tests/TutorialLabs/Tutorial03/Exam.cs)
+## Exam — Assessment Challenges
+
+> **Purpose:** Prove you can apply envelope construction, causation chains, and
+> channel semantics in realistic integration scenarios.
+
+| Difficulty | Challenge | What you prove |
+|------------|-----------|---------------|
+| 🟢 Starter | `Starter_CausationChain_ThreeGenerationLineage` | Three-generation causation chain with shared CorrelationId |
+| 🟡 Intermediate | `Intermediate_PointToPointVsPubSub_ChannelSemantics` | P2P vs PubSub delivery semantics side-by-side |
+| 🔴 Advanced | `Advanced_PriorityExpiration_MessageLifecycle` | Priority, intent, expiration, and metadata lifecycle |
+
+> 💻 [`tests/TutorialLabs/Tutorial03/Exam.cs`](../tests/TutorialLabs/Tutorial03/Exam.cs)
 
 ```bash
 dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial03.Exam"
