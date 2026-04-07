@@ -27,4 +27,13 @@ public enum BrokerType
     /// Suitable for large-scale on-prem production deployments.
     /// </summary>
     Pulsar = 2,
+
+    /// <summary>
+    /// PostgreSQL — uses a relational table as the message store with pg_notify
+    /// for low-latency push delivery and SELECT … FOR UPDATE SKIP LOCKED for
+    /// competing consumers. Ideal for lower-scale deployments (≤ 5,000 TPS)
+    /// where teams already run Postgres and want to avoid a dedicated broker.
+    /// Provides native ACID transactions via NpgsqlTransaction.
+    /// </summary>
+    Postgres = 3,
 }

@@ -20,6 +20,7 @@ public sealed class BrokerOptions
     /// For NATS: <c>nats://localhost:15222</c>.
     /// For Kafka: <c>localhost:9092</c>.
     /// For Pulsar: <c>pulsar://localhost:6650</c>.
+    /// For Postgres: <c>Host=localhost;Port=5432;Database=eip;Username=eip;Password=eip</c>.
     /// </summary>
     public string ConnectionString { get; set; } = string.Empty;
 

@@ -26,6 +26,10 @@ public static class IngestionServiceExtensions
                 "Ingestion.Pulsar",
                 "EnterpriseIntegrationPlatform.Ingestion.Pulsar.PulsarServiceExtensions",
                 "AddPulsarBroker"),
+            [BrokerType.Postgres] = (
+                "Ingestion.Postgres",
+                "EnterpriseIntegrationPlatform.Ingestion.Postgres.PostgresServiceExtensions",
+                "AddPostgresBroker"),
         };
 
     /// <summary>
