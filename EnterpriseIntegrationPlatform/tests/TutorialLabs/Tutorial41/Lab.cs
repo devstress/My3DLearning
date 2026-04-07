@@ -3,7 +3,8 @@
 // ============================================================================
 // EIP Pattern: Message State Tracking (backing the "Where is my message?" UI).
 // E2E: InMemoryMessageStateStore — record lifecycle events, query by
-//      correlation/business-key, publish results to MockEndpoint.
+//      correlation/business-key, publish results to NatsBrokerEndpoint
+//      (real NATS JetStream via Aspire).
 // ============================================================================
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
@@ -15,14 +16,6 @@ namespace TutorialLabs.Tutorial41;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("openclaw-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
     private static InMemoryMessageStateStore CreateStore() => new();
 
     private static MessageEvent MakeEvent(
@@ -43,8 +36,11 @@ public sealed class Lab
     // ── 1. State Tracking ────────────────────────────────────────────
 
     [Test]
-    public async Task RecordEvent_QueryByCorrelation_PublishToMockEndpoint()
+    public async Task RecordEvent_QueryByCorrelation_PublishToNatsBrokerEndpoint()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t41-record-query");
+        var topic = AspireFixture.UniqueTopic("t41-state-results");
+
         var store = CreateStore();
         var msgId = Guid.NewGuid();
         var corrId = Guid.NewGuid();
@@ -57,13 +53,16 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             events[0].Stage, "state-store", "state.query");
-        await _output.PublishAsync(envelope, "state-results", default);
-        _output.AssertReceivedOnTopic("state-results", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task RecordMultipleStages_TrackLifecycle_PublishLatest()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t41-lifecycle-track");
+        var topic = AspireFixture.UniqueTopic("t41-lifecycle-events");
+
         var store = CreateStore();
         var msgId = Guid.NewGuid();
         var corrId = Guid.NewGuid();
@@ -82,8 +81,8 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             latest.Stage, "state-store", "lifecycle.complete");
-        await _output.PublishAsync(envelope, "lifecycle-events", default);
-        _output.AssertReceivedOnTopic("lifecycle-events", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
 
@@ -92,6 +91,9 @@ public sealed class Lab
     [Test]
     public async Task QueryByBusinessKey_PublishMatchingEvents()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t41-bizkey-query");
+        var topic = AspireFixture.UniqueTopic("t41-bizkey-results");
+
         var store = CreateStore();
         var corrId = Guid.NewGuid();
 
@@ -108,15 +110,18 @@ public sealed class Lab
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 evt.Stage, "state-store", "bizkey.query");
-            await _output.PublishAsync(envelope, "bizkey-results", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        _output.AssertReceivedOnTopic("bizkey-results", 2);
+        nats.AssertReceivedOnTopic(topic, 2);
     }
 
     [Test]
     public async Task QueryByMessageId_PublishEventHistory()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t41-msgid-query");
+        var topic = AspireFixture.UniqueTopic("t41-message-history");
+
         var store = CreateStore();
         var msgId = Guid.NewGuid();
         var corrId = Guid.NewGuid();
@@ -130,8 +135,8 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             $"{events.Count} events", "state-store", "msgid.query");
-        await _output.PublishAsync(envelope, "message-history", default);
-        _output.AssertReceivedOnTopic("message-history", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
 
@@ -140,6 +145,9 @@ public sealed class Lab
     [Test]
     public async Task GetLatestByCorrelation_NoneRecorded_ReturnsNull()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t41-empty-query");
+        var topic = AspireFixture.UniqueTopic("t41-empty-results");
+
         var store = CreateStore();
 
         var latest = await store.GetLatestByCorrelationIdAsync(Guid.NewGuid());
@@ -150,13 +158,16 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             "not-found", "state-store", "state.empty");
-        await _output.PublishAsync(envelope, "empty-results", default);
-        _output.AssertReceivedOnTopic("empty-results", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
-    public async Task PublishAllLifecycleEventsToMockEndpoint()
+    public async Task PublishAllLifecycleEventsToNatsBrokerEndpoint()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t41-lifecycle-all");
+        var topic = AspireFixture.UniqueTopic("t41-lifecycle-stream");
+
         var store = CreateStore();
         var corrId = Guid.NewGuid();
 
@@ -172,11 +183,11 @@ public sealed class Lab
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 $"{evt.Stage}:{evt.Status}", "state-store", evt.MessageType);
-            await _output.PublishAsync(envelope, "lifecycle-stream", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        _output.AssertReceivedOnTopic("lifecycle-stream", 3);
-        var all = _output.GetAllReceived<string>("lifecycle-stream");
+        nats.AssertReceivedOnTopic(topic, 3);
+        var all = nats.GetAllReceived<string>(topic);
         Assert.That(all[0].Payload, Is.EqualTo("Ingestion:Pending"));
         Assert.That(all[2].Payload, Is.EqualTo("Delivery:Delivered"));
     }

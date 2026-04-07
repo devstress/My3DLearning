@@ -3,7 +3,8 @@
 // ============================================================================
 // EIP Pattern: Profiling.
 // E2E: ContinuousProfiler — capture snapshots, query by time range,
-//      publish profiling results to MockEndpoint.
+//      publish profiling results to NatsBrokerEndpoint (real NATS JetStream
+//      via Aspire).
 // ============================================================================
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,14 +18,6 @@ namespace TutorialLabs.Tutorial45;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("profiler-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
     private static ContinuousProfiler CreateProfiler(int maxSnapshots = 1000) =>
         new(NullLogger<ContinuousProfiler>.Instance,
             Options.Create(new ProfilingOptions { MaxRetainedSnapshots = maxSnapshots }));
@@ -33,8 +26,11 @@ public sealed class Lab
     // ── 1. Snapshot Capture ──────────────────────────────────────────
 
     [Test]
-    public async Task CaptureSnapshot_PublishMetricsToMockEndpoint()
+    public async Task CaptureSnapshot_PublishMetricsToNatsBrokerEndpoint()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t45-capture");
+        var topic = AspireFixture.UniqueTopic("t45-profiling-metrics");
+
         var profiler = CreateProfiler();
 
         var snapshot = profiler.CaptureSnapshot("baseline");
@@ -47,13 +43,16 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             $"cpu-threads:{snapshot.Cpu.ThreadCount}", "profiler", "snapshot.captured");
-        await _output.PublishAsync(envelope, "profiling-metrics", default);
-        _output.AssertReceivedOnTopic("profiling-metrics", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task SnapshotCount_Increments_PublishCount()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t45-count");
+        var topic = AspireFixture.UniqueTopic("t45-profiling-stats");
+
         var profiler = CreateProfiler();
 
         Assert.That(profiler.SnapshotCount, Is.EqualTo(0));
@@ -65,8 +64,8 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             $"count:{profiler.SnapshotCount}", "profiler", "snapshot.count");
-        await _output.PublishAsync(envelope, "profiling-stats", default);
-        _output.AssertReceivedOnTopic("profiling-stats", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
 
@@ -75,6 +74,9 @@ public sealed class Lab
     [Test]
     public async Task GetLatestSnapshot_PublishLabel()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t45-latest");
+        var topic = AspireFixture.UniqueTopic("t45-latest-snapshot");
+
         var profiler = CreateProfiler();
 
         Assert.That(profiler.GetLatestSnapshot(), Is.Null);
@@ -90,13 +92,16 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             latest.Label!, "profiler", "snapshot.latest");
-        await _output.PublishAsync(envelope, "latest-snapshot", default);
-        _output.AssertReceivedOnTopic("latest-snapshot", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task GetSnapshotsByTimeRange_PublishFiltered()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t45-range");
+        var topic = AspireFixture.UniqueTopic("t45-range-results");
+
         var profiler = CreateProfiler();
         var before = DateTimeOffset.UtcNow.AddSeconds(-1);
 
@@ -114,10 +119,10 @@ public sealed class Lab
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 snap.Label!, "profiler", "snapshot.range");
-            await _output.PublishAsync(envelope, "range-results", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        _output.AssertReceivedOnTopic("range-results", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
 
         // Narrow range should return empty
         var empty = profiler.GetSnapshots(
@@ -131,6 +136,9 @@ public sealed class Lab
     [Test]
     public async Task LabelledSnapshots_PublishWithMetadata()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t45-labelled");
+        var topic = AspireFixture.UniqueTopic("t45-labelled-snapshots");
+
         var profiler = CreateProfiler();
 
         var s1 = profiler.CaptureSnapshot("before-load");
@@ -146,15 +154,18 @@ public sealed class Lab
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 $"{snap.Label}|ws:{snap.Memory.WorkingSetBytes}", "profiler", "snapshot.labelled");
-            await _output.PublishAsync(envelope, "labelled-snapshots", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        _output.AssertReceivedOnTopic("labelled-snapshots", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
     }
 
     [Test]
     public async Task MaxRetention_EvictsOldest_PublishCurrent()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t45-retention");
+        var topic = AspireFixture.UniqueTopic("t45-retention-results");
+
         var profiler = CreateProfiler(maxSnapshots: 3);
 
         profiler.CaptureSnapshot("s1");
@@ -169,7 +180,7 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             $"retained:{profiler.SnapshotCount}", "profiler", "snapshot.retention");
-        await _output.PublishAsync(envelope, "retention-results", default);
-        _output.AssertReceivedOnTopic("retention-results", 1);
+        await nats.PublishAsync(envelope, topic, default);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 }

@@ -3,7 +3,8 @@
 // ============================================================================
 // EIP Pattern: Configuration Store + Feature Flags
 // E2E: Multi-environment config routing, feature flag rollout with tenant
-//      targeting, and config change notification — all via MockEndpoint.
+//      targeting, and config change notification — all via NatsBrokerEndpoint
+//      (real NATS JetStream via Aspire).
 // ============================================================================
 using EnterpriseIntegrationPlatform.Configuration;
 using EnterpriseIntegrationPlatform.Contracts;
@@ -19,12 +20,19 @@ public sealed class Exam
     public async Task Challenge1_MultiEnvironmentConfigDrivenRouting()
     {
         using var notifier = new ConfigurationChangeNotifier();
-        await using var output = new MockEndpoint("exam-config");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t42-exam-config");
         var store = new InMemoryConfigurationStore(notifier);
 
         await store.SetAsync(new ConfigurationEntry("Database:Host", "localhost", "dev"));
         await store.SetAsync(new ConfigurationEntry("Database:Host", "staging-db.internal", "staging"));
         await store.SetAsync(new ConfigurationEntry("Database:Host", "prod-db.internal", "prod"));
+
+        var topics = new Dictionary<string, string>
+        {
+            ["dev"] = AspireFixture.UniqueTopic("t42-exam-config-dev"),
+            ["staging"] = AspireFixture.UniqueTopic("t42-exam-config-staging"),
+            ["prod"] = AspireFixture.UniqueTopic("t42-exam-config-prod"),
+        };
 
         var environments = new[] { "dev", "staging", "prod" };
         foreach (var env in environments)
@@ -32,15 +40,15 @@ public sealed class Exam
             var entry = await store.GetAsync("Database:Host", env);
             Assert.That(entry, Is.Not.Null);
 
-            var topic = $"config-{env}";
+            var topic = topics[env];
             var envelope = IntegrationEnvelope<string>.Create(
                 entry!.Value, "config-store", "config.routed");
-            await output.PublishAsync(envelope, topic, default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        output.AssertReceivedOnTopic("config-dev", 1);
-        output.AssertReceivedOnTopic("config-staging", 1);
-        output.AssertReceivedOnTopic("config-prod", 1);
+        nats.AssertReceivedOnTopic(topics["dev"], 1);
+        nats.AssertReceivedOnTopic(topics["staging"], 1);
+        nats.AssertReceivedOnTopic(topics["prod"], 1);
 
         // Delete dev, others remain
         await store.DeleteAsync("Database:Host", "dev");
@@ -52,7 +60,10 @@ public sealed class Exam
     [Test]
     public async Task Challenge2_FeatureFlagRolloutAndTenantTargeting()
     {
-        await using var output = new MockEndpoint("exam-flags");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t42-exam-flags");
+        var betaTopic = AspireFixture.UniqueTopic("t42-exam-beta-access");
+        var standardTopic = AspireFixture.UniqueTopic("t42-exam-standard-access");
+
         var service = new InMemoryFeatureFlagService();
 
         await service.SetAsync(new FeatureFlag(
@@ -63,21 +74,23 @@ public sealed class Exam
         foreach (var tenant in tenants)
         {
             var enabled = await service.IsEnabledAsync("BetaFeature", tenant);
-            var topic = enabled ? "beta-access" : "standard-access";
+            var topic = enabled ? betaTopic : standardTopic;
             var envelope = IntegrationEnvelope<string>.Create(
                 tenant, "feature-flags", "flag.routed");
-            await output.PublishAsync(envelope, topic, default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        output.AssertReceivedOnTopic("beta-access", 2);
-        output.AssertReceivedOnTopic("standard-access", 1);
+        nats.AssertReceivedOnTopic(betaTopic, 2);
+        nats.AssertReceivedOnTopic(standardTopic, 1);
     }
 
     [Test]
-    public async Task Challenge3_ConfigChangeNotification_PublishToMockEndpoint()
+    public async Task Challenge3_ConfigChangeNotification_PublishToNatsBrokerEndpoint()
     {
         using var notifier = new ConfigurationChangeNotifier();
-        await using var output = new MockEndpoint("exam-notify");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t42-exam-notify");
+        var topic = AspireFixture.UniqueTopic("t42-exam-change-notifications");
+
         var store = new InMemoryConfigurationStore(notifier);
 
         var changes = new List<ConfigurationChange>();
@@ -100,10 +113,10 @@ public sealed class Exam
         {
             var envelope = IntegrationEnvelope<string>.Create(
                 $"{change.Key}:{change.ChangeType}", "config-store", "config.changed");
-            await output.PublishAsync(envelope, "change-notifications", default);
+            await nats.PublishAsync(envelope, topic, default);
         }
 
-        output.AssertReceivedOnTopic("change-notifications", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
     }
 }
 
