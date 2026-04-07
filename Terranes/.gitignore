@@ -1,0 +1,32 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+*.nupkg
+
+## IDE
+.vs/
+.vscode/
+*.swp
+*~
+
+## Build
+publish/
+artifacts/
+TestResults/
+
+## Node
+node_modules/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## 3D model build artifacts
+*.tmp
+*.bak
