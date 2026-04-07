@@ -43,7 +43,7 @@ public sealed class EventBusService : IEventBusService
             _ => [evt.Id],
             (_, bag) => { bag.Add(evt.Id); return bag; });
 
-        _logger.LogInformation("Published event {EventId} to topic {Topic}", evt.Id, topic);
+        _logger.LogInformation("Published event {EventId}", evt.Id);
         return Task.FromResult(evt);
     }
 

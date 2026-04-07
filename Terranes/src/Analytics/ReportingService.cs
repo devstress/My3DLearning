@@ -63,7 +63,7 @@ public sealed class ReportingService : IReportingService
         if (!_reports.TryAdd(report.Id, report))
             throw new InvalidOperationException("Report ID conflict.");
 
-        _logger.LogInformation("Generated {ReportType} report {ReportId}", reportType, report.Id);
+        _logger.LogInformation("Generated report {ReportId}", report.Id);
         return report;
     }
 

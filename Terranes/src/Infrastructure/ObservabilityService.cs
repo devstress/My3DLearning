@@ -34,7 +34,7 @@ public sealed class ObservabilityService : IObservabilityService
         if (!_auditLog.TryAdd(persisted.Id, persisted))
             throw new InvalidOperationException($"Audit log entry {persisted.Id} already exists.");
 
-        _logger.LogInformation("Audit: {Action} on {EntityId} by user {UserId}", persisted.Action, persisted.EntityId, persisted.UserId);
+        _logger.LogInformation("Audit log entry {EntryId} recorded by user {UserId}", persisted.Id, persisted.UserId);
         return Task.FromResult(persisted);
     }
 

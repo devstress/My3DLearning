@@ -29,7 +29,7 @@ public sealed class SearchService : ISearchService
             .Select(x => new SearchResult(x.EntityType, x.EntityId, x.Title, x.Summary, x.Score))
             .ToList();
 
-        _logger.LogInformation("Search for '{Query}' returned {Count} results", query, results.Count);
+        _logger.LogInformation("Search returned {Count} results", results.Count);
         return Task.FromResult(results);
     }
 
