@@ -1,6 +1,6 @@
 # Enterprise Integration Platform — Tutorial Course
 
-50 tutorials. Each one: key types, code exercises with assertions, runnable labs and exams. No theory walls.
+50 tutorials. Each one: learning objectives, key types, guided labs, and tiered exam challenges. No theory walls.
 
 ## Prerequisites
 
@@ -11,11 +11,14 @@
 ## Running Labs & Exams
 
 ```bash
-# All 522 exercises
+# All exercises
 dotnet test tests/TutorialLabs/TutorialLabs.csproj
 
 # Single tutorial (e.g. Tutorial 09)
 dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial09"
+
+# Only labs
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial09.Lab"
 
 # Only exams
 dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial09.Exam"
@@ -25,11 +28,21 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 
 Every tutorial follows the same structure:
 
-1. **One-line description** — what the pattern does
+1. **Learning Objectives** — what you will be able to do after completing the tutorial
 2. **Key Types** — actual interfaces/records/enums from `src/`
-3. **Exercises** — 3–7 working C# code blocks with `Assert` statements
-4. **Lab** — link to `Lab.cs` + `dotnet test` command (5–10 tests per tutorial)
-5. **Exam** — link to `Exam.cs` + `dotnet test` command (3 coding challenges per tutorial)
+3. **Lab — Guided Practice** — link to `Lab.cs` with a table mapping each test to its concept (6–10 tests per tutorial)
+4. **Exam — Assessment Challenges** — link to `Exam.cs` with 3 difficulty-tiered challenges per tutorial
+
+## Lab vs Exam — How They Differ
+
+| Aspect | Lab (Guided Practice) | Exam (Assessment) |
+|--------|----------------------|-------------------|
+| **Purpose** | Learn concepts by reading and running | Prove understanding in realistic scenarios |
+| **Scope** | One concept per test | Multiple concepts per challenge |
+| **Complexity** | Simple, focused | Realistic, integrated |
+| **Business context** | Generic examples | Specific domains (e-commerce, IoT, finance) |
+| **Error handling** | Happy path | Edge cases + failure scenarios |
+| **Difficulty** | Uniform | 🟢 Starter → 🟡 Intermediate → 🔴 Advanced |
 
 ## Course Map
 
