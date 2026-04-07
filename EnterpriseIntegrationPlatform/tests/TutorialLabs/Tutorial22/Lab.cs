@@ -2,7 +2,8 @@
 // Tutorial 22 – Scatter-Gather (Lab)
 // ============================================================================
 // EIP Pattern: Scatter-Gather.
-// E2E: Wire real ScatterGatherer with MockEndpoint as producer.
+// Real Integrations: ScatterGatherer with NatsBrokerEndpoint
+// (real NATS JetStream via Aspire) as producer.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,55 +18,51 @@ namespace TutorialLabs.Tutorial22;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("scatter-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
     // ── 1. Scatter Phase ─────────────────────────────────────────────
 
     [Test]
     public async Task Scatter_PublishesToAllRecipients()
     {
-        var sg = CreateScatterGatherer(timeoutMs: 500);
+        await using var nats = AspireFixture.CreateNatsEndpoint("t22-scatter");
+        var sg = CreateScatterGatherer(nats, timeoutMs: 500);
         var correlationId = Guid.NewGuid();
+        var supplierA = AspireFixture.UniqueTopic("t22-supplier-a");
+        var supplierB = AspireFixture.UniqueTopic("t22-supplier-b");
+        var supplierC = AspireFixture.UniqueTopic("t22-supplier-c");
         var request = new ScatterRequest<string>(correlationId, "quote-request",
-            new[] { "supplier-a", "supplier-b", "supplier-c" });
+            new[] { supplierA, supplierB, supplierC });
 
         // Start scatter-gather in background; submit responses immediately
         var task = sg.ScatterGatherAsync(request);
 
         await sg.SubmitResponseAsync(correlationId,
-            new GatherResponse<string>("supplier-a", "price-a", DateTimeOffset.UtcNow, true, null));
+            new GatherResponse<string>(supplierA, "price-a", DateTimeOffset.UtcNow, true, null));
         await sg.SubmitResponseAsync(correlationId,
-            new GatherResponse<string>("supplier-b", "price-b", DateTimeOffset.UtcNow, true, null));
+            new GatherResponse<string>(supplierB, "price-b", DateTimeOffset.UtcNow, true, null));
         await sg.SubmitResponseAsync(correlationId,
-            new GatherResponse<string>("supplier-c", "price-c", DateTimeOffset.UtcNow, true, null));
+            new GatherResponse<string>(supplierC, "price-c", DateTimeOffset.UtcNow, true, null));
 
         var result = await task;
 
         Assert.That(result.Responses.Count, Is.EqualTo(3));
         Assert.That(result.TimedOut, Is.False);
-        _output.AssertReceivedOnTopic("supplier-a", 1);
-        _output.AssertReceivedOnTopic("supplier-b", 1);
-        _output.AssertReceivedOnTopic("supplier-c", 1);
+        nats.AssertReceivedOnTopic(supplierA, 1);
+        nats.AssertReceivedOnTopic(supplierB, 1);
+        nats.AssertReceivedOnTopic(supplierC, 1);
     }
 
     [Test]
     public async Task Scatter_EmptyRecipients_ReturnsImmediately()
     {
-        var sg = CreateScatterGatherer(timeoutMs: 500);
+        await using var nats = AspireFixture.CreateNatsEndpoint("t22-empty");
+        var sg = CreateScatterGatherer(nats, timeoutMs: 500);
         var request = new ScatterRequest<string>(Guid.NewGuid(), "data", Array.Empty<string>());
 
         var result = await sg.ScatterGatherAsync(request);
 
         Assert.That(result.Responses.Count, Is.EqualTo(0));
         Assert.That(result.TimedOut, Is.False);
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
 
@@ -74,35 +71,40 @@ public sealed class Lab
     [Test]
     public async Task Gather_TimesOut_ReturnsPartialResponses()
     {
-        var sg = CreateScatterGatherer(timeoutMs: 200);
+        await using var nats = AspireFixture.CreateNatsEndpoint("t22-timeout");
+        var sg = CreateScatterGatherer(nats, timeoutMs: 200);
         var correlationId = Guid.NewGuid();
+        var topicFast = AspireFixture.UniqueTopic("t22-fast");
+        var topicSlow = AspireFixture.UniqueTopic("t22-slow");
         var request = new ScatterRequest<string>(correlationId, "req",
-            new[] { "fast", "slow" });
+            new[] { topicFast, topicSlow });
 
         var task = sg.ScatterGatherAsync(request);
 
         // Only fast responds
         await sg.SubmitResponseAsync(correlationId,
-            new GatherResponse<string>("fast", "done", DateTimeOffset.UtcNow, true, null));
+            new GatherResponse<string>(topicFast, "done", DateTimeOffset.UtcNow, true, null));
 
         var result = await task;
 
         Assert.That(result.TimedOut, Is.True);
         Assert.That(result.Responses.Count, Is.EqualTo(1));
-        Assert.That(result.Responses[0].Recipient, Is.EqualTo("fast"));
+        Assert.That(result.Responses[0].Recipient, Is.EqualTo(topicFast));
     }
 
     [Test]
     public async Task Gather_PreservesCorrelationId()
     {
-        var sg = CreateScatterGatherer(timeoutMs: 500);
+        await using var nats = AspireFixture.CreateNatsEndpoint("t22-corr");
+        var sg = CreateScatterGatherer(nats, timeoutMs: 500);
         var correlationId = Guid.NewGuid();
+        var topic = AspireFixture.UniqueTopic("t22-topic");
         var request = new ScatterRequest<string>(correlationId, "data",
-            new[] { "topic-1" });
+            new[] { topic });
 
         var task = sg.ScatterGatherAsync(request);
         await sg.SubmitResponseAsync(correlationId,
-            new GatherResponse<string>("topic-1", "resp", DateTimeOffset.UtcNow, true, null));
+            new GatherResponse<string>(topic, "resp", DateTimeOffset.UtcNow, true, null));
 
         var result = await task;
 
@@ -115,7 +117,8 @@ public sealed class Lab
     [Test]
     public async Task SubmitResponse_UnknownCorrelation_ReturnsFalse()
     {
-        var sg = CreateScatterGatherer(timeoutMs: 500);
+        await using var nats = AspireFixture.CreateNatsEndpoint("t22-unknown");
+        var sg = CreateScatterGatherer(nats, timeoutMs: 500);
 
         var accepted = await sg.SubmitResponseAsync(Guid.NewGuid(),
             new GatherResponse<string>("x", "data", DateTimeOffset.UtcNow, true, null));
@@ -126,7 +129,8 @@ public sealed class Lab
     [Test]
     public async Task Scatter_ExceedsMaxRecipients_Throws()
     {
-        var sg = CreateScatterGatherer(timeoutMs: 500, maxRecipients: 2);
+        await using var nats = AspireFixture.CreateNatsEndpoint("t22-maxrecip");
+        var sg = CreateScatterGatherer(nats, timeoutMs: 500, maxRecipients: 2);
         var request = new ScatterRequest<string>(Guid.NewGuid(), "data",
             new[] { "a", "b", "c" });
 
@@ -134,8 +138,8 @@ public sealed class Lab
             await sg.ScatterGatherAsync(request));
     }
 
-    private ScatterGatherer<string, string> CreateScatterGatherer(
-        int timeoutMs, int maxRecipients = 50)
+    private static ScatterGatherer<string, string> CreateScatterGatherer(
+        NatsBrokerEndpoint nats, int timeoutMs, int maxRecipients = 50)
     {
         var options = Options.Create(new ScatterGatherOptions
         {
@@ -144,7 +148,7 @@ public sealed class Lab
         });
 
         return new ScatterGatherer<string, string>(
-            _output, options,
+            nats, options,
             NullLogger<ScatterGatherer<string, string>>.Instance);
     }
 }

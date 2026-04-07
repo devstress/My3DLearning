@@ -2,8 +2,8 @@
 // Tutorial 24 – Retry Framework (Lab)
 // ============================================================================
 // EIP Pattern: Retry / Guaranteed Delivery.
-// E2E: Wire real ExponentialBackoffRetryPolicy with no-delay override,
-// then publish success to MockEndpoint.
+// Real Integrations: ExponentialBackoffRetryPolicy with no-delay override,
+// then publish success via NatsBrokerEndpoint (real NATS JetStream via Aspire).
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -18,20 +18,13 @@ namespace TutorialLabs.Tutorial24;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("retry-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
     // ── 1. Basic Retry Outcomes ──────────────────────────────────────
 
     [Test]
     public async Task Execute_SucceedsFirstAttempt_ReturnsResult()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t24-first");
+        var topic = AspireFixture.UniqueTopic("t24-success");
         var policy = CreatePolicy(maxAttempts: 3);
 
         var result = await policy.ExecuteAsync<string>(
@@ -41,10 +34,10 @@ public sealed class Lab
         Assert.That(result.Attempts, Is.EqualTo(1));
         Assert.That(result.Result, Is.EqualTo("ok"));
 
-        // Publish success to MockEndpoint
+        // Publish success to NatsBrokerEndpoint
         var envelope = IntegrationEnvelope<string>.Create(result.Result!, "svc", "retry.success");
-        await _output.PublishAsync(envelope, "success-topic", CancellationToken.None);
-        _output.AssertReceivedOnTopic("success-topic", 1);
+        await nats.PublishAsync(envelope, topic, CancellationToken.None);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
@@ -102,11 +95,13 @@ public sealed class Lab
     }
 
 
-    // ── 3. End-to-End Integration ────────────────────────────────────
+    // ── 3. End-to-End Integration (Real NATS) ────────────────────────
 
     [Test]
     public async Task Execute_RetryThenPublish_EndToEnd()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t24-e2e");
+        var topic = AspireFixture.UniqueTopic("t24-processed");
         var policy = CreatePolicy(maxAttempts: 3);
         var attempt = 0;
 
@@ -122,8 +117,8 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             result.Result!, "svc", "retry.success");
-        await _output.PublishAsync(envelope, "processed-topic", CancellationToken.None);
-        _output.AssertReceivedOnTopic("processed-topic", 1);
+        await nats.PublishAsync(envelope, topic, CancellationToken.None);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
