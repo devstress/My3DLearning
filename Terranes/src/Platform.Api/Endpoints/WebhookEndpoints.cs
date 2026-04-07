@@ -9,9 +9,9 @@ public static class WebhookEndpoints
     {
         var group = app.MapGroup("/api/webhooks").WithTags("Webhooks");
 
-        group.MapPost("/", async (Guid partnerId, string callbackUrl, List<string> eventTopics, IWebhookService service) =>
+        group.MapPost("/", async (RegisterWebhookRequest request, IWebhookService service) =>
         {
-            var registration = await service.RegisterAsync(partnerId, callbackUrl, eventTopics);
+            var registration = await service.RegisterAsync(request.PartnerId, request.CallbackUrl, request.EventTopics);
             return Results.Created($"/api/webhooks/{registration.Id}", registration);
         }).WithName("RegisterWebhook");
 
@@ -40,3 +40,5 @@ public static class WebhookEndpoints
         }).WithName("GetWebhookDeliveries");
     }
 }
+
+public sealed record RegisterWebhookRequest(Guid PartnerId, string CallbackUrl, List<string> EventTopics);

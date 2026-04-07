@@ -9,9 +9,9 @@ public static class BuilderEndpoints
     {
         var group = app.MapGroup("/api/partners/builders").WithTags("Builders");
 
-        group.MapPost("/register", async (Partner partner, BuilderProfile profile, IBuilderService service) =>
+        group.MapPost("/register", async (RegisterBuilderRequest request, IBuilderService service) =>
         {
-            var created = await service.RegisterAsync(partner, profile);
+            var created = await service.RegisterAsync(request.Partner, request.Profile);
             return Results.Created($"/api/partners/builders/{created.PartnerId}", created);
         }).WithName("RegisterBuilder");
 
@@ -27,16 +27,20 @@ public static class BuilderEndpoints
             return Results.Ok(results);
         }).WithName("SearchBuilders");
 
-        group.MapPost("/{partnerId:guid}/quotes/{quoteRequestId:guid}", async (Guid partnerId, Guid quoteRequestId, HomeModel model, LandBlock block, IBuilderService service) =>
+        group.MapPost("/{partnerId:guid}/quotes/{quoteRequestId:guid}", async (Guid partnerId, Guid quoteRequestId, BuilderQuoteRequest request, IBuilderService service) =>
         {
-            var response = await service.RequestQuoteAsync(partnerId, quoteRequestId, model, block);
+            var response = await service.RequestQuoteAsync(partnerId, quoteRequestId, request.Model, request.Block);
             return Results.Ok(response);
         }).WithName("RequestBuilderQuote");
 
-        group.MapPost("/{partnerId:guid}/quotes/{quoteRequestId:guid}/respond", async (Guid partnerId, Guid quoteRequestId, decimal amount, int estimatedDays, string description, IBuilderService service) =>
+        group.MapPost("/{partnerId:guid}/quotes/{quoteRequestId:guid}/respond", async (Guid partnerId, Guid quoteRequestId, BuilderQuoteResponseRequest request, IBuilderService service) =>
         {
-            var response = await service.SubmitQuoteResponseAsync(partnerId, quoteRequestId, amount, estimatedDays, description);
+            var response = await service.SubmitQuoteResponseAsync(partnerId, quoteRequestId, request.Amount, request.EstimatedDays, request.Description);
             return Results.Ok(response);
         }).WithName("SubmitBuilderQuoteResponse");
     }
 }
+
+public sealed record RegisterBuilderRequest(Partner Partner, BuilderProfile Profile);
+public sealed record BuilderQuoteRequest(HomeModel Model, LandBlock Block);
+public sealed record BuilderQuoteResponseRequest(decimal Amount, int EstimatedDays, string Description);

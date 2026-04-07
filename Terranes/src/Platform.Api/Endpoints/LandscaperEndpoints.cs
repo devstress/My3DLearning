@@ -10,9 +10,9 @@ public static class LandscaperEndpoints
     {
         var group = app.MapGroup("/api/partners/landscapers").WithTags("Landscapers");
 
-        group.MapPost("/register", async (Partner partner, LandscaperProfile profile, ILandscaperService service) =>
+        group.MapPost("/register", async (RegisterLandscaperRequest request, ILandscaperService service) =>
         {
-            var created = await service.RegisterAsync(partner, profile);
+            var created = await service.RegisterAsync(request.Partner, request.Profile);
             return Results.Created($"/api/partners/landscapers/{created.PartnerId}", created);
         }).WithName("RegisterLandscaper");
 
@@ -41,3 +41,5 @@ public static class LandscaperEndpoints
         }).WithName("GetDesignsForPlacement");
     }
 }
+
+public sealed record RegisterLandscaperRequest(Partner Partner, LandscaperProfile Profile);

@@ -9,9 +9,9 @@ public static class RealEstateAgentEndpoints
     {
         var group = app.MapGroup("/api/partners/agents").WithTags("Real Estate Agents");
 
-        group.MapPost("/register", async (Partner partner, AgentProfile profile, IRealEstateAgentService service) =>
+        group.MapPost("/register", async (RegisterAgentRequest request, IRealEstateAgentService service) =>
         {
-            var created = await service.RegisterAsync(partner, profile);
+            var created = await service.RegisterAsync(request.Partner, request.Profile);
             return Results.Created($"/api/partners/agents/{created.PartnerId}", created);
         }).WithName("RegisterAgent");
 
@@ -40,3 +40,5 @@ public static class RealEstateAgentEndpoints
         }).WithName("SyncAgentListing");
     }
 }
+
+public sealed record RegisterAgentRequest(Partner Partner, AgentProfile Profile);

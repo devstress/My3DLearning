@@ -525,3 +525,27 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - DI registration via single AddAnalytics() extension method
 - REST API now has 137 endpoints across 29 resource groups
 - Run: `dotnet run --project src/Platform.Api` → http://localhost:5200
+
+---
+
+## Phase 9 — Integration Tests
+
+### Chunk 032 — IntegrationTests (2026-04-07)
+
+**Goal:** Create WebApplicationFactory-based integration tests that exercise every API endpoint group end-to-end through the HTTP pipeline. Fix pre-existing multi-body parameter binding bugs discovered during integration testing.
+
+**Files created:**
+- `tests/IntegrationTests/IntegrationTests.csproj` — Test project with Microsoft.AspNetCore.Mvc.Testing
+- `tests/IntegrationTests/IntegrationTestBase.cs` — Shared base class with WebApplicationFactory, HttpClient, helper methods
+- `tests/IntegrationTests/CoreServiceIntegrationTests.cs` — 14 tests: HomeModel, LandBlock, SitePlacement, Quoting, Marketplace, Compliance, Health
+- `tests/IntegrationTests/PartnerIntegrationTests.cs` — 10 tests: Furniture, SmartHome CRUD/search/compatibility
+- `tests/IntegrationTests/Immersive3DIntegrationTests.cs` — 10 tests: Village, Walkthrough, DesignEditor, VideoToModel, Content
+- `tests/IntegrationTests/InfrastructureIntegrationTests.cs` — 10 tests: Auth, Observability, Tenant
+- `tests/IntegrationTests/JourneyNotificationAnalyticsIntegrationTests.cs` — 12 tests: Journey, Aggregator, Referral, Notification, EventBus, Webhook, Search, Analytics, Reporting
+
+**Files modified:**
+- `Terranes.slnx` — Added IntegrationTests project
+- `Directory.Packages.props` — Added Microsoft.AspNetCore.Mvc.Testing 10.0.5
+- 5 endpoint files fixed: Builder, Landscaper, Solicitor, RealEstateAgent, Webhook — multi-body params wrapped into request DTOs
+
+**Tests:** 446 total (390 unit + 56 integration), all passing

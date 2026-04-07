@@ -63,11 +63,15 @@ Notifications project with 3 services: Notification, EventBus, Webhook. In-app n
 
 Analytics project with 3 services: Search, Analytics, Reporting. Cross-entity full-text search with relevance scoring, user engagement tracking with summaries and popular entities, markdown report generation.
 
+✅ Phase 9 complete — see `rules/completion-log.md` for full history.
+
+IntegrationTests project with 56 WebApplicationFactory-based tests exercising every API endpoint group end-to-end. Fixed multi-body parameter binding bugs in 5 partner endpoints (Builder, Landscaper, Solicitor, RealEstateAgent, Webhook).
+
 ---
 
 ## Next Chunk
 
-All phases (1–8) are complete. 14 src projects, 390 tests. The platform is fully implemented with core services, partner integrations, immersive 3D experience, platform infrastructure, buyer journey orchestration, notifications & events, and search & analytics.
+All phases (1–9) are complete. 14 src projects, 446 tests (390 unit + 56 integration). The platform is fully implemented with core services, partner integrations, immersive 3D experience, platform infrastructure, buyer journey orchestration, notifications & events, search & analytics, and full integration test coverage.
 
 ---
 

@@ -9,9 +9,9 @@ public static class SolicitorEndpoints
     {
         var group = app.MapGroup("/api/partners/solicitors").WithTags("Solicitors");
 
-        group.MapPost("/register", async (Partner partner, SolicitorProfile profile, ISolicitorService service) =>
+        group.MapPost("/register", async (RegisterSolicitorRequest request, ISolicitorService service) =>
         {
-            var created = await service.RegisterAsync(partner, profile);
+            var created = await service.RegisterAsync(request.Partner, request.Profile);
             return Results.Created($"/api/partners/solicitors/{created.PartnerId}", created);
         }).WithName("RegisterSolicitor");
 
@@ -34,3 +34,5 @@ public static class SolicitorEndpoints
         }).WithName("RequestSolicitorQuote");
     }
 }
+
+public sealed record RegisterSolicitorRequest(Partner Partner, SolicitorProfile Profile);
