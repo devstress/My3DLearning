@@ -2,8 +2,9 @@
 // Tutorial 19 – Content Filter (Lab)
 // ============================================================================
 // EIP Pattern: Content Filter.
-// E2E: ContentFilter keeping only specified JSON paths, verify filtered
-// payload, and publish results via MockEndpoint.
+// Real Integrations: ContentFilter keeping only specified JSON paths, verify
+// filtered payload, and publish results via NatsBrokerEndpoint
+// (real NATS JetStream via Aspire).
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,15 +18,6 @@ namespace TutorialLabs.Tutorial19;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("filter-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
     // ── 1. Path-Based Filtering ──────────────────────────────────────
 
     [Test]
@@ -91,11 +83,14 @@ public sealed class Lab
     }
 
 
-    // ── 3. End-to-End Integration ────────────────────────────────────
+    // ── 3. End-to-End Integration (Real NATS) ────────────────────────
 
     [Test]
-    public async Task Filter_E2E_PublishFilteredToMockEndpoint()
+    public async Task Filter_E2E_PublishFilteredToNatsEndpoint()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t19-e2e");
+        var topic = AspireFixture.UniqueTopic("t19-filtered");
+
         var filter = CreateFilter();
 
         var payload = """{"order":{"id":"ORD-5","total":500,"status":"shipped"},"audit":{"user":"admin"}}""";
@@ -103,10 +98,10 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             filtered, "FilterService", "payload.filtered");
-        await _output.PublishAsync(envelope, "filtered-topic", CancellationToken.None);
+        await nats.PublishAsync(envelope, topic, CancellationToken.None);
 
-        _output.AssertReceivedOnTopic("filtered-topic", 1);
-        var received = _output.GetReceived<string>();
+        nats.AssertReceivedOnTopic(topic, 1);
+        var received = nats.GetReceived<string>();
         Assert.That(received.Payload, Does.Contain("ORD-5"));
         Assert.That(received.Payload, Does.Contain("shipped"));
         Assert.That(received.Payload, Does.Not.Contain("admin"));

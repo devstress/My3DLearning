@@ -2,8 +2,9 @@
 // Tutorial 20 – Splitter (Lab)
 // ============================================================================
 // EIP Pattern: Splitter.
-// E2E: MessageSplitter with FuncSplitStrategy + MockEndpoint to capture
-// split messages, verify SequenceNumber, TotalCount, and CausationId.
+// Real Integrations: MessageSplitter with FuncSplitStrategy + NatsBrokerEndpoint
+// (real NATS JetStream via Aspire) to capture split messages, verify
+// SequenceNumber, TotalCount, and CausationId.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -18,21 +19,14 @@ namespace TutorialLabs.Tutorial20;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("splitter-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
-    // ── 1. Split Output & Correlation ────────────────────────────────
+    // ── 1. Split Output & Correlation (Real NATS) ────────────────────
 
     [Test]
     public async Task Split_ProducesCorrectItemCount()
     {
-        var splitter = CreateStringSplitter(",");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t20-count");
+        var topic = AspireFixture.UniqueTopic("t20-split");
+        var splitter = CreateStringSplitter(nats, topic, ",");
 
         var source = IntegrationEnvelope<string>.Create(
             "A,B,C", "OrderService", "batch.created");
@@ -40,13 +34,15 @@ public sealed class Lab
 
         Assert.That(result.ItemCount, Is.EqualTo(3));
         Assert.That(result.SplitEnvelopes, Has.Count.EqualTo(3));
-        _output.AssertReceivedOnTopic("split-topic", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
     }
 
     [Test]
     public async Task Split_PreservesCorrelationId()
     {
-        var splitter = CreateStringSplitter(",");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t20-corr");
+        var topic = AspireFixture.UniqueTopic("t20-split");
+        var splitter = CreateStringSplitter(nats, topic, ",");
 
         var source = IntegrationEnvelope<string>.Create(
             "X,Y", "Svc", "batch");
@@ -59,7 +55,9 @@ public sealed class Lab
     [Test]
     public async Task Split_SetsCausationIdToSourceMessageId()
     {
-        var splitter = CreateStringSplitter(",");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t20-caus");
+        var topic = AspireFixture.UniqueTopic("t20-split");
+        var splitter = CreateStringSplitter(nats, topic, ",");
 
         var source = IntegrationEnvelope<string>.Create(
             "A,B", "Svc", "batch");
@@ -70,12 +68,14 @@ public sealed class Lab
     }
 
 
-    // ── 2. Sequence Metadata ─────────────────────────────────────────
+    // ── 2. Sequence Metadata (Real NATS) ─────────────────────────────
 
     [Test]
     public async Task Split_SequenceNumbers_AreZeroBased()
     {
-        var splitter = CreateStringSplitter(",");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t20-seq");
+        var topic = AspireFixture.UniqueTopic("t20-split");
+        var splitter = CreateStringSplitter(nats, topic, ",");
 
         var source = IntegrationEnvelope<string>.Create(
             "A,B,C", "Svc", "batch");
@@ -89,7 +89,9 @@ public sealed class Lab
     [Test]
     public async Task Split_TotalCount_MatchesItemCount()
     {
-        var splitter = CreateStringSplitter(",");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t20-total");
+        var topic = AspireFixture.UniqueTopic("t20-split");
+        var splitter = CreateStringSplitter(nats, topic, ",");
 
         var source = IntegrationEnvelope<string>.Create(
             "A,B,C,D", "Svc", "batch");
@@ -102,15 +104,18 @@ public sealed class Lab
     }
 
 
-    // ── 3. Edge Cases ────────────────────────────────────────────────
+    // ── 3. Edge Cases (Real NATS) ────────────────────────────────────
 
     [Test]
     public async Task Split_EmptyResult_ReturnsZeroItems()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t20-empty");
+        var topic = AspireFixture.UniqueTopic("t20-split");
+
         var strategy = new FuncSplitStrategy<string>(_ => Array.Empty<string>());
-        var options = Options.Create(new SplitterOptions { TargetTopic = "split-topic" });
+        var options = Options.Create(new SplitterOptions { TargetTopic = topic });
         var splitter = new MessageSplitter<string>(
-            strategy, _output, options,
+            strategy, nats, options,
             NullLogger<MessageSplitter<string>>.Instance);
 
         var source = IntegrationEnvelope<string>.Create(
@@ -119,29 +124,32 @@ public sealed class Lab
 
         Assert.That(result.ItemCount, Is.EqualTo(0));
         Assert.That(result.SplitEnvelopes, Is.Empty);
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
     [Test]
     public async Task Split_SourceMessageId_CapturedInResult()
     {
-        var splitter = CreateStringSplitter(",");
+        await using var nats = AspireFixture.CreateNatsEndpoint("t20-srcid");
+        var topic = AspireFixture.UniqueTopic("t20-split");
+        var splitter = CreateStringSplitter(nats, topic, ",");
 
         var source = IntegrationEnvelope<string>.Create(
             "A,B", "Svc", "batch");
         var result = await splitter.SplitAsync(source);
 
         Assert.That(result.SourceMessageId, Is.EqualTo(source.MessageId));
-        Assert.That(result.TargetTopic, Is.EqualTo("split-topic"));
+        Assert.That(result.TargetTopic, Is.EqualTo(topic));
     }
 
-    private MessageSplitter<string> CreateStringSplitter(string delimiter)
+    private static MessageSplitter<string> CreateStringSplitter(
+        NatsBrokerEndpoint nats, string topic, string delimiter)
     {
         var strategy = new FuncSplitStrategy<string>(
             composite => composite.Split(delimiter).ToList());
-        var options = Options.Create(new SplitterOptions { TargetTopic = "split-topic" });
+        var options = Options.Create(new SplitterOptions { TargetTopic = topic });
         return new MessageSplitter<string>(
-            strategy, _output, options,
+            strategy, nats, options,
             NullLogger<MessageSplitter<string>>.Instance);
     }
 }

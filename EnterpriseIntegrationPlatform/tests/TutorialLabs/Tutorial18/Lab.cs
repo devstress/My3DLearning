@@ -2,8 +2,9 @@
 // Tutorial 18 – Content Enricher (Lab)
 // ============================================================================
 // EIP Pattern: Content Enricher.
-// E2E: ContentEnricher with MockEnrichmentSource, verify enriched
-// JSON payload, fallback behaviour, and publish via MockEndpoint.
+// Real Integrations: ContentEnricher with MockEnrichmentSource, verify enriched
+// JSON payload, fallback behaviour, and publish via NatsBrokerEndpoint
+// (real NATS JetStream via Aspire).
 // ============================================================================
 
 using System.Text.Json.Nodes;
@@ -20,15 +21,6 @@ namespace TutorialLabs.Tutorial18;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("enricher-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
     // ── 1. Enrichment & Lookup ───────────────────────────────────────
 
     [Test]
@@ -135,11 +127,14 @@ public sealed class Lab
     }
 
 
-    // ── 3. End-to-End Integration ────────────────────────────────────
+    // ── 3. End-to-End Integration (Real NATS) ────────────────────────
 
     [Test]
-    public async Task Enrich_E2E_PublishEnrichedToMockEndpoint()
+    public async Task Enrich_E2E_PublishEnrichedToNatsEndpoint()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t18-e2e");
+        var topic = AspireFixture.UniqueTopic("t18-enriched");
+
         var source = new MockEnrichmentSource()
             .WithData("C-100", """{"name":"Alice"}""");
 
@@ -150,10 +145,10 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             enriched, "EnricherService", "payload.enriched");
-        await _output.PublishAsync(envelope, "enriched-topic", CancellationToken.None);
+        await nats.PublishAsync(envelope, topic, CancellationToken.None);
 
-        _output.AssertReceivedOnTopic("enriched-topic", 1);
-        var received = _output.GetReceived<string>();
+        nats.AssertReceivedOnTopic(topic, 1);
+        var received = nats.GetReceived<string>();
         Assert.That(received.Payload, Does.Contain("Alice"));
     }
 

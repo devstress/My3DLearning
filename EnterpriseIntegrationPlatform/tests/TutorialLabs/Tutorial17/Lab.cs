@@ -2,8 +2,9 @@
 // Tutorial 17 – Normalizer (Lab)
 // ============================================================================
 // EIP Pattern: Normalizer.
-// E2E: MessageNormalizer detecting JSON/XML/CSV and converting to canonical
-// JSON. Publish normalized results via MockEndpoint.
+// Real Integrations: MessageNormalizer detecting JSON/XML/CSV and converting
+// to canonical JSON. Publish normalized results via NatsBrokerEndpoint
+// (real NATS JetStream via Aspire).
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -18,15 +19,6 @@ namespace TutorialLabs.Tutorial17;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("normalizer-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
     // ── 1. Format Detection & Conversion ─────────────────────────────
 
     [Test]
@@ -96,11 +88,14 @@ public sealed class Lab
     }
 
 
-    // ── 3. End-to-End Integration ────────────────────────────────────
+    // ── 3. End-to-End Integration (Real NATS) ────────────────────────
 
     [Test]
-    public async Task Normalize_E2E_PublishNormalizedToMockEndpoint()
+    public async Task Normalize_E2E_PublishNormalizedToNatsEndpoint()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t17-e2e");
+        var topic = AspireFixture.UniqueTopic("t17-normalized");
+
         var normalizer = CreateNormalizer();
 
         var xml = "<Order><id>ORD-1</id><total>99</total></Order>";
@@ -108,10 +103,10 @@ public sealed class Lab
 
         var envelope = IntegrationEnvelope<string>.Create(
             result.Payload, "NormalizerService", "payload.normalized");
-        await _output.PublishAsync(envelope, "normalized-topic", CancellationToken.None);
+        await nats.PublishAsync(envelope, topic, CancellationToken.None);
 
-        _output.AssertReceivedOnTopic("normalized-topic", 1);
-        var received = _output.GetReceived<string>();
+        nats.AssertReceivedOnTopic(topic, 1);
+        var received = nats.GetReceived<string>();
         Assert.That(received.Payload, Does.Contain("ORD-1"));
     }
 
