@@ -24,6 +24,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Core DLQ Publishing ───────────────────────────────────────
+
     [Test]
     public async Task Publish_MaxRetriesExceeded_SendsToDeadLetterTopic()
     {
@@ -49,6 +52,9 @@ public sealed class Lab
         Assert.That(received.Payload.OriginalEnvelope.Payload, Is.EqualTo("payload"));
         Assert.That(received.Payload.OriginalEnvelope.MessageId, Is.EqualTo(envelope.MessageId));
     }
+
+
+    // ── 2. Dead-Letter Metadata ──────────────────────────────────────
 
     [Test]
     public async Task Publish_SetsCorrectReason()
@@ -91,6 +97,9 @@ public sealed class Lab
         Assert.That(received.Payload.FailedAt, Is.GreaterThanOrEqualTo(before));
         Assert.That(received.Payload.FailedAt, Is.LessThanOrEqualTo(DateTimeOffset.UtcNow));
     }
+
+
+    // ── 3. Reason Coverage ───────────────────────────────────────────
 
     [Test]
     public async Task Publish_PreservesCorrelationId()

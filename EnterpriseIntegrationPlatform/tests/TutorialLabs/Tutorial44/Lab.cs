@@ -29,6 +29,9 @@ public sealed class Lab
         new(NullLogger<InMemoryFailoverManager>.Instance,
             Options.Create(new DisasterRecoveryOptions()));
 
+
+    // ── 1. Region Registration ───────────────────────────────────────
+
     [Test]
     public async Task RegisterRegions_PublishTopologyToMockEndpoint()
     {
@@ -87,6 +90,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "failover-events", default);
         _output.AssertReceivedOnTopic("failover-events", 1);
     }
+
+
+    // ── 2. Failover Operations ───────────────────────────────────────
 
     [Test]
     public async Task FailoverToUnknownRegion_PublishError()
@@ -158,6 +164,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "failback-events", default);
         _output.AssertReceivedOnTopic("failback-events", 1);
     }
+
+
+    // ── 3. Health Monitoring ─────────────────────────────────────────
 
     [Test]
     public async Task UpdateHealthCheck_PublishTimestampChange()

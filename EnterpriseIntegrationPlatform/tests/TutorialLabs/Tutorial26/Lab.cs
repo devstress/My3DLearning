@@ -25,6 +25,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Basic Replay ──────────────────────────────────────────────
+
     [Test]
     public async Task Replay_SingleMessage_PublishesToTargetTopic()
     {
@@ -57,6 +60,9 @@ public sealed class Lab
         _output.AssertReceivedOnTopic("replay-target", 3);
     }
 
+
+    // ── 2. Filtering ─────────────────────────────────────────────────
+
     [Test]
     public async Task Replay_FilterByMessageType_OnlyMatchingReplayed()
     {
@@ -85,6 +91,9 @@ public sealed class Lab
         Assert.That(result.SkippedCount, Is.EqualTo(0));
         _output.AssertNoneReceived();
     }
+
+
+    // ── 3. Behaviour & Metadata ──────────────────────────────────────
 
     [Test]
     public async Task Replay_SkipAlreadyReplayed_SkipsTaggedMessages()

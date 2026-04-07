@@ -26,6 +26,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Format Detection & Conversion ─────────────────────────────
+
     [Test]
     public async Task Normalize_Json_PassesThroughUnchanged()
     {
@@ -68,6 +71,9 @@ public sealed class Lab
         Assert.That(result.Payload, Does.Contain("Bob"));
     }
 
+
+    // ── 2. Strict vs Non-Strict Mode ─────────────────────────────────
+
     [Test]
     public async Task Normalize_StrictContentType_ThrowsForUnknown()
     {
@@ -88,6 +94,9 @@ public sealed class Lab
         Assert.That(result.DetectedFormat, Is.EqualTo("JSON"));
         Assert.That(result.WasTransformed, Is.False);
     }
+
+
+    // ── 3. End-to-End Integration ────────────────────────────────────
 
     [Test]
     public async Task Normalize_E2E_PublishNormalizedToMockEndpoint()

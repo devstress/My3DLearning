@@ -35,6 +35,9 @@ public sealed class Lab
 
     private InMemoryConfigurationStore CreateStore() => new(_notifier);
 
+
+    // ── 1. Environment Resolution ────────────────────────────────────
+
     [Test]
     public async Task EnvironmentOverride_ResolvesSpecificEnvironment()
     {
@@ -72,6 +75,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "fallback-config", default);
         _output.AssertReceivedOnTopic("fallback-config", 1);
     }
+
+
+    // ── 2. Batch Resolution ──────────────────────────────────────────
 
     [Test]
     public async Task EnvironmentOverride_ReturnsNull_WhenNotFound()
@@ -112,6 +118,9 @@ public sealed class Lab
 
         _output.AssertReceivedOnTopic("batch-config", 2);
     }
+
+
+    // ── 3. Variable Fallback ─────────────────────────────────────────
 
     [Test]
     public async Task ConfigCascade_DevStagingProd_PublishResolved()

@@ -25,6 +25,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Path-Based Filtering ──────────────────────────────────────
+
     [Test]
     public async Task Filter_RetainsSpecifiedPaths()
     {
@@ -66,6 +69,9 @@ public sealed class Lab
         Assert.That(result, Does.Not.Contain("555-0123"));
     }
 
+
+    // ── 2. Validation & Error Handling ───────────────────────────────
+
     [Test]
     public void Filter_EmptyKeepPaths_ThrowsArgumentException()
     {
@@ -83,6 +89,9 @@ public sealed class Lab
         Assert.ThrowsAsync<InvalidOperationException>(
             () => filter.FilterAsync("[1,2,3]", new[] { "a" }));
     }
+
+
+    // ── 3. End-to-End Integration ────────────────────────────────────
 
     [Test]
     public async Task Filter_E2E_PublishFilteredToMockEndpoint()

@@ -39,6 +39,9 @@ public sealed class Lab
             BusinessKey = businessKey,
         };
 
+
+    // ── 1. State Tracking ────────────────────────────────────────────
+
     [Test]
     public async Task RecordEvent_QueryByCorrelation_PublishToMockEndpoint()
     {
@@ -82,6 +85,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "lifecycle-events", default);
         _output.AssertReceivedOnTopic("lifecycle-events", 1);
     }
+
+
+    // ── 2. Lifecycle Tracking ────────────────────────────────────────
 
     [Test]
     public async Task QueryByBusinessKey_PublishMatchingEvents()
@@ -127,6 +133,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "message-history", default);
         _output.AssertReceivedOnTopic("message-history", 1);
     }
+
+
+    // ── 3. Business-Key Queries ──────────────────────────────────────
 
     [Test]
     public async Task GetLatestByCorrelation_NoneRecorded_ReturnsNull()

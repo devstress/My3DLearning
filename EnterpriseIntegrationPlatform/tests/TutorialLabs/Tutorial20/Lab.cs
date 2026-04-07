@@ -26,6 +26,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Split Output & Correlation ────────────────────────────────
+
     [Test]
     public async Task Split_ProducesCorrectItemCount()
     {
@@ -66,6 +69,9 @@ public sealed class Lab
         Assert.That(result.SplitEnvelopes[1].CausationId, Is.EqualTo(source.MessageId));
     }
 
+
+    // ── 2. Sequence Metadata ─────────────────────────────────────────
+
     [Test]
     public async Task Split_SequenceNumbers_AreZeroBased()
     {
@@ -94,6 +100,9 @@ public sealed class Lab
 
         Assert.That(result.ItemCount, Is.EqualTo(4));
     }
+
+
+    // ── 3. Edge Cases ────────────────────────────────────────────────
 
     [Test]
     public async Task Split_EmptyResult_ReturnsZeroItems()

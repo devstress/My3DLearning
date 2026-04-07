@@ -23,6 +23,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. MockEndpoint Assertions ───────────────────────────────────
+
     [Test]
     public async Task MockEndpoint_CapturesPublishedMessages()
     {
@@ -49,6 +52,9 @@ public sealed class Lab
         _output.AssertReceivedOnTopic("topic-b", 1);
         Assert.That(_output.GetReceivedTopics(), Has.Count.EqualTo(2));
     }
+
+
+    // ── 2. Envelope & Fault Contracts ────────────────────────────────
 
     [Test]
     public void IntegrationEnvelope_Create_SetsAllFields()
@@ -85,6 +91,9 @@ public sealed class Lab
         Assert.That(fault.FaultReason, Is.EqualTo("Invalid schema"));
         Assert.That(fault.RetryCount, Is.EqualTo(3));
     }
+
+
+    // ── 3. Routing Slip ──────────────────────────────────────────────
 
     [Test]
     public void RoutingSlip_Advance_MovesToNextStep()

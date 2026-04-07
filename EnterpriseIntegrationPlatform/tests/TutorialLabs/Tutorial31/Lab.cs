@@ -33,6 +33,9 @@ public sealed class Lab
         new(Guid.NewGuid(), streamId, type, data, version,
             DateTimeOffset.UtcNow, new Dictionary<string, string>());
 
+
+    // ── 1. Event Appending ───────────────────────────────────────────
+
     [Test]
     public async Task AppendAndReadForward_RoundTrip()
     {
@@ -65,6 +68,9 @@ public sealed class Lab
         Assert.That(events[1].Version, Is.EqualTo(2));
         await Task.CompletedTask;
     }
+
+
+    // ── 2. Stream Navigation ─────────────────────────────────────────
 
     [Test]
     public async Task ReadStreamBackward_ReturnsDescendingOrder()
@@ -106,6 +112,9 @@ public sealed class Lab
         Assert.That(subset, Has.Count.EqualTo(3));
         Assert.That(subset[0].Version, Is.EqualTo(3));
     }
+
+
+    // ── 3. Notification Publishing ───────────────────────────────────
 
     [Test]
     public async Task EmptyStream_ReturnsEmptyList()

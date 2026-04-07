@@ -66,6 +66,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Single & Multi-Step Transforms ────────────────────────────
+
     [Test]
     public async Task Pipeline_SingleStep_TransformsPayload()
     {
@@ -92,6 +95,9 @@ public sealed class Lab
         Assert.That(result.Payload, Is.EqualTo("[TRANSFORMED] ORDER DATA"));
         Assert.That(result.StepsApplied, Is.EqualTo(2));
     }
+
+
+    // ── 2. Pipeline Configuration & Error Handling ───────────────────
 
     [Test]
     public async Task Pipeline_Disabled_ReturnsInputUnchanged()
@@ -140,6 +146,9 @@ public sealed class Lab
         Assert.ThrowsAsync<InvalidOperationException>(
             () => pipeline.ExecuteAsync("this is too long", "text/plain"));
     }
+
+
+    // ── 3. End-to-End Integration ────────────────────────────────────
 
     [Test]
     public async Task Pipeline_E2E_PublishTransformedToMockEndpoint()

@@ -26,6 +26,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Compensation Execution ────────────────────────────────────
+
     [Test]
     public async Task CompensateAsync_SingleStep_ReturnsTrue()
     {
@@ -59,6 +62,9 @@ public sealed class Lab
         _output.AssertReceivedOnTopic("saga-compensations", 3);
     }
 
+
+    // ── 2. Failure Detection ─────────────────────────────────────────
+
     [Test]
     public async Task MockCompensation_FailureDetected_NackPublished()
     {
@@ -78,6 +84,9 @@ public sealed class Lab
         Assert.That(result, Is.False);
         _output.AssertReceivedOnTopic("saga-failures", 1);
     }
+
+
+    // ── 3. Pipeline Result & Workflow Types ──────────────────────────
 
     [Test]
     public void IntegrationPipelineResult_FailureHasReason()

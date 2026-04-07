@@ -25,6 +25,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Rule Matching ─────────────────────────────────────────────
+
     [Test]
     public async Task Evaluate_MatchingRule_ReturnsMatch()
     {
@@ -62,6 +65,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "default-topic");
         _output.AssertReceivedOnTopic("default-topic", 1);
     }
+
+
+    // ── 2. Conditions & Logic ────────────────────────────────────────
 
     [Test]
     public async Task Evaluate_ContainsOperator_MatchesSubstring()
@@ -120,6 +126,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "fallback");
         _output.AssertReceivedOnTopic("fallback", 1);
     }
+
+
+    // ── 3. Priority & Complex Rules ──────────────────────────────────
 
     [Test]
     public async Task Evaluate_PriorityOrder_HigherPriorityWins()

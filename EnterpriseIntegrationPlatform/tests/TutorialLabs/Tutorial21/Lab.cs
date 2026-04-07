@@ -27,6 +27,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Group Completion ──────────────────────────────────────────
+
     [Test]
     public async Task Aggregate_SingleMessage_GroupNotComplete()
     {
@@ -58,6 +61,9 @@ public sealed class Lab
         Assert.That(result.AggregateEnvelope, Is.Not.Null);
         _output.AssertReceivedOnTopic("aggregated-topic", 1);
     }
+
+
+    // ── 2. Correlation & Isolation ───────────────────────────────────
 
     [Test]
     public async Task Aggregate_PreservesCorrelationId()
@@ -115,6 +121,9 @@ public sealed class Lab
         Assert.That(r3.ReceivedCount, Is.EqualTo(3));
         _output.AssertReceivedOnTopic("aggregated-topic", 1);
     }
+
+
+    // ── 3. Merge Strategies ──────────────────────────────────────────
 
     [Test]
     public async Task Aggregate_MergesMetadata_FromAllEnvelopes()

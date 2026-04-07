@@ -35,6 +35,9 @@ public sealed class Lab
         await _consumer.DisposeAsync();
     }
 
+
+    // ── 1. Request-Reply Correlation ─────────────────────────────────
+
     [Test]
     public async Task SendAndReceive_PublishesRequestToTopic()
     {
@@ -77,6 +80,9 @@ public sealed class Lab
         Assert.That(result.CorrelationId, Is.EqualTo(correlationId));
     }
 
+
+    // ── 2. Timeout & Duration ────────────────────────────────────────
+
     [Test]
     public async Task SendAndReceive_TimesOut_ReturnsNullReply()
     {
@@ -111,6 +117,9 @@ public sealed class Lab
         Assert.That(result.Duration, Is.GreaterThan(TimeSpan.Zero));
         Assert.That(result.TimedOut, Is.False);
     }
+
+
+    // ── 3. Input Validation ──────────────────────────────────────────
 
     [Test]
     public async Task SendAndReceive_EmptyRequestTopic_Throws()

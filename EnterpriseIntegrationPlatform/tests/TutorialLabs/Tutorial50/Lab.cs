@@ -25,6 +25,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Message Expiration ────────────────────────────────────────
+
     [Test]
     public async Task ExpiredMessage_NotPublished()
     {
@@ -55,6 +58,9 @@ public sealed class Lab
         _output.AssertReceivedOnTopic("active-messages", 1);
     }
 
+
+    // ── 2. Security & Multi-Tenancy ──────────────────────────────────
+
     [Test]
     public void InputSanitizer_Idempotent()
     {
@@ -74,6 +80,9 @@ public sealed class Lab
 
         Assert.That(context.TenantId, Is.EqualTo(TenantContext.Anonymous.TenantId));
     }
+
+
+    // ── 3. Metadata & Schema ─────────────────────────────────────────
 
     [Test]
     public void MessageHeaders_ReplayId_ConstantExists()

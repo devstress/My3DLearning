@@ -25,6 +25,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Scatter Phase ─────────────────────────────────────────────
+
     [Test]
     public async Task Scatter_PublishesToAllRecipients()
     {
@@ -65,6 +68,9 @@ public sealed class Lab
         _output.AssertNoneReceived();
     }
 
+
+    // ── 2. Gather & Timeout ──────────────────────────────────────────
+
     [Test]
     public async Task Gather_TimesOut_ReturnsPartialResponses()
     {
@@ -102,6 +108,9 @@ public sealed class Lab
 
         Assert.That(result.CorrelationId, Is.EqualTo(correlationId));
     }
+
+
+    // ── 3. Edge Cases ────────────────────────────────────────────────
 
     [Test]
     public async Task SubmitResponse_UnknownCorrelation_ReturnsFalse()

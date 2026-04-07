@@ -26,6 +26,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Validation & Notification ─────────────────────────────────
+
     [Test]
     public async Task Validate_Success_PublishesAck()
     {
@@ -55,6 +58,9 @@ public sealed class Lab
         _output.AssertReceivedOnTopic("nack-topic", 1);
     }
 
+
+    // ── 2. Logging ───────────────────────────────────────────────────
+
     [Test]
     public async Task LogAsync_CompletesWithoutError()
     {
@@ -72,6 +78,9 @@ public sealed class Lab
         Assert.That(result.IsValid, Is.True);
         Assert.That(result.Reason, Is.Null);
     }
+
+
+    // ── 3. End-to-End Notification Flow ──────────────────────────────
 
     [Test]
     public void MessageValidationResult_Failure_HasReasonAndInvalid()

@@ -32,6 +32,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _input.DisposeAsync();
 
+
+    // ── 1. Basic Email Dispatch ──────────────────────────────────────
+
     [Test]
     public async Task Send_SingleRecipient_DelegatesToSmtp()
     {
@@ -56,6 +59,9 @@ public sealed class Lab
 
         Assert.That(_smtp.SendCount, Is.EqualTo(1));
     }
+
+
+    // ── 2. Message Formatting ────────────────────────────────────────
 
     [Test]
     public async Task Send_NullSubject_UsesDefaultTemplate()
@@ -85,6 +91,9 @@ public sealed class Lab
         Assert.That(captured.Headers["X-Message-Id"],
             Is.EqualTo(envelope.MessageId.ToString()));
     }
+
+
+    // ── 3. Error Handling & E2E ──────────────────────────────────────
 
     [Test]
     public async Task Send_DisconnectsEvenWhenAuthThrows()

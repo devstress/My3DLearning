@@ -32,6 +32,9 @@ public sealed class Lab
         await _output.DisposeAsync();
     }
 
+
+    // ── 1. Configuration Store CRUD ──────────────────────────────────
+
     [Test]
     public async Task SetAndGet_PublishConfigValueToMockEndpoint()
     {
@@ -67,6 +70,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "config-changes", default);
         _output.AssertReceivedOnTopic("config-changes", 1);
     }
+
+
+    // ── 2. Environment-Scoped Configuration ──────────────────────────
 
     [Test]
     public async Task DeleteConfig_PublishDeletionNotification()
@@ -123,6 +129,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, topic, default);
         _output.AssertReceivedOnTopic("feature-enabled", 1);
     }
+
+
+    // ── 3. Feature Flag Evaluation ───────────────────────────────────
 
     [Test]
     public async Task FeatureFlag_TargetTenant_PublishRouting()

@@ -27,6 +27,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Core Translation ──────────────────────────────────────────
+
     [Test]
     public async Task Translate_TransformsPayload_PublishesToTarget()
     {
@@ -43,6 +46,9 @@ public sealed class Lab
         Assert.That(result.SourceMessageId, Is.EqualTo(envelope.MessageId));
         _output.AssertReceivedOnTopic("translated-topic", 1);
     }
+
+
+    // ── 2. Envelope Fidelity ─────────────────────────────────────────
 
     [Test]
     public async Task Translate_PreservesCorrelationId()
@@ -94,6 +100,9 @@ public sealed class Lab
         Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("new.type"));
         _output.AssertReceivedOnTopic("target", 1);
     }
+
+
+    // ── 3. Validation & E2E ──────────────────────────────────────────
 
     [Test]
     public async Task Translate_PreservesMetadata()

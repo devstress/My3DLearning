@@ -28,6 +28,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Enrichment & Lookup ───────────────────────────────────────
+
     [Test]
     public async Task Enrich_MergesExternalData()
     {
@@ -58,6 +61,9 @@ public sealed class Lab
         Assert.That(result, Does.Contain("Widget"));
         Assert.That(result, Does.Contain("WH-1"));
     }
+
+
+    // ── 2. Fallback Behaviour ────────────────────────────────────────
 
     [Test]
     public async Task Enrich_SourceReturnsNull_UsesFallback()
@@ -127,6 +133,9 @@ public sealed class Lab
         Assert.ThrowsAsync<InvalidOperationException>(
             () => enricher.EnrichAsync(payload, Guid.NewGuid()));
     }
+
+
+    // ── 3. End-to-End Integration ────────────────────────────────────
 
     [Test]
     public async Task Enrich_E2E_PublishEnrichedToMockEndpoint()

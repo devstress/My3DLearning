@@ -29,6 +29,9 @@ public sealed class Lab
         new(NullLogger<ContinuousProfiler>.Instance,
             Options.Create(new ProfilingOptions { MaxRetainedSnapshots = maxSnapshots }));
 
+
+    // ── 1. Snapshot Capture ──────────────────────────────────────────
+
     [Test]
     public async Task CaptureSnapshot_PublishMetricsToMockEndpoint()
     {
@@ -65,6 +68,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "profiling-stats", default);
         _output.AssertReceivedOnTopic("profiling-stats", 1);
     }
+
+
+    // ── 2. Time-Range Queries ────────────────────────────────────────
 
     [Test]
     public async Task GetLatestSnapshot_PublishLabel()
@@ -118,6 +124,9 @@ public sealed class Lab
             DateTimeOffset.UtcNow.AddMinutes(1), DateTimeOffset.UtcNow.AddMinutes(2));
         Assert.That(empty, Is.Empty);
     }
+
+
+    // ── 3. Retention & Eviction ──────────────────────────────────────
 
     [Test]
     public async Task LabelledSnapshots_PublishWithMetadata()

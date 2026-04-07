@@ -26,6 +26,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Ordering ──────────────────────────────────────────────────
+
     [Test]
     public async Task Accept_InOrder_ReleasesAllWhenComplete()
     {
@@ -71,6 +74,9 @@ public sealed class Lab
         _output.AssertReceivedOnTopic("ordered-topic", 3);
     }
 
+
+    // ── 2. Validation ────────────────────────────────────────────────
+
     [Test]
     public void Accept_DuplicateSequenceNumber_IsIgnored()
     {
@@ -95,6 +101,9 @@ public sealed class Lab
 
         Assert.Throws<ArgumentException>(() => resequencer.Accept(envelope));
     }
+
+
+    // ── 3. Timeout & State ───────────────────────────────────────────
 
     [Test]
     public async Task ReleaseOnTimeout_IncompleteSequence_ReleasesBuffered()

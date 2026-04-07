@@ -25,6 +25,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Token Acquisition ─────────────────────────────────────────
+
     [Test]
     public async Task Acquire_WithTokens_IsPermitted()
     {
@@ -61,6 +64,9 @@ public sealed class Lab
         _output.AssertReceivedOnTopic("processed", 3);
     }
 
+
+    // ── 2. Rejection ─────────────────────────────────────────────────
+
     [Test]
     public async Task Acquire_RejectOnBackpressure_RejectsWhenEmpty()
     {
@@ -94,6 +100,9 @@ public sealed class Lab
         Assert.That(throttle.AvailableTokens, Is.EqualTo(4));
         _output.AssertReceivedOnTopic("topic", 1);
     }
+
+
+    // ── 3. Metrics ───────────────────────────────────────────────────
 
     [Test]
     public async Task GetMetrics_ReflectsAcquireAndReject()

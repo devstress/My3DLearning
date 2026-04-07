@@ -35,6 +35,9 @@ public sealed class Lab
         await _output.DisposeAsync();
     }
 
+
+    // ── 1. AI Service Interactions ───────────────────────────────────
+
     [Test]
     public async Task Ollama_GenerateAsync_ReturnsExpected()
     {
@@ -62,6 +65,9 @@ public sealed class Lab
         Assert.That(result.ConversationId, Is.EqualTo("conv-123"));
         Assert.That(result.References, Has.Count.EqualTo(1));
     }
+
+
+    // ── 2. Configuration & Data Contracts ────────────────────────────
 
     [Test]
     public void OllamaSettings_Defaults()
@@ -96,6 +102,9 @@ public sealed class Lab
         Assert.That(response.References[0].DocumentName, Is.EqualTo("file1.pdf"));
         Assert.That(response.References[1].Score, Is.EqualTo(0.8));
     }
+
+
+    // ── 3. End-to-End AI Pipeline ────────────────────────────────────
 
     [Test]
     public async Task E2E_MockEndpoint_AiEnrichedPipeline()

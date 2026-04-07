@@ -26,6 +26,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Scaling ───────────────────────────────────────────────────
+
     [Test]
     public async Task HighLag_ScalesUp()
     {
@@ -63,6 +66,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "scale-events");
         _output.AssertReceivedOnTopic("scale-events", 1);
     }
+
+
+    // ── 2. Limits ────────────────────────────────────────────────────
 
     [Test]
     public async Task MaxConsumers_SignalsBackpressure()
@@ -102,6 +108,9 @@ public sealed class Lab
         await _output.PublishAsync(envelope, "scale-events");
         _output.AssertReceivedOnTopic("scale-events", 1);
     }
+
+
+    // ── 3. Steady State ──────────────────────────────────────────────
 
     [Test]
     public async Task ModerateLag_NoScaleChange()

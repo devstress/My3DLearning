@@ -26,6 +26,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Basic Retry Outcomes ──────────────────────────────────────
+
     [Test]
     public async Task Execute_SucceedsFirstAttempt_ReturnsResult()
     {
@@ -63,6 +66,9 @@ public sealed class Lab
         Assert.That(result.Result, Is.EqualTo("recovered"));
     }
 
+
+    // ── 2. Overloads & Configuration ─────────────────────────────────
+
     [Test]
     public async Task Execute_AllAttemptsFail_ReturnsFailure()
     {
@@ -94,6 +100,9 @@ public sealed class Lab
         Assert.That(result.Attempts, Is.EqualTo(1));
         Assert.That(called, Is.True);
     }
+
+
+    // ── 3. End-to-End Integration ────────────────────────────────────
 
     [Test]
     public async Task Execute_RetryThenPublish_EndToEnd()

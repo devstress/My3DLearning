@@ -33,6 +33,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _input.DisposeAsync();
 
+
+    // ── 1. File Write Operations ─────────────────────────────────────
+
     [Test]
     public async Task Write_CreatesDataFile_AndMetadataSidecar()
     {
@@ -58,6 +61,9 @@ public sealed class Lab
         Assert.That(capturedPath, Does.Contain(envelope.MessageId.ToString()));
         Assert.That(capturedPath, Does.Contain("invoice.created"));
     }
+
+
+    // ── 2. File Read & List ──────────────────────────────────────────
 
     [Test]
     public async Task Write_CreatesDirectory_WhenOptionEnabled()
@@ -103,6 +109,9 @@ public sealed class Lab
 
         Assert.That(result, Is.EqualTo(expected));
     }
+
+
+    // ── 3. End-to-End Integration ────────────────────────────────────
 
     [Test]
     public async Task ListFiles_ReturnsMatchingPaths()

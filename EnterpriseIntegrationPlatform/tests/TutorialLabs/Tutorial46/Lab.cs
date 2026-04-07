@@ -30,6 +30,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Message Dispatcher ────────────────────────────────────────
+
     [Test]
     public async Task Dispatcher_RegisterAndDispatch_HandlerInvoked()
     {
@@ -85,6 +88,9 @@ public sealed class Lab
         Assert.That(received.Payload, Does.Contain("ORD-001"));
     }
 
+
+    // ── 2. Service Activator ─────────────────────────────────────────
+
     [Test]
     public async Task ServiceActivator_InvokeWithReply_PublishesToReplyTopic()
     {
@@ -121,6 +127,9 @@ public sealed class Lab
         Assert.That(result.ReplySent, Is.False);
         _output.AssertNoneReceived();
     }
+
+
+    // ── 3. Pipeline Orchestration ────────────────────────────────────
 
     [Test]
     public async Task PipelineOrchestrator_ProcessAsync_DispatchesToWorkflow()
