@@ -51,11 +51,23 @@ Immersive3D project with 5 services: VirtualVillage, Walkthrough, DesignEditor, 
 
 Infrastructure project with 3 services: Auth, Observability, Tenant. Authentication with hashed passwords and RBAC, structured audit logging with health checks and metrics, multi-tenant isolation.
 
+✅ Phase 6 complete — see `rules/completion-log.md` for full history.
+
+Journey project with 3 services: BuyerJourney, QuoteAggregator, Referral. Full buyer lifecycle orchestration from browsing through to partner referral, cross-partner cost aggregation, qualified lead generation.
+
+✅ Phase 7 complete — see `rules/completion-log.md` for full history.
+
+Notifications project with 3 services: Notification, EventBus, Webhook. In-app notification delivery with read tracking, in-memory pub/sub event bus with correlation, webhook registration and simulated delivery for partners.
+
+✅ Phase 8 complete — see `rules/completion-log.md` for full history.
+
+Analytics project with 3 services: Search, Analytics, Reporting. Cross-entity full-text search with relevance scoring, user engagement tracking with summaries and popular entities, markdown report generation.
+
 ---
 
 ## Next Chunk
 
-All phases (1–5) are complete. 11 src projects, 290 tests. The platform is fully implemented with all core services, partner integrations, immersive 3D experience, and platform infrastructure.
+All phases (1–8) are complete. 14 src projects, 390 tests. The platform is fully implemented with core services, partner integrations, immersive 3D experience, platform infrastructure, buyer journey orchestration, notifications & events, and search & analytics.
 
 ---
 

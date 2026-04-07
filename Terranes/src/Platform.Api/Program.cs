@@ -1,9 +1,12 @@
+using Terranes.Analytics;
 using Terranes.Compliance;
 using Terranes.Immersive3D;
 using Terranes.Infrastructure;
+using Terranes.Journey;
 using Terranes.Land;
 using Terranes.Marketplace;
 using Terranes.Models3D;
+using Terranes.Notifications;
 using Terranes.PartnerIntegration;
 using Terranes.Platform.Api.Endpoints;
 using Terranes.Quoting;
@@ -21,6 +24,9 @@ builder.Services.AddCompliance();
 builder.Services.AddPartnerIntegration();
 builder.Services.AddImmersive3D();
 builder.Services.AddInfrastructure();
+builder.Services.AddJourney();
+builder.Services.AddNotifications();
+builder.Services.AddAnalytics();
 
 builder.Services.AddEndpointsApiExplorer();
 
@@ -55,6 +61,21 @@ app.MapContentEndpoints();
 app.MapAuthEndpoints();
 app.MapObservabilityEndpoints();
 app.MapTenantEndpoints();
+
+// Map API endpoints — buyer journey
+app.MapBuyerJourneyEndpoints();
+app.MapQuoteAggregatorEndpoints();
+app.MapReferralEndpoints();
+
+// Map API endpoints — notifications & events
+app.MapNotificationEndpoints();
+app.MapEventBusEndpoints();
+app.MapWebhookEndpoints();
+
+// Map API endpoints — search & analytics
+app.MapSearchEndpoints();
+app.MapAnalyticsEndpoints();
+app.MapReportingEndpoints();
 
 // Health check
 app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Timestamp = DateTimeOffset.UtcNow }))

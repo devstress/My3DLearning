@@ -29,6 +29,9 @@
     <ProjectReference Include="..\..\src\PartnerIntegration\PartnerIntegration.csproj" />
     <ProjectReference Include="..\..\src\Immersive3D\Immersive3D.csproj" />
     <ProjectReference Include="..\..\src\Infrastructure\Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Journey\Journey.csproj" />
+    <ProjectReference Include="..\..\src\Notifications\Notifications.csproj" />
+    <ProjectReference Include="..\..\src\Analytics\Analytics.csproj" />
   </ItemGroup>
 
   <ItemGroup>

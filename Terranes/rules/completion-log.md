@@ -358,3 +358,170 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - DI registration via single AddInfrastructure() extension method
 - REST API now has 94 endpoints across 20 resource groups
 - Run: `dotnet run --project src/Platform.Api` → http://localhost:5200
+
+---
+
+## Phase 6 — Buyer Journey Orchestration
+
+### Chunk 023 — Buyer Journey Service (2026-04-07)
+
+**Goal:** Orchestrate the complete buyer experience from village browsing through to partner referral.
+
+**Files created:**
+- `src/Contracts/Enums/JourneyStage.cs` — Browsing, DesignSelected, PlacedOnLand, Customising, QuoteRequested, QuoteReceived, Referred, Completed, Abandoned
+- `src/Contracts/Models/BuyerJourney.cs` — Full journey record with entity linking
+- `src/Contracts/Abstractions/IBuyerJourneyService.cs` — Journey service interface
+- `src/Journey/BuyerJourneyService.cs` — Full implementation with lifecycle, stage validation, entity linking
+- `src/Platform.Api/Endpoints/BuyerJourneyEndpoints.cs` — 6 REST endpoints
+- `tests/UnitTests/Services/BuyerJourneyServiceTests.cs` — 14 tests
+
+### Chunk 024 — Quote Aggregator (2026-04-07)
+
+**Goal:** Aggregate cost estimates from multiple partner categories into a unified quote.
+
+**Files created:**
+- `src/Contracts/Models/AggregatedQuote.cs` — Aggregated quote record with per-category breakdowns
+- `src/Contracts/Abstractions/IQuoteAggregatorService.cs` — Aggregator service interface
+- `src/Journey/QuoteAggregatorService.cs` — Full implementation with realistic estimate ranges
+- `src/Platform.Api/Endpoints/QuoteAggregatorEndpoints.cs` — 3 REST endpoints
+- `tests/UnitTests/Services/QuoteAggregatorServiceTests.cs` — 9 tests
+
+### Chunk 025 — Referral Pipeline (2026-04-07)
+
+**Goal:** Generate qualified leads and route to partners with accept/decline workflow.
+
+**Files created:**
+- `src/Contracts/Enums/ReferralStatus.cs` — Pending, Sent, Accepted, Declined, Expired
+- `src/Contracts/Models/PartnerReferral.cs` — Referral record with response tracking
+- `src/Contracts/Abstractions/IReferralService.cs` — Referral service interface
+- `src/Journey/ReferralService.cs` — Full implementation with status management and response timestamps
+- `src/Platform.Api/Endpoints/ReferralEndpoints.cs` — 5 REST endpoints
+- `tests/UnitTests/Services/ReferralServiceTests.cs` — 13 tests
+
+### Phase 6 Summary
+
+**Files created:**
+- `src/Journey/Journey.csproj` — New project
+- `src/Journey/ServiceCollectionExtensions.cs` — AddJourney() DI registration
+
+**Tests:** 326 total (290 existing + 36 new journey tests). All pass.
+
+**Architecture:**
+- 12 src projects (+ Journey)
+- Journey houses buyer journey, quote aggregator, and referral services
+- QuoteAggregatorService depends on IQuotingService for aggregation
+- DI registration via single AddJourney() extension method
+- REST API now has 108 endpoints across 23 resource groups
+
+---
+
+## Phase 7 — Notifications & Events
+
+### Chunk 026 — Notification Service (2026-04-07)
+
+**Goal:** Notification creation, delivery tracking, and read status management.
+
+**Files created:**
+- `src/Contracts/Enums/NotificationType.cs` — QuoteReady, ReferralCreated, ReferralAccepted, DesignSaved, VideoProcessingComplete, ContentPublished, SystemAlert, Info
+- `src/Contracts/Enums/NotificationStatus.cs` — Queued, Delivered, Read, Failed
+- `src/Contracts/Models/Notification.cs` — Notification record
+- `src/Contracts/Abstractions/INotificationService.cs` — Notification service interface
+- `src/Notifications/NotificationService.cs` — Full implementation with delivery and read tracking
+- `src/Platform.Api/Endpoints/NotificationEndpoints.cs` — 5 REST endpoints
+- `tests/UnitTests/Services/NotificationServiceTests.cs` — 12 tests
+
+### Chunk 027 — Event Bus (2026-04-07)
+
+**Goal:** In-memory pub/sub event system for cross-service communication.
+
+**Files created:**
+- `src/Contracts/Models/PlatformEvent.cs` — Event record with topic and correlation
+- `src/Contracts/Abstractions/IEventBusService.cs` — Event bus interface
+- `src/Notifications/EventBusService.cs` — Full implementation with topic index and correlation tracking
+- `src/Platform.Api/Endpoints/EventBusEndpoints.cs` — 5 REST endpoints
+- `tests/UnitTests/Services/EventBusServiceTests.cs` — 11 tests
+
+### Chunk 028 — Webhook Service (2026-04-07)
+
+**Goal:** Webhook registration and simulated delivery for partner integrations.
+
+**Files created:**
+- `src/Contracts/Enums/WebhookDeliveryStatus.cs` — Pending, Delivered, Failed, Retrying
+- `src/Contracts/Models/WebhookRegistration.cs` — Webhook registration record
+- `src/Contracts/Models/WebhookDelivery.cs` — Webhook delivery record
+- `src/Contracts/Abstractions/IWebhookService.cs` — Webhook service interface
+- `src/Notifications/WebhookService.cs` — Full implementation with topic matching, deactivation, delivery history
+- `src/Platform.Api/Endpoints/WebhookEndpoints.cs` — 5 REST endpoints
+- `tests/UnitTests/Services/WebhookServiceTests.cs` — 13 tests
+
+### Phase 7 Summary
+
+**Files created:**
+- `src/Notifications/Notifications.csproj` — New project
+- `src/Notifications/ServiceCollectionExtensions.cs` — AddNotifications() DI registration
+
+**Tests:** 362 total (326 existing + 36 new notification tests). All pass.
+
+**Architecture:**
+- 13 src projects (+ Notifications)
+- Notifications houses notification, event bus, and webhook services
+- EventBusService supports case-insensitive topic matching
+- WebhookService matches events to registered webhooks by topic
+- DI registration via single AddNotifications() extension method
+- REST API now has 123 endpoints across 26 resource groups
+
+---
+
+## Phase 8 — Search & Analytics
+
+### Chunk 029 — Search Service (2026-04-07)
+
+**Goal:** Cross-entity full-text search with relevance scoring.
+
+**Files created:**
+- `src/Contracts/Models/SearchResult.cs` — Search result record with relevance score
+- `src/Contracts/Abstractions/ISearchService.cs` — Search service interface
+- `src/Analytics/SearchService.cs` — Full implementation with substring matching, word-level scoring, type filtering
+- `src/Platform.Api/Endpoints/SearchEndpoints.cs` — 5 REST endpoints
+- `tests/UnitTests/Services/SearchServiceTests.cs` — 12 tests
+
+### Chunk 030 — Analytics Service (2026-04-07)
+
+**Goal:** User engagement tracking with aggregated summaries and popular entity discovery.
+
+**Files created:**
+- `src/Contracts/Enums/AnalyticsEventType.cs` — VillageView, HomeModelView, WalkthroughStarted, DesignPlaced, DesignEdited, QuoteRequested, Referral, Search, Registration, Login
+- `src/Contracts/Models/AnalyticsEvent.cs` — Analytics event record
+- `src/Contracts/Models/AnalyticsSummary.cs` — Aggregated summary record
+- `src/Contracts/Abstractions/IAnalyticsService.cs` — Analytics service interface
+- `src/Analytics/AnalyticsService.cs` — Full implementation with user events, summaries, popular entities
+- `src/Platform.Api/Endpoints/AnalyticsEndpoints.cs` — 5 REST endpoints
+- `tests/UnitTests/Services/AnalyticsServiceTests.cs` — 12 tests
+
+### Chunk 031 — Reporting Service (2026-04-07)
+
+**Goal:** Report generation with multiple report types and markdown content.
+
+**Files created:**
+- `src/Contracts/Models/Report.cs` — Report record
+- `src/Contracts/Abstractions/IReportingService.cs` — Reporting service interface
+- `src/Analytics/ReportingService.cs` — Full implementation with 5 report types (PlatformOverview, JourneySummary, PartnerActivity, EngagementReport, QuoteSummary)
+- `src/Platform.Api/Endpoints/ReportingEndpoints.cs` — 4 REST endpoints
+- `tests/UnitTests/Services/ReportingServiceTests.cs` — 12 tests
+
+### Phase 8 Summary
+
+**Files created:**
+- `src/Analytics/Analytics.csproj` — New project
+- `src/Analytics/ServiceCollectionExtensions.cs` — AddAnalytics() DI registration
+
+**Tests:** 390 total (362 existing + 28 new analytics tests). All pass. *Correction: 100 new tests across all 3 phases for a total of 390.*
+
+**Architecture:**
+- 14 src projects (Contracts, Models3D, Land, SitePlacement, Quoting, Marketplace, Compliance, PartnerIntegration, Immersive3D, Infrastructure, Journey, Notifications, Analytics, Platform.Api)
+- Analytics houses search, analytics, and reporting services
+- SearchService uses simple substring matching with word-level relevance scoring
+- ReportingService depends on IAnalyticsService for event counts
+- DI registration via single AddAnalytics() extension method
+- REST API now has 137 endpoints across 29 resource groups
+- Run: `dotnet run --project src/Platform.Api` → http://localhost:5200
