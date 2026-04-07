@@ -49,7 +49,7 @@ public sealed class TenantService : ITenantService
 
         _tenantUsers[persisted.Id] = [];
 
-        _logger.LogInformation("Created tenant {TenantId} ({Slug})", persisted.Id, persisted.Slug);
+        _logger.LogInformation("Created tenant {TenantId}", persisted.Id);
         return Task.FromResult(persisted);
     }
 

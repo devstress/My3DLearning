@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Terranes.Contracts.Abstractions;
 using Terranes.Contracts.Enums;
@@ -38,17 +37,17 @@ public sealed class AuthService : IAuthService
             throw new ArgumentException("Tenant ID is required.", nameof(user));
 
         if (!_emailIndex.TryAdd(user.Email, user.Id == Guid.Empty ? Guid.NewGuid() : user.Id))
-            throw new InvalidOperationException($"Email {user.Email} is already registered.");
+            throw new InvalidOperationException("Email is already registered.");
 
         var id = _emailIndex[user.Email];
         var persisted = user with { Id = id, IsActive = true, CreatedAtUtc = DateTimeOffset.UtcNow };
 
         if (!_users.TryAdd(persisted.Id, persisted))
-            throw new InvalidOperationException($"User {persisted.Id} already exists.");
+            throw new InvalidOperationException("User ID conflict.");
 
         _passwordHashes[persisted.Id] = HashPassword(password);
 
-        _logger.LogInformation("Registered user {UserId} ({Role})", persisted.Id, persisted.Role);
+        _logger.LogInformation("Registered user {UserId}", persisted.Id);
         return Task.FromResult(persisted);
     }
 
@@ -63,7 +62,7 @@ public sealed class AuthService : IAuthService
         if (!_users.TryGetValue(userId, out var user) || !user.IsActive)
             return Task.FromResult<PlatformUser?>(null);
 
-        if (!_passwordHashes.TryGetValue(userId, out var hash) || hash != HashPassword(password))
+        if (!_passwordHashes.TryGetValue(userId, out var hash) || !VerifyPassword(password, hash))
             return Task.FromResult<PlatformUser?>(null);
 
         var updated = user with { LastLoginAtUtc = DateTimeOffset.UtcNow };
@@ -87,7 +86,7 @@ public sealed class AuthService : IAuthService
         var updated = user with { Role = newRole };
         _users[userId] = updated;
 
-        _logger.LogInformation("Updated user {UserId} role to {Role}", userId, newRole);
+        _logger.LogInformation("Updated user {UserId} role", userId);
         return Task.FromResult(updated);
     }
 
@@ -111,9 +110,27 @@ public sealed class AuthService : IAuthService
         return Task.FromResult(user.Role == role && user.IsActive);
     }
 
+    private const int SaltSize = 16;
+    private const int HashSize = 32;
+    private const int Iterations = 100_000;
+    private static readonly HashAlgorithmName Algorithm = HashAlgorithmName.SHA256;
+
     private static string HashPassword(string password)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-        return Convert.ToBase64String(bytes);
+        var salt = RandomNumberGenerator.GetBytes(SaltSize);
+        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, Algorithm, HashSize);
+        return $"{Convert.ToBase64String(salt)}:{Convert.ToBase64String(hash)}";
+    }
+
+    private static bool VerifyPassword(string password, string stored)
+    {
+        var parts = stored.Split(':');
+        if (parts.Length != 2) return false;
+
+        var salt = Convert.FromBase64String(parts[0]);
+        var expectedHash = Convert.FromBase64String(parts[1]);
+        var actualHash = Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, Algorithm, HashSize);
+
+        return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
     }
 }

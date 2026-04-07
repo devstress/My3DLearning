@@ -47,7 +47,7 @@ public sealed class VideoToModelService : IVideoToModelService
         if (!_jobs.TryAdd(job.Id, job))
             throw new InvalidOperationException($"Job {job.Id} already exists.");
 
-        _logger.LogInformation("Uploaded video {JobId} ({FileName})", job.Id, fileName);
+        _logger.LogInformation("Uploaded video {JobId}", job.Id);
         return Task.FromResult(job);
     }
 
