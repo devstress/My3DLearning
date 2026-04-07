@@ -24,7 +24,7 @@
 
 ✅ Phases 1–27 complete — see `rules/completion-log.md` for full history.
 
-48 src projects. 522 TutorialLabs tests across 50 tutorials. Broker providers: NATS JetStream, Kafka, Pulsar.
+48 src projects + Ingestion.Postgres = 49 src projects. 522 TutorialLabs tests across 50 tutorials. Broker providers: NATS JetStream, Kafka, Pulsar, **PostgreSQL**.
 
 ---
 
@@ -61,15 +61,11 @@ transactions, channels, competing consumers) work through the same interfaces.
 
 | Chunk | Scope | Status |
 |-------|-------|--------|
-| 103 | **BrokerType.Postgres + project scaffold** — Add `Postgres = 3` to `BrokerType` enum. Create `src/Ingestion.Postgres/` project with `Ingestion.Postgres.csproj` (refs Npgsql, Ingestion). Add `PostgresBrokerOptions`, SQL schema file `Schema/001_create_tables.sql`, `PostgresConnectionFactory`. Wire into solution. | `not-started` |
-| 104 | **PostgresBrokerProducer** — Implements `IMessageBrokerProducer`. INSERT into `eip_messages` + `pg_notify('eip_' \|\| topic)`. Serializes `IntegrationEnvelope<T>` via existing `EnvelopeSerializer`. Unit tests for publish, serialization round-trip, pg_notify trigger. | `not-started` |
-| 105 | **PostgresBrokerConsumer** — Implements `IMessageBrokerConsumer`, `IEventDrivenConsumer`, `IPollingConsumer`, `ISelectiveConsumer`. LISTEN/NOTIFY for push delivery; `SELECT … FOR UPDATE SKIP LOCKED` polling fallback. Consumer group support via `consumer_group` column. Competing consumers work naturally via row locks. Unit + integration tests. | `not-started` |
-| 106 | **PostgresTransactionalClient + DurableSubscriber** — `ITransactionalClient` using `NpgsqlTransaction` (native ACID). `SupportsNativeTransactions = true`. `IDurableSubscriber` — rows only deleted after explicit ACK. `IChannelPurger` — DELETE by topic. Unit tests for commit/rollback/compensation, durable ACK, purge. | `not-started` |
 | 107 | **DLQ + Retry + Channels on Postgres** — Verify `DeadLetterPublisher<T>`, `ExponentialBackoffRetryPolicy`, `InvalidMessageChannel`, `PointToPointChannel`, `PublishSubscribeChannel`, `DatatypeChannel`, `MessagingBridge` all work unchanged with Postgres producer/consumer. Integration tests exercising each EIP pattern end-to-end through Postgres. | `not-started` |
 | 108 | **DI wiring + Aspire integration** — `AddPostgresBroker(services, connectionString)` extension. Register in `IngestionServiceExtensions.BrokerRegistrations`. Add Postgres container to `tests/TestAppHost/Program.cs`. `PostgresBrokerEndpoint` test helper (mirrors `NatsBrokerEndpoint`). Connectivity integration tests. | `not-started` |
 | 109 | **Routing + advanced EIP on Postgres** — Integration tests: `ContentBasedRouter`, `DynamicRouter`, `RecipientListRouter`, `RoutingSlipRouter`, `MessageFilter`, `Detour`, `ScatterGather`, `Splitter`, `Aggregator`, `Resequencer` — all wired to Postgres broker. Proves every EIP routing pattern works on Postgres transport. | `not-started` |
 
-**Next Chunk:** 103
+**Next Chunk:** 107
 
 ---
 

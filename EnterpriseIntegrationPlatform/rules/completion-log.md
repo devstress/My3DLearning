@@ -4,6 +4,36 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunks 103–106 – PostgreSQL Message Broker (Ingestion.Postgres)
+
+- **Date**: 2026-04-07
+- **Phase**: 28 — PostgreSQL Message Broker (EIP-Complete, ≤ 5k TPS)
+- **Status**: done
+- **Goal**: Add PostgreSQL as a fourth production message broker, implementing all EIP interfaces (IMessageBrokerProducer, IMessageBrokerConsumer, IEventDrivenConsumer, IPollingConsumer, ISelectiveConsumer, ITransactionalClient) so all existing EIP components work unchanged.
+- **Architecture**:
+  - `BrokerType.Postgres = 3` added to enum
+  - `eip_messages` table with pg_notify trigger for low-latency delivery
+  - `eip_subscriptions` with `SELECT … FOR UPDATE SKIP LOCKED` for competing consumers
+  - `eip_dead_letters` table for DLQ
+  - `eip_durable_subscribers` with auto-fanout trigger
+  - Native ACID transactions via `NpgsqlTransaction`
+- **Files created**:
+  - `src/Ingestion.Postgres/Ingestion.Postgres.csproj`
+  - `src/Ingestion.Postgres/PostgresBrokerProducer.cs`
+  - `src/Ingestion.Postgres/PostgresBrokerConsumer.cs`
+  - `src/Ingestion.Postgres/PostgresTransactionalClient.cs`
+  - `src/Ingestion.Postgres/PostgresConnectionFactory.cs`
+  - `src/Ingestion.Postgres/PostgresBrokerOptions.cs`
+  - `src/Ingestion.Postgres/PostgresServiceExtensions.cs`
+  - `src/Ingestion.Postgres/Schema/001_create_tables.sql`
+- **Files modified**:
+  - `src/Ingestion/BrokerType.cs` — Added `Postgres = 3`
+  - `src/Ingestion/BrokerOptions.cs` — Added Postgres connection string doc
+  - `src/Ingestion/IngestionServiceExtensions.cs` — Registered Postgres in BrokerRegistrations
+  - `Directory.Packages.props` — Added `Npgsql 9.0.3`
+  - `EnterpriseIntegrationPlatform.sln` — Added Ingestion.Postgres project
+- **Test counts**: 522 TutorialLabs tests unchanged. Full solution builds: 49 src projects, 0 errors, 0 warnings.
+
 ## Chunk 102 – Update tutorials/README.md
 
 - **Date**: 2026-04-06
