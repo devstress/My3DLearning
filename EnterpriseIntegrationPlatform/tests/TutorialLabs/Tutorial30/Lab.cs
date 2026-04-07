@@ -2,7 +2,8 @@
 // Tutorial 30 – Business Rule Engine (Lab)
 // ============================================================================
 // EIP Pattern: Rule Engine (Message Routing variant).
-// E2E: BusinessRuleEngine with InMemoryRuleStore + MockEndpoint.
+// Real Integrations: BusinessRuleEngine with InMemoryRuleStore +
+// NatsBrokerEndpoint (real NATS JetStream via Aspire).
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,23 +18,16 @@ namespace TutorialLabs.Tutorial30;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("rules-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
     // ── 1. Rule Matching ─────────────────────────────────────────────
 
     [Test]
     public async Task Evaluate_MatchingRule_ReturnsMatch()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t30-match");
+        var topic = AspireFixture.UniqueTopic("t30-orders");
         var store = new InMemoryRuleStore();
         await store.AddOrUpdateAsync(CreateRouteRule("OrderRule", "MessageType",
-            RuleConditionOperator.Equals, "order.created", "orders-topic"));
+            RuleConditionOperator.Equals, "order.created", topic));
 
         var engine = CreateEngine(store);
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "order.created");
@@ -42,15 +36,17 @@ public sealed class Lab
         Assert.That(result.HasMatch, Is.True);
         Assert.That(result.MatchedRules, Has.Count.EqualTo(1));
         Assert.That(result.MatchedRules[0].Name, Is.EqualTo("OrderRule"));
-        Assert.That(result.Actions[0].TargetTopic, Is.EqualTo("orders-topic"));
+        Assert.That(result.Actions[0].TargetTopic, Is.EqualTo(topic));
 
-        await _output.PublishAsync(envelope, result.Actions[0].TargetTopic!);
-        _output.AssertReceivedOnTopic("orders-topic", 1);
+        await nats.PublishAsync(envelope, result.Actions[0].TargetTopic!);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task Evaluate_NoMatch_ReturnsEmpty()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t30-nomatch");
+        var topic = AspireFixture.UniqueTopic("t30-default");
         var store = new InMemoryRuleStore();
         await store.AddOrUpdateAsync(CreateRouteRule("OrderRule", "MessageType",
             RuleConditionOperator.Equals, "order.created", "orders-topic"));
@@ -62,8 +58,8 @@ public sealed class Lab
         Assert.That(result.HasMatch, Is.False);
         Assert.That(result.MatchedRules, Is.Empty);
 
-        await _output.PublishAsync(envelope, "default-topic");
-        _output.AssertReceivedOnTopic("default-topic", 1);
+        await nats.PublishAsync(envelope, topic);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
 
@@ -72,25 +68,29 @@ public sealed class Lab
     [Test]
     public async Task Evaluate_ContainsOperator_MatchesSubstring()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t30-contains");
+        var topic = AspireFixture.UniqueTopic("t30-order-events");
         var store = new InMemoryRuleStore();
         await store.AddOrUpdateAsync(CreateRouteRule("PartialMatch", "Source",
-            RuleConditionOperator.Contains, "Order", "order-events"));
+            RuleConditionOperator.Contains, "Order", topic));
 
         var engine = CreateEngine(store);
         var envelope = IntegrationEnvelope<string>.Create("data", "MyOrderService", "evt");
         var result = await engine.EvaluateAsync(envelope);
 
         Assert.That(result.HasMatch, Is.True);
-        await _output.PublishAsync(envelope, result.Actions[0].TargetTopic!);
-        _output.AssertReceivedOnTopic("order-events", 1);
+        await nats.PublishAsync(envelope, result.Actions[0].TargetTopic!);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task Evaluate_MetadataCondition_MatchesMetadataField()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t30-metadata");
+        var topic = AspireFixture.UniqueTopic("t30-us-east");
         var store = new InMemoryRuleStore();
         await store.AddOrUpdateAsync(CreateRouteRule("RegionRule", "Metadata.region",
-            RuleConditionOperator.Equals, "us-east", "us-east-topic"));
+            RuleConditionOperator.Equals, "us-east", topic));
 
         var engine = CreateEngine(store);
         var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "evt") with
@@ -100,13 +100,15 @@ public sealed class Lab
         var result = await engine.EvaluateAsync(envelope);
 
         Assert.That(result.HasMatch, Is.True);
-        await _output.PublishAsync(envelope, result.Actions[0].TargetTopic!);
-        _output.AssertReceivedOnTopic("us-east-topic", 1);
+        await nats.PublishAsync(envelope, result.Actions[0].TargetTopic!);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task Evaluate_DisabledRule_IsSkipped()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t30-disabled");
+        var topic = AspireFixture.UniqueTopic("t30-fallback");
         var store = new InMemoryRuleStore();
         var rule = new BusinessRule
         {
@@ -123,8 +125,8 @@ public sealed class Lab
         Assert.That(result.HasMatch, Is.False);
         Assert.That(result.RulesEvaluated, Is.EqualTo(0));
 
-        await _output.PublishAsync(envelope, "fallback");
-        _output.AssertReceivedOnTopic("fallback", 1);
+        await nats.PublishAsync(envelope, topic);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
 
@@ -133,6 +135,8 @@ public sealed class Lab
     [Test]
     public async Task Evaluate_PriorityOrder_HigherPriorityWins()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t30-priority");
+        var topic = AspireFixture.UniqueTopic("t30-fast-lane");
         var store = new InMemoryRuleStore();
         await store.AddOrUpdateAsync(new BusinessRule
         {
@@ -144,7 +148,7 @@ public sealed class Lab
         {
             Name = "HighPriority", Priority = 1, StopOnMatch = true,
             Conditions = [new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "order.created" }],
-            Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "fast-lane" },
+            Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = topic },
         });
 
         var engine = CreateEngine(store);
@@ -152,15 +156,17 @@ public sealed class Lab
         var result = await engine.EvaluateAsync(envelope);
 
         Assert.That(result.MatchedRules, Has.Count.EqualTo(1));
-        Assert.That(result.Actions[0].TargetTopic, Is.EqualTo("fast-lane"));
+        Assert.That(result.Actions[0].TargetTopic, Is.EqualTo(topic));
 
-        await _output.PublishAsync(envelope, result.Actions[0].TargetTopic!);
-        _output.AssertReceivedOnTopic("fast-lane", 1);
+        await nats.PublishAsync(envelope, result.Actions[0].TargetTopic!);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task Evaluate_OrLogic_MatchesAnyCondition()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t30-or");
+        var topic = AspireFixture.UniqueTopic("t30-combined");
         var store = new InMemoryRuleStore();
         await store.AddOrUpdateAsync(new BusinessRule
         {
@@ -170,7 +176,7 @@ public sealed class Lab
                 new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "order.created" },
                 new RuleCondition { FieldName = "Source", Operator = RuleConditionOperator.Equals, Value = "PaymentService" },
             ],
-            Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "combined" },
+            Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = topic },
         });
 
         var engine = CreateEngine(store);
@@ -178,8 +184,8 @@ public sealed class Lab
         var result = await engine.EvaluateAsync(envelope);
 
         Assert.That(result.HasMatch, Is.True);
-        await _output.PublishAsync(envelope, result.Actions[0].TargetTopic!);
-        _output.AssertReceivedOnTopic("combined", 1);
+        await nats.PublishAsync(envelope, result.Actions[0].TargetTopic!);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     private static BusinessRuleEngine CreateEngine(InMemoryRuleStore store)

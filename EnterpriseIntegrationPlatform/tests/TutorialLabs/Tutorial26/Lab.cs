@@ -2,7 +2,8 @@
 // Tutorial 26 – Message Replay (Lab)
 // ============================================================================
 // EIP Pattern: Message Store / Replay.
-// E2E: MessageReplayer with InMemoryMessageReplayStore + MockEndpoint.
+// Real Integrations: MessageReplayer with InMemoryMessageReplayStore +
+// NatsBrokerEndpoint (real NATS JetStream via Aspire) as producer.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,35 +18,30 @@ namespace TutorialLabs.Tutorial26;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("replay-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
     // ── 1. Basic Replay ──────────────────────────────────────────────
 
     [Test]
     public async Task Replay_SingleMessage_PublishesToTargetTopic()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t26-single");
+        var topic = AspireFixture.UniqueTopic("t26-replay");
         var store = new InMemoryMessageReplayStore();
         var envelope = IntegrationEnvelope<string>.Create("order-1", "OrderService", "order.created");
         await store.StoreForReplayAsync(envelope, "source-topic", CancellationToken.None);
 
-        var replayer = CreateReplayer(store);
+        var replayer = CreateReplayer(store, nats, topic);
         var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
         Assert.That(result.ReplayedCount, Is.EqualTo(1));
         Assert.That(result.FailedCount, Is.EqualTo(0));
-        _output.AssertReceivedOnTopic("replay-target", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task Replay_MultipleMessages_ReplaysAll()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t26-multi");
+        var topic = AspireFixture.UniqueTopic("t26-replay");
         var store = new InMemoryMessageReplayStore();
         for (var i = 0; i < 3; i++)
         {
@@ -53,11 +49,11 @@ public sealed class Lab
             await store.StoreForReplayAsync(env, "source-topic", CancellationToken.None);
         }
 
-        var replayer = CreateReplayer(store);
+        var replayer = CreateReplayer(store, nats, topic);
         var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
         Assert.That(result.ReplayedCount, Is.EqualTo(3));
-        _output.AssertReceivedOnTopic("replay-target", 3);
+        nats.AssertReceivedOnTopic(topic, 3);
     }
 
 
@@ -66,30 +62,34 @@ public sealed class Lab
     [Test]
     public async Task Replay_FilterByMessageType_OnlyMatchingReplayed()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t26-filter");
+        var topic = AspireFixture.UniqueTopic("t26-replay");
         var store = new InMemoryMessageReplayStore();
         await store.StoreForReplayAsync(
             IntegrationEnvelope<string>.Create("a", "Svc", "order.created"), "source-topic", CancellationToken.None);
         await store.StoreForReplayAsync(
             IntegrationEnvelope<string>.Create("b", "Svc", "payment.received"), "source-topic", CancellationToken.None);
 
-        var replayer = CreateReplayer(store);
+        var replayer = CreateReplayer(store, nats, topic);
         var filter = new ReplayFilter { MessageType = "order.created" };
         var result = await replayer.ReplayAsync(filter, CancellationToken.None);
 
         Assert.That(result.ReplayedCount, Is.EqualTo(1));
-        _output.AssertReceivedOnTopic("replay-target", 1);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task Replay_EmptyStore_ReturnsZeroReplayed()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t26-empty");
+        var topic = AspireFixture.UniqueTopic("t26-replay");
         var store = new InMemoryMessageReplayStore();
-        var replayer = CreateReplayer(store);
+        var replayer = CreateReplayer(store, nats, topic);
         var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
         Assert.That(result.ReplayedCount, Is.EqualTo(0));
         Assert.That(result.SkippedCount, Is.EqualTo(0));
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
 
@@ -98,6 +98,8 @@ public sealed class Lab
     [Test]
     public async Task Replay_SkipAlreadyReplayed_SkipsTaggedMessages()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t26-skip");
+        var topic = AspireFixture.UniqueTopic("t26-replay");
         var store = new InMemoryMessageReplayStore();
         var env = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
         {
@@ -108,40 +110,43 @@ public sealed class Lab
         var opts = new ReplayOptions
         {
             SourceTopic = "source-topic",
-            TargetTopic = "replay-target",
+            TargetTopic = topic,
             MaxMessages = 100,
             SkipAlreadyReplayed = true,
         };
-        var replayer = new MessageReplayer(store, _output, Options.Create(opts), NullLogger<MessageReplayer>.Instance);
+        var replayer = new MessageReplayer(store, nats, Options.Create(opts), NullLogger<MessageReplayer>.Instance);
         var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
         Assert.That(result.SkippedCount, Is.EqualTo(1));
         Assert.That(result.ReplayedCount, Is.EqualTo(0));
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
     [Test]
     public async Task Replay_ResultTimestamps_ArePopulated()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t26-timestamps");
+        var topic = AspireFixture.UniqueTopic("t26-replay");
         var store = new InMemoryMessageReplayStore();
         await store.StoreForReplayAsync(
             IntegrationEnvelope<string>.Create("d", "Svc", "evt"), "source-topic", CancellationToken.None);
 
-        var replayer = CreateReplayer(store);
+        var replayer = CreateReplayer(store, nats, topic);
         var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
 
         Assert.That(result.StartedAt, Is.LessThanOrEqualTo(result.CompletedAt));
         Assert.That(result.CompletedAt, Is.LessThanOrEqualTo(DateTimeOffset.UtcNow));
     }
 
-    private MessageReplayer CreateReplayer(InMemoryMessageReplayStore store)
+    private static MessageReplayer CreateReplayer(
+        InMemoryMessageReplayStore store, NatsBrokerEndpoint nats, string topic)
     {
         var opts = Options.Create(new ReplayOptions
         {
             SourceTopic = "source-topic",
-            TargetTopic = "replay-target",
+            TargetTopic = topic,
             MaxMessages = 100,
         });
-        return new MessageReplayer(store, _output, opts, NullLogger<MessageReplayer>.Instance);
+        return new MessageReplayer(store, nats, opts, NullLogger<MessageReplayer>.Instance);
     }
 }

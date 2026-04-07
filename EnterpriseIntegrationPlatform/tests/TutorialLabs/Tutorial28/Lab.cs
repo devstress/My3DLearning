@@ -2,8 +2,9 @@
 // Tutorial 28 – Competing Consumers (Lab)
 // ============================================================================
 // EIP Pattern: Competing Consumers.
-// E2E: CompetingConsumerOrchestrator with InMemory scaler/lag monitor +
-// MockEndpoint to verify scale decisions are published.
+// Real Integrations: CompetingConsumerOrchestrator with InMemory scaler/lag
+// monitor + NatsBrokerEndpoint (real NATS JetStream via Aspire) to verify
+// scale decisions are published.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -18,20 +19,13 @@ namespace TutorialLabs.Tutorial28;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("consumers-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
-
     // ── 1. Scaling ───────────────────────────────────────────────────
 
     [Test]
     public async Task HighLag_ScalesUp()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t28-scaleup");
+        var topic = AspireFixture.UniqueTopic("t28-scale");
         var lagMonitor = new InMemoryConsumerLagMonitor();
         var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 1);
         var backpressure = new BackpressureSignal();
@@ -44,13 +38,15 @@ public sealed class Lab
         Assert.That(scaler.CurrentCount, Is.EqualTo(2));
 
         var envelope = IntegrationEnvelope<string>.Create($"consumers={scaler.CurrentCount}", "Svc", "scale.up");
-        await _output.PublishAsync(envelope, "scale-events");
-        _output.AssertReceivedOnTopic("scale-events", 1);
+        await nats.PublishAsync(envelope, topic);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task LowLag_ScalesDown()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t28-scaledown");
+        var topic = AspireFixture.UniqueTopic("t28-scale");
         var lagMonitor = new InMemoryConsumerLagMonitor();
         var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 3);
         var backpressure = new BackpressureSignal();
@@ -63,8 +59,8 @@ public sealed class Lab
         Assert.That(scaler.CurrentCount, Is.EqualTo(2));
 
         var envelope = IntegrationEnvelope<string>.Create($"consumers={scaler.CurrentCount}", "Svc", "scale.down");
-        await _output.PublishAsync(envelope, "scale-events");
-        _output.AssertReceivedOnTopic("scale-events", 1);
+        await nats.PublishAsync(envelope, topic);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
 
@@ -73,6 +69,8 @@ public sealed class Lab
     [Test]
     public async Task MaxConsumers_SignalsBackpressure()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t28-maxbp");
+        var topic = AspireFixture.UniqueTopic("t28-bp");
         var lagMonitor = new InMemoryConsumerLagMonitor();
         var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 5);
         var backpressure = new BackpressureSignal();
@@ -86,13 +84,15 @@ public sealed class Lab
         Assert.That(scaler.CurrentCount, Is.EqualTo(5));
 
         var envelope = IntegrationEnvelope<string>.Create("backpressure", "Svc", "backpressure.active");
-        await _output.PublishAsync(envelope, "bp-events");
-        _output.AssertReceivedOnTopic("bp-events", 1);
+        await nats.PublishAsync(envelope, topic);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task MinConsumers_DoesNotScaleBelow()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t28-minscale");
+        var topic = AspireFixture.UniqueTopic("t28-scale");
         var lagMonitor = new InMemoryConsumerLagMonitor();
         var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 2);
         var backpressure = new BackpressureSignal();
@@ -105,8 +105,8 @@ public sealed class Lab
         Assert.That(scaler.CurrentCount, Is.EqualTo(2));
 
         var envelope = IntegrationEnvelope<string>.Create("no-change", "Svc", "scale.none");
-        await _output.PublishAsync(envelope, "scale-events");
-        _output.AssertReceivedOnTopic("scale-events", 1);
+        await nats.PublishAsync(envelope, topic);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
 
@@ -115,6 +115,8 @@ public sealed class Lab
     [Test]
     public async Task ModerateLag_NoScaleChange()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t28-moderate");
+        var topic = AspireFixture.UniqueTopic("t28-scale");
         var lagMonitor = new InMemoryConsumerLagMonitor();
         var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 3);
         var backpressure = new BackpressureSignal();
@@ -128,13 +130,15 @@ public sealed class Lab
         Assert.That(backpressure.IsBackpressured, Is.False);
 
         var envelope = IntegrationEnvelope<string>.Create("stable", "Svc", "scale.stable");
-        await _output.PublishAsync(envelope, "scale-events");
-        _output.AssertReceivedOnTopic("scale-events", 1);
+        await nats.PublishAsync(envelope, topic);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
     public async Task BackpressureReleased_AfterLagDrops()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t28-bprelease");
+        var topic = AspireFixture.UniqueTopic("t28-bp");
         var lagMonitor = new InMemoryConsumerLagMonitor();
         var scaler = new InMemoryConsumerScaler(NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 5);
         var backpressure = new BackpressureSignal();
@@ -150,8 +154,8 @@ public sealed class Lab
         Assert.That(backpressure.IsBackpressured, Is.False);
 
         var envelope = IntegrationEnvelope<string>.Create("released", "Svc", "bp.released");
-        await _output.PublishAsync(envelope, "bp-events");
-        _output.AssertReceivedOnTopic("bp-events", 1);
+        await nats.PublishAsync(envelope, topic);
+        nats.AssertReceivedOnTopic(topic, 1);
     }
 
     private static CompetingConsumerOrchestrator CreateOrchestrator(
