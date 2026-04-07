@@ -53,7 +53,7 @@ public sealed class RealEstateAgentService : IRealEstateAgentService
         _profiles[registeredPartner.Id] = registeredProfile;
         _agentListings[registeredPartner.Id] = [];
 
-        _logger.LogInformation("Registered real estate agent {PartnerId} (License: {License})", registeredPartner.Id, registeredProfile.LicenseNumber);
+        _logger.LogInformation("Registered real estate agent {PartnerId}", registeredPartner.Id);
         return Task.FromResult(registeredProfile);
     }
 

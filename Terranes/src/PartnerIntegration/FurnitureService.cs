@@ -84,7 +84,7 @@ public sealed class FurnitureService : IFurnitureService
         if (!_fittings.TryAdd(persisted.Id, persisted))
             throw new InvalidOperationException($"Room fitting {persisted.Id} already exists.");
 
-        _logger.LogInformation("Fitted item {ItemId} in room {RoomName} of model {ModelId}", persisted.FurnitureItemId, persisted.RoomName, persisted.HomeModelId);
+        _logger.LogInformation("Fitted item {ItemId} in model {ModelId}", persisted.FurnitureItemId, persisted.HomeModelId);
         return Task.FromResult(persisted);
     }
 
