@@ -22,48 +22,9 @@
 
 ## Completed Phases
 
-✅ Phases 1–27 complete — see `rules/completion-log.md` for full history.
+✅ Phases 1–28 complete — see `rules/completion-log.md` for full history.
 
-48 src projects + Ingestion.Postgres = 49 src projects. 522 TutorialLabs tests across 50 tutorials. Broker providers: NATS JetStream, Kafka, Pulsar, **PostgreSQL**.
-
----
-
-## Phase 28 — PostgreSQL Message Broker (EIP-Complete, ≤ 5k TPS)
-
-**Goal:** Add PostgreSQL as a full-featured EIP message broker for lower-scale deployments (≤ 5,000 TPS).
-Many organisations already run Postgres — adding it as a broker eliminates the operational overhead of
-a dedicated message system for smaller teams. The implementation must support **all EIP behaviours**
-currently available on NATS/Kafka/Pulsar: publish/subscribe, point-to-point, content-based routing,
-dead-letter queues, retry with backoff, transactional publish, durable subscriptions, channel purge,
-competing consumers, selective consumption, and polling.
-
-**Design:**
-- New project `src/Ingestion.Postgres/` (mirrors Ingestion.Nats/Kafka/Pulsar structure)
-- `BrokerType.Postgres = 3` added to the existing enum
-- Schema: `eip_messages` table (id, topic, consumer_group, payload JSONB, created_at, locked_until, delivered_at, dead_lettered_at) + indexes
-- Low-latency delivery via `pg_notify` on INSERT trigger; polling fallback for reliability
-- Consumer groups via `SELECT … FOR UPDATE SKIP LOCKED` row locking
-- Native `NpgsqlTransaction` for `ITransactionalClient` — true ACID atomicity
-- DLQ via `dead_lettered_at` column + `eip_dead_letters` table
-- Durable subscriber: rows remain until explicitly ACKed
-- Channel purge: `DELETE FROM eip_messages WHERE topic = $1`
-- `AddPostgresBroker(services, connectionString)` DI extension following NATS pattern
-- Aspire TestAppHost gets a Postgres container for integration tests
-- All existing EIP components (routers, DLQ publisher, retry, splitter, aggregator, etc.)
-  work unchanged because they depend only on `IMessageBrokerProducer`/`IMessageBrokerConsumer`
-
-**Architecture — why this is an EIP fix, not a test fix:**
-The existing `IMessageBrokerProducer` / `IMessageBrokerConsumer` abstractions already decouple
-all 48 EIP components from the transport. Adding Postgres as a fourth provider proves the
-architecture is sound and gives teams a deployment option that requires zero additional
-infrastructure beyond their existing database. All EIP patterns (routing, DLQ, retry,
-transactions, channels, competing consumers) work through the same interfaces.
-
-| Chunk | Scope | Status |
-|-------|-------|--------|
-| 109 | **Routing + advanced EIP on Postgres** — Integration tests: `ContentBasedRouter`, `DynamicRouter`, `RecipientListRouter`, `RoutingSlipRouter`, `MessageFilter`, `Detour`, `ScatterGather`, `Splitter`, `Aggregator`, `Resequencer` — all wired to Postgres broker. Proves every EIP routing pattern works on Postgres transport. | `not-started` |
-
-**Next Chunk:** 109
+49 src projects. 522 TutorialLabs tests across 50 tutorials. 38 BrokerAgnosticTests. Broker providers: NATS JetStream, Kafka, Pulsar, **PostgreSQL**. All EIP routing patterns (ContentBasedRouter, DynamicRouter, RecipientListRouter, MessageFilter, Detour, Splitter, Aggregator, Resequencer, DLQ, Retry) verified on Postgres transport.
 
 ---
 

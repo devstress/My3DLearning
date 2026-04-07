@@ -4,6 +4,24 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 109 – Routing + Advanced EIP Patterns on Postgres
+
+- **Date**: 2026-04-07
+- **Phase**: 28 — PostgreSQL Message Broker (EIP-Complete, ≤ 5k TPS)
+- **Status**: done
+- **Goal**: Integration tests proving all EIP routing and advanced patterns work when wired to a real PostgreSQL message broker via PostgresBrokerEndpoint.
+- **Architecture**:
+  - `PostgresRoutingIntegrationTests` (7 tests): ContentBasedRouter (MessageType + Metadata + Regex), MessageFilter, RecipientListRouter, DynamicRouter (register + route), Detour (activate/deactivate)
+  - `PostgresAdvancedEipTests` (7 tests): Splitter (split + causation chain), DeadLetterPublisher (single + multi-reason), Resequencer (out-of-order → in-order + publish), Retry + DLQ pipeline, Aggregator (count completion + concat), full pipeline (Splitter → Router → DLQ)
+  - All tests use unique topics (Guid-based) to prevent cross-test interference
+  - All tests Docker-gated: Assert.Ignore when Aspire Postgres container unavailable
+- **Files created**:
+  - `tests/TutorialLabs/InfrastructureTests/PostgresRoutingIntegrationTests.cs` (7 tests)
+  - `tests/TutorialLabs/InfrastructureTests/PostgresAdvancedEipTests.cs` (7 tests)
+- **Files modified**:
+  - `rules/milestones.md` — Phase 28 complete, no remaining chunks
+- **Test counts**: 38 BrokerAgnosticTests pass. 14 new Postgres integration tests (Docker-gated). 49 src projects, 0 errors, 0 warnings.
+
 ## Chunk 108 – DI Wiring + Aspire Postgres Container + PostgresBrokerEndpoint
 
 - **Date**: 2026-04-07
