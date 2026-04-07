@@ -1,10 +1,20 @@
 // ============================================================================
-// Tutorial 11 – Dynamic Router (Lab)
+// Tutorial 11 – Dynamic Router (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Dynamic Router
-// Real Integrations: Wire real DynamicRouter with NatsBrokerEndpoint (real
-// NATS JetStream via Aspire), register/unregister routes at runtime, verify
-// routing decisions and message delivery through real broker.
+// PURPOSE: Run each test in order to see how the Dynamic Router builds and
+//   manages its routing table at runtime, resolves destinations, and handles
+//   fallback scenarios.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Route resolution — a registered key routes to its destination topic
+//   2. Fallback routing — an unmatched key falls back to the default topic
+//   3. No fallback — missing fallback topic throws InvalidOperationException
+//   4. Route update — re-registering a key replaces the previous destination
+//   5. Unregister — removing a key causes subsequent messages to fall back
+//   6. Unregister miss — unregistering a non-existent key returns false
+//   7. Routing table — GetRoutingTable returns a snapshot of all entries
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

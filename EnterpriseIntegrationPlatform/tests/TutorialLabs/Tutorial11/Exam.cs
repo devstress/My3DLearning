@@ -1,8 +1,22 @@
 // ============================================================================
-// Tutorial 11 – Dynamic Router (Exam)
+// Tutorial 11 – Dynamic Router (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: multi-participant topology, route replacement semantics,
-// and case-insensitive routing verification via MockEndpoint.
+// PURPOSE: Prove you can apply the Dynamic Router pattern in realistic
+//   integration scenarios that combine registration, routing, fallback, and
+//   introspection.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — multi-participant topology routed correctly with fallback
+//   🟡 Intermediate — route replacement semantics when a new participant overrides
+//   🔴 Advanced     — case-insensitive matching across mixed-case condition keys
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,8 +31,17 @@ namespace TutorialLabs.Tutorial11;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Multi-Participant Topology ───────────────────────
+    //
+    // SCENARIO: Three microservices (orders, payments, shipments) each
+    //   register their own route with the Dynamic Router. A fourth message
+    //   arrives with an unknown event type.
+    //
+    // WHAT YOU PROVE: The router dispatches each message to the correct
+    //   participant topic and falls back for the unrecognised event.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge1_MultiParticipantTopology_RoutesCorrectly()
+    public async Task Starter_MultiParticipantTopology_RoutesCorrectly()
     {
         await using var output = new MockEndpoint("multi-participant");
         var router = CreateRouter(output);
@@ -48,8 +71,17 @@ public sealed class Exam
         output.AssertReceivedOnTopic("shipment-svc-topic", 1);
     }
 
+    // ── 🟡 INTERMEDIATE — Route Replacement Semantics ──────────────────
+    //
+    // SCENARIO: Version 1 of the order handler registers a route. A new
+    //   deployment (v2) re-registers the same condition key with a different
+    //   destination and participant ID.
+    //
+    // WHAT YOU PROVE: The latest registration wins — the routing table and
+    //   subsequent routing decisions reflect the v2 destination.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge2_RouteReplacement_NewParticipantOverrides()
+    public async Task Intermediate_RouteReplacement_NewParticipantOverrides()
     {
         await using var output = new MockEndpoint("replacement");
         var router = CreateRouter(output);
@@ -69,8 +101,16 @@ public sealed class Exam
         output.AssertReceivedOnTopic("new-handler", 1);
     }
 
+    // ── 🔴 ADVANCED — Case-Insensitive Matching ────────────────────────
+    //
+    // SCENARIO: A route is registered with mixed-case key "Order.Created",
+    //   but the incoming message carries the all-lowercase "order.created".
+    //
+    // WHAT YOU PROVE: With CaseInsensitive enabled, the router matches
+    //   regardless of casing and delivers the message to the registered topic.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge3_CaseInsensitive_MatchesRegardlessOfCase()
+    public async Task Advanced_CaseInsensitive_MatchesRegardlessOfCase()
     {
         await using var output = new MockEndpoint("case-insensitive");
         var router = CreateRouter(output);
