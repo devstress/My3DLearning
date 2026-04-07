@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS eip_messages (
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT now(),
 
     -- Indexing for topic-based reads and cleanup
-    CONSTRAINT uq_eip_messages_message_id UNIQUE (message_id)
+    CONSTRAINT uq_eip_messages_message_topic UNIQUE (message_id, topic)
 );
 
 CREATE INDEX IF NOT EXISTS ix_eip_messages_topic_id

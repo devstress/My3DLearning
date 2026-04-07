@@ -154,6 +154,7 @@ public sealed class PostgresAdvancedEipTests
             MessageType = "msg",
             Payload = "third",
             SequenceNumber = 3,
+            TotalCount = 3,
             Timestamp = DateTimeOffset.UtcNow,
         };
         var env1 = new IntegrationEnvelope<string>
@@ -165,6 +166,7 @@ public sealed class PostgresAdvancedEipTests
             MessageType = "msg",
             Payload = "first",
             SequenceNumber = 1,
+            TotalCount = 3,
             Timestamp = DateTimeOffset.UtcNow,
         };
         var env2 = new IntegrationEnvelope<string>
@@ -176,21 +178,22 @@ public sealed class PostgresAdvancedEipTests
             MessageType = "msg",
             Payload = "second",
             SequenceNumber = 2,
+            TotalCount = 3,
             Timestamp = DateTimeOffset.UtcNow,
         };
 
         // Feed in order: 3, 1, 2
-        var r1 = resequencer.Accept(env3); // seq 3: buffered, gap at 1-2
+        var r1 = resequencer.Accept(env3); // seq 3: buffered, 1/3
         Assert.That(r1, Is.Empty);
 
-        var r2 = resequencer.Accept(env1); // seq 1: released (1 is first)
-        Assert.That(r2.Count, Is.EqualTo(1));
-        Assert.That(r2[0].Payload, Is.EqualTo("first"));
+        var r2 = resequencer.Accept(env1); // seq 1: buffered, 2/3
+        Assert.That(r2, Is.Empty);
 
-        var r3 = resequencer.Accept(env2); // seq 2: released, then 3 is also released
-        Assert.That(r3.Count, Is.EqualTo(2));
-        Assert.That(r3[0].Payload, Is.EqualTo("second"));
-        Assert.That(r3[1].Payload, Is.EqualTo("third"));
+        var r3 = resequencer.Accept(env2); // seq 2: complete 3/3, release all in order
+        Assert.That(r3.Count, Is.EqualTo(3));
+        Assert.That(r3[0].Payload, Is.EqualTo("first"));
+        Assert.That(r3[1].Payload, Is.EqualTo("second"));
+        Assert.That(r3[2].Payload, Is.EqualTo("third"));
 
         // Now publish the resequenced results through Postgres
         await using var broker = new PostgresBrokerEndpoint("reseq-pg", connStr);

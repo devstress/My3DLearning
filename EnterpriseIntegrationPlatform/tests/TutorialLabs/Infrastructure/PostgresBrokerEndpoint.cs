@@ -29,6 +29,9 @@ namespace TutorialLabs.Infrastructure;
 public sealed class PostgresBrokerEndpoint : IMessageBrokerProducer, IMessageBrokerConsumer,
     IEventDrivenConsumer, IPollingConsumer, ISelectiveConsumer, IAsyncDisposable
 {
+    private static readonly SemaphoreSlim SchemaGate = new(1, 1);
+    private static bool _schemaInitializedGlobal;
+
     private readonly string _name;
     private readonly PostgresConnectionFactory _factory;
     private readonly PostgresBrokerProducer _producer;
@@ -61,12 +64,31 @@ public sealed class PostgresBrokerEndpoint : IMessageBrokerProducer, IMessageBro
 
     /// <summary>
     /// Ensures the EIP schema tables exist. Called lazily before first publish/subscribe.
+    /// Uses a static gate to prevent concurrent schema creation across test instances.
     /// </summary>
     public async Task EnsureSchemaAsync(CancellationToken ct = default)
     {
         if (_schemaInitialized) return;
-        await _factory.InitializeSchemaAsync(ct);
-        _schemaInitialized = true;
+        if (_schemaInitializedGlobal)
+        {
+            _schemaInitialized = true;
+            return;
+        }
+
+        await SchemaGate.WaitAsync(ct);
+        try
+        {
+            if (!_schemaInitializedGlobal)
+            {
+                await _factory.InitializeSchemaAsync(ct);
+                _schemaInitializedGlobal = true;
+            }
+            _schemaInitialized = true;
+        }
+        finally
+        {
+            SchemaGate.Release();
+        }
     }
 
     // ── IMessageBrokerProducer (publishes to real Postgres) ─────────────

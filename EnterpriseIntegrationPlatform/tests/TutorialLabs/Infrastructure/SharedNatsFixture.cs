@@ -107,13 +107,42 @@ public static class SharedTestAppHost
     }
 
     /// <summary>Gets the PostgreSQL connection string from the running TestAppHost.</summary>
+    /// <remarks>
+    /// Waits for the Postgres container to accept connections before returning.
+    /// Returns <c>null</c> when Docker/Postgres is unavailable so tests can skip.
+    /// </remarks>
     public static async Task<string?> GetPostgresConnectionStringAsync()
     {
         var app = await GetAppAsync();
         if (app is null) return null;
 
-        var endpoint = app.GetEndpoint("postgres", "postgres-tcp");
-        return $"Host={endpoint.Host};Port={endpoint.Port};Database=eip;Username=eip;Password=eip";
+        try
+        {
+            var endpoint = app.GetEndpoint("postgres", "postgres-tcp");
+            var connStr = $"Host={endpoint.Host};Port={endpoint.Port};Database=eip;Username=eip;Password=eip;Timeout=5";
+
+            // Verify Postgres actually accepts connections (container may still be starting)
+            const int maxAttempts = 10;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    await using var conn = new Npgsql.NpgsqlConnection(connStr);
+                    await conn.OpenAsync();
+                    return connStr; // Connection succeeded
+                }
+                catch (Exception) when (attempt < maxAttempts)
+                {
+                    await Task.Delay(1_000); // Wait 1s between retries
+                }
+            }
+
+            return null; // All retries exhausted
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     /// <summary>Stops the test host.</summary>
