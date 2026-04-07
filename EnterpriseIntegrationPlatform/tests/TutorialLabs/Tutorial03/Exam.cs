@@ -1,9 +1,10 @@
 // ============================================================================
-// Tutorial 03 – First Message (Exam)
+// Tutorial 03 – Your First Message (Exam)
 // ============================================================================
-// EIP Pattern: Message Channel
-// End-to-End: PointToPointChannel and PublishSubscribeChannel with
-// MockEndpoints — real channel components delivering real messages.
+// EIP Patterns: Message, Message Channel, Causation Chain, Message Expiration
+// End-to-End: Advanced message construction — three-generation causation chain,
+// Point-to-Point vs Publish-Subscribe channel semantics verification, and
+// message lifecycle with priority, intent, and expiration.
 // ============================================================================
 
 using NUnit.Framework;
@@ -17,82 +18,169 @@ namespace TutorialLabs.Tutorial03;
 [TestFixture]
 public sealed class Exam
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp()
-    {
-        _output = new MockEndpoint("output");
-    }
-
-    [TearDown]
-    public async Task TearDown()
-    {
-        await _output.DisposeAsync();
-    }
+    // ── Challenge 1: Three-Generation Causation Chain ────────────────────
 
     [Test]
-    public async Task EndToEnd_PointToPointChannel_DeliversMessage()
+    public async Task Challenge1_CausationChain_ThreeGenerationLineage()
     {
-        var channel = new PointToPointChannel(
-            _output, _output, NullLogger<PointToPointChannel>.Instance);
+        // Build a three-generation message lineage:
+        //   Order.Created → Order.Validated → Order.Fulfilled
+        // Each child's CausationId = parent's MessageId.
+        // All share the same CorrelationId for distributed tracing.
+        var output = new MockEndpoint("lineage");
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "p2p-delivery", "OrderService", "order.created");
+        var orderCreated = IntegrationEnvelope<string>.Create(
+            "ORD-500", "OrderService", "order.created");
 
-        await channel.SendAsync(envelope, "orders-queue", CancellationToken.None);
+        var orderValidated = IntegrationEnvelope<string>.Create(
+            "ORD-500-valid", "ValidationService", "order.validated",
+            correlationId: orderCreated.CorrelationId,
+            causationId: orderCreated.MessageId);
 
-        _output.AssertReceivedCount(1);
-        var received = _output.GetReceived<string>();
-        Assert.That(received.Payload, Is.EqualTo("p2p-delivery"));
-        Assert.That(received.MessageId, Is.EqualTo(envelope.MessageId));
+        var orderFulfilled = IntegrationEnvelope<string>.Create(
+            "ORD-500-shipped", "FulfillmentService", "order.fulfilled",
+            correlationId: orderCreated.CorrelationId,
+            causationId: orderValidated.MessageId);
+
+        // Publish all three to trace the lineage
+        await output.PublishAsync(orderCreated, "order-events");
+        await output.PublishAsync(orderValidated, "order-events");
+        await output.PublishAsync(orderFulfilled, "order-events");
+
+        output.AssertReceivedCount(3);
+
+        // All share the same correlation (business transaction)
+        var messages = output.GetAllReceived<string>("order-events");
+        Assert.That(messages.Select(m => m.CorrelationId).Distinct().Count(), Is.EqualTo(1));
+
+        // Causation chain: Created→Validated→Fulfilled
+        Assert.That(orderCreated.CausationId, Is.Null); // root has no parent
+        Assert.That(orderValidated.CausationId, Is.EqualTo(orderCreated.MessageId));
+        Assert.That(orderFulfilled.CausationId, Is.EqualTo(orderValidated.MessageId));
+
+        // Each has a unique MessageId
+        var ids = new[] { orderCreated.MessageId, orderValidated.MessageId, orderFulfilled.MessageId };
+        Assert.That(ids.Distinct().Count(), Is.EqualTo(3));
+
+        await output.DisposeAsync();
     }
 
-    [Test]
-    public async Task EndToEnd_PublishSubscribeChannel_FanOutToSubscribers()
-    {
-        var sub1 = new MockEndpoint("subscriber-1");
-        var sub2 = new MockEndpoint("subscriber-2");
-
-        var channel1 = new PublishSubscribeChannel(
-            sub1, sub1, NullLogger<PublishSubscribeChannel>.Instance);
-        var channel2 = new PublishSubscribeChannel(
-            sub2, sub2, NullLogger<PublishSubscribeChannel>.Instance);
-
-        var envelope = IntegrationEnvelope<string>.Create(
-            "fanout-event", "EventService", "event.fired");
-
-        await channel1.PublishAsync(envelope, "events", CancellationToken.None);
-        await channel2.PublishAsync(envelope, "events", CancellationToken.None);
-
-        sub1.AssertReceivedCount(1);
-        sub2.AssertReceivedCount(1);
-        Assert.That(sub1.GetReceived<string>().Payload, Is.EqualTo("fanout-event"));
-        Assert.That(sub2.GetReceived<string>().Payload, Is.EqualTo("fanout-event"));
-
-        await sub1.DisposeAsync();
-        await sub2.DisposeAsync();
-    }
+    // ── Challenge 2: P2P vs Pub/Sub Channel Semantics ───────────────────
 
     [Test]
-    public async Task EndToEnd_MultiTopicRouting_VerifyTopicCounts()
+    public async Task Challenge2_PointToPointVsPubSub_ChannelSemantics()
     {
-        var channel = new PointToPointChannel(
-            _output, _output, NullLogger<PointToPointChannel>.Instance);
+        // Demonstrate the fundamental difference:
+        // - Point-to-Point: one consumer receives each message
+        // - Pub/Sub: ALL subscribers receive each message
+        var p2pOutput = new MockEndpoint("p2p");
+        var pubSubA = new MockEndpoint("sub-a");
+        var pubSubB = new MockEndpoint("sub-b");
 
+        var p2pChannel = new PointToPointChannel(
+            p2pOutput, p2pOutput, NullLogger<PointToPointChannel>.Instance);
+
+        var pubSubChannelA = new PublishSubscribeChannel(
+            pubSubA, pubSubA, NullLogger<PublishSubscribeChannel>.Instance);
+        var pubSubChannelB = new PublishSubscribeChannel(
+            pubSubB, pubSubB, NullLogger<PublishSubscribeChannel>.Instance);
+
+        // Send 3 messages through P2P — all go to the single output
         for (var i = 0; i < 3; i++)
         {
-            var env = IntegrationEnvelope<string>.Create($"order-{i}", "svc", "type");
-            await channel.SendAsync(env, "orders", CancellationToken.None);
-        }
-        for (var i = 0; i < 2; i++)
-        {
-            var env = IntegrationEnvelope<string>.Create($"payment-{i}", "svc", "type");
-            await channel.SendAsync(env, "payments", CancellationToken.None);
+            var env = IntegrationEnvelope<string>.Create($"cmd-{i}", "svc", "command");
+            await p2pChannel.SendAsync(env, "commands", CancellationToken.None);
         }
 
-        _output.AssertReceivedCount(5);
-        _output.AssertReceivedOnTopic("orders", 3);
-        _output.AssertReceivedOnTopic("payments", 2);
+        // Send 2 messages through Pub/Sub — each subscriber gets both
+        for (var i = 0; i < 2; i++)
+        {
+            var env = IntegrationEnvelope<string>.Create($"event-{i}", "svc", "event");
+            await pubSubChannelA.PublishAsync(env, "events", CancellationToken.None);
+            await pubSubChannelB.PublishAsync(env, "events", CancellationToken.None);
+        }
+
+        // P2P: 3 messages, single consumer
+        p2pOutput.AssertReceivedCount(3);
+
+        // Pub/Sub: each subscriber gets 2 messages independently
+        pubSubA.AssertReceivedCount(2);
+        pubSubB.AssertReceivedCount(2);
+        Assert.That(pubSubA.GetReceived<string>(0).Payload, Is.EqualTo("event-0"));
+        Assert.That(pubSubB.GetReceived<string>(1).Payload, Is.EqualTo("event-1"));
+
+        await p2pOutput.DisposeAsync();
+        await pubSubA.DisposeAsync();
+        await pubSubB.DisposeAsync();
+    }
+
+    // ── Challenge 3: Priority, Intent, and Expiration Lifecycle ──────────
+
+    [Test]
+    public async Task Challenge3_PriorityExpiration_MessageLifecycle()
+    {
+        // Build messages with different priorities and intents,
+        // verify expiration logic, and confirm metadata survives delivery.
+        var output = new MockEndpoint("lifecycle");
+
+        // Critical command that expires in 1 hour
+        var urgentCommand = IntegrationEnvelope<string>.Create(
+            "shutdown-node-5", "OpsService", "infra.command") with
+        {
+            Priority = MessagePriority.Critical,
+            Intent = MessageIntent.Command,
+            ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
+            Metadata = new Dictionary<string, string>
+            {
+                [MessageHeaders.TraceId] = "trace-urgent-001",
+            },
+        };
+
+        // Low-priority document (no expiration)
+        var backgroundDoc = IntegrationEnvelope<string>.Create(
+            "monthly-report-data", "ReportService", "report.document") with
+        {
+            Priority = MessagePriority.Low,
+            Intent = MessageIntent.Document,
+        };
+
+        // Already-expired event
+        var expiredEvent = IntegrationEnvelope<string>.Create(
+            "stale-price-update", "PricingService", "price.event") with
+        {
+            Priority = MessagePriority.Normal,
+            Intent = MessageIntent.Event,
+            ExpiresAt = DateTimeOffset.UtcNow.AddHours(-1),
+        };
+
+        await output.PublishAsync(urgentCommand, "commands");
+        await output.PublishAsync(backgroundDoc, "documents");
+        await output.PublishAsync(expiredEvent, "events");
+
+        output.AssertReceivedCount(3);
+
+        // Verify priority ordering is preserved
+        var cmd = output.GetReceived<string>(0);
+        var doc = output.GetReceived<string>(1);
+        var evt = output.GetReceived<string>(2);
+
+        Assert.That(cmd.Priority, Is.EqualTo(MessagePriority.Critical));
+        Assert.That(doc.Priority, Is.EqualTo(MessagePriority.Low));
+        Assert.That(evt.Priority, Is.EqualTo(MessagePriority.Normal));
+
+        // Verify intents
+        Assert.That(cmd.Intent, Is.EqualTo(MessageIntent.Command));
+        Assert.That(doc.Intent, Is.EqualTo(MessageIntent.Document));
+        Assert.That(evt.Intent, Is.EqualTo(MessageIntent.Event));
+
+        // Expiration checks
+        Assert.That(cmd.IsExpired, Is.False);
+        Assert.That(doc.IsExpired, Is.False);  // no expiration = never expires
+        Assert.That(evt.IsExpired, Is.True);   // already past expiration
+
+        // Metadata survives delivery
+        Assert.That(cmd.Metadata[MessageHeaders.TraceId], Is.EqualTo("trace-urgent-001"));
+
+        await output.DisposeAsync();
     }
 }
