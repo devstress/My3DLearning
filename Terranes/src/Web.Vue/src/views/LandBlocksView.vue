@@ -103,10 +103,12 @@ watch([searchSuburb, searchState], search);
         <div class="row mb-3">
           <div class="col">
             <table class="table table-sm">
-              <tr><th>Address</th><td>{{ selectedBlock.address }}, {{ selectedBlock.suburb }} {{ selectedBlock.state }}</td></tr>
-              <tr><th>Area</th><td>{{ selectedBlock.areaSqm.toFixed(0) }} m²</td></tr>
-              <tr><th>Frontage × Depth</th><td>{{ selectedBlock.frontageMetre.toFixed(1) }}m × {{ selectedBlock.depthMetre.toFixed(1) }}m</td></tr>
-              <tr><th>Zoning</th><td>{{ selectedBlock.zoning }}</td></tr>
+              <tbody>
+                <tr><th>Address</th><td>{{ selectedBlock.address }}, {{ selectedBlock.suburb }} {{ selectedBlock.state }}</td></tr>
+                <tr><th>Area</th><td>{{ selectedBlock.areaSqm.toFixed(0) }} m²</td></tr>
+                <tr><th>Frontage × Depth</th><td>{{ selectedBlock.frontageMetre.toFixed(1) }}m × {{ selectedBlock.depthMetre.toFixed(1) }}m</td></tr>
+                <tr><th>Zoning</th><td>{{ selectedBlock.zoning }}</td></tr>
+              </tbody>
             </table>
           </div>
         </div>

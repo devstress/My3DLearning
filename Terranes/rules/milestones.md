@@ -71,11 +71,19 @@ IntegrationTests project with 56 WebApplicationFactory-based tests exercising ev
 
 Blazor Server Web UI with 7 pages: Home (landing), Villages (browse/search/detail), Home Designs (gallery/search/detail), Land Blocks (search/test-fit), Marketplace (browse/search/filter), Buyer Journey (guided E2E flow), Dashboard (stats/journeys/notifications). All 29 services wired directly via DI.
 
+✅ Phase 11 complete — see `rules/completion-log.md` for full history.
+
+Vue 3 + Vite + TypeScript frontend replaces Blazor Server. .NET Aspire AppHost orchestrates Platform.Api + Vue frontend together. ServiceDefaults adds OpenTelemetry, health checks, and service discovery.
+
+✅ Phase 12 complete — see `rules/completion-log.md` for full history.
+
+Vue frontend cleanup, reusable components, and 49 Vitest component tests. Old Blazor Web project removed. 4 shared components: LoadingSpinner, StatusBadge, DetailModal, ErrorAlert. All views refactored to use shared components.
+
 ---
 
 ## Next Chunk
 
-All phases (1–10) are complete. 15 src projects, 446 tests (390 unit + 56 integration). The platform now has a full Blazor Server web UI wired end-to-end with all backend services.
+All phases (1–12) are complete. 17 src projects + Vue 3 frontend, 495 tests (390 NUnit unit + 56 NUnit integration + 49 Vitest component). The platform has a Vue 3 + Vite frontend with Aspire orchestration, shared components, and comprehensive test coverage.
 
 ---
 

@@ -639,3 +639,53 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - Run: `dotnet run --project src/Platform.Api` → REST API standalone
 
 **Tests:** 446 total (390 unit + 56 integration), all passing — no regressions
+
+---
+
+## Phase 12 — Vue Frontend Cleanup, Components & Testing
+
+### Chunk 049 — Cleanup, Reusable Components & Vitest Tests (2026-04-07)
+
+**Goal:** Remove old Blazor Web project, extract reusable Vue components, write comprehensive Vitest component tests, and fix HTML validation warnings.
+
+**Files deleted:**
+- `src/Web/` — Entire old Blazor Server Web project removed from filesystem
+
+**Files created:**
+- `src/Web.Vue/src/components/LoadingSpinner.vue` — Reusable loading indicator with customizable message
+- `src/Web.Vue/src/components/StatusBadge.vue` — Color-mapped status badge supporting 16 status values
+- `src/Web.Vue/src/components/DetailModal.vue` — Reusable Bootstrap modal wrapper with slot
+- `src/Web.Vue/src/components/ErrorAlert.vue` — Conditional error alert display
+- `src/Web.Vue/src/__tests__/HomeView.spec.ts` — 6 tests: page title, feature cards, router links
+- `src/Web.Vue/src/__tests__/HomeModelsView.spec.ts` — 6 tests: loading, cards, details modal, empty state
+- `src/Web.Vue/src/__tests__/VillagesView.spec.ts` — 5 tests: loading, cards, detail modal, lots table
+- `src/Web.Vue/src/__tests__/LandBlocksView.spec.ts` — 5 tests: loading, table, test-fit modal, error handling
+- `src/Web.Vue/src/__tests__/MarketplaceView.spec.ts` — 5 tests: loading, cards, status badges, price formatting
+- `src/Web.Vue/src/__tests__/JourneyView.spec.ts` — 6 tests: begin button, progress bar, stages, errors, completion
+- `src/Web.Vue/src/__tests__/DashboardView.spec.ts` — 5 tests: stat cards, journeys, notifications, designs
+- `src/Web.Vue/src/__tests__/components/StatusBadge.spec.ts` — 4 tests: text, classes, fallback, custom map
+- `src/Web.Vue/src/__tests__/components/DetailModal.spec.ts` — 3 tests: hidden, visible, close emit
+- `src/Web.Vue/src/__tests__/components/LoadingSpinner.spec.ts` — 2 tests: default message, custom message
+- `src/Web.Vue/src/__tests__/components/ErrorAlert.spec.ts` — 2 tests: hidden when null, visible when set
+
+**Files modified:**
+- `src/Web.Vue/package.json` — Added test scripts; added vitest, @vue/test-utils, jsdom, @vitest/coverage-v8
+- `src/Web.Vue/vite.config.ts` — Added vitest test configuration (globals, jsdom environment)
+- `src/Web.Vue/src/views/HomeModelsView.vue` — Use LoadingSpinner, DetailModal; add `<tbody>` to table
+- `src/Web.Vue/src/views/VillagesView.vue` — Use LoadingSpinner, DetailModal, StatusBadge; add `<tbody>`
+- `src/Web.Vue/src/views/LandBlocksView.vue` — Use LoadingSpinner, DetailModal, ErrorAlert; add `<tbody>`
+- `src/Web.Vue/src/views/MarketplaceView.vue` — Use LoadingSpinner, DetailModal, StatusBadge; add `<tbody>`
+- `src/Web.Vue/src/views/JourneyView.vue` — Use StatusBadge, ErrorAlert; removed getStageBadge()
+- `src/Web.Vue/src/views/DashboardView.vue` — Use LoadingSpinner, StatusBadge; removed getStageBadge()
+- `rules/milestones.md` — Updated for Phases 11, 12
+- `rules/completion-log.md` — This entry
+
+**Architecture:**
+- 17 src projects (AppHost, ServiceDefaults, 14 domain + Platform.Api) + Vue 3 frontend
+- 4 shared components reduce code duplication across 6 views
+- 49 Vitest component tests with full API mocking via vi.mock
+- All `<table>` elements use proper `<tbody>` wrappers (no HTML validation warnings)
+- Vue tests: `npm test` or `npx vitest run` in `src/Web.Vue/`
+- .NET tests: `dotnet test` in Terranes/
+
+**Tests:** 495 total (390 NUnit unit + 56 NUnit integration + 49 Vitest component), all passing

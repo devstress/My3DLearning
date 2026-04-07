@@ -91,26 +91,28 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
       <template v-if="selectedListing">
         <p>{{ selectedListing.description }}</p>
         <table class="table table-sm">
-          <tr>
-            <th>Status</th>
-            <td><StatusBadge :status="selectedListing.status" /></td>
-          </tr>
-          <tr>
-            <th>Price</th>
-            <td>{{ formatPrice(selectedListing.askingPriceAud) }}</td>
-          </tr>
-          <tr>
-            <th>Home Model ID</th>
-            <td><code>{{ selectedListing.homeModelId }}</code></td>
-          </tr>
-          <tr v-if="selectedListing.landBlockId">
-            <th>Land Block ID</th>
-            <td><code>{{ selectedListing.landBlockId }}</code></td>
-          </tr>
-          <tr>
-            <th>Listed</th>
-            <td>{{ new Date(selectedListing.listedUtc).toLocaleString() }}</td>
-          </tr>
+          <tbody>
+            <tr>
+              <th>Status</th>
+              <td><StatusBadge :status="selectedListing.status" /></td>
+            </tr>
+            <tr>
+              <th>Price</th>
+              <td>{{ formatPrice(selectedListing.askingPriceAud) }}</td>
+            </tr>
+            <tr>
+              <th>Home Model ID</th>
+              <td><code>{{ selectedListing.homeModelId }}</code></td>
+            </tr>
+            <tr v-if="selectedListing.landBlockId">
+              <th>Land Block ID</th>
+              <td><code>{{ selectedListing.landBlockId }}</code></td>
+            </tr>
+            <tr>
+              <th>Listed</th>
+              <td>{{ new Date(selectedListing.listedUtc).toLocaleString() }}</td>
+            </tr>
+          </tbody>
         </table>
       </template>
     </DetailModal>

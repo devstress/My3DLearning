@@ -81,10 +81,12 @@ watch([searchName, selectedLayout], search);
       <template v-if="selectedVillage">
         <p>{{ selectedVillage.description }}</p>
         <table class="table table-sm">
-          <tr><th>Layout</th><td>{{ selectedVillage.layoutType }}</td></tr>
-          <tr><th>Max Lots</th><td>{{ selectedVillage.maxLots }}</td></tr>
-          <tr><th>Location</th><td>{{ selectedVillage.centreLatitude.toFixed(4) }}, {{ selectedVillage.centreLongitude.toFixed(4) }}</td></tr>
-          <tr><th>Created</th><td>{{ new Date(selectedVillage.createdUtc).toLocaleString() }}</td></tr>
+          <tbody>
+            <tr><th>Layout</th><td>{{ selectedVillage.layoutType }}</td></tr>
+            <tr><th>Max Lots</th><td>{{ selectedVillage.maxLots }}</td></tr>
+            <tr><th>Location</th><td>{{ selectedVillage.centreLatitude.toFixed(4) }}, {{ selectedVillage.centreLongitude.toFixed(4) }}</td></tr>
+            <tr><th>Created</th><td>{{ new Date(selectedVillage.createdUtc).toLocaleString() }}</td></tr>
+          </tbody>
         </table>
 
         <template v-if="villageLots && villageLots.length > 0">

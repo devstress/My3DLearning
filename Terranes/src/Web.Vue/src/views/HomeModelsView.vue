@@ -81,13 +81,15 @@ watch([minBedrooms, selectedFormat], search);
       <template v-if="selectedModel">
         <p>{{ selectedModel.description }}</p>
         <table class="table table-sm">
-          <tr><th>Bedrooms</th><td>{{ selectedModel.bedrooms }}</td></tr>
-          <tr><th>Bathrooms</th><td>{{ selectedModel.bathrooms }}</td></tr>
-          <tr><th>Garage Spaces</th><td>{{ selectedModel.garageSpaces }}</td></tr>
-          <tr><th>Floor Area</th><td>{{ selectedModel.floorAreaSqm.toFixed(1) }} m²</td></tr>
-          <tr><th>Format</th><td>{{ selectedModel.format }}</td></tr>
-          <tr><th>File Size</th><td>{{ selectedModel.fileSizeMb.toFixed(1) }} MB</td></tr>
-          <tr><th>Created</th><td>{{ new Date(selectedModel.createdUtc).toLocaleString() }}</td></tr>
+          <tbody>
+            <tr><th>Bedrooms</th><td>{{ selectedModel.bedrooms }}</td></tr>
+            <tr><th>Bathrooms</th><td>{{ selectedModel.bathrooms }}</td></tr>
+            <tr><th>Garage Spaces</th><td>{{ selectedModel.garageSpaces }}</td></tr>
+            <tr><th>Floor Area</th><td>{{ selectedModel.floorAreaSqm.toFixed(1) }} m²</td></tr>
+            <tr><th>Format</th><td>{{ selectedModel.format }}</td></tr>
+            <tr><th>File Size</th><td>{{ selectedModel.fileSizeMb.toFixed(1) }} MB</td></tr>
+            <tr><th>Created</th><td>{{ new Date(selectedModel.createdUtc).toLocaleString() }}</td></tr>
+          </tbody>
         </table>
       </template>
     </DetailModal>
