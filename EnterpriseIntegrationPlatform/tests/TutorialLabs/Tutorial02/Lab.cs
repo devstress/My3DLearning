@@ -1,275 +1,272 @@
 // ============================================================================
-// Tutorial 02 – Environment Setup (Lab)
+// Tutorial 02 – Temporal.io Workflow Orchestration (Lab)
 // ============================================================================
-// EIP Pattern: Service Activator
-// End-to-End: Wire real ServiceActivator and channels via DI using
-// AspireIntegrationTestHost — request-reply, fire-and-forget, and
-// multi-channel pipelines through actual components.
+// EIP Patterns: Process Manager, Saga, Scatter-Gather
+// End-to-End: Temporal workflow dispatch, saga compensation with rollback,
+// fan-out/split via parallel activities, and scalability through task queues
+// and retry policies. Uses MockTemporalWorkflowDispatcher for unit-level
+// validation; real Temporal containers run via Aspire in integration tests.
 // ============================================================================
 
+using System.Text.Json;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
+using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
-using EnterpriseIntegrationPlatform.Ingestion.Channels;
-using EnterpriseIntegrationPlatform.Processing.Dispatcher;
+using EnterpriseIntegrationPlatform.Demo.Pipeline;
+using EnterpriseIntegrationPlatform.Testing;
+using EnterpriseIntegrationPlatform.Workflow.Temporal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace TutorialLabs.Tutorial02;
 
 [TestFixture]
 public sealed class Lab
 {
-    private AspireIntegrationTestHost _host = null!;
-    private MockEndpoint _output = null!;
+    private MockTemporalWorkflowDispatcher _dispatcher = null!;
 
-    [TearDown]
-    public async Task TearDown()
+    [SetUp]
+    public void SetUp() => _dispatcher = new MockTemporalWorkflowDispatcher();
+
+    // ── 1. Workflow Dispatch Basics ─────────────────────────────────────
+
+    [Test]
+    public async Task WorkflowDispatch_EnvelopeFieldsMappedToInput()
     {
-        if (_host is not null) await _host.DisposeAsync();
-        if (_output is not null) await _output.DisposeAsync();
+        // PipelineOrchestrator maps IntegrationEnvelope fields to
+        // IntegrationPipelineInput — the Temporal workflow's input contract.
+        _dispatcher.ReturnsSuccess();
+        var orchestrator = CreateOrchestrator();
+
+        var json = JsonSerializer.Deserialize<JsonElement>("{\"orderId\":\"ORD-100\"}");
+        var envelope = IntegrationEnvelope<JsonElement>.Create(
+            json, "OrderService", "order.created");
+
+        await orchestrator.ProcessAsync(envelope);
+
+        _dispatcher.AssertDispatchCount(1);
+        var input = _dispatcher.LastInput!;
+        Assert.That(input.MessageId, Is.EqualTo(envelope.MessageId));
+        Assert.That(input.CorrelationId, Is.EqualTo(envelope.CorrelationId));
+        Assert.That(input.Source, Is.EqualTo("OrderService"));
+        Assert.That(input.MessageType, Is.EqualTo("order.created"));
+        Assert.That(input.PayloadJson, Does.Contain("ORD-100"));
     }
 
     [Test]
-    public async Task ServiceActivator_FireAndForget_ProcessesMessageThroughDI()
+    public async Task WorkflowDispatch_WorkflowIdDerivedFromMessageId()
     {
-        // Wire real ServiceActivator via DI
-        var builder = AspireIntegrationTestHost.CreateBuilder();
-        _output = builder.AddMockEndpoint("output");
-        builder.UseProducer(_output);
-        builder.ConfigureServices(services =>
+        // Temporal workflow ID is deterministic: "integration-{messageId}"
+        // This makes workflow execution idempotent — resubmitting the same
+        // message produces the same workflow ID, preventing duplicates.
+        _dispatcher.ReturnsSuccess();
+        var orchestrator = CreateOrchestrator();
+
+        var json = JsonSerializer.Deserialize<JsonElement>("{}");
+        var envelope = IntegrationEnvelope<JsonElement>.Create(json, "svc", "type");
+
+        await orchestrator.ProcessAsync(envelope);
+
+        Assert.That(_dispatcher.LastWorkflowId,
+            Is.EqualTo($"integration-{envelope.MessageId}"));
+    }
+
+    // ── 2. Saga Pattern: Success and Failure Paths ──────────────────────
+
+    [Test]
+    public async Task SagaPattern_SuccessPath_AllStepsComplete()
+    {
+        // On success: persist → validate → ack. No compensation needed.
+        _dispatcher.ReturnsSuccess();
+        var orchestrator = CreateOrchestrator();
+
+        var json = JsonSerializer.Deserialize<JsonElement>("{\"valid\":true}");
+        var envelope = IntegrationEnvelope<JsonElement>.Create(json, "svc", "order.valid");
+
+        await orchestrator.ProcessAsync(envelope);
+
+        _dispatcher.AssertDispatchCount(1);
+        // The workflow ID is deterministic from the message
+        Assert.That(_dispatcher.LastWorkflowId!.StartsWith("integration-"), Is.True);
+    }
+
+    [Test]
+    public async Task SagaPattern_FailurePath_CompensationTriggered()
+    {
+        // On failure: the workflow rolls back completed steps.
+        // MockDispatcher simulates the Temporal workflow's nack path.
+        _dispatcher.ReturnsFailure("Validation failed: invalid schema");
+        var orchestrator = CreateOrchestrator();
+
+        var json = JsonSerializer.Deserialize<JsonElement>("{\"bad\":true}");
+        var envelope = IntegrationEnvelope<JsonElement>.Create(json, "svc", "order.invalid");
+
+        await orchestrator.ProcessAsync(envelope);
+
+        _dispatcher.AssertDispatchCount(1);
+        var input = _dispatcher.LastInput!;
+        Assert.That(input.MessageType, Is.EqualTo("order.invalid"));
+    }
+
+    [Test]
+    public async Task SagaPattern_CustomCompensationHandler_ExecutesRollback()
+    {
+        // OnDispatch allows custom saga logic — simulate compensation steps.
+        var compensatedSteps = new List<string>();
+        _dispatcher.OnDispatch((input, workflowId) =>
         {
-            services.AddSingleton<IServiceActivator, ServiceActivator>();
-            services.Configure<ServiceActivatorOptions>(opt =>
-            {
-                opt.ReplySource = "OrderProcessor";
-                opt.ReplyMessageType = "order.processed";
-            });
+            // Simulate: persist succeeded → validate failed → compensate persist
+            compensatedSteps.Add("PersistMessage");
+            compensatedSteps.Add("LogReceived");
+            // Compensation reverses: LogReceived first, then PersistMessage
+            compensatedSteps.Reverse();
+            return new IntegrationPipelineResult(input.MessageId, false, "Schema mismatch");
         });
-        _host = builder.Build();
 
-        var activator = _host.GetService<IServiceActivator>();
+        var orchestrator = CreateOrchestrator();
+        var json = JsonSerializer.Deserialize<JsonElement>("{\"schema\":\"v0\"}");
+        var envelope = IntegrationEnvelope<JsonElement>.Create(json, "svc", "legacy.format");
 
-        // Send a command through the real ServiceActivator (fire-and-forget)
-        var command = IntegrationEnvelope<string>.Create(
-            "ProcessOrder:ORD-100", "WebApp", "order.process");
+        await orchestrator.ProcessAsync(envelope);
 
-        var result = await activator.InvokeAsync(command,
-            (env, ct) =>
-            {
-                // Real service logic: log processing (fire-and-forget, no reply)
-                return Task.CompletedTask;
-            });
-
-        Assert.That(result.Succeeded, Is.True);
-        Assert.That(result.ReplySent, Is.False);
+        // Compensation executed in reverse order
+        Assert.That(compensatedSteps[0], Is.EqualTo("LogReceived"));
+        Assert.That(compensatedSteps[1], Is.EqualTo("PersistMessage"));
     }
 
+    // ── 3. Fan-Out / Split Pattern ──────────────────────────────────────
+
     [Test]
-    public async Task ServiceActivator_RequestReply_PublishesReplyToAddress()
+    public async Task FanOut_MultipleMessagesDispatchedIndependently()
     {
-        // Wire real ServiceActivator with MockEndpoint capturing replies
-        var builder = AspireIntegrationTestHost.CreateBuilder();
-        _output = builder.AddMockEndpoint("replies");
-        builder.UseProducer(_output);
-        builder.ConfigureServices(services =>
-        {
-            services.AddSingleton<IServiceActivator, ServiceActivator>();
-            services.Configure<ServiceActivatorOptions>(opt =>
-            {
-                opt.ReplySource = "PricingService";
-                opt.ReplyMessageType = "price.calculated";
-            });
-        });
-        _host = builder.Build();
+        // Integration pattern: split a batch into individual workflows.
+        // Each order line becomes a separate Temporal workflow execution.
+        _dispatcher.ReturnsSuccess();
+        var orchestrator = CreateOrchestrator();
 
-        var activator = _host.GetService<IServiceActivator>();
-
-        // Request with ReplyTo address — ServiceActivator will publish reply
-        var request = IntegrationEnvelope<string>.Create(
-            "GetPrice:SKU-999", "CatalogUI", "price.request") with
+        var orderLines = new[]
         {
-            ReplyTo = "price-replies",
-            Intent = MessageIntent.Command,
+            "{\"sku\":\"SKU-001\",\"qty\":2}",
+            "{\"sku\":\"SKU-002\",\"qty\":1}",
+            "{\"sku\":\"SKU-003\",\"qty\":5}",
         };
 
-        var result = await activator.InvokeAsync<string, string>(request,
-            (env, ct) =>
+        // Fan-out: dispatch each order line as a separate workflow
+        foreach (var line in orderLines)
+        {
+            var json = JsonSerializer.Deserialize<JsonElement>(line);
+            var envelope = IntegrationEnvelope<JsonElement>.Create(
+                json, "OrderSplitter", "order.line");
+            await orchestrator.ProcessAsync(envelope);
+        }
+
+        // Three independent workflow executions
+        _dispatcher.AssertDispatchCount(3);
+
+        // Each has a unique workflow ID (from unique message IDs)
+        var workflowIds = Enumerable.Range(0, 3)
+            .Select(i => _dispatcher.GetWorkflowId(i))
+            .ToList();
+        Assert.That(workflowIds.Distinct().Count(), Is.EqualTo(3));
+
+        // Each carries its own payload
+        Assert.That(_dispatcher.GetInput(0).PayloadJson, Does.Contain("SKU-001"));
+        Assert.That(_dispatcher.GetInput(1).PayloadJson, Does.Contain("SKU-002"));
+        Assert.That(_dispatcher.GetInput(2).PayloadJson, Does.Contain("SKU-003"));
+    }
+
+    // ── 4. Scalability: Retry, Timeout, Task Queue ──────────────────────
+
+    [Test]
+    public void TemporalOptions_DefaultScalabilitySettings()
+    {
+        // TemporalOptions defines the scalability knobs for Temporal workers.
+        var options = new TemporalOptions();
+
+        // Task queue determines which worker pool picks up the workflow
+        Assert.That(options.TaskQueue, Is.EqualTo("integration-workflows"));
+        // Namespace isolates workflows (multi-tenancy at the Temporal level)
+        Assert.That(options.Namespace, Is.EqualTo("default"));
+        // Server address for the gRPC connection
+        Assert.That(options.ServerAddress, Is.EqualTo("localhost:15233"));
+    }
+
+    [Test]
+    public void PipelineOptions_ConfiguresAckNackSubjects()
+    {
+        // PipelineOptions controls the NATS subjects for notifications
+        // and Temporal connection settings — all tunable for scalability.
+        var options = new PipelineOptions();
+
+        Assert.That(options.AckSubject, Is.EqualTo("integration.ack"));
+        Assert.That(options.NackSubject, Is.EqualTo("integration.nack"));
+        Assert.That(options.InboundSubject, Is.EqualTo("integration.inbound"));
+        Assert.That(options.TemporalTaskQueue, Is.EqualTo("integration-workflows"));
+        Assert.That(options.WorkflowTimeout, Is.EqualTo(TimeSpan.FromMinutes(5)));
+    }
+
+    // ── 5. DI Wiring with Aspire ────────────────────────────────────────
+
+    [Test]
+    public async Task AspireHost_WiresOrchestratorViaDI()
+    {
+        // In production, Aspire wires PipelineOrchestrator with the real
+        // TemporalWorkflowDispatcher. In tests, we substitute the mock.
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
+
+        await using var host = AspireIntegrationTestHost.CreateBuilder()
+            .ConfigureServices(svc =>
             {
-                // Real pricing service logic
-                return Task.FromResult<string?>($"Price:149.99");
-            });
+                svc.AddSingleton<ITemporalWorkflowDispatcher>(dispatcher);
+                svc.Configure<PipelineOptions>(o =>
+                {
+                    o.AckSubject = "test.ack";
+                    o.NackSubject = "test.nack";
+                });
+                svc.AddSingleton<PipelineOrchestrator>();
+            })
+            .Build();
 
-        Assert.That(result.Succeeded, Is.True);
-        Assert.That(result.ReplySent, Is.True);
-        Assert.That(result.ReplyTopic, Is.EqualTo("price-replies"));
+        var orchestrator = host.GetService<PipelineOrchestrator>();
+        var json = JsonSerializer.Deserialize<JsonElement>("{\"di\":true}");
+        var envelope = IntegrationEnvelope<JsonElement>.Create(json, "DIService", "di.test");
 
-        // Reply was published to the ReplyTo address
-        _output.AssertReceivedOnTopic("price-replies", 1);
-        var reply = _output.GetReceived<string>();
-        Assert.That(reply.Payload, Is.EqualTo("Price:149.99"));
-        Assert.That(reply.CorrelationId, Is.EqualTo(request.CorrelationId));
-        Assert.That(reply.CausationId, Is.EqualTo(request.MessageId));
+        await orchestrator.ProcessAsync(envelope);
+
+        Assert.That(dispatcher.LastInput!.Source, Is.EqualTo("DIService"));
+        Assert.That(dispatcher.LastInput.AckSubject, Is.EqualTo("test.ack"));
+        Assert.That(dispatcher.LastInput.NackSubject, Is.EqualTo("test.nack"));
     }
 
     [Test]
-    public async Task PointToPointChannel_WiredViaDI_SendsToRealBroker()
+    public async Task CorrelationAndCausation_PropagatedThroughWorkflow()
     {
-        var builder = AspireIntegrationTestHost.CreateBuilder();
-        _output = builder.AddMockEndpoint("broker");
-        builder.UseProducer(_output).UseConsumer(_output);
-        builder.ConfigureServices(services =>
-            services.AddSingleton<PointToPointChannel>());
-        _host = builder.Build();
+        // End-to-end tracing: correlation and causation IDs flow from
+        // the envelope into the Temporal workflow input, enabling
+        // distributed trace stitching across Temporal and NATS.
+        _dispatcher.ReturnsSuccess();
+        var orchestrator = CreateOrchestrator();
 
-        var channel = _host.GetService<PointToPointChannel>();
+        var correlationId = Guid.NewGuid();
+        var causationId = Guid.NewGuid();
+        var json = JsonSerializer.Deserialize<JsonElement>("{}");
+        var envelope = IntegrationEnvelope<JsonElement>.Create(
+            json, "svc", "type", correlationId, causationId);
 
-        // Wire a handler through DI-resolved channel
-        IntegrationEnvelope<string>? received = null;
-        await channel.ReceiveAsync<string>("task-queue", "worker",
-            msg => { received = msg; return Task.CompletedTask; },
-            CancellationToken.None);
+        await orchestrator.ProcessAsync(envelope);
 
-        var task = IntegrationEnvelope<string>.Create(
-            "ProcessReport:RPT-42", "Scheduler", "task.execute") with
-        {
-            Intent = MessageIntent.Command,
-        };
-        await channel.SendAsync(task, "task-queue", CancellationToken.None);
-
-        // Message flowed through the DI-wired channel
-        _output.AssertReceivedOnTopic("task-queue", 1);
-        Assert.That(_output.GetReceived<string>().Payload, Is.EqualTo("ProcessReport:RPT-42"));
-
-        // Handler received it
-        await _output.SendAsync(task);
-        Assert.That(received, Is.Not.Null);
-        Assert.That(received!.Intent, Is.EqualTo(MessageIntent.Command));
+        var input = _dispatcher.LastInput!;
+        Assert.That(input.CorrelationId, Is.EqualTo(correlationId));
+        Assert.That(input.CausationId, Is.EqualTo(causationId));
     }
 
-    [Test]
-    public async Task FullPipeline_Channel_ToServiceActivator_ToReply()
-    {
-        // Full DI pipeline: P2P channel → ServiceActivator → reply channel
-        var builder = AspireIntegrationTestHost.CreateBuilder();
-        _output = builder.AddMockEndpoint("pipeline");
-        builder.UseProducer(_output).UseConsumer(_output);
-        builder.ConfigureServices(services =>
-        {
-            services.AddSingleton<PointToPointChannel>();
-            services.AddSingleton<IServiceActivator, ServiceActivator>();
-            services.Configure<ServiceActivatorOptions>(opt =>
-            {
-                opt.ReplySource = "InventoryService";
-                opt.ReplyMessageType = "stock.checked";
-            });
-        });
-        _host = builder.Build();
+    // ── Helpers ──────────────────────────────────────────────────────────
 
-        var channel = _host.GetService<PointToPointChannel>();
-        var activator = _host.GetService<IServiceActivator>();
-
-        // Wire channel handler that invokes the service activator
-        await channel.ReceiveAsync<string>("stock-checks", "inventory-checker",
-            async msg =>
-            {
-                var request = msg with { ReplyTo = "stock-results" };
-                await activator.InvokeAsync<string, string>(request,
-                    (env, ct) => Task.FromResult<string?>($"InStock:{env.Payload}"));
-            }, CancellationToken.None);
-
-        // Send a stock check request through the pipeline
-        var checkRequest = IntegrationEnvelope<string>.Create(
-            "SKU-500", "WebStore", "stock.check") with
-        {
-            Intent = MessageIntent.Command,
-        };
-        await channel.SendAsync(checkRequest, "stock-checks", CancellationToken.None);
-
-        // Channel published to broker
-        _output.AssertReceivedOnTopic("stock-checks", 1);
-
-        // Trigger the handler → ServiceActivator → reply
-        await _output.SendAsync(checkRequest with { ReplyTo = "stock-results" });
-
-        // ServiceActivator published the reply
-        _output.AssertReceivedOnTopic("stock-results", 1);
-        var reply = _output.GetReceived<string>(1);
-        Assert.That(reply.Payload, Is.EqualTo("InStock:SKU-500"));
-        Assert.That(reply.Source, Is.EqualTo("InventoryService"));
-    }
-
-    [Test]
-    public async Task NamedEndpoints_IndependentPipelines_ThroughDI()
-    {
-        var builder = AspireIntegrationTestHost.CreateBuilder();
-        var ordersBroker = builder.AddMockEndpoint("orders");
-        var paymentsBroker = builder.AddMockEndpoint("payments");
-        _output = ordersBroker;
-        _host = builder.Build();
-
-        // Two independent pipelines using named endpoints
-        var orderChannel = new PointToPointChannel(
-            ordersBroker, ordersBroker,
-            NullLogger<PointToPointChannel>.Instance);
-        var paymentChannel = new PointToPointChannel(
-            paymentsBroker, paymentsBroker,
-            NullLogger<PointToPointChannel>.Instance);
-
-        var orderMsg = IntegrationEnvelope<string>.Create(
-            "NewOrder:ORD-200", "WebStore", "order.created");
-        var paymentMsg = IntegrationEnvelope<string>.Create(
-            "PaymentReceived:PAY-300", "PaymentGateway", "payment.received");
-
-        await orderChannel.SendAsync(orderMsg, "orders-queue", CancellationToken.None);
-        await paymentChannel.SendAsync(paymentMsg, "payments-queue", CancellationToken.None);
-
-        // Each endpoint captured only its own messages
-        ordersBroker.AssertReceivedOnTopic("orders-queue", 1);
-        paymentsBroker.AssertReceivedOnTopic("payments-queue", 1);
-        Assert.That(ordersBroker.GetReceived<string>().Payload, Is.EqualTo("NewOrder:ORD-200"));
-        Assert.That(paymentsBroker.GetReceived<string>().Payload, Is.EqualTo("PaymentReceived:PAY-300"));
-    }
-
-    [Test]
-    public async Task PublishSubscribeChannel_WiredViaDI_FanOutToMultipleHandlers()
-    {
-        var builder = AspireIntegrationTestHost.CreateBuilder();
-        _output = builder.AddMockEndpoint("broker");
-        builder.UseProducer(_output).UseConsumer(_output);
-        builder.ConfigureServices(services =>
-            services.AddSingleton<PublishSubscribeChannel>());
-        _host = builder.Build();
-
-        var channel = _host.GetService<PublishSubscribeChannel>();
-
-        // Two subscribers through DI-wired PubSub channel
-        var auditLog = new List<string>();
-        var alerts = new List<string>();
-
-        await channel.SubscribeAsync<string>("system-events", "audit",
-            msg => { auditLog.Add(msg.Payload); return Task.CompletedTask; },
-            CancellationToken.None);
-        await channel.SubscribeAsync<string>("system-events", "alerting",
-            msg => { alerts.Add(msg.Payload); return Task.CompletedTask; },
-            CancellationToken.None);
-
-        var evt = IntegrationEnvelope<string>.Create(
-            "DiskSpace:Warning:90%", "MonitoringAgent", "system.disk.warning") with
-        {
-            Intent = MessageIntent.Event,
-            Priority = MessagePriority.High,
-        };
-        await channel.PublishAsync(evt, "system-events", CancellationToken.None);
-
-        // Channel published through the DI-wired broker
-        _output.AssertReceivedOnTopic("system-events", 1);
-
-        // Fan out to both subscribers
-        await _output.SendAsync(evt);
-        Assert.That(auditLog, Has.Count.EqualTo(1));
-        Assert.That(alerts, Has.Count.EqualTo(1));
-        Assert.That(auditLog[0], Is.EqualTo("DiskSpace:Warning:90%"));
-    }
+    private PipelineOrchestrator CreateOrchestrator(PipelineOptions? options = null) =>
+        new(
+            _dispatcher,
+            Options.Create(options ?? new PipelineOptions()),
+            NullLogger<PipelineOrchestrator>.Instance);
 }

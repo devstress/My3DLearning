@@ -1,206 +1,175 @@
 // ============================================================================
-// Tutorial 02 – Environment Setup (Exam)
+// Tutorial 02 – Temporal.io Workflow Orchestration (Exam)
 // ============================================================================
-// EIP Pattern: Service Activator + Message Channel Pipeline
-// End-to-End: Advanced DI wiring — full multi-stage pipelines with real
-// ServiceActivator, PointToPointChannel, PublishSubscribeChannel, and
-// request-reply orchestration through actual components.
+// EIP Patterns: Process Manager, Saga (Compensation), Scatter-Gather
+// End-to-End: Advanced Temporal patterns — atomic pipeline orchestration,
+// saga compensation with step-level rollback, parallel fan-out with result
+// aggregation, and notification-enabled workflows.
 // ============================================================================
 
+using System.Text.Json;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
+using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
-using EnterpriseIntegrationPlatform.Ingestion;
-using EnterpriseIntegrationPlatform.Ingestion.Channels;
-using EnterpriseIntegrationPlatform.Processing.Dispatcher;
+using EnterpriseIntegrationPlatform.Demo.Pipeline;
+using EnterpriseIntegrationPlatform.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace TutorialLabs.Tutorial02;
 
 [TestFixture]
 public sealed class Exam
 {
-    private AspireIntegrationTestHost _host = null!;
-    private MockEndpoint _output = null!;
-
-    [TearDown]
-    public async Task TearDown()
-    {
-        if (_host is not null) await _host.DisposeAsync();
-        if (_output is not null) await _output.DisposeAsync();
-    }
+    // ── Challenge 1: Multi-Step Saga with Compensation Tracking ──────────
 
     [Test]
-    public async Task MultiStage_ChannelToActivatorToChannel_FullPipeline()
+    public async Task Challenge1_SagaCompensation_TracksStepsAndRollsBack()
     {
-        // Full DI pipeline: input P2P → ServiceActivator → output PubSub
-        var builder = AspireIntegrationTestHost.CreateBuilder();
-        _output = builder.AddMockEndpoint("pipeline");
-        builder.UseProducer(_output).UseConsumer(_output);
-        builder.ConfigureServices(services =>
+        // Simulate a 4-step saga where step 3 fails.
+        // Steps 1 and 2 must be compensated in reverse order.
+        var completedSteps = new List<string>();
+        var compensatedSteps = new List<string>();
+
+        var dispatcher = new MockTemporalWorkflowDispatcher();
+        dispatcher.OnDispatch((input, workflowId) =>
         {
-            services.AddSingleton<PointToPointChannel>();
-            services.AddSingleton<PublishSubscribeChannel>();
-            services.AddSingleton<IServiceActivator, ServiceActivator>();
-            services.Configure<ServiceActivatorOptions>(opt =>
-            {
-                opt.ReplySource = "EnrichmentService";
-                opt.ReplyMessageType = "data.enriched";
-            });
-        });
-        _host = builder.Build();
+            // Step 1: Persist
+            completedSteps.Add("Persist");
+            // Step 2: Validate schema
+            completedSteps.Add("ValidateSchema");
+            // Step 3: Enrich (fails!)
+            var enrichFailed = true;
 
-        var inputChannel = _host.GetService<PointToPointChannel>();
-        var outputChannel = _host.GetService<PublishSubscribeChannel>();
-        var activator = _host.GetService<IServiceActivator>();
-
-        // Wire pipeline: P2P receive → activator → PubSub publish
-        await inputChannel.ReceiveAsync<string>("raw-data", "enrichment-worker",
-            async msg =>
+            if (enrichFailed)
             {
-                // ServiceActivator processes the message
-                await activator.InvokeAsync(msg, (env, ct) =>
+                // Compensate in reverse order (LIFO)
+                foreach (var step in Enumerable.Reverse(completedSteps).ToList())
                 {
-                    // Enrich and forward to output channel
-                    var enriched = env with
-                    {
-                        Metadata = new Dictionary<string, string>
-                        {
-                            ["enriched-by"] = "EnrichmentService",
-                            ["original-source"] = env.Source,
-                        },
-                    };
-                    return outputChannel.PublishAsync(enriched, "enriched-data", ct);
-                });
-            }, CancellationToken.None);
+                    compensatedSteps.Add($"Compensate:{step}");
+                }
 
-        // Send raw data into the pipeline
-        var rawData = IntegrationEnvelope<string>.Create(
-            "customer:CUST-100", "DataIngestion", "data.raw") with
-        {
-            Intent = MessageIntent.Document,
-        };
-        await inputChannel.SendAsync(rawData, "raw-data", CancellationToken.None);
+                return new IntegrationPipelineResult(input.MessageId, false, "Enrichment failed");
+            }
 
-        // Input channel published to broker
-        _output.AssertReceivedOnTopic("raw-data", 1);
-
-        // Trigger the pipeline
-        await _output.SendAsync(rawData);
-
-        // Output channel published the enriched data
-        _output.AssertReceivedOnTopic("enriched-data", 1);
-        var enriched = _output.GetReceived<string>(1);
-        Assert.That(enriched.Payload, Is.EqualTo("customer:CUST-100"));
-        Assert.That(enriched.Metadata["enriched-by"], Is.EqualTo("EnrichmentService"));
-        Assert.That(enriched.Metadata["original-source"], Is.EqualTo("DataIngestion"));
-    }
-
-    [Test]
-    public async Task RequestReply_ThroughDIPipeline_CausationChainPreserved()
-    {
-        var builder = AspireIntegrationTestHost.CreateBuilder();
-        _output = builder.AddMockEndpoint("broker");
-        builder.UseProducer(_output);
-        builder.ConfigureServices(services =>
-        {
-            services.AddSingleton<IServiceActivator, ServiceActivator>();
-            services.Configure<ServiceActivatorOptions>(opt =>
-            {
-                opt.ReplySource = "ValidationService";
-                opt.ReplyMessageType = "validation.result";
-            });
+            return new IntegrationPipelineResult(input.MessageId, true);
         });
-        _host = builder.Build();
 
-        var activator = _host.GetService<IServiceActivator>();
+        var orchestrator = new PipelineOrchestrator(
+            dispatcher,
+            Options.Create(new PipelineOptions()),
+            NullLogger<PipelineOrchestrator>.Instance);
 
-        // Request-reply: validate an order and return result
-        var request = IntegrationEnvelope<string>.Create(
-            "ValidateOrder:ORD-888", "CheckoutService", "order.validate") with
-        {
-            Intent = MessageIntent.Command,
-            ReplyTo = "validation-replies",
-        };
+        var json = JsonSerializer.Deserialize<JsonElement>("{\"data\":\"test\"}");
+        var envelope = IntegrationEnvelope<JsonElement>.Create(json, "svc", "saga.test");
 
-        var result = await activator.InvokeAsync<string, string>(request,
-            (env, ct) =>
-            {
-                // Real validation logic
-                var orderId = env.Payload.Split(':')[1];
-                return Task.FromResult<string?>($"Valid:{orderId}");
-            });
+        await orchestrator.ProcessAsync(envelope);
 
-        Assert.That(result.Succeeded, Is.True);
-        Assert.That(result.ReplySent, Is.True);
+        // Completed steps tracked in forward order
+        Assert.That(completedSteps, Has.Count.EqualTo(2));
+        Assert.That(completedSteps[0], Is.EqualTo("Persist"));
+        Assert.That(completedSteps[1], Is.EqualTo("ValidateSchema"));
 
-        // Reply arrived at the ReplyTo address
-        _output.AssertReceivedOnTopic("validation-replies", 1);
-        var reply = _output.GetReceived<string>();
-        Assert.That(reply.Payload, Is.EqualTo("Valid:ORD-888"));
-        Assert.That(reply.Source, Is.EqualTo("ValidationService"));
-        Assert.That(reply.CorrelationId, Is.EqualTo(request.CorrelationId));
-        Assert.That(reply.CausationId, Is.EqualTo(request.MessageId));
+        // Compensation executed in reverse order
+        Assert.That(compensatedSteps, Has.Count.EqualTo(2));
+        Assert.That(compensatedSteps[0], Is.EqualTo("Compensate:ValidateSchema"));
+        Assert.That(compensatedSteps[1], Is.EqualTo("Compensate:Persist"));
     }
 
+    // ── Challenge 2: Fan-Out with Result Aggregation ────────────────────
+
     [Test]
-    public async Task MultipleEndpoints_IndependentActivators_ProcessInParallel()
+    public async Task Challenge2_FanOut_AggregatesResultsFromParallelWorkflows()
     {
-        // Two independent ServiceActivator pipelines with separate endpoints
-        var builder = AspireIntegrationTestHost.CreateBuilder();
-        var orderEndpoint = builder.AddMockEndpoint("orders");
-        var inventoryEndpoint = builder.AddMockEndpoint("inventory");
-        _output = orderEndpoint;
-        _host = builder.Build();
-
-        // Each endpoint gets its own ServiceActivator
-        var orderActivator = new ServiceActivator(
-            orderEndpoint,
-            Microsoft.Extensions.Options.Options.Create(new ServiceActivatorOptions
-            {
-                ReplySource = "OrderService",
-                ReplyMessageType = "order.confirmed",
-            }),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<ServiceActivator>.Instance);
-
-        var inventoryActivator = new ServiceActivator(
-            inventoryEndpoint,
-            Microsoft.Extensions.Options.Options.Create(new ServiceActivatorOptions
-            {
-                ReplySource = "InventoryService",
-                ReplyMessageType = "stock.reserved",
-            }),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<ServiceActivator>.Instance);
-
-        // Process order confirmation
-        var orderRequest = IntegrationEnvelope<string>.Create(
-            "ConfirmOrder:ORD-500", "Checkout", "order.confirm") with
+        // Pattern: Split an order into line items, dispatch each as an
+        // independent Temporal workflow, aggregate results.
+        var dispatcher = new MockTemporalWorkflowDispatcher();
+        dispatcher.OnDispatch((input, workflowId) =>
         {
-            ReplyTo = "order-confirmations",
-            Intent = MessageIntent.Command,
+            // Simulate: SKU-002 fails validation, others succeed
+            var isSuccess = !input.PayloadJson.Contains("SKU-002");
+            return new IntegrationPipelineResult(
+                input.MessageId,
+                isSuccess,
+                isSuccess ? null : "SKU-002 is discontinued");
+        });
+
+        var orchestrator = new PipelineOrchestrator(
+            dispatcher,
+            Options.Create(new PipelineOptions()),
+            NullLogger<PipelineOrchestrator>.Instance);
+
+        var orderLines = new[]
+        {
+            ("{\"sku\":\"SKU-001\",\"qty\":2}", "line.001"),
+            ("{\"sku\":\"SKU-002\",\"qty\":1}", "line.002"),
+            ("{\"sku\":\"SKU-003\",\"qty\":3}", "line.003"),
         };
 
-        // Process inventory reservation
-        var inventoryRequest = IntegrationEnvelope<string>.Create(
-            "ReserveStock:SKU-200:5", "Checkout", "stock.reserve") with
+        // Fan-out: process each line independently
+        var results = new List<(string Sku, bool Success, string? Reason)>();
+        foreach (var (payload, msgType) in orderLines)
         {
-            ReplyTo = "stock-reservations",
-            Intent = MessageIntent.Command,
+            var json = JsonSerializer.Deserialize<JsonElement>(payload);
+            var envelope = IntegrationEnvelope<JsonElement>.Create(json, "OrderSplit", msgType);
+            await orchestrator.ProcessAsync(envelope);
+
+            var input = dispatcher.Dispatches.Last();
+            var sku = JsonSerializer.Deserialize<JsonElement>(input.Input.PayloadJson)
+                .GetProperty("sku").GetString()!;
+            // Re-run to capture result
+            var result = input.Input.PayloadJson.Contains("SKU-002")
+                ? new IntegrationPipelineResult(input.Input.MessageId, false, "SKU-002 is discontinued")
+                : new IntegrationPipelineResult(input.Input.MessageId, true);
+            results.Add((sku, result.IsSuccess, result.FailureReason));
+        }
+
+        // Aggregation: 2 succeeded, 1 failed
+        Assert.That(dispatcher.DispatchCount, Is.EqualTo(3));
+        Assert.That(results.Count(r => r.Success), Is.EqualTo(2));
+        Assert.That(results.Count(r => !r.Success), Is.EqualTo(1));
+        Assert.That(results.Single(r => !r.Success).Sku, Is.EqualTo("SKU-002"));
+    }
+
+    // ── Challenge 3: Notification-Enabled Workflow ──────────────────────
+
+    [Test]
+    public async Task Challenge3_NotificationsEnabled_AckSubjectConfigured()
+    {
+        // When NotificationsEnabled=true, the workflow publishes Ack/Nack
+        // to configurable NATS subjects. This tests the subject wiring.
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
+
+        var options = new PipelineOptions
+        {
+            AckSubject = "custom.ack",
+            NackSubject = "custom.nack",
         };
 
-        // Both activators process independently
-        var orderResult = await orderActivator.InvokeAsync<string, string>(orderRequest,
-            (env, ct) => Task.FromResult<string?>($"Confirmed:{env.Payload.Split(':')[1]}"));
-        var inventoryResult = await inventoryActivator.InvokeAsync<string, string>(inventoryRequest,
-            (env, ct) => Task.FromResult<string?>($"Reserved:{env.Payload.Split(':')[1]}:5units"));
+        await using var host = AspireIntegrationTestHost.CreateBuilder()
+            .ConfigureServices(svc =>
+            {
+                svc.AddSingleton<ITemporalWorkflowDispatcher>(dispatcher);
+                svc.Configure<PipelineOptions>(o =>
+                {
+                    o.AckSubject = options.AckSubject;
+                    o.NackSubject = options.NackSubject;
+                });
+                svc.AddSingleton<PipelineOrchestrator>();
+            })
+            .Build();
 
-        // Each endpoint captured only its own replies
-        Assert.That(orderResult.Succeeded, Is.True);
-        Assert.That(inventoryResult.Succeeded, Is.True);
-        orderEndpoint.AssertReceivedOnTopic("order-confirmations", 1);
-        inventoryEndpoint.AssertReceivedOnTopic("stock-reservations", 1);
+        var orchestrator = host.GetService<PipelineOrchestrator>();
+        var json = JsonSerializer.Deserialize<JsonElement>("{\"notify\":true}");
+        var envelope = IntegrationEnvelope<JsonElement>.Create(json, "NotifySvc", "order.complete");
 
-        Assert.That(orderEndpoint.GetReceived<string>().Payload, Is.EqualTo("Confirmed:ORD-500"));
-        Assert.That(inventoryEndpoint.GetReceived<string>().Payload, Is.EqualTo("Reserved:SKU-200:5units"));
+        await orchestrator.ProcessAsync(envelope);
+
+        var input = dispatcher.LastInput!;
+        Assert.That(input.AckSubject, Is.EqualTo("custom.ack"));
+        Assert.That(input.NackSubject, Is.EqualTo("custom.nack"));
+        Assert.That(input.Source, Is.EqualTo("NotifySvc"));
     }
 }

@@ -1,116 +1,117 @@
-# Tutorial 02 — Setting Up Your Environment
+# Tutorial 02 — Temporal.io Workflow Orchestration
 
-Wire real EIP components via dependency injection using `AspireIntegrationTestHost`. This tutorial demonstrates the Service Activator pattern — connecting messaging infrastructure to application services with request-reply and fire-and-forget processing.
+Orchestrate multi-step integration pipelines with Temporal.io — durable workflows that survive crashes, enforce all-or-nothing semantics, and scale horizontally via task queues. This tutorial covers the saga pattern, fan-out/split, and the scalability model that makes Temporal the backbone of reliable integrations.
 
 ## Key Types
 
 ```csharp
-// src/Processing.Dispatcher/ServiceActivator.cs — connects messaging to services
-public sealed class ServiceActivator : IServiceActivator
+// src/Demo.Pipeline/ITemporalWorkflowDispatcher.cs — dispatches workflows to Temporal
+public interface ITemporalWorkflowDispatcher
 {
-    // Invokes a service operation from a message, publishes reply to ReplyTo address
-    Task<ServiceActivatorResult> InvokeAsync<TRequest, TResponse>(
-        IntegrationEnvelope<TRequest> envelope,
-        Func<IntegrationEnvelope<TRequest>, CancellationToken, Task<TResponse?>> serviceOperation,
-        CancellationToken cancellationToken = default);
-
-    // Fire-and-forget: invoke service with no reply
-    Task<ServiceActivatorResult> InvokeAsync<T>(
-        IntegrationEnvelope<T> envelope,
-        Func<IntegrationEnvelope<T>, CancellationToken, Task> serviceOperation,
+    Task<IntegrationPipelineResult> DispatchAsync(
+        IntegrationPipelineInput input,
+        string workflowId,
         CancellationToken cancellationToken = default);
 }
 
-// src/Processing.Dispatcher/ServiceActivatorOptions.cs
-public sealed class ServiceActivatorOptions
+// src/Demo.Pipeline/PipelineOrchestrator.cs — converts envelopes to workflow input
+public sealed class PipelineOrchestrator : IPipelineOrchestrator
 {
-    public string ReplySource { get; set; } = "ServiceActivator";
-    public string ReplyMessageType { get; set; } = "service-activator.reply";
+    // Maps IntegrationEnvelope<JsonElement> to IntegrationPipelineInput,
+    // assigns deterministic workflow ID ("integration-{messageId}"),
+    // and dispatches to Temporal
+    Task ProcessAsync(IntegrationEnvelope<JsonElement> envelope, CancellationToken ct);
 }
 
-// src/Testing/AspireIntegrationTestHost.cs — DI host for integration wiring
-public sealed class AspireIntegrationTestHost : IAsyncDisposable
+// src/Activities/IntegrationPipelineInput.cs — workflow input contract
+public sealed record IntegrationPipelineInput(
+    Guid MessageId, Guid CorrelationId, Guid? CausationId,
+    DateTimeOffset Timestamp, string Source, string MessageType,
+    string SchemaVersion, int Priority, string PayloadJson,
+    string? MetadataJson, string AckSubject, string NackSubject,
+    bool NotificationsEnabled = false);
+
+// src/Workflow.Temporal/Workflows/AtomicPipelineWorkflow.cs — saga with compensation
+[Workflow]
+public class AtomicPipelineWorkflow
 {
-    public static Builder CreateBuilder();
-    public T GetService<T>() where T : notnull;
-    public MockEndpoint GetEndpoint(string name);
+    // Persist → Validate → Deliver/Compensate — all-or-nothing with rollback
+}
+
+// src/Workflow.Temporal/TemporalOptions.cs — worker scalability settings
+public sealed class TemporalOptions
+{
+    public string TaskQueue { get; set; } = "integration-workflows";
+    public string Namespace { get; set; } = "default";
+    public string ServerAddress { get; set; } = "localhost:15233";
 }
 ```
 
 ## Exercises
 
-### 1. Wire ServiceActivator via DI for fire-and-forget
+### 1. Dispatch a workflow and verify envelope-to-input mapping
 
 ```csharp
-var builder = AspireIntegrationTestHost.CreateBuilder();
-var output = builder.AddMockEndpoint("output");
-builder.UseProducer(output);
-builder.ConfigureServices(services =>
+var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
+var orchestrator = new PipelineOrchestrator(dispatcher, Options.Create(new PipelineOptions()),
+    NullLogger<PipelineOrchestrator>.Instance);
+
+var json = JsonSerializer.Deserialize<JsonElement>("{\"orderId\":\"ORD-100\"}");
+var envelope = IntegrationEnvelope<JsonElement>.Create(json, "OrderService", "order.created");
+
+await orchestrator.ProcessAsync(envelope);
+// dispatcher.LastInput.MessageId == envelope.MessageId
+// dispatcher.LastInput.Source == "OrderService"
+```
+
+### 2. Saga pattern — success and failure paths
+
+```csharp
+// Success path: workflow completes, Ack published
+dispatcher.ReturnsSuccess();
+await orchestrator.ProcessAsync(successEnvelope);
+
+// Failure path: workflow fails, compensation + Nack
+dispatcher.ReturnsFailure("Validation failed");
+await orchestrator.ProcessAsync(failureEnvelope);
+```
+
+### 3. Custom compensation with step tracking
+
+```csharp
+dispatcher.OnDispatch((input, workflowId) =>
 {
-    services.AddSingleton<IServiceActivator, ServiceActivator>();
-    services.Configure<ServiceActivatorOptions>(opt =>
-    {
-        opt.ReplySource = "OrderProcessor";
-        opt.ReplyMessageType = "order.processed";
-    });
+    // Simulate: steps complete forward, then compensate in reverse (LIFO)
+    var completed = new List<string> { "Persist", "Validate" };
+    completed.Reverse(); // Compensate: Validate first, then Persist
+    return new IntegrationPipelineResult(input.MessageId, false, "Schema mismatch");
 });
-var host = builder.Build();
-
-var activator = host.GetService<IServiceActivator>();
-var command = IntegrationEnvelope<string>.Create("ProcessOrder:ORD-100", "WebApp", "order.process");
-
-var result = await activator.InvokeAsync(command,
-    (env, ct) => Task.CompletedTask); // Fire-and-forget
-
-// result.Succeeded == true, result.ReplySent == false
 ```
 
-### 2. ServiceActivator request-reply with ReplyTo
+### 4. Fan-out: split batch into parallel workflows
 
 ```csharp
-var request = IntegrationEnvelope<string>.Create(
-    "GetPrice:SKU-999", "CatalogUI", "price.request") with
+var orderLines = new[] { "{\"sku\":\"A\"}", "{\"sku\":\"B\"}", "{\"sku\":\"C\"}" };
+foreach (var line in orderLines)
 {
-    ReplyTo = "price-replies",
-    Intent = MessageIntent.Command,
-};
-
-var result = await activator.InvokeAsync<string, string>(request,
-    (env, ct) => Task.FromResult<string?>("Price:149.99"));
-
-// result.ReplySent == true — reply published to "price-replies"
-// Causation chain: reply.CausationId == request.MessageId
+    var json = JsonSerializer.Deserialize<JsonElement>(line);
+    var envelope = IntegrationEnvelope<JsonElement>.Create(json, "Splitter", "order.line");
+    await orchestrator.ProcessAsync(envelope);
+}
+// dispatcher.DispatchCount == 3 — three independent workflow executions
 ```
 
-### 3. Full pipeline: P2P channel → ServiceActivator → reply
+### 5. Scalability settings — task queues, timeouts, namespaces
 
 ```csharp
-await channel.ReceiveAsync<string>("stock-checks", "inventory-checker",
-    async msg =>
-    {
-        var request = msg with { ReplyTo = "stock-results" };
-        await activator.InvokeAsync<string, string>(request,
-            (env, ct) => Task.FromResult<string?>($"InStock:{env.Payload}"));
-    }, CancellationToken.None);
-```
+var options = new TemporalOptions();
+// options.TaskQueue = "integration-workflows"  ← which worker pool processes this
+// options.Namespace = "default"                ← multi-tenancy isolation
+// options.ServerAddress = "localhost:15233"     ← Temporal cluster gRPC
 
-### 4. Multiple named endpoints for independent pipelines
-
-```csharp
-var ordersBroker = builder.AddMockEndpoint("orders");
-var paymentsBroker = builder.AddMockEndpoint("payments");
-// Each endpoint routes through its own channel — fully independent
-```
-
-### 5. PubSub channel with multiple handlers wired through DI
-
-```csharp
-var channel = host.GetService<PublishSubscribeChannel>();
-await channel.SubscribeAsync<string>("system-events", "audit",
-    msg => { /* audit */ return Task.CompletedTask; }, CancellationToken.None);
-await channel.SubscribeAsync<string>("system-events", "alerting",
-    msg => { /* alert */ return Task.CompletedTask; }, CancellationToken.None);
-// Both subscribers receive every message
+var pipelineOptions = new PipelineOptions();
+// pipelineOptions.WorkflowTimeout = TimeSpan.FromMinutes(5) ← max execution time
+// pipelineOptions.TemporalTaskQueue = "integration-workflows"
 ```
 
 ## Lab
