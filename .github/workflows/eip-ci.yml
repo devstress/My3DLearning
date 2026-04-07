@@ -1,8 +1,11 @@
-name: CI
+name: EIP CI
 
 on:
   push:
     branches: [ main, 'copilot/**' ]
+    paths:
+      - 'EnterpriseIntegrationPlatform/**'
+      - '.github/workflows/eip-ci.yml'
 
 jobs:
   # ── .NET Build + Unit/Contract/Integration/Workflow Tests ───────────────────
