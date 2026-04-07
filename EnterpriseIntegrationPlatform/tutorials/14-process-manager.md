@@ -4,6 +4,17 @@ Centralised stateful orchestration via Temporal workflows — decides the next s
 
 ---
 
+## Learning Objectives
+
+1. Understand the Process Manager pattern and how it centralises stateful orchestration via Temporal workflows
+2. Convert an `IntegrationEnvelope` into an `IntegrationPipelineInput` for Temporal dispatch
+3. Map envelope fields (source, message type, correlation ID) to pipeline input properties
+4. Derive a deterministic, idempotent workflow ID from the message identifier
+5. Serialize payload and metadata into JSON for cross-boundary transport
+6. Configure Ack/Nack subjects via `PipelineOptions` for asynchronous result handling
+
+---
+
 ## Key Types
 
 ```csharp
@@ -49,152 +60,36 @@ public interface ITemporalWorkflowDispatcher
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Successful dispatch — workflow completes without error
+> 💻 Run the lab tests to see each Process Manager concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var dispatcher = Substitute.For<ITemporalWorkflowDispatcher>();
-dispatcher.DispatchAsync(
-    Arg.Any<IntegrationPipelineInput>(),
-    Arg.Any<string>(),
-    Arg.Any<CancellationToken>())
-    .Returns(ci => new IntegrationPipelineResult(
-        ci.ArgAt<IntegrationPipelineInput>(0).MessageId,
-        IsSuccess: true));
-
-var options = Options.Create(new PipelineOptions
-{
-    AckSubject = "integration.ack",
-    NackSubject = "integration.nack",
-});
-
-var orchestrator = new PipelineOrchestrator(
-    dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
-
-var json = JsonSerializer.Deserialize<JsonElement>(
-    """{"orderId": "ORD-1", "amount": 100}""");
-
-var envelope = IntegrationEnvelope<JsonElement>.Create(
-    json, "OrderService", "order.created");
-
-await orchestrator.ProcessAsync(envelope);
-
-await dispatcher.Received(1).DispatchAsync(
-    Arg.Any<IntegrationPipelineInput>(),
-    Arg.Any<string>(),
-    Arg.Any<CancellationToken>());
-```
-
-### 2. Input mapping — envelope fields map to pipeline input
-
-```csharp
-IntegrationPipelineInput? capturedInput = null;
-
-dispatcher.DispatchAsync(
-    Arg.Any<IntegrationPipelineInput>(),
-    Arg.Any<string>(),
-    Arg.Any<CancellationToken>())
-    .Returns(ci =>
-    {
-        capturedInput = ci.ArgAt<IntegrationPipelineInput>(0);
-        return new IntegrationPipelineResult(capturedInput.MessageId, IsSuccess: true);
-    });
-
-var envelope = IntegrationEnvelope<JsonElement>.Create(
-    json, "TestService", "test.event") with
-{
-    Priority = MessagePriority.High,
-    SchemaVersion = "2.0",
-    Metadata = new Dictionary<string, string> { ["tenant"] = "acme" },
-};
-
-await orchestrator.ProcessAsync(envelope);
-
-Assert.That(capturedInput!.MessageId, Is.EqualTo(envelope.MessageId));
-Assert.That(capturedInput.CorrelationId, Is.EqualTo(envelope.CorrelationId));
-Assert.That(capturedInput.Source, Is.EqualTo("TestService"));
-Assert.That(capturedInput.MessageType, Is.EqualTo("test.event"));
-Assert.That(capturedInput.SchemaVersion, Is.EqualTo("2.0"));
-Assert.That(capturedInput.Priority, Is.EqualTo((int)MessagePriority.High));
-Assert.That(capturedInput.AckSubject, Is.EqualTo("test.ack"));
-Assert.That(capturedInput.NackSubject, Is.EqualTo("test.nack"));
-Assert.That(capturedInput.PayloadJson, Does.Contain("value"));
-Assert.That(capturedInput.MetadataJson, Does.Contain("acme"));
-```
-
-### 3. Workflow ID derived from MessageId
-
-```csharp
-string? capturedWorkflowId = null;
-
-dispatcher.DispatchAsync(
-    Arg.Any<IntegrationPipelineInput>(),
-    Arg.Any<string>(),
-    Arg.Any<CancellationToken>())
-    .Returns(ci =>
-    {
-        capturedWorkflowId = ci.ArgAt<string>(1);
-        var input = ci.ArgAt<IntegrationPipelineInput>(0);
-        return new IntegrationPipelineResult(input.MessageId, IsSuccess: true);
-    });
-
-var envelope = IntegrationEnvelope<JsonElement>.Create(
-    json, "Service", "event.type");
-
-await orchestrator.ProcessAsync(envelope);
-
-Assert.That(capturedWorkflowId, Is.Not.Null);
-Assert.That(capturedWorkflowId, Is.EqualTo($"integration-{envelope.MessageId}"));
-```
-
-### 4. Failed workflow completes without throwing
-
-```csharp
-dispatcher.DispatchAsync(
-    Arg.Any<IntegrationPipelineInput>(),
-    Arg.Any<string>(),
-    Arg.Any<CancellationToken>())
-    .Returns(ci => new IntegrationPipelineResult(
-        ci.ArgAt<IntegrationPipelineInput>(0).MessageId,
-        IsSuccess: false,
-        FailureReason: "Validation failed"));
-
-var envelope = IntegrationEnvelope<JsonElement>.Create(
-    json, "Service", "event.type");
-
-Assert.DoesNotThrowAsync(() => orchestrator.ProcessAsync(envelope));
-```
-
-### 5. IntegrationPipelineResult record shape
-
-```csharp
-var messageId = Guid.NewGuid();
-
-var success = new IntegrationPipelineResult(messageId, IsSuccess: true);
-Assert.That(success.MessageId, Is.EqualTo(messageId));
-Assert.That(success.IsSuccess, Is.True);
-Assert.That(success.FailureReason, Is.Null);
-
-var failure = new IntegrationPipelineResult(
-    messageId, IsSuccess: false, FailureReason: "Timeout exceeded");
-Assert.That(failure.IsSuccess, Is.False);
-Assert.That(failure.FailureReason, Is.EqualTo("Timeout exceeded"));
-```
-
----
-
-## Lab
-
-> 💻 [`tests/TutorialLabs/Tutorial14/Lab.cs`](../tests/TutorialLabs/Tutorial14/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `ProcessAsync_DispatchesCorrectWorkflowId` | Workflow ID derived deterministically from MessageId |
+| 2 | `ProcessAsync_MapsEnvelopeFieldsToInput` | Core envelope fields mapped to pipeline input |
+| 3 | `ProcessAsync_SerializesPayloadAsJson` | Payload serialized as JSON string |
+| 4 | `ProcessAsync_WithMetadata_SerializesMetadataJson` | Metadata dictionary serialized to JSON |
+| 5 | `ProcessAsync_EmptyMetadata_SetsMetadataJsonNull` | Empty/null metadata maps to null JSON |
+| 6 | `ProcessAsync_SetsAckAndNackSubjectsFromOptions` | Ack/Nack subjects sourced from PipelineOptions |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial14.Lab"
 ```
 
-## Exam
+---
 
-> 💻 [`tests/TutorialLabs/Tutorial14/Exam.cs`](../tests/TutorialLabs/Tutorial14/Exam.cs)
+## Exam — Assessment Challenges
+
+> 🎯 Prove you can apply the Process Manager pattern in realistic, end-to-end scenarios.
+> Each challenge combines multiple concepts and uses a business-like domain.
+
+| # | Challenge | Difficulty |
+|---|-----------|------------|
+| 1 | `Starter_PriorityMapping_CastsEnumToInt` | 🟢 Starter |
+| 2 | `Intermediate_IdempotentWorkflowId_DeterministicFromMessageId` | 🟡 Intermediate |
+| 3 | `Advanced_CausationIdAndTimestamp_PreservedInInput` | 🔴 Advanced |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial14.Exam"
