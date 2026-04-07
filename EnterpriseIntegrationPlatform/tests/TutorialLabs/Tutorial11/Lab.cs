@@ -26,6 +26,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Route Resolution ──────────────────────────────────────────
+
     [Test]
     public async Task Route_RegisteredKey_RoutesToDestination()
     {
@@ -72,6 +75,9 @@ public sealed class Lab
         _output.AssertNoneReceived();
     }
 
+
+    // ── 2. Runtime Route Management ──────────────────────────────────
+
     [Test]
     public async Task Register_UpdatesExistingRoute()
     {
@@ -113,6 +119,9 @@ public sealed class Lab
 
         Assert.That(removed, Is.False);
     }
+
+
+    // ── 3. Routing Table Introspection ───────────────────────────────
 
     [Test]
     public async Task GetRoutingTable_ReturnsSnapshot()

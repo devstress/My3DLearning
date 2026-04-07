@@ -26,6 +26,9 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+
+    // ── 1. Basic Fan-Out ─────────────────────────────────────────────
+
     [Test]
     public async Task Route_SingleRuleMatch_FansOutToAllDestinations()
     {
@@ -71,6 +74,9 @@ public sealed class Lab
         Assert.That(result.Destinations, Is.Empty);
         _output.AssertNoneReceived();
     }
+
+
+    // ── 2. Multi-Rule & Deduplication ────────────────────────────────
 
     [Test]
     public async Task Route_MultipleRulesMatch_CombinesDestinations()
@@ -145,6 +151,9 @@ public sealed class Lab
         Assert.That(result.ResolvedCount, Is.EqualTo(3));
         _output.AssertReceivedCount(3);
     }
+
+
+    // ── 3. Advanced Recipient Sources ────────────────────────────────
 
     [Test]
     public async Task Route_MetadataRecipients_AddsDestinations()
