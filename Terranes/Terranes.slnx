@@ -14,6 +14,7 @@
     <Project Path="src/Notifications/Notifications.csproj" />
     <Project Path="src/Analytics/Analytics.csproj" />
     <Project Path="src/Platform.Api/Platform.Api.csproj" />
+    <Project Path="src/Web/Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/UnitTests/UnitTests.csproj" />

@@ -1,0 +1,135 @@
+@page "/marketplace"
+@rendermode InteractiveServer
+@inject IMarketplaceService MarketplaceService
+
+<PageTitle>Marketplace — Terranes</PageTitle>
+
+<div class="container">
+    <h2 class="mb-4">🏬 Property Marketplace</h2>
+    <p class="text-muted">Browse property listings from agents, builders, and homeowners.</p>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <input type="text" class="form-control" placeholder="Suburb..."
+                   @bind="searchSuburb" @bind:event="oninput" @bind:after="SearchAsync" />
+        </div>
+        <div class="col-md-3">
+            <input type="number" class="form-control" placeholder="Max price ($)"
+                   @bind="maxPrice" @bind:event="oninput" @bind:after="SearchAsync" />
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @bind="selectedStatus" @bind:after="SearchAsync">
+                <option value="">All Statuses</option>
+                @foreach (var status in Enum.GetValues<ListingStatus>())
+                {
+                    <option value="@status">@status</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (listings is null)
+    {
+        <p><em>Loading listings...</em></p>
+    }
+    else if (!listings.Any())
+    {
+        <div class="alert alert-info">No listings found matching your criteria.</div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var listing in listings)
+            {
+                <div class="col-md-6">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h5 class="card-title">@listing.Title</h5>
+                                <span class="badge @GetStatusBadgeClass(listing.Status)">@listing.Status</span>
+                            </div>
+                            <p class="card-text text-muted">@listing.Description</p>
+                            <div class="d-flex justify-content-between">
+                                @if (listing.AskingPriceAud.HasValue)
+                                {
+                                    <span class="h5 text-success">$@listing.AskingPriceAud.Value.ToString("N0")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Price on Application</span>
+                                }
+                                <small class="text-muted">Listed @listing.ListedAtUtc.ToString("d")</small>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewListing(listing)">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (selectedListing is not null)
+    {
+        <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">@selectedListing.Title</h5>
+                        <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>@selectedListing.Description</p>
+                        <table class="table table-sm">
+                            <tr><th>Status</th><td><span class="badge @GetStatusBadgeClass(selectedListing.Status)">@selectedListing.Status</span></td></tr>
+                            <tr><th>Price</th><td>@(selectedListing.AskingPriceAud.HasValue ? $"${selectedListing.AskingPriceAud.Value:N0}" : "Price on Application")</td></tr>
+                            <tr><th>Home Model ID</th><td><code>@selectedListing.HomeModelId</code></td></tr>
+                            @if (selectedListing.LandBlockId.HasValue)
+                            {
+                                <tr><th>Land Block ID</th><td><code>@selectedListing.LandBlockId</code></td></tr>
+                            }
+                            <tr><th>Listed</th><td>@selectedListing.ListedAtUtc.ToString("g")</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<PropertyListing>? listings;
+    private string searchSuburb = "";
+    private decimal? maxPrice;
+    private string selectedStatus = "";
+    private PropertyListing? selectedListing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        ListingStatus? status = Enum.TryParse<ListingStatus>(selectedStatus, out var s) ? s : null;
+        listings = await MarketplaceService.SearchAsync(
+            string.IsNullOrWhiteSpace(searchSuburb) ? null : searchSuburb,
+            maxPrice, status);
+    }
+
+    private void ViewListing(PropertyListing listing) { selectedListing = listing; }
+    private void CloseModal() { selectedListing = null; }
+
+    private static string GetStatusBadgeClass(ListingStatus status) => status switch
+    {
+        ListingStatus.Active => "bg-success",
+        ListingStatus.Draft => "bg-warning",
+        ListingStatus.UnderOffer => "bg-info",
+        ListingStatus.Sold => "bg-danger",
+        ListingStatus.Withdrawn => "bg-secondary",
+        _ => "bg-secondary"
+    };
+}

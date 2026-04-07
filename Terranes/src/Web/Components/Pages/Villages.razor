@@ -1,0 +1,132 @@
+@page "/villages"
+@rendermode InteractiveServer
+@inject IVirtualVillageService VillageService
+
+<PageTitle>Virtual Villages — Terranes</PageTitle>
+
+<div class="container">
+    <h2 class="mb-4">🏘️ Virtual Villages</h2>
+    <p class="text-muted">Explore immersive 3D neighbourhoods of fully designed homes.</p>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <input type="text" class="form-control" placeholder="Search by name..."
+                   @bind="searchName" @bind:event="oninput" @bind:after="SearchAsync" />
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @bind="selectedLayout" @bind:after="SearchAsync">
+                <option value="">All Layouts</option>
+                @foreach (var layoutType in Enum.GetValues<VillageLayoutType>())
+                {
+                    <option value="@layoutType">@layoutType</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (villages is null)
+    {
+        <p><em>Loading villages...</em></p>
+    }
+    else if (!villages.Any())
+    {
+        <div class="alert alert-info">No villages found. Create one to get started!</div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var village in villages)
+            {
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">@village.Name</h5>
+                            <p class="card-text text-muted">@village.Description</p>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="badge bg-primary">@village.Layout</span>
+                                <span class="badge bg-secondary">Max @village.MaxLots lots</span>
+                            </div>
+                            <small class="text-muted">
+                                📍 @village.CentreLatitude.ToString("F4"), @village.CentreLongitude.ToString("F4")
+                            </small>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewVillage(village)">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (selectedVillage is not null)
+    {
+        <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">@selectedVillage.Name</h5>
+                        <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>@selectedVillage.Description</p>
+                        <table class="table table-sm">
+                            <tr><th>Layout</th><td>@selectedVillage.Layout</td></tr>
+                            <tr><th>Max Lots</th><td>@selectedVillage.MaxLots</td></tr>
+                            <tr><th>Location</th><td>@selectedVillage.CentreLatitude.ToString("F4"), @selectedVillage.CentreLongitude.ToString("F4")</td></tr>
+                            <tr><th>Created</th><td>@selectedVillage.CreatedAtUtc.ToString("g")</td></tr>
+                        </table>
+
+                        @if (villageLots is not null && villageLots.Any())
+                        {
+                            <h6>Lots (@villageLots.Count)</h6>
+                            <table class="table table-sm table-striped">
+                                <thead><tr><th>#</th><th>Status</th><th>Position</th></tr></thead>
+                                <tbody>
+                                    @foreach (var lot in villageLots)
+                                    {
+                                        <tr>
+                                            <td>@lot.LotNumber</td>
+                                            <td><span class="badge @(lot.Status == VillageLotStatus.Occupied ? "bg-success" : "bg-warning")">@lot.Status</span></td>
+                                            <td>@lot.PositionX.ToString("F1"), @lot.PositionY.ToString("F1")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<VirtualVillage>? villages;
+    private string searchName = "";
+    private string selectedLayout = "";
+    private VirtualVillage? selectedVillage;
+    private IReadOnlyList<VillageLot>? villageLots;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        VillageLayoutType? layout = Enum.TryParse<VillageLayoutType>(selectedLayout, out var l) ? l : null;
+        villages = await VillageService.SearchAsync(
+            string.IsNullOrWhiteSpace(searchName) ? null : searchName, layout);
+    }
+
+    private async Task ViewVillage(VirtualVillage village)
+    {
+        selectedVillage = village;
+        villageLots = await VillageService.GetLotsAsync(village.Id);
+    }
+
+    private void CloseModal() { selectedVillage = null; villageLots = null; }
+}

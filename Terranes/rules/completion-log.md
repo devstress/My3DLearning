@@ -549,3 +549,38 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - 5 endpoint files fixed: Builder, Landscaper, Solicitor, RealEstateAgent, Webhook — multi-body params wrapped into request DTOs
 
 **Tests:** 446 total (390 unit + 56 integration), all passing
+
+---
+
+## Phase 10 — Blazor Web UI
+
+### Chunk 033 — Blazor Server Scaffold + All Pages (2026-04-07)
+
+**Goal:** Build a Blazor Server web UI that wires all 29 backend services directly via DI, providing a full buyer-facing experience with 7 pages covering the entire platform.
+
+**Files created:**
+- `src/Web/Web.csproj` — Blazor Server project referencing all 12 service projects
+- `src/Web/Program.cs` — Registers all Terranes services + Blazor components
+- `src/Web/Components/_Imports.razor` — Global Razor imports including Terranes namespaces
+- `src/Web/Components/Layout/NavMenu.razor` — Navigation with Terranes pages
+- `src/Web/Components/Pages/Home.razor` — Landing page with platform overview and feature cards
+- `src/Web/Components/Pages/Villages.razor` — Virtual village browser with search, layout filter, lot details
+- `src/Web/Components/Pages/HomeModels.razor` — Home design gallery with bedroom/format filters, detail modal
+- `src/Web/Components/Pages/LandBlocks.razor` — Land block search with suburb/state filters, test-fit functionality
+- `src/Web/Components/Pages/Marketplace.razor` — Property listing browser with suburb/price/status filters
+- `src/Web/Components/Pages/Journey.razor` — Guided buyer journey (Browsing → DesignSelected → PlacedOnLand → Customising → QuoteRequested → QuoteReceived → Completed)
+- `src/Web/Components/Pages/Dashboard.razor` — Platform dashboard with active journeys, notifications, stats, recent designs
+
+**Files modified:**
+- `Terranes.slnx` — Added Web project
+
+**Architecture:**
+- 15 src projects (14 existing + Web)
+- Blazor Server Interactive with all 29 services wired via DI
+- 7 interactive pages covering: home, villages, designs, land, marketplace, journey, dashboard
+- Journey page implements full buyer flow with stage-specific UI and progress bar
+- Dashboard aggregates data from Journey, Notification, Analytics, HomeModel, and Marketplace services
+- Run: `dotnet run --project src/Web` → http://localhost:5000 (Blazor UI)
+- Run: `dotnet run --project src/Platform.Api` → http://localhost:5200 (REST API)
+
+**Tests:** 446 total (390 unit + 56 integration), all passing
