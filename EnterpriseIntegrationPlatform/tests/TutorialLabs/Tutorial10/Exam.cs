@@ -1,8 +1,22 @@
 // ============================================================================
-// Tutorial 10 – Message Filter (Exam)
+// Tutorial 10 – Message Filter (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: spam filter with In operator, priority-based filter, and
-// multi-condition AND filter — all verified via MockEndpoint topic counts.
+// PURPOSE: Prove you can apply message filter patterns in realistic scenarios —
+//          spam filtering, priority-based triage, and multi-condition metadata
+//          filtering.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Filter trusted partners using In operator, quarantine others
+//   🟡 Intermediate — Priority-based triage — only High/Critical pass through
+//   🔴 Advanced     — Multi-condition AND filter on tenant and environment metadata
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -18,8 +32,17 @@ namespace TutorialLabs.Tutorial10;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Spam Filter with Trusted Partner Whitelist ──────────
+    //
+    // SCENARIO: An integration gateway receives messages from multiple sources.
+    // Only trusted partners (TrustedPartnerA, TrustedPartnerB) should pass
+    // through to the legitimate queue; all others are quarantined.
+    //
+    // WHAT YOU PROVE: You can use the In operator to whitelist trusted sources
+    // and route untrusted messages to a quarantine discard topic.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge1_SpamFilter_AcceptsTrustedRejectsOthers()
+    public async Task Starter_SpamFilter_AcceptsTrustedRejectsOthers()
     {
         await using var output = new MockEndpoint("spam");
         var options = Options.Create(new MessageFilterOptions
@@ -52,8 +75,17 @@ public sealed class Exam
         output.AssertReceivedOnTopic("quarantine", 1);
     }
 
+    // ── 🟡 INTERMEDIATE — Priority-Based Message Triage ──────────────────
+    //
+    // SCENARIO: A monitoring system receives alerts at all priority levels.
+    // Only High and Critical priority messages should reach priority processing;
+    // Normal and Low messages are archived for later review.
+    //
+    // WHAT YOU PROVE: You can filter messages by priority using the In operator
+    // and verify correct routing to processing vs. archive topics.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge2_PriorityFilter_OnlyHighCriticalPass()
+    public async Task Intermediate_PriorityFilter_OnlyHighCriticalPass()
     {
         await using var output = new MockEndpoint("priority");
         var options = Options.Create(new MessageFilterOptions
@@ -92,8 +124,17 @@ public sealed class Exam
         output.AssertReceivedOnTopic("low-archive", 2);
     }
 
+    // ── 🔴 ADVANCED — Multi-Condition AND Filter on Metadata ──────────────
+    //
+    // SCENARIO: A multi-tenant SaaS platform must route messages only when
+    // BOTH the tenant is "acme-corp" AND the environment is "production".
+    // Messages missing either condition are discarded to non-prod-discard.
+    //
+    // WHAT YOU PROVE: You can combine multiple RuleConditions with AND logic
+    // and verify that all conditions must be satisfied for acceptance.
+    // ─────────────────────────────────────────────────────────────────────
     [Test]
-    public async Task Challenge3_MetadataFilter_AndLogic_BothConditionsRequired()
+    public async Task Advanced_MetadataFilter_AndLogic_BothConditionsRequired()
     {
         await using var output = new MockEndpoint("metadata");
         var options = Options.Create(new MessageFilterOptions

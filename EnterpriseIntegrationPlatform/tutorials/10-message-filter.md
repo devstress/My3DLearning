@@ -2,7 +2,16 @@
 
 Predicate-based filtering with `IMessageFilter`, `MessageFilterResult`, `MessageFilterOptions`, and `RuleCondition`.
 
----
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Configure accept/reject filter conditions using `RuleCondition` operators
+2. Route accepted messages to an output topic and rejected messages to a discard topic
+3. Handle pass-through behavior when no conditions are configured
+4. Implement silent discard when no discard topic is specified
+5. Use the `In` operator to match against comma-separated value lists
+6. Combine multiple conditions with `And` / `Or` logic operators
 
 ## Key Types
 
@@ -48,196 +57,45 @@ public sealed record RuleCondition
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Accept filter: message passes when predicate matches
+> **Purpose:** Run each test in order to see how the Message Filter evaluates
+> accept/reject conditions through real NATS JetStream via Aspire. Read the code
+> and comments to understand each concept before moving to the Exam.
 
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var options = Options.Create(new MessageFilterOptions
-{
-    Conditions =
-    [
-        new RuleCondition
-        {
-            FieldName = "MessageType",
-            Operator = RuleConditionOperator.Equals,
-            Value = "order.created",
-        },
-    ],
-    Logic = RuleLogicOperator.And,
-    OutputTopic = "orders-accepted",
-    DiscardTopic = "orders-rejected",
-});
-
-var filter = new MessageFilter(producer, options, NullLogger<MessageFilter>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "valid-order", "OrderService", "order.created");
-
-var result = await filter.FilterAsync(envelope);
-
-Assert.That(result.Passed, Is.True);
-Assert.That(result.OutputTopic, Is.EqualTo("orders-accepted"));
-Assert.That(result.Reason, Is.EqualTo("Predicate matched"));
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Is("orders-accepted"),
-    Arg.Any<CancellationToken>());
-```
-
-### 2. Reject filter: message discarded to DLQ
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var options = Options.Create(new MessageFilterOptions
-{
-    Conditions =
-    [
-        new RuleCondition
-        {
-            FieldName = "MessageType",
-            Operator = RuleConditionOperator.Equals,
-            Value = "order.created",
-        },
-    ],
-    Logic = RuleLogicOperator.And,
-    OutputTopic = "orders-accepted",
-    DiscardTopic = "orders-rejected",
-});
-
-var filter = new MessageFilter(producer, options, NullLogger<MessageFilter>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "unknown-data", "UnknownService", "unknown.event");
-
-var result = await filter.FilterAsync(envelope);
-
-Assert.That(result.Passed, Is.False);
-Assert.That(result.OutputTopic, Is.EqualTo("orders-rejected"));
-Assert.That(result.Reason, Does.Contain("discard"));
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Is("orders-rejected"),
-    Arg.Any<CancellationToken>());
-```
-
-### 3. No conditions configured — everything passes through
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var options = Options.Create(new MessageFilterOptions
-{
-    Conditions = [],
-    OutputTopic = "pass-through-topic",
-});
-
-var filter = new MessageFilter(producer, options, NullLogger<MessageFilter>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "any-data", "AnyService", "any.event");
-
-var result = await filter.FilterAsync(envelope);
-
-Assert.That(result.Passed, Is.True);
-Assert.That(result.OutputTopic, Is.EqualTo("pass-through-topic"));
-```
-
-### 4. No discard topic — silent drop, no publish
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var options = Options.Create(new MessageFilterOptions
-{
-    Conditions =
-    [
-        new RuleCondition
-        {
-            FieldName = "MessageType",
-            Operator = RuleConditionOperator.Equals,
-            Value = "expected.type",
-        },
-    ],
-    Logic = RuleLogicOperator.And,
-    OutputTopic = "output-topic",
-});
-
-var filter = new MessageFilter(producer, options, NullLogger<MessageFilter>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "wrong-data", "Service", "wrong.type");
-
-var result = await filter.FilterAsync(envelope);
-
-Assert.That(result.Passed, Is.False);
-Assert.That(result.OutputTopic, Is.Null);
-Assert.That(result.Reason, Does.Contain("silently discarded"));
-
-await producer.DidNotReceive().PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Any<string>(),
-    Arg.Any<CancellationToken>());
-```
-
-### 5. Filter result contains correct reason and topic for both outcomes
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var options = Options.Create(new MessageFilterOptions
-{
-    Conditions =
-    [
-        new RuleCondition
-        {
-            FieldName = "Source",
-            Operator = RuleConditionOperator.Equals,
-            Value = "TrustedService",
-        },
-    ],
-    Logic = RuleLogicOperator.And,
-    OutputTopic = "trusted-output",
-    DiscardTopic = "untrusted-dlq",
-});
-
-var filter = new MessageFilter(producer, options, NullLogger<MessageFilter>.Instance);
-
-var trusted = IntegrationEnvelope<string>.Create(
-    "trusted-data", "TrustedService", "data.event");
-var passResult = await filter.FilterAsync(trusted);
-Assert.That(passResult.Passed, Is.True);
-Assert.That(passResult.Reason, Is.EqualTo("Predicate matched"));
-
-var untrusted = IntegrationEnvelope<string>.Create(
-    "untrusted-data", "UntrustedService", "data.event");
-var failResult = await filter.FilterAsync(untrusted);
-Assert.That(failResult.Passed, Is.False);
-Assert.That(failResult.OutputTopic, Is.EqualTo("untrusted-dlq"));
-Assert.That(failResult.Reason, Does.Contain("discard"));
-```
-
----
-
-## Lab
+| # | Test | Concept |
+|---|------|---------|
+| 1 | `Filter_Accept_PublishesToOutputTopic` | Accepted message published to output topic |
+| 2 | `Filter_Reject_PublishesToDiscardTopic` | Rejected message published to discard topic |
+| 3 | `Filter_NoConditions_PassThrough` | No conditions — everything passes through |
+| 4 | `Filter_SilentDiscard_NoPublishWhenNoDiscardTopic` | Silent discard when no discard topic set |
+| 5 | `Filter_BySource_AcceptsAndRejects` | Source-based filtering with accept/reject |
+| 6 | `Filter_InOperator_MatchesAnyOfCommaSeparatedValues` | In operator matches comma-separated values |
+| 7 | `Filter_OrLogic_EitherConditionSuffices` | Or logic — either condition suffices |
 
 > 💻 [`tests/TutorialLabs/Tutorial10/Lab.cs`](../tests/TutorialLabs/Tutorial10/Lab.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial10.Lab"
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial10.Lab"
 ```
 
-## Exam
+---
+
+## Exam — Assessment Challenges
+
+> **Purpose:** Prove you can apply message filter patterns in realistic scenarios —
+> spam filtering, priority-based triage, and multi-condition metadata filtering.
+
+| Difficulty | Challenge | What you prove |
+|------------|-----------|---------------|
+| 🟢 Starter | `Starter_SpamFilter_AcceptsTrustedRejectsOthers` | Filter trusted partners using In operator, quarantine others |
+| 🟡 Intermediate | `Intermediate_PriorityFilter_OnlyHighCriticalPass` | Priority-based triage — only High/Critical pass through |
+| 🔴 Advanced | `Advanced_MetadataFilter_AndLogic_BothConditionsRequired` | Multi-condition AND filter on tenant and environment metadata |
 
 > 💻 [`tests/TutorialLabs/Tutorial10/Exam.cs`](../tests/TutorialLabs/Tutorial10/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial10.Exam"
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial10.Exam"
 ```
 
 ---

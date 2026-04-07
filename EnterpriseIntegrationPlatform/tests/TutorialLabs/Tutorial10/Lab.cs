@@ -1,10 +1,19 @@
 // ============================================================================
-// Tutorial 10 – Message Filter (Lab)
+// Tutorial 10 – Message Filter (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Message Filter
-// Real Integrations: Wire real MessageFilter with NatsBrokerEndpoint (real
-// NATS JetStream via Aspire), configure accept/reject conditions using
-// RuleCondition operators, verify messages arrive at output/discard topics.
+// PURPOSE: Run each test in order to see how the Message Filter evaluates
+//          accept/reject conditions through real NATS JetStream via Aspire.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Accept filter — matching message published to output topic
+//   2. Reject filter — non-matching message published to discard topic
+//   3. No conditions — everything passes through
+//   4. Silent discard — no publish when no discard topic configured
+//   5. Source filtering — accepts trusted, rejects untrusted sources
+//   6. In operator — matches any of comma-separated values
+//   7. Or logic — either condition suffices for acceptance
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
