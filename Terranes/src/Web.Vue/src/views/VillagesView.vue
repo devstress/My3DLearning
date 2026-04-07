@@ -2,6 +2,9 @@
 import { ref, onMounted, watch } from 'vue';
 import { api } from '../api/client';
 import type { VirtualVillage, VillageLot } from '../types';
+import LoadingSpinner from '../components/LoadingSpinner.vue';
+import DetailModal from '../components/DetailModal.vue';
+import StatusBadge from '../components/StatusBadge.vue';
 
 const villages = ref<VirtualVillage[] | null>(null);
 const searchName = ref('');
@@ -49,7 +52,7 @@ watch([searchName, selectedLayout], search);
       </div>
     </div>
 
-    <p v-if="villages === null"><em>Loading villages...</em></p>
+    <LoadingSpinner v-if="villages === null" message="Loading villages..." />
     <div v-else-if="villages.length === 0" class="alert alert-info">
       No villages found. Create one to get started!
     </div>
@@ -74,42 +77,32 @@ watch([searchName, selectedLayout], search);
       </div>
     </div>
 
-    <div v-if="selectedVillage" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ selectedVillage.name }}</h5>
-            <button type="button" class="btn-close" @click="closeModal"></button>
-          </div>
-          <div class="modal-body">
-            <p>{{ selectedVillage.description }}</p>
-            <table class="table table-sm">
-              <tr><th>Layout</th><td>{{ selectedVillage.layoutType }}</td></tr>
-              <tr><th>Max Lots</th><td>{{ selectedVillage.maxLots }}</td></tr>
-              <tr><th>Location</th><td>{{ selectedVillage.centreLatitude.toFixed(4) }}, {{ selectedVillage.centreLongitude.toFixed(4) }}</td></tr>
-              <tr><th>Created</th><td>{{ new Date(selectedVillage.createdUtc).toLocaleString() }}</td></tr>
-            </table>
+    <DetailModal :show="!!selectedVillage" :title="selectedVillage?.name ?? ''" @close="closeModal">
+      <template v-if="selectedVillage">
+        <p>{{ selectedVillage.description }}</p>
+        <table class="table table-sm">
+          <tr><th>Layout</th><td>{{ selectedVillage.layoutType }}</td></tr>
+          <tr><th>Max Lots</th><td>{{ selectedVillage.maxLots }}</td></tr>
+          <tr><th>Location</th><td>{{ selectedVillage.centreLatitude.toFixed(4) }}, {{ selectedVillage.centreLongitude.toFixed(4) }}</td></tr>
+          <tr><th>Created</th><td>{{ new Date(selectedVillage.createdUtc).toLocaleString() }}</td></tr>
+        </table>
 
-            <template v-if="villageLots && villageLots.length > 0">
-              <h6>Lots ({{ villageLots.length }})</h6>
-              <table class="table table-sm table-striped">
-                <thead><tr><th>#</th><th>Status</th><th>Position</th></tr></thead>
-                <tbody>
-                  <tr v-for="lot in villageLots" :key="lot.id">
-                    <td>{{ lot.lotNumber }}</td>
-                    <td>
-                      <span class="badge" :class="lot.status === 'Occupied' ? 'bg-success' : 'bg-warning'">
-                        {{ lot.status }}
-                      </span>
-                    </td>
-                    <td>{{ lot.positionX.toFixed(1) }}, {{ lot.positionY.toFixed(1) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </template>
-          </div>
-        </div>
-      </div>
-    </div>
+        <template v-if="villageLots && villageLots.length > 0">
+          <h6>Lots ({{ villageLots.length }})</h6>
+          <table class="table table-sm table-striped">
+            <thead><tr><th>#</th><th>Status</th><th>Position</th></tr></thead>
+            <tbody>
+              <tr v-for="lot in villageLots" :key="lot.id">
+                <td>{{ lot.lotNumber }}</td>
+                <td>
+                  <StatusBadge :status="lot.status" />
+                </td>
+                <td>{{ lot.positionX.toFixed(1) }}, {{ lot.positionY.toFixed(1) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+      </template>
+    </DetailModal>
   </div>
 </template>

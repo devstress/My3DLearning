@@ -2,6 +2,8 @@
 import { ref, onMounted } from 'vue';
 import { api } from '../api/client';
 import type { BuyerJourney, Notification as AppNotification, HomeModel } from '../types';
+import LoadingSpinner from '../components/LoadingSpinner.vue';
+import StatusBadge from '../components/StatusBadge.vue';
 
 const DEMO_BUYER_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -12,21 +14,6 @@ const activeJourneyCount = ref(0);
 const homeModelCount = ref(0);
 const listingCount = ref(0);
 const analyticsEventCount = ref(0);
-
-function getStageBadge(stage: string): string {
-  switch (stage) {
-    case 'Browsing': return 'bg-info';
-    case 'DesignSelected':
-    case 'PlacedOnLand': return 'bg-primary';
-    case 'Customising':
-    case 'QuoteRequested': return 'bg-warning text-dark';
-    case 'QuoteReceived':
-    case 'Referred':
-    case 'Completed': return 'bg-success';
-    case 'Abandoned': return 'bg-danger';
-    default: return 'bg-secondary';
-  }
-}
 
 onMounted(async () => {
   const [journeys, notifs, models, listings, analytics] = await Promise.all([
@@ -91,7 +78,7 @@ onMounted(async () => {
         <div class="card shadow-sm h-100">
           <div class="card-header"><strong>Active Buyer Journeys</strong></div>
           <div class="card-body">
-            <p v-if="activeJourneys === null"><em>Loading...</em></p>
+            <LoadingSpinner v-if="activeJourneys === null" />
             <p v-else-if="activeJourneys.length === 0" class="text-muted">No active journeys.</p>
             <div v-else class="list-group list-group-flush">
               <div
@@ -103,7 +90,7 @@ onMounted(async () => {
                   <strong>{{ j.id.substring(0, 8) }}...</strong>
                   <br /><small class="text-muted">Started {{ new Date(j.startedUtc).toLocaleString() }}</small>
                 </div>
-                <span class="badge" :class="getStageBadge(j.currentStage)">{{ j.currentStage }}</span>
+                <StatusBadge :status="j.currentStage" />
               </div>
             </div>
           </div>
@@ -114,7 +101,7 @@ onMounted(async () => {
         <div class="card shadow-sm h-100">
           <div class="card-header"><strong>Recent Notifications</strong></div>
           <div class="card-body">
-            <p v-if="notifications === null"><em>Loading...</em></p>
+            <LoadingSpinner v-if="notifications === null" />
             <p v-else-if="notifications.length === 0" class="text-muted">No notifications.</p>
             <div v-else class="list-group list-group-flush">
               <div

@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
@@ -21,5 +22,9 @@ export default defineConfig({
         secure: false,
       },
     },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
   },
 })

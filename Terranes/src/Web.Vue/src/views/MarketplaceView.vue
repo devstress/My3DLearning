@@ -2,6 +2,9 @@
 import { ref, onMounted, watch } from 'vue';
 import { api } from '../api/client';
 import type { PropertyListing } from '../types';
+import LoadingSpinner from '../components/LoadingSpinner.vue';
+import DetailModal from '../components/DetailModal.vue';
+import StatusBadge from '../components/StatusBadge.vue';
 
 const listings = ref<PropertyListing[] | null>(null);
 const searchSuburb = ref('');
@@ -10,17 +13,6 @@ const selectedStatus = ref('');
 const selectedListing = ref<PropertyListing | null>(null);
 
 const statuses = ['Active', 'Draft', 'UnderOffer', 'Sold', 'Withdrawn'];
-
-function getStatusBadgeClass(status: string): string {
-  switch (status) {
-    case 'Active': return 'bg-success';
-    case 'Draft': return 'bg-warning';
-    case 'UnderOffer': return 'bg-info';
-    case 'Sold': return 'bg-danger';
-    case 'Withdrawn': return 'bg-secondary';
-    default: return 'bg-secondary';
-  }
-}
 
 function formatPrice(price?: number): string {
   if (price == null) return 'Price on Application';
@@ -67,7 +59,7 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
       </div>
     </div>
 
-    <p v-if="listings === null"><em>Loading listings...</em></p>
+    <LoadingSpinner v-if="listings === null" message="Loading listings..." />
     <div v-else-if="listings.length === 0" class="alert alert-info">
       No listings found matching your criteria.
     </div>
@@ -77,7 +69,7 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
               <h5 class="card-title">{{ listing.title }}</h5>
-              <span class="badge" :class="getStatusBadgeClass(listing.status)">{{ listing.status }}</span>
+              <StatusBadge :status="listing.status" />
             </div>
             <p class="card-text text-muted">{{ listing.description }}</p>
             <div class="d-flex justify-content-between">
@@ -95,40 +87,32 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
       </div>
     </div>
 
-    <div v-if="selectedListing" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ selectedListing.title }}</h5>
-            <button type="button" class="btn-close" @click="closeModal"></button>
-          </div>
-          <div class="modal-body">
-            <p>{{ selectedListing.description }}</p>
-            <table class="table table-sm">
-              <tr>
-                <th>Status</th>
-                <td><span class="badge" :class="getStatusBadgeClass(selectedListing.status)">{{ selectedListing.status }}</span></td>
-              </tr>
-              <tr>
-                <th>Price</th>
-                <td>{{ formatPrice(selectedListing.askingPriceAud) }}</td>
-              </tr>
-              <tr>
-                <th>Home Model ID</th>
-                <td><code>{{ selectedListing.homeModelId }}</code></td>
-              </tr>
-              <tr v-if="selectedListing.landBlockId">
-                <th>Land Block ID</th>
-                <td><code>{{ selectedListing.landBlockId }}</code></td>
-              </tr>
-              <tr>
-                <th>Listed</th>
-                <td>{{ new Date(selectedListing.listedUtc).toLocaleString() }}</td>
-              </tr>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
+    <DetailModal :show="!!selectedListing" :title="selectedListing?.title ?? ''" @close="closeModal">
+      <template v-if="selectedListing">
+        <p>{{ selectedListing.description }}</p>
+        <table class="table table-sm">
+          <tr>
+            <th>Status</th>
+            <td><StatusBadge :status="selectedListing.status" /></td>
+          </tr>
+          <tr>
+            <th>Price</th>
+            <td>{{ formatPrice(selectedListing.askingPriceAud) }}</td>
+          </tr>
+          <tr>
+            <th>Home Model ID</th>
+            <td><code>{{ selectedListing.homeModelId }}</code></td>
+          </tr>
+          <tr v-if="selectedListing.landBlockId">
+            <th>Land Block ID</th>
+            <td><code>{{ selectedListing.landBlockId }}</code></td>
+          </tr>
+          <tr>
+            <th>Listed</th>
+            <td>{{ new Date(selectedListing.listedUtc).toLocaleString() }}</td>
+          </tr>
+        </table>
+      </template>
+    </DetailModal>
   </div>
 </template>

@@ -2,6 +2,9 @@
 import { ref, onMounted, watch } from 'vue';
 import { api } from '../api/client';
 import type { LandBlock, HomeModel, SitePlacement } from '../types';
+import LoadingSpinner from '../components/LoadingSpinner.vue';
+import DetailModal from '../components/DetailModal.vue';
+import ErrorAlert from '../components/ErrorAlert.vue';
 
 const blocks = ref<LandBlock[] | null>(null);
 const searchSuburb = ref('');
@@ -60,7 +63,7 @@ watch([searchSuburb, searchState], search);
       </div>
     </div>
 
-    <p v-if="blocks === null"><em>Loading land blocks...</em></p>
+    <LoadingSpinner v-if="blocks === null" message="Loading land blocks..." />
     <div v-else-if="blocks.length === 0" class="alert alert-info">
       No land blocks found. Try a different search.
     </div>
@@ -95,56 +98,46 @@ watch([searchSuburb, searchState], search);
       </table>
     </div>
 
-    <div v-if="selectedBlock" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Test-Fit on {{ selectedBlock.address }}</h5>
-            <button type="button" class="btn-close" @click="closeModal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="row mb-3">
-              <div class="col">
-                <table class="table table-sm">
-                  <tr><th>Address</th><td>{{ selectedBlock.address }}, {{ selectedBlock.suburb }} {{ selectedBlock.state }}</td></tr>
-                  <tr><th>Area</th><td>{{ selectedBlock.areaSqm.toFixed(0) }} m²</td></tr>
-                  <tr><th>Frontage × Depth</th><td>{{ selectedBlock.frontageMetre.toFixed(1) }}m × {{ selectedBlock.depthMetre.toFixed(1) }}m</td></tr>
-                  <tr><th>Zoning</th><td>{{ selectedBlock.zoning }}</td></tr>
-                </table>
-              </div>
-            </div>
-
-            <h6>Select a Home Design to Test-Fit</h6>
-            <p v-if="availableModels === null"><em>Loading designs...</em></p>
-            <p v-else-if="availableModels.length === 0" class="text-muted">No home designs available. Create one first.</p>
-            <div v-else class="list-group">
-              <button
-                v-for="model in availableModels"
-                :key="model.id"
-                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                @click="testFit(model)"
-              >
-                <div>
-                  <strong>{{ model.name }}</strong> —
-                  {{ model.bedrooms }} bed, {{ model.bathrooms }} bath, {{ model.floorAreaSqm.toFixed(0) }} m²
-                </div>
-                <span class="badge bg-primary">Test-Fit →</span>
-              </button>
-            </div>
-
-            <div v-if="placementResult" class="alert alert-success mt-3">
-              <strong>✅ Placement Created!</strong><br />
-              Placement ID: <code>{{ placementResult.id }}</code><br />
-              Offset: {{ placementResult.offsetX.toFixed(1) }}m × {{ placementResult.offsetY.toFixed(1) }}m |
-              Rotation: {{ placementResult.rotationDegrees }}° | Scale: {{ placementResult.scaleFactor }}
-            </div>
-
-            <div v-if="placementError" class="alert alert-danger mt-3">
-              <strong>❌ Placement Failed</strong><br />{{ placementError }}
-            </div>
+    <DetailModal :show="!!selectedBlock" :title="selectedBlock ? 'Test-Fit on ' + selectedBlock.address : ''" @close="closeModal">
+      <template v-if="selectedBlock">
+        <div class="row mb-3">
+          <div class="col">
+            <table class="table table-sm">
+              <tr><th>Address</th><td>{{ selectedBlock.address }}, {{ selectedBlock.suburb }} {{ selectedBlock.state }}</td></tr>
+              <tr><th>Area</th><td>{{ selectedBlock.areaSqm.toFixed(0) }} m²</td></tr>
+              <tr><th>Frontage × Depth</th><td>{{ selectedBlock.frontageMetre.toFixed(1) }}m × {{ selectedBlock.depthMetre.toFixed(1) }}m</td></tr>
+              <tr><th>Zoning</th><td>{{ selectedBlock.zoning }}</td></tr>
+            </table>
           </div>
         </div>
-      </div>
-    </div>
+
+        <h6>Select a Home Design to Test-Fit</h6>
+        <LoadingSpinner v-if="availableModels === null" message="Loading designs..." />
+        <p v-else-if="availableModels.length === 0" class="text-muted">No home designs available. Create one first.</p>
+        <div v-else class="list-group">
+          <button
+            v-for="model in availableModels"
+            :key="model.id"
+            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+            @click="testFit(model)"
+          >
+            <div>
+              <strong>{{ model.name }}</strong> —
+              {{ model.bedrooms }} bed, {{ model.bathrooms }} bath, {{ model.floorAreaSqm.toFixed(0) }} m²
+            </div>
+            <span class="badge bg-primary">Test-Fit →</span>
+          </button>
+        </div>
+
+        <div v-if="placementResult" class="alert alert-success mt-3">
+          <strong>✅ Placement Created!</strong><br />
+          Placement ID: <code>{{ placementResult.id }}</code><br />
+          Offset: {{ placementResult.offsetX.toFixed(1) }}m × {{ placementResult.offsetY.toFixed(1) }}m |
+          Rotation: {{ placementResult.rotationDegrees }}° | Scale: {{ placementResult.scaleFactor }}
+        </div>
+
+        <ErrorAlert :message="placementError" />
+      </template>
+    </DetailModal>
   </div>
 </template>

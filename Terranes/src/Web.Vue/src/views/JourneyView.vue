@@ -2,6 +2,8 @@
 import { ref, onMounted } from 'vue';
 import { api } from '../api/client';
 import type { BuyerJourney, HomeModel, LandBlock } from '../types';
+import StatusBadge from '../components/StatusBadge.vue';
+import ErrorAlert from '../components/ErrorAlert.vue';
 
 const DEMO_BUYER_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -15,21 +17,6 @@ const journeyStages = [
   'Browsing', 'DesignSelected', 'PlacedOnLand',
   'Customising', 'QuoteRequested', 'QuoteReceived', 'Completed',
 ];
-
-function getStageBadge(stage: string): string {
-  switch (stage) {
-    case 'Browsing': return 'bg-info';
-    case 'DesignSelected':
-    case 'PlacedOnLand': return 'bg-primary';
-    case 'Customising':
-    case 'QuoteRequested': return 'bg-warning text-dark';
-    case 'QuoteReceived':
-    case 'Referred':
-    case 'Completed': return 'bg-success';
-    case 'Abandoned': return 'bg-danger';
-    default: return 'bg-secondary';
-  }
-}
 
 function getProgressPercent(): number {
   if (!currentJourney.value) return 0;
@@ -145,7 +132,7 @@ onMounted(async () => {
           >
             <div>
               <strong>Journey {{ j.id.substring(0, 8) }}...</strong>
-              <span class="badge ms-2" :class="getStageBadge(j.currentStage)">{{ j.currentStage }}</span>
+              <StatusBadge :status="j.currentStage" />
             </div>
             <small class="text-muted">Started {{ new Date(j.startedUtc).toLocaleString() }}</small>
           </div>
@@ -158,9 +145,7 @@ onMounted(async () => {
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Journey Progress</h5>
-            <span class="badge fs-6" :class="getStageBadge(currentJourney.currentStage)">
-              {{ currentJourney.currentStage }}
-            </span>
+            <StatusBadge :status="currentJourney.currentStage" />
           </div>
 
           <div class="progress mb-3" style="height: 25px;">
@@ -270,7 +255,7 @@ onMounted(async () => {
         <button class="btn btn-outline-primary" @click="startNewJourney">Start New Journey</button>
       </div>
 
-      <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+      <ErrorAlert :message="errorMessage" />
     </template>
   </div>
 </template>

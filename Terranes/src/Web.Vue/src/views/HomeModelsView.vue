@@ -2,6 +2,8 @@
 import { ref, onMounted, watch } from 'vue';
 import { api } from '../api/client';
 import type { HomeModel } from '../types';
+import LoadingSpinner from '../components/LoadingSpinner.vue';
+import DetailModal from '../components/DetailModal.vue';
 
 const models = ref<HomeModel[] | null>(null);
 const minBedrooms = ref<number | undefined>(undefined);
@@ -48,7 +50,7 @@ watch([minBedrooms, selectedFormat], search);
       </div>
     </div>
 
-    <p v-if="models === null"><em>Loading home designs...</em></p>
+    <LoadingSpinner v-if="models === null" message="Loading home designs..." />
     <div v-else-if="models.length === 0" class="alert alert-info">
       No home designs found matching your criteria.
     </div>
@@ -75,27 +77,19 @@ watch([minBedrooms, selectedFormat], search);
       </div>
     </div>
 
-    <div v-if="selectedModel" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ selectedModel.name }}</h5>
-            <button type="button" class="btn-close" @click="closeModal"></button>
-          </div>
-          <div class="modal-body">
-            <p>{{ selectedModel.description }}</p>
-            <table class="table table-sm">
-              <tr><th>Bedrooms</th><td>{{ selectedModel.bedrooms }}</td></tr>
-              <tr><th>Bathrooms</th><td>{{ selectedModel.bathrooms }}</td></tr>
-              <tr><th>Garage Spaces</th><td>{{ selectedModel.garageSpaces }}</td></tr>
-              <tr><th>Floor Area</th><td>{{ selectedModel.floorAreaSqm.toFixed(1) }} m²</td></tr>
-              <tr><th>Format</th><td>{{ selectedModel.format }}</td></tr>
-              <tr><th>File Size</th><td>{{ selectedModel.fileSizeMb.toFixed(1) }} MB</td></tr>
-              <tr><th>Created</th><td>{{ new Date(selectedModel.createdUtc).toLocaleString() }}</td></tr>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
+    <DetailModal :show="!!selectedModel" :title="selectedModel?.name ?? ''" @close="closeModal">
+      <template v-if="selectedModel">
+        <p>{{ selectedModel.description }}</p>
+        <table class="table table-sm">
+          <tr><th>Bedrooms</th><td>{{ selectedModel.bedrooms }}</td></tr>
+          <tr><th>Bathrooms</th><td>{{ selectedModel.bathrooms }}</td></tr>
+          <tr><th>Garage Spaces</th><td>{{ selectedModel.garageSpaces }}</td></tr>
+          <tr><th>Floor Area</th><td>{{ selectedModel.floorAreaSqm.toFixed(1) }} m²</td></tr>
+          <tr><th>Format</th><td>{{ selectedModel.format }}</td></tr>
+          <tr><th>File Size</th><td>{{ selectedModel.fileSizeMb.toFixed(1) }} MB</td></tr>
+          <tr><th>Created</th><td>{{ new Date(selectedModel.createdUtc).toLocaleString() }}</td></tr>
+        </table>
+      </template>
+    </DetailModal>
   </div>
 </template>
