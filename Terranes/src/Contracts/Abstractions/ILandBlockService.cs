@@ -23,4 +23,14 @@ public interface ILandBlockService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The land block data, or <c>null</c> if the address could not be resolved.</returns>
     Task<LandBlock?> LookupByAddressAsync(string address, string state, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stores a land block and returns it with a generated ID if needed.
+    /// </summary>
+    Task<LandBlock> CreateAsync(LandBlock block, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Search for land blocks by suburb, state, or minimum area.
+    /// </summary>
+    Task<IReadOnlyList<LandBlock>> SearchAsync(string? suburb = null, string? state = null, double? minAreaSqm = null, CancellationToken cancellationToken = default);
 }

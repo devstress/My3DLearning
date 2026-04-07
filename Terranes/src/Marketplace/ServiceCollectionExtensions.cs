@@ -11,7 +11,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddMarketplace(this IServiceCollection services)
     {
         services.AddSingleton<IMarketplaceService, MarketplaceService>();
-        services.AddSingleton<MarketplaceService>();
         return services;
     }
 }

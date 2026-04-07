@@ -33,4 +33,9 @@ public interface IMarketplaceService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>All matching listings.</returns>
     Task<IReadOnlyList<PropertyListing>> SearchAsync(string? suburb = null, decimal? maxPriceAud = null, ListingStatus? status = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the status of a listing.
+    /// </summary>
+    Task<PropertyListing> UpdateStatusAsync(Guid listingId, ListingStatus newStatus, CancellationToken cancellationToken = default);
 }

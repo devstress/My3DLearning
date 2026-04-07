@@ -30,4 +30,14 @@ public interface IQuotingService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>All line items associated with the quote request.</returns>
     Task<IReadOnlyList<QuoteLineItem>> GetLineItemsAsync(Guid quoteRequestId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Adds a line item from a partner to an existing quote request.
+    /// </summary>
+    Task<QuoteLineItem> AddLineItemAsync(QuoteLineItem lineItem, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Completes a quote request, setting its status to Completed.
+    /// </summary>
+    Task<QuoteRequest> CompleteQuoteAsync(Guid quoteRequestId, CancellationToken cancellationToken = default);
 }

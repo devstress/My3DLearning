@@ -1,7 +1,6 @@
 using Terranes.Contracts.Abstractions;
 using Terranes.Contracts.Enums;
 using Terranes.Contracts.Models;
-using Terranes.Marketplace;
 
 namespace Terranes.Platform.Api.Endpoints;
 
@@ -29,7 +28,7 @@ public static class MarketplaceEndpoints
             return Results.Ok(listings);
         }).WithName("SearchListings");
 
-        group.MapPut("/{id:guid}/status", async (Guid id, ListingStatus newStatus, MarketplaceService service) =>
+        group.MapPut("/{id:guid}/status", async (Guid id, ListingStatus newStatus, IMarketplaceService service) =>
         {
             var updated = await service.UpdateStatusAsync(id, newStatus);
             return Results.Ok(updated);

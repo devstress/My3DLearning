@@ -37,7 +37,7 @@ public sealed class MarketplaceService : IMarketplaceService
         if (!_store.TryAdd(persisted.Id, persisted))
             throw new InvalidOperationException($"Listing with ID {persisted.Id} already exists.");
 
-        _logger.LogInformation("Created listing {ListingId} '{Title}'", persisted.Id, persisted.Title);
+        _logger.LogInformation("Created listing {ListingId}", persisted.Id);
         return Task.FromResult(persisted);
     }
 

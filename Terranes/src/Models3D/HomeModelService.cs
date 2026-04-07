@@ -48,7 +48,7 @@ public sealed class HomeModelService : IHomeModelService
         if (!_store.TryAdd(persisted.Id, persisted))
             throw new InvalidOperationException($"Home model with ID {persisted.Id} already exists.");
 
-        _logger.LogInformation("Created home model {ModelId} '{Name}' ({Format})", persisted.Id, persisted.Name, persisted.Format);
+        _logger.LogInformation("Created home model {ModelId} ({Format})", persisted.Id, persisted.Format);
         return Task.FromResult(persisted);
     }
 

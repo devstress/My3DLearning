@@ -63,8 +63,8 @@ public sealed class ComplianceService : IComplianceService
             DateTimeOffset.UtcNow);
 
         _store.TryAdd(result.Id, result);
-        _logger.LogInformation("Compliance check {CheckId}: {Outcome} for placement {PlacementId} in {Jurisdiction} ({ViolationCount} violations)",
-            result.Id, result.Outcome, sitePlacementId, jurisdiction, violations.Count);
+        _logger.LogInformation("Compliance check {CheckId}: {Outcome} for placement {PlacementId} ({ViolationCount} violations)",
+            result.Id, result.Outcome, sitePlacementId, violations.Count);
         return result;
     }
 

@@ -1,6 +1,5 @@
 using Terranes.Contracts.Abstractions;
 using Terranes.Contracts.Models;
-using Terranes.Land;
 
 namespace Terranes.Platform.Api.Endpoints;
 
@@ -10,7 +9,7 @@ public static class LandBlockEndpoints
     {
         var group = app.MapGroup("/api/land-blocks").WithTags("Land Blocks");
 
-        group.MapPost("/", async (LandBlock block, LandBlockService service) =>
+        group.MapPost("/", async (LandBlock block, ILandBlockService service) =>
         {
             var created = await service.CreateAsync(block);
             return Results.Created($"/api/land-blocks/{created.Id}", created);
@@ -28,7 +27,7 @@ public static class LandBlockEndpoints
             return block is not null ? Results.Ok(block) : Results.NotFound();
         }).WithName("LookupLandBlock");
 
-        group.MapGet("/", async (string? suburb, string? state, double? minAreaSqm, LandBlockService service) =>
+        group.MapGet("/", async (string? suburb, string? state, double? minAreaSqm, ILandBlockService service) =>
         {
             var blocks = await service.SearchAsync(suburb, state, minAreaSqm);
             return Results.Ok(blocks);

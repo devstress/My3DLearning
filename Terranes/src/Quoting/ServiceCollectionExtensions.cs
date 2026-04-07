@@ -11,7 +11,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddQuoting(this IServiceCollection services)
     {
         services.AddSingleton<IQuotingService, QuotingService>();
-        services.AddSingleton<QuotingService>();
         return services;
     }
 }

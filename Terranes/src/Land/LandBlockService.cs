@@ -43,7 +43,7 @@ public sealed class LandBlockService : ILandBlockService
         if (!_store.TryAdd(persisted.Id, persisted))
             throw new InvalidOperationException($"Land block with ID {persisted.Id} already exists.");
 
-        _logger.LogInformation("Created land block {BlockId} at {Address}, {State}", persisted.Id, persisted.Address, persisted.State);
+        _logger.LogInformation("Created land block {BlockId}", persisted.Id);
         return Task.FromResult(persisted);
     }
 

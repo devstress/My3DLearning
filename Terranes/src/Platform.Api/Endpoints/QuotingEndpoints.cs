@@ -1,6 +1,5 @@
 using Terranes.Contracts.Abstractions;
 using Terranes.Contracts.Models;
-using Terranes.Quoting;
 
 namespace Terranes.Platform.Api.Endpoints;
 
@@ -28,13 +27,13 @@ public static class QuotingEndpoints
             return Results.Ok(items);
         }).WithName("GetQuoteLineItems");
 
-        group.MapPost("/line-items", async (QuoteLineItem lineItem, QuotingService service) =>
+        group.MapPost("/line-items", async (QuoteLineItem lineItem, IQuotingService service) =>
         {
             var created = await service.AddLineItemAsync(lineItem);
             return Results.Created($"/api/quotes/{created.QuoteRequestId}/line-items", created);
         }).WithName("AddQuoteLineItem");
 
-        group.MapPost("/{id:guid}/complete", async (Guid id, QuotingService service) =>
+        group.MapPost("/{id:guid}/complete", async (Guid id, IQuotingService service) =>
         {
             var completed = await service.CompleteQuoteAsync(id);
             return Results.Ok(completed);
