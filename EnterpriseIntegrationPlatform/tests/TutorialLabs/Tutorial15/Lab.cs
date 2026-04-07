@@ -1,10 +1,19 @@
 // ============================================================================
-// Tutorial 15 – Message Translator (Lab)
+// Tutorial 15 – Message Translator (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Message Translator
-// Real Integrations: Wire real MessageTranslator with NatsBrokerEndpoint
-// (real NATS JetStream via Aspire) as producer, verify payload
-// transformation and envelope publishing.
+// PURPOSE: Run each test in order to see how the Message Translator pattern
+//          converts a payload from one format to another while preserving
+//          envelope identity (CorrelationId, CausationId chain).
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Translate_TransformsPayload_PublishesToTarget        — core payload transformation and target topic publishing
+//   2. Translate_PreservesCorrelationId                     — CorrelationId preserved across translation
+//   3. Translate_SetsCausationIdToSourceMessageId           — CausationId set to source MessageId
+//   4. Translate_OverridesSourceAndMessageType              — Source and MessageType overrides via TranslatorOptions
+//   5. Translate_PreservesMetadata                          — metadata dictionary preserved through translation
+//   6. Translate_NoTargetTopic_ThrowsInvalidOperation       — validation throws when TargetTopic is empty
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire), NUnit
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

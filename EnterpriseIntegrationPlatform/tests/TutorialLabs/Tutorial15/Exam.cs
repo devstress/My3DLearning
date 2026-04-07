@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 15 – Message Translator (Exam)
+// Tutorial 15 – Message Translator (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: type-converting translator, metadata preservation chain,
-// and multi-field transformation verification via MockEndpoint.
+// PURPOSE: Prove you can apply the Message Translator pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Type-converting translation from string to int
+//   🟡 Intermediate — Metadata and correlation preserved across a two-stage chain
+//   🔴 Advanced     — Source, MessageType, Priority, and SchemaVersion preserved when no override
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint, MessageTranslator, MockPayloadTransform, NUnit
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -18,8 +31,18 @@ namespace TutorialLabs.Tutorial15;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Type-converting translation from string to int ────
+    //
+    // SCENARIO: A string payload "42" arrives from a parser service. The
+    //           translator converts it to an integer and publishes to the
+    //           target topic with the correct MessageType and CausationId.
+    //
+    // WHAT YOU PROVE: The translator correctly converts payload types across
+    //                 a type boundary (string → int) and preserves envelope lineage.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_TypeConversion_StringToInt()
+    public async Task Starter_TypeConversion_StringToInt()
     {
         await using var output = new MockEndpoint("type-convert");
         var transform = new MockPayloadTransform<string, int>(input => int.Parse(input));
@@ -43,8 +66,19 @@ public sealed class Exam
         output.AssertReceivedOnTopic("int-topic", 1);
     }
 
+    // ── 🟡 INTERMEDIATE — Metadata and correlation across two-stage chain ─
+    //
+    // SCENARIO: A message flows through two translators in sequence. The
+    //           first uppercases the payload; the second wraps it in brackets.
+    //           Metadata ("trace") and CorrelationId must survive both hops,
+    //           and each stage must set CausationId to its input's MessageId.
+    //
+    // WHAT YOU PROVE: The translator preserves metadata and correlation
+    //                 through a multi-stage translation pipeline.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_MetadataPreservationChain_TwoTranslations()
+    public async Task Intermediate_MetadataPreservationChain_TwoTranslations()
     {
         await using var output1 = new MockEndpoint("stage1");
         await using var output2 = new MockEndpoint("stage2");
@@ -80,8 +114,19 @@ public sealed class Exam
         output2.AssertReceivedOnTopic("stage2-topic", 1);
     }
 
+    // ── 🔴 ADVANCED — Source, MessageType, Priority, SchemaVersion preserved ─
+    //
+    // SCENARIO: An envelope carries high-priority data with a specific
+    //           SchemaVersion. No TargetSource or TargetMessageType overrides
+    //           are configured. After translation, all original envelope
+    //           properties must be faithfully preserved in the output.
+    //
+    // WHAT YOU PROVE: When no overrides are configured, the translator
+    //                 preserves Source, MessageType, Priority, and SchemaVersion.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_PreservesSourceWhenNoOverride()
+    public async Task Advanced_PreservesSourceWhenNoOverride()
     {
         await using var output = new MockEndpoint("preserve");
         var transform = new MockPayloadTransform<string, string>(_ => "out");

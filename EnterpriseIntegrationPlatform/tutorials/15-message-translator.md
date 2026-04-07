@@ -4,6 +4,17 @@ Converts a message payload from one format to another while preserving envelope 
 
 ---
 
+## Learning Objectives
+
+1. Understand the Message Translator pattern and how it converts payloads between formats
+2. Wire a `IPayloadTransform<TIn, TOut>` into a `MessageTranslator` to perform payload conversion
+3. Verify that CorrelationId is preserved and CausationId is set to the source MessageId
+4. Override Source and MessageType via `TranslatorOptions` configuration
+5. Confirm metadata dictionaries survive translation unchanged
+6. Validate that an empty TargetTopic triggers an `InvalidOperationException`
+
+---
+
 ## Key Types
 
 ```csharp
@@ -45,114 +56,36 @@ public sealed record FieldMapping
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Basic translation — string to string
+> 💻 Run the lab tests to see each Message Translator concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var transform = new FuncPayloadTransform<string, string>(s => s.ToUpperInvariant());
-
-var options = Options.Create(new TranslatorOptions
-{
-    TargetTopic = "translated-topic",
-});
-
-var translator = new MessageTranslator<string, string>(
-    transform, producer, options,
-    NullLogger<MessageTranslator<string, string>>.Instance);
-
-var source = IntegrationEnvelope<string>.Create(
-    "hello world", "SourceService", "greeting.event");
-
-var result = await translator.TranslateAsync(source);
-
-Assert.That(result.TranslatedEnvelope.Payload, Is.EqualTo("HELLO WORLD"));
-Assert.That(result.TargetTopic, Is.EqualTo("translated-topic"));
-Assert.That(result.SourceMessageId, Is.EqualTo(source.MessageId));
-```
-
-### 2. CorrelationId is preserved across translation
-
-```csharp
-var transform = new FuncPayloadTransform<string, string>(s => s);
-
-var translator = new MessageTranslator<string, string>(
-    transform, producer, options,
-    NullLogger<MessageTranslator<string, string>>.Instance);
-
-var source = IntegrationEnvelope<string>.Create(
-    "data", "Service", "event.type");
-
-var result = await translator.TranslateAsync(source);
-
-Assert.That(result.TranslatedEnvelope.CorrelationId, Is.EqualTo(source.CorrelationId));
-```
-
-### 3. CausationId set to source MessageId
-
-```csharp
-var source = IntegrationEnvelope<string>.Create(
-    "data", "Service", "event.type");
-
-var result = await translator.TranslateAsync(source);
-
-Assert.That(result.TranslatedEnvelope.CausationId, Is.EqualTo(source.MessageId));
-Assert.That(result.TranslatedEnvelope.MessageId, Is.Not.EqualTo(source.MessageId));
-```
-
-### 4. TargetMessageType override changes MessageType
-
-```csharp
-var options = Options.Create(new TranslatorOptions
-{
-    TargetTopic = "output-topic",
-    TargetMessageType = "translated.event",
-});
-
-var translator = new MessageTranslator<string, string>(
-    transform, producer, options,
-    NullLogger<MessageTranslator<string, string>>.Instance);
-
-var source = IntegrationEnvelope<string>.Create(
-    "data", "Service", "original.event");
-
-var result = await translator.TranslateAsync(source);
-
-Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("translated.event"));
-```
-
-### 5. No TargetTopic configured — throws
-
-```csharp
-var options = Options.Create(new TranslatorOptions
-{
-    TargetTopic = "",
-});
-
-var translator = new MessageTranslator<string, string>(
-    transform, producer, options,
-    NullLogger<MessageTranslator<string, string>>.Instance);
-
-var source = IntegrationEnvelope<string>.Create(
-    "data", "Service", "event.type");
-
-Assert.ThrowsAsync<InvalidOperationException>(
-    () => translator.TranslateAsync(source));
-```
-
----
-
-## Lab
-
-> 💻 [`tests/TutorialLabs/Tutorial15/Lab.cs`](../tests/TutorialLabs/Tutorial15/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Translate_TransformsPayload_PublishesToTarget` | Core payload transformation and target topic publishing |
+| 2 | `Translate_PreservesCorrelationId` | CorrelationId preserved across translation |
+| 3 | `Translate_SetsCausationIdToSourceMessageId` | CausationId set to source MessageId |
+| 4 | `Translate_OverridesSourceAndMessageType` | Source and MessageType overrides via TranslatorOptions |
+| 5 | `Translate_PreservesMetadata` | Metadata dictionary preserved through translation |
+| 6 | `Translate_NoTargetTopic_ThrowsInvalidOperation` | Validation throws when TargetTopic is empty |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial15.Lab"
 ```
 
-## Exam
+---
 
-> 💻 [`tests/TutorialLabs/Tutorial15/Exam.cs`](../tests/TutorialLabs/Tutorial15/Exam.cs)
+## Exam — Assessment Challenges
+
+> 🎯 Prove you can apply the Message Translator pattern in realistic, end-to-end scenarios.
+> Each challenge combines multiple concepts and uses a business-like domain.
+
+| # | Challenge | Difficulty |
+|---|-----------|------------|
+| 1 | `Starter_TypeConversion_StringToInt` | 🟢 Starter |
+| 2 | `Intermediate_MetadataPreservationChain_TwoTranslations` | 🟡 Intermediate |
+| 3 | `Advanced_PreservesSourceWhenNoOverride` | 🔴 Advanced |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial15.Exam"
