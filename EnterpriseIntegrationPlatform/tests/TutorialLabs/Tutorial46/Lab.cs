@@ -2,8 +2,9 @@
 // Tutorial 46 – Complete Integration / Demo Pipeline (Lab)
 // ============================================================================
 // EIP Pattern: Message Dispatcher + Service Activator + Pipeline Orchestration.
-// E2E: Wire MessageDispatcher and ServiceActivator with MockEndpoint to verify
-// end-to-end dispatch, handler invocation, and reply publishing.
+// E2E: Wire MessageDispatcher and ServiceActivator with NatsBrokerEndpoint
+//      (real NATS JetStream via Aspire) to verify end-to-end dispatch,
+//      handler invocation, and reply publishing.
 // ============================================================================
 
 using System.Text.Json;
@@ -11,7 +12,6 @@ using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Demo.Pipeline;
 using EnterpriseIntegrationPlatform.Processing.Dispatcher;
-using EnterpriseIntegrationPlatform.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
@@ -22,14 +22,6 @@ namespace TutorialLabs.Tutorial46;
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("pipeline-out");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
 
     // ── 1. Message Dispatcher ────────────────────────────────────────
 
@@ -67,8 +59,11 @@ public sealed class Lab
     }
 
     [Test]
-    public async Task Dispatcher_DispatchAndPublish_MockEndpointReceives()
+    public async Task Dispatcher_DispatchAndPublish_NatsBrokerEndpointReceives()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t46-dispatch-publish");
+        var topic = AspireFixture.UniqueTopic("t46-processed-orders");
+
         var dispatcher = new MessageDispatcher(
             Options.Create(new MessageDispatcherOptions()),
             NullLogger<MessageDispatcher>.Instance);
@@ -77,14 +72,14 @@ public sealed class Lab
         {
             var outEnvelope = IntegrationEnvelope<string>.Create(
                 $"processed:{env.Payload}", "pipeline", "order.processed");
-            await _output.PublishAsync(outEnvelope, "processed-orders");
+            await nats.PublishAsync(outEnvelope, topic, default);
         });
 
         var envelope = IntegrationEnvelope<string>.Create("ORD-001", "svc", "order.created");
         await dispatcher.DispatchAsync(envelope);
 
-        _output.AssertReceivedOnTopic("processed-orders", 1);
-        var received = _output.GetReceived<string>();
+        nats.AssertReceivedOnTopic(topic, 1);
+        var received = nats.GetReceived<string>();
         Assert.That(received.Payload, Does.Contain("ORD-001"));
     }
 
@@ -94,13 +89,16 @@ public sealed class Lab
     [Test]
     public async Task ServiceActivator_InvokeWithReply_PublishesToReplyTopic()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t46-reply");
+        var replyTopic = AspireFixture.UniqueTopic("t46-reply");
+
         var activator = new ServiceActivator(
-            _output, Options.Create(new ServiceActivatorOptions()),
+            nats, Options.Create(new ServiceActivatorOptions()),
             NullLogger<ServiceActivator>.Instance);
 
         var envelope = IntegrationEnvelope<string>.Create("request", "svc", "order.query") with
         {
-            ReplyTo = "reply-topic",
+            ReplyTo = replyTopic,
         };
 
         var result = await activator.InvokeAsync<string, string>(
@@ -108,14 +106,16 @@ public sealed class Lab
 
         Assert.That(result.Succeeded, Is.True);
         Assert.That(result.ReplySent, Is.True);
-        _output.AssertReceivedOnTopic("reply-topic", 1);
+        nats.AssertReceivedOnTopic(replyTopic, 1);
     }
 
     [Test]
     public async Task ServiceActivator_NoReplyTo_NoReplyPublished()
     {
+        await using var nats = AspireFixture.CreateNatsEndpoint("t46-noreply");
+
         var activator = new ServiceActivator(
-            _output, Options.Create(new ServiceActivatorOptions()),
+            nats, Options.Create(new ServiceActivatorOptions()),
             NullLogger<ServiceActivator>.Instance);
 
         var envelope = IntegrationEnvelope<string>.Create("request", "svc", "order.query");
@@ -125,7 +125,7 @@ public sealed class Lab
 
         Assert.That(result.Succeeded, Is.True);
         Assert.That(result.ReplySent, Is.False);
-        _output.AssertNoneReceived();
+        nats.AssertNoneReceived();
     }
 
 
