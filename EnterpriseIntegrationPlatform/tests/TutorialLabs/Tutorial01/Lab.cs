@@ -1,9 +1,19 @@
 // ============================================================================
-// Tutorial 01 – Introduction (Lab)
+// Tutorial 01 – Introduction (Lab · Guided Practice)
 // ============================================================================
-// EIP Patterns: Point-to-Point Channel, Publish-Subscribe Channel
-// End-to-End: Wire real channels with NatsBrokerEndpoint backed by real
-// NATS JetStream via Aspire — real broker connections, no mocks.
+// PURPOSE: Run each test in order to see how channels and envelopes work
+//          with a real NATS JetStream broker. Read the code and comments to
+//          understand each concept before moving to the Exam.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. PointToPointChannel — send a command, receive it via queue semantics
+//   2. PublishSubscribeChannel — fan-out event to multiple subscribers
+//   3. Batch delivery — send 5 messages, verify all arrive in sequence
+//   4. Domain object payload — typed record flows through the channel
+//   5. Multi-hop pipeline — P2P → enrichment handler → PubSub
+//   6. Causation chain — parent→child lineage preserved across channels
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using NUnit.Framework;
