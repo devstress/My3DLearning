@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
     <ProjectReference Include="..\Models3D\Models3D.csproj" />
     <ProjectReference Include="..\Land\Land.csproj" />
     <ProjectReference Include="..\SitePlacement\SitePlacement.csproj" />

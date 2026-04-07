@@ -14,6 +14,9 @@ using Terranes.SitePlacementEngine;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add Aspire service defaults (telemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
 // Register all Terranes services
 builder.Services.AddModels3D();
 builder.Services.AddLand();
@@ -30,9 +33,22 @@ builder.Services.AddAnalytics();
 
 builder.Services.AddEndpointsApiExplorer();
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
 
-app.UseHttpsRedirection();
+app.UseCors();
+
+// Map Aspire default endpoints (/health, /alive)
+app.MapDefaultEndpoints();
 
 // Map API endpoints — core services
 app.MapHomeModelEndpoints();

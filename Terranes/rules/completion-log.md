@@ -584,3 +584,58 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - Run: `dotnet run --project src/Platform.Api` → http://localhost:5200 (REST API)
 
 **Tests:** 446 total (390 unit + 56 integration), all passing
+
+---
+
+## Phase 11 — Vue 3 + Vite Frontend & Aspire Orchestration
+
+### Chunk 048 — Vue 3 + Vite + Aspire Migration (2026-04-07)
+
+**Goal:** Replace Blazor Server UI with a Vue 3 + Vite + TypeScript frontend and add .NET Aspire orchestration to run the frontend and backend together.
+
+**Files created:**
+- `src/Web.Vue/` — Full Vue 3 + Vite + TypeScript frontend project
+  - `package.json` — Dependencies: vue 3.5, vue-router 4.5, vite 8, typescript
+  - `vite.config.ts` — Vite config with API proxy (supports Aspire service discovery)
+  - `index.html` — Entry HTML with Bootstrap 5 CDN
+  - `src/main.ts` — Vue app entry point with router
+  - `src/App.vue` — Root layout with sidebar navigation
+  - `src/style.css` — Global layout styles
+  - `src/types/index.ts` — TypeScript interfaces for all domain entities
+  - `src/api/client.ts` — Fetch-based API client for all endpoints
+  - `src/router/index.ts` — Vue Router with 7 lazy-loaded routes
+  - `src/views/HomeView.vue` — Landing page with 6 feature cards
+  - `src/views/HomeModelsView.vue` — Home design gallery with filters + detail modal
+  - `src/views/VillagesView.vue` — Virtual village browser with lots table
+  - `src/views/LandBlocksView.vue` — Land search + test-fit placement modal
+  - `src/views/MarketplaceView.vue` — Property listings with status badges
+  - `src/views/JourneyView.vue` — 7-stage buyer journey with progress bar
+  - `src/views/DashboardView.vue` — Stats cards, journeys, notifications, designs
+- `src/AppHost/` — .NET Aspire AppHost project
+  - `AppHost.csproj` — Aspire SDK 13.2.1, Aspire.Hosting.JavaScript
+  - `Program.cs` — Orchestrates Platform.Api + Vue frontend
+  - `Properties/launchSettings.json` — Dashboard URLs
+  - `appsettings.json`, `appsettings.Development.json`
+- `src/ServiceDefaults/` — .NET Aspire ServiceDefaults project
+  - `ServiceDefaults.csproj` — OpenTelemetry, service discovery, resilience
+  - `Extensions.cs` — AddServiceDefaults(), ConfigureOpenTelemetry(), MapDefaultEndpoints()
+
+**Files modified:**
+- `Terranes.slnx` — Replaced Web with AppHost + ServiceDefaults (17 src projects)
+- `Directory.Packages.props` — Added Aspire and OpenTelemetry package versions
+- `src/Platform.Api/Platform.Api.csproj` — Added ServiceDefaults reference
+- `src/Platform.Api/Program.cs` — Added AddServiceDefaults(), CORS, MapDefaultEndpoints()
+- `.gitignore` — Added dist/ for Vue build output
+- `README.md` — Updated tech stack, run instructions, project structure
+
+**Architecture:**
+- 17 src projects (14 existing domain + Platform.Api + AppHost + ServiceDefaults) + Vue 3 frontend
+- Vue 3 + Vite + TypeScript frontend replaces Blazor Server
+- .NET Aspire orchestrates both frontend and backend
+- ServiceDefaults adds OpenTelemetry, health checks, service discovery, HTTP resilience
+- Vite dev proxy forwards /api → Platform.Api (supports Aspire service references)
+- Run: `dotnet run --project src/AppHost` → Aspire dashboard + both services
+- Run: `cd src/Web.Vue && npm run dev` → Vue frontend standalone
+- Run: `dotnet run --project src/Platform.Api` → REST API standalone
+
+**Tests:** 446 total (390 unit + 56 integration), all passing — no regressions
