@@ -72,6 +72,8 @@ The platform will integrate:
 |---|---|---|
 | Runtime | .NET | 10 |
 | Language | C# | 14 |
+| Frontend | Vue 3 + Vite + TypeScript | Latest |
+| Orchestration | .NET Aspire | 13.2 |
 | Testing | NUnit 4.4.0, NSubstitute 5.3.0 | Latest |
 
 ## Getting Started
@@ -79,6 +81,7 @@ The platform will integrate:
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [Node.js 20+](https://nodejs.org/)
 
 ### Build & Run
 
@@ -92,8 +95,13 @@ dotnet build
 # Run the tests
 dotnet test
 
-# Run the Blazor Web UI
-dotnet run --project src/Web
+# Run everything with Aspire (frontend + backend together)
+dotnet run --project src/AppHost
+
+# Or run individually:
+
+# Run the Vue 3 frontend (separate terminal)
+cd src/Web.Vue && npm run dev
 
 # Run the REST API (separate terminal)
 dotnet run --project src/Platform.Api
@@ -101,7 +109,7 @@ dotnet run --project src/Platform.Api
 
 ### Web UI
 
-The Blazor Server UI runs at **http://localhost:5000** and provides:
+The Vue 3 frontend runs at **http://localhost:5173** (via Vite dev server) and provides:
 
 | Page | Description |
 |---|---|
@@ -113,6 +121,10 @@ The Blazor Server UI runs at **http://localhost:5000** and provides:
 | My Journey | Guided buyer journey from browsing to quoting |
 | Dashboard | Active journeys, notifications, analytics |
 
+### Aspire Dashboard
+
+When running via `dotnet run --project src/AppHost`, the Aspire dashboard is available at **http://localhost:15037** and provides orchestration, health checks, and OpenTelemetry observability for both the API backend and Vue frontend.
+
 ### REST API
 
 The REST API runs at **http://localhost:5200** with 137 endpoints across 29 resource groups.
@@ -122,19 +134,27 @@ The REST API runs at **http://localhost:5200** with 137 endpoints across 29 reso
 ```
 Terranes/
 ├── src/
-│   ├── Contracts/                    # Core DTOs, interfaces, and canonical models
-│   ├── Models3D/                     # 3D model loading, placement, manipulation (Phase 2)
-│   ├── Land/                         # Land data, block analysis, zoning (Phase 2)
-│   ├── Quoting/                      # Quote aggregation engine (Phase 2)
-│   ├── Marketplace/                  # Home listings, search, agent/owner management (Phase 2)
-│   ├── Compliance/                   # AI-powered building regulation checks (Phase 2)
-│   └── Platform.Api/                 # User-facing REST API (Phase 5)
+│   ├── AppHost/                       # .NET Aspire orchestrator (runs frontend + backend)
+│   ├── ServiceDefaults/               # Shared Aspire service defaults (telemetry, health)
+│   ├── Web.Vue/                       # Vue 3 + Vite + TypeScript frontend
+│   ├── Contracts/                     # Core DTOs, interfaces, and canonical models
+│   ├── Models3D/                      # 3D model loading, placement, manipulation
+│   ├── Land/                          # Land data, block analysis, zoning
+│   ├── Quoting/                       # Quote aggregation engine
+│   ├── Marketplace/                   # Home listings, search, agent/owner management
+│   ├── Compliance/                    # AI-powered building regulation checks
+│   ├── PartnerIntegration/            # Builder, landscaper, furniture, smart home partners
+│   ├── Immersive3D/                   # Virtual villages, walkthroughs, design editor
+│   ├── Infrastructure/                # Auth, observability, multi-tenancy
+│   ├── Journey/                       # Buyer journey orchestration
+│   ├── Notifications/                 # Notification delivery and event bus
+│   ├── Analytics/                     # Search, analytics, and reporting
+│   └── Platform.Api/                  # User-facing REST API (137 endpoints)
 ├── tests/
-│   └── UnitTests/                    # Fast, isolated unit tests
+│   ├── UnitTests/                     # 390 NUnit unit tests
+│   └── IntegrationTests/             # 56 WebApplicationFactory integration tests
 ├── docs/                             # Architecture, ADRs, design docs
-├── deploy/                           # Kubernetes manifests, Helm charts
-├── tutorials/                        # Learning resources
-└── rules/                            # Development milestones, coding standards, architecture rules
+└── rules/                            # Development milestones, coding standards
 ```
 
 ## Documentation

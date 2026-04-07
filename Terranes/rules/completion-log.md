@@ -584,3 +584,182 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - Run: `dotnet run --project src/Platform.Api` → http://localhost:5200 (REST API)
 
 **Tests:** 446 total (390 unit + 56 integration), all passing
+
+---
+
+## Phase 11 — Vue 3 + Vite Frontend & Aspire Orchestration
+
+### Chunk 048 — Vue 3 + Vite + Aspire Migration (2026-04-07)
+
+**Goal:** Replace Blazor Server UI with a Vue 3 + Vite + TypeScript frontend and add .NET Aspire orchestration to run the frontend and backend together.
+
+**Files created:**
+- `src/Web.Vue/` — Full Vue 3 + Vite + TypeScript frontend project
+  - `package.json` — Dependencies: vue 3.5, vue-router 4.5, vite 8, typescript
+  - `vite.config.ts` — Vite config with API proxy (supports Aspire service discovery)
+  - `index.html` — Entry HTML with Bootstrap 5 CDN
+  - `src/main.ts` — Vue app entry point with router
+  - `src/App.vue` — Root layout with sidebar navigation
+  - `src/style.css` — Global layout styles
+  - `src/types/index.ts` — TypeScript interfaces for all domain entities
+  - `src/api/client.ts` — Fetch-based API client for all endpoints
+  - `src/router/index.ts` — Vue Router with 7 lazy-loaded routes
+  - `src/views/HomeView.vue` — Landing page with 6 feature cards
+  - `src/views/HomeModelsView.vue` — Home design gallery with filters + detail modal
+  - `src/views/VillagesView.vue` — Virtual village browser with lots table
+  - `src/views/LandBlocksView.vue` — Land search + test-fit placement modal
+  - `src/views/MarketplaceView.vue` — Property listings with status badges
+  - `src/views/JourneyView.vue` — 7-stage buyer journey with progress bar
+  - `src/views/DashboardView.vue` — Stats cards, journeys, notifications, designs
+- `src/AppHost/` — .NET Aspire AppHost project
+  - `AppHost.csproj` — Aspire SDK 13.2.1, Aspire.Hosting.JavaScript
+  - `Program.cs` — Orchestrates Platform.Api + Vue frontend
+  - `Properties/launchSettings.json` — Dashboard URLs
+  - `appsettings.json`, `appsettings.Development.json`
+- `src/ServiceDefaults/` — .NET Aspire ServiceDefaults project
+  - `ServiceDefaults.csproj` — OpenTelemetry, service discovery, resilience
+  - `Extensions.cs` — AddServiceDefaults(), ConfigureOpenTelemetry(), MapDefaultEndpoints()
+
+**Files modified:**
+- `Terranes.slnx` — Replaced Web with AppHost + ServiceDefaults (17 src projects)
+- `Directory.Packages.props` — Added Aspire and OpenTelemetry package versions
+- `src/Platform.Api/Platform.Api.csproj` — Added ServiceDefaults reference
+- `src/Platform.Api/Program.cs` — Added AddServiceDefaults(), CORS, MapDefaultEndpoints()
+- `.gitignore` — Added dist/ for Vue build output
+- `README.md` — Updated tech stack, run instructions, project structure
+
+**Architecture:**
+- 17 src projects (14 existing domain + Platform.Api + AppHost + ServiceDefaults) + Vue 3 frontend
+- Vue 3 + Vite + TypeScript frontend replaces Blazor Server
+- .NET Aspire orchestrates both frontend and backend
+- ServiceDefaults adds OpenTelemetry, health checks, service discovery, HTTP resilience
+- Vite dev proxy forwards /api → Platform.Api (supports Aspire service references)
+- Run: `dotnet run --project src/AppHost` → Aspire dashboard + both services
+- Run: `cd src/Web.Vue && npm run dev` → Vue frontend standalone
+- Run: `dotnet run --project src/Platform.Api` → REST API standalone
+
+**Tests:** 446 total (390 unit + 56 integration), all passing — no regressions
+
+---
+
+## Phase 12 — Vue Frontend Cleanup, Components & Testing
+
+### Chunk 049 — Cleanup, Reusable Components & Vitest Tests (2026-04-07)
+
+**Goal:** Remove old Blazor Web project, extract reusable Vue components, write comprehensive Vitest component tests, and fix HTML validation warnings.
+
+**Files deleted:**
+- `src/Web/` — Entire old Blazor Server Web project removed from filesystem
+
+**Files created:**
+- `src/Web.Vue/src/components/LoadingSpinner.vue` — Reusable loading indicator with customizable message
+- `src/Web.Vue/src/components/StatusBadge.vue` — Color-mapped status badge supporting 16 status values
+- `src/Web.Vue/src/components/DetailModal.vue` — Reusable Bootstrap modal wrapper with slot
+- `src/Web.Vue/src/components/ErrorAlert.vue` — Conditional error alert display
+- `src/Web.Vue/src/__tests__/HomeView.spec.ts` — 6 tests: page title, feature cards, router links
+- `src/Web.Vue/src/__tests__/HomeModelsView.spec.ts` — 6 tests: loading, cards, details modal, empty state
+- `src/Web.Vue/src/__tests__/VillagesView.spec.ts` — 5 tests: loading, cards, detail modal, lots table
+- `src/Web.Vue/src/__tests__/LandBlocksView.spec.ts` — 5 tests: loading, table, test-fit modal, error handling
+- `src/Web.Vue/src/__tests__/MarketplaceView.spec.ts` — 5 tests: loading, cards, status badges, price formatting
+- `src/Web.Vue/src/__tests__/JourneyView.spec.ts` — 6 tests: begin button, progress bar, stages, errors, completion
+- `src/Web.Vue/src/__tests__/DashboardView.spec.ts` — 5 tests: stat cards, journeys, notifications, designs
+- `src/Web.Vue/src/__tests__/components/StatusBadge.spec.ts` — 4 tests: text, classes, fallback, custom map
+- `src/Web.Vue/src/__tests__/components/DetailModal.spec.ts` — 3 tests: hidden, visible, close emit
+- `src/Web.Vue/src/__tests__/components/LoadingSpinner.spec.ts` — 2 tests: default message, custom message
+- `src/Web.Vue/src/__tests__/components/ErrorAlert.spec.ts` — 2 tests: hidden when null, visible when set
+
+**Files modified:**
+- `src/Web.Vue/package.json` — Added test scripts; added vitest, @vue/test-utils, jsdom, @vitest/coverage-v8
+- `src/Web.Vue/vite.config.ts` — Added vitest test configuration (globals, jsdom environment)
+- `src/Web.Vue/src/views/HomeModelsView.vue` — Use LoadingSpinner, DetailModal; add `<tbody>` to table
+- `src/Web.Vue/src/views/VillagesView.vue` — Use LoadingSpinner, DetailModal, StatusBadge; add `<tbody>`
+- `src/Web.Vue/src/views/LandBlocksView.vue` — Use LoadingSpinner, DetailModal, ErrorAlert; add `<tbody>`
+- `src/Web.Vue/src/views/MarketplaceView.vue` — Use LoadingSpinner, DetailModal, StatusBadge; add `<tbody>`
+- `src/Web.Vue/src/views/JourneyView.vue` — Use StatusBadge, ErrorAlert; removed getStageBadge()
+- `src/Web.Vue/src/views/DashboardView.vue` — Use LoadingSpinner, StatusBadge; removed getStageBadge()
+- `rules/milestones.md` — Updated for Phases 11, 12
+- `rules/completion-log.md` — This entry
+
+**Architecture:**
+- 17 src projects (AppHost, ServiceDefaults, 14 domain + Platform.Api) + Vue 3 frontend
+- 4 shared components reduce code duplication across 6 views
+- 49 Vitest component tests with full API mocking via vi.mock
+- All `<table>` elements use proper `<tbody>` wrappers (no HTML validation warnings)
+- Vue tests: `npm test` or `npx vitest run` in `src/Web.Vue/`
+- .NET tests: `dotnet test` in Terranes/
+
+**Tests:** 495 total (390 NUnit unit + 56 NUnit integration + 49 Vitest component), all passing
+
+---
+
+## Phase 13 — UX & UI Polish (AI-Driven)
+
+### Chunk 050 — Toast Notifications & Action Feedback (2026-04-07)
+
+**Goal:** Add user-facing feedback for every async action. Create toast notification system and loading-disabled buttons so users always know what's happening.
+
+**Files created:**
+- `rules/ux-rules.md` — AI agent rule for UX/UI implementation (component conventions, design principles, forbidden patterns)
+- `src/Web.Vue/src/composables/useToast.ts` — Global toast state composable: showSuccess, showError, showInfo, removeToast. Auto-dismiss after 5s for success/info, manual dismiss for errors.
+- `src/Web.Vue/src/composables/useAsyncAction.ts` — Loading + toast wrapper for async actions
+- `src/Web.Vue/src/components/ToastContainer.vue` — Bottom-right stacked toast display with enter/leave transitions, aria-live polite region
+- `src/Web.Vue/src/components/ActionButton.vue` — Button with spinner, disabled state, aria-busy during loading
+- `src/Web.Vue/src/__tests__/composables/useToast.spec.ts` — 7 tests: add/remove, auto-dismiss, persistence
+- `src/Web.Vue/src/__tests__/composables/useAsyncAction.spec.ts` — 6 tests: loading state, success/error toasts, result handling
+- `src/Web.Vue/src/__tests__/components/ToastContainer.spec.ts` — 5 tests: empty, success, error, dismiss, stacking
+- `src/Web.Vue/src/__tests__/components/ActionButton.spec.ts` — 8 tests: slots, loading, disabled, variant, size, click, aria-busy
+
+**Files modified:**
+- `src/Web.Vue/src/App.vue` — Added ToastContainer mount
+- `src/Web.Vue/src/views/JourneyView.vue` — All 7 async actions now show toast feedback + ActionButton with loading states
+- `src/Web.Vue/src/views/LandBlocksView.vue` — Test-fit success/error toasts added
+- `src/Web.Vue/package.json` — Added vitest, @vue/test-utils, jsdom devDeps; added test/test:watch scripts
+- `src/Web.Vue/tsconfig.app.json` — Excluded test files from app build
+- `src/Web.Vue/.gitignore` — Added vue-tsc build artifact patterns
+- `rules/milestones.md` — Added Phase 13 with 13 UX chunks; marked Chunk 050 done
+
+**Tests:** 521 total (390 NUnit unit + 56 NUnit integration + 75 Vitest component), all passing
+
+### Chunk 051 — Skeleton Loaders & Smooth Transitions (2026-04-07)
+
+**Goal:** Replace text-based loading indicators with skeleton placeholders that match the final layout shape. Add smooth fade transitions between routes.
+
+**Files created:**
+- `src/Web.Vue/src/components/SkeletonCard.vue` — Configurable card-grid skeleton with count/columns props. Uses Bootstrap's placeholder-glow animation. aria-hidden for screen readers.
+- `src/Web.Vue/src/components/SkeletonTable.vue` — Configurable table skeleton with rows/cols props. Animated placeholder cells.
+- `src/Web.Vue/src/__tests__/components/SkeletonCard.spec.ts` — 5 tests: default count, custom count, column class, animation, accessibility
+- `src/Web.Vue/src/__tests__/components/SkeletonTable.spec.ts` — 3 tests: default rows/cols, custom rows/cols, animation
+
+**Files modified:**
+- `src/Web.Vue/src/App.vue` — Added `<Transition name="fade" mode="out-in">` on RouterView for smooth route transitions
+- `src/Web.Vue/src/style.css` — Added fade transition CSS with prefers-reduced-motion respect
+- `src/Web.Vue/src/views/VillagesView.vue` — Replaced LoadingSpinner with SkeletonCard (3 cards, 3 columns)
+- `src/Web.Vue/src/views/HomeModelsView.vue` — Replaced LoadingSpinner with SkeletonCard (3 cards, 3 columns)
+- `src/Web.Vue/src/views/MarketplaceView.vue` — Replaced LoadingSpinner with SkeletonCard (2 cards, 2 columns)
+- `src/Web.Vue/src/views/LandBlocksView.vue` — Replaced LoadingSpinner with SkeletonTable (5 rows, 8 columns)
+- Updated 4 view tests to check for placeholder-glow instead of text-based loading messages
+
+**Tests:** 529 total (390 NUnit unit + 56 NUnit integration + 83 Vitest component), all passing
+
+### Chunk 063 — Playwright Multi-Browser E2E Tests (2026-04-07)
+
+**Goal:** Add Playwright E2E cross-browser testing infrastructure with Chromium, Firefox, WebKit + mobile and tablet viewports. Create AI agent rule for Playwright conventions. 29 E2E tests across 5 spec files covering navigation, home page, responsive layout, views smoke, and UX feedback/accessibility.
+
+**Files created:**
+- `playwright.config.ts` — 6 browser projects (Chromium, Firefox, WebKit, mobile-chrome/Pixel 5, mobile-safari/iPhone 13, tablet/iPad gen 7). Auto-starts Vite dev server. Trace on retry, screenshot on failure.
+- `e2e/helpers.ts` — `openSidebarIfMobile()` helper for mobile viewport sidebar toggle
+- `e2e/navigation.spec.ts` — 5 tests: home load, sidebar links, sidebar navigation with mobile support, CTA cards, active link highlighting
+- `e2e/home.spec.ts` — 4 tests: hero section, feature cards grid, CTA buttons, tagline section
+- `e2e/responsive.spec.ts` — 6 tests: desktop sidebar, mobile hidden nav, mobile toggler, tablet cards, mobile stacking, page title
+- `e2e/views.spec.ts` — 8 tests: per-view smoke tests for Villages, Home Models, Land Blocks, Marketplace, Journey, Dashboard + search controls
+- `e2e/ux-feedback.spec.ts` — 6 tests: route transitions, toast container, skeleton loaders, document structure, button text, link text
+- `rules/playwright-rules.md` — AI agent rule: multi-browser projects, run commands, test conventions, selector priority, customer-first philosophy, forbidden patterns
+
+**Files modified:**
+- `package.json` — Added `@playwright/test ^1.59.1` devDep, 6 new scripts: `test:e2e`, `test:e2e:chromium`, `test:e2e:firefox`, `test:e2e:webkit`, `test:e2e:mobile`, `test:e2e:report`
+- `vite.config.ts` — Added `exclude: ['e2e/**']` to Vitest config to prevent Playwright spec collision
+- `.gitignore` — Added `test-results/`, `playwright-report/`, `blob-report/`
+- `rules/ux-rules.md` — Added E2E Testing row to tech stack, added Playwright steps to chunk implementation pattern
+- `rules/milestones.md` — Added Chunk 063 (done)
+
+**Tests:** 29 Playwright E2E tests × 6 browser projects = 174 cross-browser runs. 83 Vitest component tests. 446 NUnit tests. All passing.

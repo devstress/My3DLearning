@@ -1,0 +1,11 @@
+node_modules
+dist
+*.local
+src/**/*.vue.js
+src/**/*.js
+!src/__tests__/**
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
