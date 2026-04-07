@@ -1,9 +1,11 @@
 // ============================================================================
 // Tutorial 10 – Message Filter (Lab)
 // ============================================================================
-// EIP Pattern: Message Filter.
-// E2E: Wire real MessageFilter with MockEndpoint, configure accept/reject
-// conditions, verify messages arrive at correct output/discard topics.
+// EIP Pattern: Message Filter
+// End-to-End: Wire real MessageFilter with MockEndpoint, configure accept/
+// reject conditions using RuleCondition operators (Equals, Contains, In, Or),
+// verify messages arrive at output/discard topics, test silent discard when
+// no DiscardTopic is configured, and multi-condition logic.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -27,9 +29,12 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+    // ── 1. Accept & Reject ──────────────────────────────────────────────
+
     [Test]
     public async Task Filter_Accept_PublishesToOutputTopic()
     {
+        // When all conditions match, the message passes to OutputTopic.
         var filter = CreateFilter("order.created", "orders-accepted", "orders-rejected");
 
         var envelope = IntegrationEnvelope<string>.Create(
@@ -44,6 +49,8 @@ public sealed class Lab
     [Test]
     public async Task Filter_Reject_PublishesToDiscardTopic()
     {
+        // When conditions don't match and a DiscardTopic is configured,
+        // the message routes to the discard topic for investigation.
         var filter = CreateFilter("order.created", "orders-accepted", "orders-rejected");
 
         var envelope = IntegrationEnvelope<string>.Create(
@@ -58,6 +65,7 @@ public sealed class Lab
     [Test]
     public async Task Filter_NoConditions_PassThrough()
     {
+        // No conditions = all messages pass. This is the identity filter.
         var options = Options.Create(new MessageFilterOptions
         {
             Conditions = [],
@@ -73,9 +81,13 @@ public sealed class Lab
         _output.AssertReceivedOnTopic("pass-through", 1);
     }
 
+    // ── 2. Silent Discard & Source Filtering ────────────────────────────
+
     [Test]
-    public async Task Filter_SilentDiscard_NoPublish()
+    public async Task Filter_SilentDiscard_NoPublishWhenNoDiscardTopic()
     {
+        // Without a DiscardTopic, rejected messages are silently dropped.
+        // No message is published anywhere — the filter absorbs it.
         var options = Options.Create(new MessageFilterOptions
         {
             Conditions =
@@ -106,6 +118,7 @@ public sealed class Lab
     [Test]
     public async Task Filter_BySource_AcceptsAndRejects()
     {
+        // Source-based filtering: only messages from TrustedService pass.
         var options = Options.Create(new MessageFilterOptions
         {
             Conditions =
@@ -136,9 +149,13 @@ public sealed class Lab
         _output.AssertReceivedOnTopic("untrusted-dlq", 1);
     }
 
+    // ── 3. Advanced Operators ───────────────────────────────────────────
+
     [Test]
-    public async Task Filter_InOperator_MultipleSources()
+    public async Task Filter_InOperator_MatchesAnyOfCommaSeparatedValues()
     {
+        // In operator: comma-separated list of allowed values (case-insensitive).
+        // Any match passes; no match rejects.
         var options = Options.Create(new MessageFilterOptions
         {
             Conditions =
@@ -172,6 +189,8 @@ public sealed class Lab
     [Test]
     public async Task Filter_OrLogic_EitherConditionSuffices()
     {
+        // Or logic: at least one condition must match for the message to pass.
+        // This enables "priority override" or "VIP" fast-lane patterns.
         var options = Options.Create(new MessageFilterOptions
         {
             Conditions =

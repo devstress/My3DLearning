@@ -1,9 +1,11 @@
 // ============================================================================
 // Tutorial 09 – Content-Based Router (Lab)
 // ============================================================================
-// EIP Pattern: Content-Based Router.
-// E2E: Wire real ContentBasedRouter with MockEndpoint as producer, configure
-// routing rules, send messages, verify delivery to correct topics.
+// EIP Pattern: Content-Based Router
+// End-to-End: Wire real ContentBasedRouter with MockEndpoint as producer,
+// configure routing rules (Equals, Contains, StartsWith, Regex), verify
+// delivery to correct topics, priority ordering, default fallback, and
+// matched rule metadata accessibility.
 // ============================================================================
 
 using System.Text.Json;
@@ -27,9 +29,12 @@ public sealed class Lab
     [TearDown]
     public async Task TearDown() => await _output.DisposeAsync();
 
+    // ── 1. Routing Operators ────────────────────────────────────────────
+
     [Test]
     public async Task Route_Equals_MatchesMessageType()
     {
+        // Equals operator: case-insensitive exact match on the field value.
         var router = CreateRouter(new RoutingRule
         {
             Priority = 1, Name = "OrderRule",
@@ -48,8 +53,10 @@ public sealed class Lab
     }
 
     [Test]
-    public async Task Route_Contains_MatchesMetadata()
+    public async Task Route_Contains_MatchesMetadataSubstring()
     {
+        // Contains operator: substring match in the field value.
+        // FieldName "Metadata.region" reads the "region" key from Metadata.
         var router = CreateRouter(new RoutingRule
         {
             Priority = 1, Name = "EuropeRegion",
@@ -69,8 +76,9 @@ public sealed class Lab
     }
 
     [Test]
-    public async Task Route_StartsWith_MatchesSource()
+    public async Task Route_StartsWith_MatchesSourcePrefix()
     {
+        // StartsWith operator: prefix match on the field value.
         var router = CreateRouter(new RoutingRule
         {
             Priority = 1, Name = "InternalRule",
@@ -89,6 +97,8 @@ public sealed class Lab
     [Test]
     public async Task Route_Regex_MatchesPattern()
     {
+        // Regex operator: compiled, case-insensitive, 1-second timeout.
+        // Matches any MessageType starting with "order." followed by characters.
         var router = CreateRouter(new RoutingRule
         {
             Priority = 1, Name = "AllOrders",
@@ -104,9 +114,13 @@ public sealed class Lab
         _output.AssertReceivedOnTopic("order-events", 1);
     }
 
+    // ── 2. Default Fallback & Priority ──────────────────────────────────
+
     [Test]
-    public async Task Route_NoMatch_FallsToDefault()
+    public async Task Route_NoMatch_FallsToDefaultTopic()
     {
+        // When no rule matches, the router uses DefaultTopic.
+        // RoutingDecision.IsDefault = true, MatchedRule = null.
         var router = CreateRouter(new RoutingRule
         {
             Priority = 1,
@@ -125,8 +139,10 @@ public sealed class Lab
     }
 
     [Test]
-    public async Task Route_Priority_LowerNumberWins()
+    public async Task Route_Priority_LowerNumberEvaluatedFirst()
     {
+        // Rules are evaluated in Priority order (ascending).
+        // The first match wins — lower number = higher priority.
         var options = Options.Create(new RouterOptions
         {
             Rules =
@@ -158,9 +174,13 @@ public sealed class Lab
         _output.AssertReceivedOnTopic("new-orders", 1);
     }
 
+    // ── 3. RoutingDecision Metadata ─────────────────────────────────────
+
     [Test]
-    public async Task Route_MatchedRule_ContainsAllDetails()
+    public async Task Route_MatchedRule_ContainsAllRuleDetails()
     {
+        // RoutingDecision.MatchedRule exposes the full rule that triggered
+        // the routing — useful for logging and audit trails.
         var router = CreateRouter(new RoutingRule
         {
             Priority = 5, Name = "CriticalSource",
