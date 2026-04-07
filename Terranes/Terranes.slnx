@@ -8,6 +8,8 @@
     <Project Path="src/Marketplace/Marketplace.csproj" />
     <Project Path="src/Compliance/Compliance.csproj" />
     <Project Path="src/PartnerIntegration/PartnerIntegration.csproj" />
+    <Project Path="src/Immersive3D/Immersive3D.csproj" />
+    <Project Path="src/Infrastructure/Infrastructure.csproj" />
     <Project Path="src/Platform.Api/Platform.Api.csproj" />
   </Folder>
   <Folder Name="/tests/">

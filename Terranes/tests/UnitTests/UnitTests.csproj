@@ -27,6 +27,8 @@
     <ProjectReference Include="..\..\src\Marketplace\Marketplace.csproj" />
     <ProjectReference Include="..\..\src\Compliance\Compliance.csproj" />
     <ProjectReference Include="..\..\src\PartnerIntegration\PartnerIntegration.csproj" />
+    <ProjectReference Include="..\..\src\Immersive3D\Immersive3D.csproj" />
+    <ProjectReference Include="..\..\src\Infrastructure\Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

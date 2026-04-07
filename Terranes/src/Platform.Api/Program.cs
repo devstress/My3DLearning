@@ -1,4 +1,6 @@
 using Terranes.Compliance;
+using Terranes.Immersive3D;
+using Terranes.Infrastructure;
 using Terranes.Land;
 using Terranes.Marketplace;
 using Terranes.Models3D;
@@ -17,6 +19,8 @@ builder.Services.AddQuoting();
 builder.Services.AddMarketplace();
 builder.Services.AddCompliance();
 builder.Services.AddPartnerIntegration();
+builder.Services.AddImmersive3D();
+builder.Services.AddInfrastructure();
 
 builder.Services.AddEndpointsApiExplorer();
 
@@ -39,6 +43,18 @@ app.MapFurnitureEndpoints();
 app.MapSmartHomeEndpoints();
 app.MapSolicitorEndpoints();
 app.MapRealEstateAgentEndpoints();
+
+// Map API endpoints — immersive 3D experience
+app.MapVirtualVillageEndpoints();
+app.MapWalkthroughEndpoints();
+app.MapDesignEditorEndpoints();
+app.MapVideoToModelEndpoints();
+app.MapContentEndpoints();
+
+// Map API endpoints — platform infrastructure
+app.MapAuthEndpoints();
+app.MapObservabilityEndpoints();
+app.MapTenantEndpoints();
 
 // Health check
 app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Timestamp = DateTimeOffset.UtcNow }))

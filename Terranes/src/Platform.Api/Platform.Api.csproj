@@ -13,5 +13,7 @@
     <ProjectReference Include="..\Marketplace\Marketplace.csproj" />
     <ProjectReference Include="..\Compliance\Compliance.csproj" />
     <ProjectReference Include="..\PartnerIntegration\PartnerIntegration.csproj" />
+    <ProjectReference Include="..\Immersive3D\Immersive3D.csproj" />
+    <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
   </ItemGroup>
 </Project>

@@ -43,38 +43,19 @@
 
 PartnerIntegration project with 6 services: Builder, Landscaper, Furniture, SmartHome, Solicitor, RealEstateAgent. All wired into Platform.Api with 30+ partner endpoints.
 
----
+✅ Phase 4 complete — see `rules/completion-log.md` for full history.
 
-## Phase 4 — Immersive 3D Experience
+Immersive3D project with 5 services: VirtualVillage, Walkthrough, DesignEditor, VideoToModel, Content. 3D neighbourhood scenes, immersive tours, real-time editing, AI video-to-3D, user-generated content.
 
-**Goal:** Build the immersive 3D virtual village, walkthroughs, and real-time modification tools.
+✅ Phase 5 complete — see `rules/completion-log.md` for full history.
 
-| Chunk | Scope | Status |
-|-------|-------|--------|
-| 014 | Virtual Village — 3D neighbourhood of fully designed homes | not-started |
-| 015 | Home Walkthrough — immersive 3D tour (like Envis/Matterport) | not-started |
-| 016 | Real-Time 3D Editor — modify home design on-block in real time | not-started |
-| 017 | AI Video-to-3D — record house turning into 3D model | not-started |
-| 018 | User-Generated Content — agents/users post their own built homes | not-started |
-
----
-
-## Phase 5 — Platform Infrastructure
-
-**Goal:** Observability, security, multi-tenancy, deployment.
-
-| Chunk | Scope | Status |
-|-------|-------|--------|
-| 019 | Authentication & Authorization — OAuth, RBAC, user/agent/partner roles | not-started |
-| 020 | Observability — structured logging, health checks, metrics, tracing | not-started |
-| 021 | Multi-Tenancy — tenant isolation for partner data, user data, quotes | not-started |
-| 022 | Deployment — Kubernetes manifests, Helm charts, CI/CD pipeline | not-started |
+Infrastructure project with 3 services: Auth, Observability, Tenant. Authentication with hashed passwords and RBAC, structured audit logging with health checks and metrics, multi-tenant isolation.
 
 ---
 
 ## Next Chunk
 
-**Chunk 014** — Virtual Village (Phase 4)
+All phases (1–5) are complete. 11 src projects, 290 tests. The platform is fully implemented with all core services, partner integrations, immersive 3D experience, and platform infrastructure.
 
 ---
 

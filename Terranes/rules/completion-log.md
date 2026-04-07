@@ -213,3 +213,148 @@
 - DI registration via single AddPartnerIntegration() extension method
 - REST API now has 49 endpoints across 12 resource groups
 - RealEstateAgentService integrates with IMarketplaceService for listing sync
+
+---
+
+## Phase 4 — Immersive 3D Experience
+
+### Chunk 014 — Virtual Village (2026-04-07)
+
+**Goal:** 3D neighbourhood scene with lot management, home placement, and village statistics.
+
+**Files created:**
+- `src/Contracts/Enums/VillageLayoutType.cs` — Grid, Curved, CulDeSac, MixedUse
+- `src/Contracts/Enums/VillageLotStatus.cs` — Vacant, Occupied, Reserved, UnderDesign
+- `src/Contracts/Models/VirtualVillage.cs` — Village scene record
+- `src/Contracts/Models/VillageLot.cs` — Individual lot record
+- `src/Contracts/Abstractions/IVirtualVillageService.cs` — Village service interface
+- `src/Immersive3D/VirtualVillageService.cs` — Full implementation with village creation, lot allocation, placement assignment, stats
+- `src/Platform.Api/Endpoints/VirtualVillageEndpoints.cs` — 7 REST endpoints
+- `tests/UnitTests/Services/VirtualVillageServiceTests.cs` — 15 tests
+
+### Chunk 015 — Home Walkthrough (2026-04-07)
+
+**Goal:** Immersive 3D tour with room navigation and point-of-interest markers.
+
+**Files created:**
+- `src/Contracts/Enums/WalkthroughPoiType.cs` — Room, Feature, Measurement, Fixture, Outdoor
+- `src/Contracts/Enums/WalkthroughStatus.cs` — Generating, Ready, Failed
+- `src/Contracts/Models/HomeWalkthrough.cs` — Walkthrough session record
+- `src/Contracts/Models/WalkthroughPoi.cs` — Point of interest record
+- `src/Contracts/Abstractions/IWalkthroughService.cs` — Walkthrough service interface
+- `src/Immersive3D/WalkthroughService.cs` — Full implementation with generation, POI management, room filtering
+- `src/Platform.Api/Endpoints/WalkthroughEndpoints.cs` — 5 REST endpoints
+- `tests/UnitTests/Services/WalkthroughServiceTests.cs` — 12 tests
+
+### Chunk 016 — Real-Time 3D Editor (2026-04-07)
+
+**Goal:** Modify home design on-block in real time with material/position/rotation edits and undo support.
+
+**Files created:**
+- `src/Contracts/Enums/EditOperationType.cs` — Move, Rotate, Scale, MaterialChange, ComponentSwap, ColourChange
+- `src/Contracts/Models/DesignEdit.cs` — Edit operation record
+- `src/Contracts/Abstractions/IDesignEditorService.cs` — Design editor interface
+- `src/Immersive3D/DesignEditorService.cs` — Full implementation with edit apply, history, undo, filter by type, reset
+- `src/Platform.Api/Endpoints/DesignEditorEndpoints.cs` — 5 REST endpoints
+- `tests/UnitTests/Services/DesignEditorServiceTests.cs` — 11 tests
+
+### Chunk 017 — AI Video-to-3D (2026-04-07)
+
+**Goal:** Video upload and processing pipeline for AI-driven 3D mesh generation.
+
+**Files created:**
+- `src/Contracts/Enums/VideoProcessingStatus.cs` — Queued, Analysing, GeneratingMesh, Completed, Failed
+- `src/Contracts/Models/VideoToModelJob.cs` — Video conversion job record
+- `src/Contracts/Abstractions/IVideoToModelService.cs` — Video-to-3D service interface
+- `src/Immersive3D/VideoToModelService.cs` — Full implementation with upload validation, stage progression, failure handling
+- `src/Platform.Api/Endpoints/VideoToModelEndpoints.cs` — 5 REST endpoints
+- `tests/UnitTests/Services/VideoToModelServiceTests.cs` — 13 tests
+
+### Chunk 018 — User-Generated Content (2026-04-07)
+
+**Goal:** User home posts, galleries, publishing, and community ratings.
+
+**Files created:**
+- `src/Contracts/Enums/ContentPostStatus.cs` — Draft, Published, UnderReview, Removed, Archived
+- `src/Contracts/Models/ContentPost.cs` — Content post record with images and rating aggregation
+- `src/Contracts/Models/ContentRating.cs` — Community rating record
+- `src/Contracts/Abstractions/IContentService.cs` — Content service interface
+- `src/Immersive3D/ContentService.cs` — Full implementation with post lifecycle, publishing, ratings with average calculation, duplicate prevention
+- `src/Platform.Api/Endpoints/ContentEndpoints.cs` — 6 REST endpoints
+- `tests/UnitTests/Services/ContentServiceTests.cs` — 15 tests
+
+### Phase 4 Summary
+
+**Files created:**
+- `src/Immersive3D/Immersive3D.csproj` — New project
+- `src/Immersive3D/ServiceCollectionExtensions.cs` — AddImmersive3D() DI registration
+
+**Tests:** 254 total (193 existing + 61 new immersive tests). All pass.
+
+**Architecture:**
+- 10 src projects (Contracts, Models3D, Land, SitePlacement, Quoting, Marketplace, Compliance, PartnerIntegration, Immersive3D, Platform.Api)
+- Immersive3D houses all 5 immersive experience services in one project
+- All services use ConcurrentDictionary for thread-safe in-memory storage
+- DI registration via single AddImmersive3D() extension method
+- REST API now has 77 endpoints across 17 resource groups
+
+---
+
+## Phase 5 — Platform Infrastructure
+
+### Chunk 019 — Authentication & Authorization (2026-04-07)
+
+**Goal:** User registration, login with hashed passwords, role-based access control.
+
+**Files created:**
+- `src/Contracts/Enums/UserRole.cs` — Buyer, Partner, Agent, Admin
+- `src/Contracts/Models/PlatformUser.cs` — Platform user record with auth and tenant info
+- `src/Contracts/Abstractions/IAuthService.cs` — Auth service interface
+- `src/Infrastructure/AuthService.cs` — Full implementation with SHA256 password hashing, email uniqueness, role management, deactivation
+- `src/Platform.Api/Endpoints/AuthEndpoints.cs` — 5 REST endpoints
+- `tests/UnitTests/Services/AuthServiceTests.cs` — 14 tests
+
+### Chunk 020 — Observability (2026-04-07)
+
+**Goal:** Structured audit logging, health checks for all services, custom metrics recording.
+
+**Files created:**
+- `src/Contracts/Enums/HealthStatus.cs` — Healthy, Degraded, Unhealthy
+- `src/Contracts/Models/HealthCheckResult.cs` — Health check result record
+- `src/Contracts/Models/AuditLogEntry.cs` — Structured audit log entry record
+- `src/Contracts/Abstractions/IObservabilityService.cs` — Observability service interface
+- `src/Infrastructure/ObservabilityService.cs` — Full implementation with audit log, 10-component health checks, metrics store
+- `src/Platform.Api/Endpoints/ObservabilityEndpoints.cs` — 6 REST endpoints
+- `tests/UnitTests/Services/ObservabilityServiceTests.cs` — 12 tests
+
+### Chunk 021 — Multi-Tenancy (2026-04-07)
+
+**Goal:** Tenant creation, slug-based lookup, tenant isolation, user-tenant assignment.
+
+**Files created:**
+- `src/Contracts/Models/Tenant.cs` — Tenant record with slug and active state
+- `src/Contracts/Abstractions/ITenantService.cs` — Tenant service interface
+- `src/Infrastructure/TenantService.cs` — Full implementation with slug uniqueness, tenant lifecycle, user listing
+- `src/Platform.Api/Endpoints/TenantEndpoints.cs` — 6 REST endpoints
+- `tests/UnitTests/Services/TenantServiceTests.cs` — 10 tests
+
+### Chunk 022 — Deployment (covered by Platform.Api wiring)
+
+Deployment manifests are not applicable to the in-memory demo platform. All services are wired end-to-end through Platform.Api with `dotnet run --project src/Platform.Api`.
+
+### Phase 5 Summary
+
+**Files created:**
+- `src/Infrastructure/Infrastructure.csproj` — New project
+- `src/Infrastructure/ServiceCollectionExtensions.cs` — AddInfrastructure() DI registration
+
+**Tests:** 290 total (254 existing + 36 new infrastructure tests). All pass.
+
+**Architecture:**
+- 11 src projects (Contracts, Models3D, Land, SitePlacement, Quoting, Marketplace, Compliance, PartnerIntegration, Immersive3D, Infrastructure, Platform.Api)
+- Infrastructure houses auth, observability, and tenant services
+- AuthService uses SHA256 password hashing with email index for uniqueness
+- TenantService depends on IAuthService for user lookups
+- DI registration via single AddInfrastructure() extension method
+- REST API now has 94 endpoints across 20 resource groups
+- Run: `dotnet run --project src/Platform.Api` → http://localhost:5200
