@@ -1,0 +1,192 @@
+@page "/dashboard"
+@rendermode InteractiveServer
+@inject IBuyerJourneyService JourneyService
+@inject INotificationService NotificationService
+@inject IAnalyticsService AnalyticsService
+@inject IHomeModelService HomeModelService
+@inject IMarketplaceService MarketplaceService
+
+<PageTitle>Dashboard — Terranes</PageTitle>
+
+<div class="container">
+    <h2 class="mb-4">📊 Dashboard</h2>
+
+    <!-- Platform Stats -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm text-center">
+                <div class="card-body">
+                    <h3 class="text-primary">@activeJourneyCount</h3>
+                    <small class="text-muted">Active Journeys</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm text-center">
+                <div class="card-body">
+                    <h3 class="text-success">@homeModelCount</h3>
+                    <small class="text-muted">Home Designs</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm text-center">
+                <div class="card-body">
+                    <h3 class="text-info">@listingCount</h3>
+                    <small class="text-muted">Marketplace Listings</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm text-center">
+                <div class="card-body">
+                    <h3 class="text-warning">@analyticsEventCount</h3>
+                    <small class="text-muted">Analytics Events</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Active Journeys -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><strong>Active Buyer Journeys</strong></div>
+                <div class="card-body">
+                    @if (activeJourneys is null)
+                    {
+                        <p><em>Loading...</em></p>
+                    }
+                    else if (!activeJourneys.Any())
+                    {
+                        <p class="text-muted">No active journeys.</p>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var j in activeJourneys.Take(10))
+                            {
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <strong>@j.Id.ToString()[..8]...</strong>
+                                        <br /><small class="text-muted">Started @j.StartedAtUtc.ToString("g")</small>
+                                    </div>
+                                    <span class="badge @GetStageBadge(j.Stage)">@j.Stage</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><strong>Recent Notifications</strong></div>
+                <div class="card-body">
+                    @if (notifications is null)
+                    {
+                        <p><em>Loading...</em></p>
+                    }
+                    else if (!notifications.Any())
+                    {
+                        <p class="text-muted">No notifications.</p>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var n in notifications.Take(10))
+                            {
+                                <div class="list-group-item px-0 @(n.Status != NotificationStatus.Read ? "fw-bold" : "")">
+                                    <div class="d-flex justify-content-between">
+                                        <span>@n.Title</span>
+                                        <span class="badge @(n.Status != NotificationStatus.Read ? "bg-danger" : "bg-secondary")">@n.Status</span>
+                                    </div>
+                                    <small class="text-muted">@n.Message</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Home Designs -->
+    <div class="row g-4 mt-2">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header"><strong>Recent Home Designs</strong></div>
+                <div class="card-body">
+                    @if (recentModels is not null && recentModels.Any())
+                    {
+                        <div class="row g-3">
+                            @foreach (var model in recentModels.Take(4))
+                            {
+                                <div class="col-md-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6>@model.Name</h6>
+                                            <small>@model.Bedrooms bed, @model.Bathrooms bath</small><br />
+                                            <small class="text-muted">@model.FloorAreaSquareMetres.ToString("F0") m²</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No home designs yet.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private static readonly Guid DemoBuyerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    private IReadOnlyList<BuyerJourney>? activeJourneys;
+    private IReadOnlyList<Notification>? notifications;
+    private IReadOnlyList<HomeModel>? recentModels;
+    private int activeJourneyCount;
+    private int homeModelCount;
+    private int listingCount;
+    private int analyticsEventCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var journeysTask = JourneyService.GetActiveJourneysAsync();
+        var notificationsTask = NotificationService.GetNotificationsForRecipientAsync(DemoBuyerId);
+        var modelsTask = HomeModelService.SearchAsync(null, null);
+        var listingsTask = MarketplaceService.SearchAsync(null, null, null);
+        var analyticsTask = AnalyticsService.GetTotalEventCountAsync();
+
+        await Task.WhenAll(journeysTask, notificationsTask, modelsTask, listingsTask, analyticsTask);
+
+        activeJourneys = journeysTask.Result;
+        activeJourneyCount = activeJourneys.Count;
+        notifications = notificationsTask.Result;
+        recentModels = modelsTask.Result;
+        homeModelCount = recentModels.Count;
+        listingCount = listingsTask.Result.Count;
+        analyticsEventCount = analyticsTask.Result;
+    }
+
+    private static string GetStageBadge(JourneyStage stage) => stage switch
+    {
+        JourneyStage.Browsing => "bg-info",
+        JourneyStage.DesignSelected => "bg-primary",
+        JourneyStage.PlacedOnLand => "bg-primary",
+        JourneyStage.Customising => "bg-warning text-dark",
+        JourneyStage.QuoteRequested => "bg-warning text-dark",
+        JourneyStage.QuoteReceived => "bg-success",
+        JourneyStage.Referred => "bg-success",
+        JourneyStage.Completed => "bg-success",
+        JourneyStage.Abandoned => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

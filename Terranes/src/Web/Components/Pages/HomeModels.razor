@@ -1,0 +1,114 @@
+@page "/home-models"
+@rendermode InteractiveServer
+@inject IHomeModelService HomeModelService
+
+<PageTitle>Home Designs — Terranes</PageTitle>
+
+<div class="container">
+    <h2 class="mb-4">🏡 Home Designs</h2>
+    <p class="text-muted">Browse our gallery of 3D home models.</p>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label class="form-label">Min Bedrooms</label>
+            <input type="number" class="form-control" min="0" max="10"
+                   @bind="minBedrooms" @bind:event="oninput" @bind:after="SearchAsync" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Format</label>
+            <select class="form-select" @bind="selectedFormat" @bind:after="SearchAsync">
+                <option value="">All Formats</option>
+                @foreach (var fmt in Enum.GetValues<ModelFormat>())
+                {
+                    <option value="@fmt">@fmt</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (models is null)
+    {
+        <p><em>Loading home designs...</em></p>
+    }
+    else if (!models.Any())
+    {
+        <div class="alert alert-info">No home designs found matching your criteria.</div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var model in models)
+            {
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">@model.Name</h5>
+                            <p class="card-text text-muted small">@model.Description</p>
+                            <div class="row text-center mb-2">
+                                <div class="col"><strong>@model.Bedrooms</strong><br /><small>Beds</small></div>
+                                <div class="col"><strong>@model.Bathrooms</strong><br /><small>Baths</small></div>
+                                <div class="col"><strong>@model.GarageSpaces</strong><br /><small>Garage</small></div>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="badge bg-info">@model.Format</span>
+                                <span>@model.FloorAreaSquareMetres.ToString("F0") m²</span>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => SelectModel(model)">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (selectedModel is not null)
+    {
+        <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">@selectedModel.Name</h5>
+                        <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>@selectedModel.Description</p>
+                        <table class="table table-sm">
+                            <tr><th>Bedrooms</th><td>@selectedModel.Bedrooms</td></tr>
+                            <tr><th>Bathrooms</th><td>@selectedModel.Bathrooms</td></tr>
+                            <tr><th>Garage Spaces</th><td>@selectedModel.GarageSpaces</td></tr>
+                            <tr><th>Floor Area</th><td>@selectedModel.FloorAreaSquareMetres.ToString("F1") m²</td></tr>
+                            <tr><th>Format</th><td>@selectedModel.Format</td></tr>
+                            <tr><th>File Size</th><td>@(selectedModel.FileSizeBytes / 1024.0 / 1024.0):F1 MB</td></tr>
+                            <tr><th>Created</th><td>@selectedModel.CreatedAtUtc.ToString("g")</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<HomeModel>? models;
+    private int? minBedrooms;
+    private string selectedFormat = "";
+    private HomeModel? selectedModel;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        ModelFormat? format = Enum.TryParse<ModelFormat>(selectedFormat, out var f) ? f : null;
+        models = await HomeModelService.SearchAsync(minBedrooms, format);
+    }
+
+    private void SelectModel(HomeModel model) { selectedModel = model; }
+    private void CloseModal() { selectedModel = null; }
+}

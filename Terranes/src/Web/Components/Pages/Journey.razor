@@ -1,0 +1,323 @@
+@page "/journey"
+@rendermode InteractiveServer
+@inject IBuyerJourneyService JourneyService
+@inject IVirtualVillageService VillageService
+@inject IHomeModelService HomeModelService
+@inject ILandBlockService LandBlockService
+@inject ISitePlacementService SitePlacementService
+@inject IQuotingService QuotingService
+
+<PageTitle>Buyer Journey — Terranes</PageTitle>
+
+<div class="container">
+    <h2 class="mb-4">🚀 Your Buyer Journey</h2>
+    <p class="text-muted">Experience the full buyer journey from browsing to quoting.</p>
+
+    @if (currentJourney is null)
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-body text-center py-5">
+                <h4>Start Your Journey</h4>
+                <p class="text-muted">Begin by browsing our virtual villages and finding your dream home.</p>
+                <button class="btn btn-primary btn-lg" @onclick="StartJourney">
+                    🚀 Begin Journey
+                </button>
+            </div>
+        </div>
+
+        @if (pastJourneys is not null && pastJourneys.Any())
+        {
+            <h5>Previous Journeys</h5>
+            <div class="list-group mb-4">
+                @foreach (var j in pastJourneys)
+                {
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>Journey @j.Id.ToString()[..8]...</strong>
+                            <span class="badge @GetStageBadge(j.Stage) ms-2">@j.Stage</span>
+                        </div>
+                        <small class="text-muted">Started @j.StartedAtUtc.ToString("g")</small>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <!-- Journey Progress -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Journey Progress</h5>
+                    <span class="badge @GetStageBadge(currentJourney.Stage) fs-6">@currentJourney.Stage</span>
+                </div>
+
+                <!-- Stage Progress Bar -->
+                <div class="progress mb-3" style="height: 25px;">
+                    <div class="progress-bar bg-success" style="width: @GetProgressPercent()%">
+                        @currentJourney.Stage
+                    </div>
+                </div>
+
+                <div class="row text-center">
+                    @foreach (var stage in journeyStages)
+                    {
+                        var isComplete = (int)currentJourney.Stage >= (int)stage;
+                        var isCurrent = currentJourney.Stage == stage;
+                        <div class="col">
+                            <div class="@(isComplete ? "text-success" : "text-muted") @(isCurrent ? "fw-bold" : "")">
+                                @(isComplete ? "✅" : "⬜") @stage
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Stage-Specific Actions -->
+        @switch (currentJourney.Stage)
+        {
+            case JourneyStage.Browsing:
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h5>Step 1: Select a Home Design</h5>
+                        <p>Choose a home design from our gallery.</p>
+                        @if (availableModels is not null)
+                        {
+                            <div class="row g-3">
+                                @foreach (var model in availableModels.Take(6))
+                                {
+                                    <div class="col-md-4">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <h6>@model.Name</h6>
+                                                <small>@model.Bedrooms bed, @model.Bathrooms bath, @model.FloorAreaSquareMetres.ToString("F0") m²</small>
+                                            </div>
+                                            <div class="card-footer">
+                                                <button class="btn btn-sm btn-primary w-100" @onclick="() => SelectDesign(model.Id)">
+                                                    Select Design
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+                break;
+
+            case JourneyStage.DesignSelected:
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h5>Step 2: Choose a Land Block</h5>
+                        <p>Select a land block to test-fit your chosen design.</p>
+                        @if (availableLand is not null)
+                        {
+                            <div class="list-group">
+                                @foreach (var block in availableLand.Take(5))
+                                {
+                                    <button class="list-group-item list-group-item-action" @onclick="() => SelectLand(block.Id)">
+                                        <strong>@block.Address</strong>, @block.Suburb @block.State —
+                                        @block.AreaSquareMetres.ToString("F0") m², @block.Zoning
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+                break;
+
+            case JourneyStage.PlacedOnLand:
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h5>Step 3: Customise Your Design</h5>
+                        <p>Your design has been placed on the land. Move to customisation.</p>
+                        <button class="btn btn-primary" @onclick="MoveToCustomising">
+                            Start Customising →
+                        </button>
+                    </div>
+                </div>
+                break;
+
+            case JourneyStage.Customising:
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h5>Step 4: Request a Quote</h5>
+                        <p>Your design is customised. Request an indicative quote from our partner network.</p>
+                        <button class="btn btn-primary" @onclick="RequestQuote">
+                            💰 Request Indicative Quote
+                        </button>
+                    </div>
+                </div>
+                break;
+
+            case JourneyStage.QuoteRequested:
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body text-center">
+                        <h5>Quote Requested</h5>
+                        <p class="text-muted">Your quote is being prepared by our partner network...</p>
+                        <button class="btn btn-outline-primary" @onclick="CheckQuoteReady">
+                            Refresh Status
+                        </button>
+                    </div>
+                </div>
+                break;
+
+            case JourneyStage.QuoteReceived:
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h5>✅ Quote Received!</h5>
+                        <p>Your indicative quote is ready. You can proceed to partner referral.</p>
+                        <button class="btn btn-success" @onclick="CompleteJourney">
+                            🎉 Complete Journey
+                        </button>
+                    </div>
+                </div>
+                break;
+
+            case JourneyStage.Completed:
+            case JourneyStage.Referred:
+                <div class="alert alert-success text-center">
+                    <h4>🎉 Journey Complete!</h4>
+                    <p>Your journey is complete. Thank you for using Terranes!</p>
+                    <button class="btn btn-outline-primary" @onclick="StartNewJourney">Start New Journey</button>
+                </div>
+                break;
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+    }
+</div>
+
+@code {
+    // Use a fixed demo buyer ID for the UI
+    private static readonly Guid DemoBuyerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    private BuyerJourney? currentJourney;
+    private IReadOnlyList<BuyerJourney>? pastJourneys;
+    private IReadOnlyList<HomeModel>? availableModels;
+    private IReadOnlyList<LandBlock>? availableLand;
+    private string? errorMessage;
+
+    private static readonly JourneyStage[] journeyStages =
+    {
+        JourneyStage.Browsing, JourneyStage.DesignSelected, JourneyStage.PlacedOnLand,
+        JourneyStage.Customising, JourneyStage.QuoteRequested, JourneyStage.QuoteReceived, JourneyStage.Completed
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var journeys = await JourneyService.GetBuyerJourneysAsync(DemoBuyerId);
+        var active = journeys.FirstOrDefault(j => j.Stage != JourneyStage.Completed && j.Stage != JourneyStage.Abandoned);
+        if (active is not null)
+        {
+            currentJourney = active;
+            await LoadStageData();
+        }
+        pastJourneys = journeys;
+    }
+
+    private async Task StartJourney()
+    {
+        currentJourney = await JourneyService.StartJourneyAsync(DemoBuyerId);
+        await LoadStageData();
+    }
+
+    private async Task LoadStageData()
+    {
+        errorMessage = null;
+        if (currentJourney?.Stage == JourneyStage.Browsing)
+            availableModels = await HomeModelService.SearchAsync(null, null);
+        else if (currentJourney?.Stage == JourneyStage.DesignSelected)
+            availableLand = await LandBlockService.SearchAsync();
+    }
+
+    private async Task SelectDesign(Guid modelId)
+    {
+        try
+        {
+            currentJourney = await JourneyService.AdvanceStageAsync(currentJourney!.Id, JourneyStage.DesignSelected, modelId);
+            await LoadStageData();
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+    }
+
+    private async Task SelectLand(Guid blockId)
+    {
+        try
+        {
+            currentJourney = await JourneyService.AdvanceStageAsync(currentJourney!.Id, JourneyStage.PlacedOnLand, blockId);
+            await LoadStageData();
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+    }
+
+    private async Task MoveToCustomising()
+    {
+        try
+        {
+            currentJourney = await JourneyService.AdvanceStageAsync(currentJourney!.Id, JourneyStage.Customising);
+            await LoadStageData();
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+    }
+
+    private async Task RequestQuote()
+    {
+        try
+        {
+            currentJourney = await JourneyService.AdvanceStageAsync(currentJourney!.Id, JourneyStage.QuoteRequested);
+            await LoadStageData();
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+    }
+
+    private async Task CheckQuoteReady()
+    {
+        try
+        {
+            currentJourney = await JourneyService.GetJourneyAsync(currentJourney!.Id);
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+    }
+
+    private async Task CompleteJourney()
+    {
+        try
+        {
+            currentJourney = await JourneyService.AdvanceStageAsync(currentJourney!.Id, JourneyStage.Completed);
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+    }
+
+    private async Task StartNewJourney()
+    {
+        currentJourney = null;
+        await StartJourney();
+    }
+
+    private int GetProgressPercent()
+    {
+        if (currentJourney is null) return 0;
+        var idx = Array.IndexOf(journeyStages, currentJourney.Stage);
+        return idx < 0 ? 0 : (int)((idx + 1.0) / journeyStages.Length * 100);
+    }
+
+    private static string GetStageBadge(JourneyStage stage) => stage switch
+    {
+        JourneyStage.Browsing => "bg-info",
+        JourneyStage.DesignSelected => "bg-primary",
+        JourneyStage.PlacedOnLand => "bg-primary",
+        JourneyStage.Customising => "bg-warning text-dark",
+        JourneyStage.QuoteRequested => "bg-warning text-dark",
+        JourneyStage.QuoteReceived => "bg-success",
+        JourneyStage.Referred => "bg-success",
+        JourneyStage.Completed => "bg-success",
+        JourneyStage.Abandoned => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

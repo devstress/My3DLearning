@@ -1,0 +1,195 @@
+@page "/land"
+@rendermode InteractiveServer
+@inject ILandBlockService LandBlockService
+@inject ISitePlacementService SitePlacementService
+@inject IHomeModelService HomeModelService
+
+<PageTitle>Land Blocks — Terranes</PageTitle>
+
+<div class="container">
+    <h2 class="mb-4">🗺️ Land Blocks</h2>
+    <p class="text-muted">Search available land blocks and test-fit home designs.</p>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <input type="text" class="form-control" placeholder="Search by suburb..."
+                   @bind="searchSuburb" @bind:event="oninput" @bind:after="SearchAsync" />
+        </div>
+        <div class="col-md-3">
+            <input type="text" class="form-control" placeholder="State (e.g. NSW)"
+                   @bind="searchState" @bind:event="oninput" @bind:after="SearchAsync" />
+        </div>
+    </div>
+
+    @if (blocks is null)
+    {
+        <p><em>Loading land blocks...</em></p>
+    }
+    else if (!blocks.Any())
+    {
+        <div class="alert alert-info">No land blocks found. Try a different search.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Address</th>
+                        <th>Suburb</th>
+                        <th>State</th>
+                        <th>Area (m²)</th>
+                        <th>Frontage</th>
+                        <th>Depth</th>
+                        <th>Zoning</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var block in blocks)
+                    {
+                        <tr>
+                            <td>@block.Address</td>
+                            <td>@block.Suburb</td>
+                            <td>@block.State</td>
+                            <td>@block.AreaSquareMetres.ToString("F0")</td>
+                            <td>@block.FrontageMetres.ToString("F1")m</td>
+                            <td>@block.DepthMetres.ToString("F1")m</td>
+                            <td><span class="badge bg-secondary">@block.Zoning</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => SelectBlock(block)">
+                                    Test-Fit
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (selectedBlock is not null)
+    {
+        <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Test-Fit on @selectedBlock.Address</h5>
+                        <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col">
+                                <table class="table table-sm">
+                                    <tr><th>Address</th><td>@selectedBlock.Address, @selectedBlock.Suburb @selectedBlock.State @selectedBlock.PostCode</td></tr>
+                                    <tr><th>Area</th><td>@selectedBlock.AreaSquareMetres.ToString("F0") m²</td></tr>
+                                    <tr><th>Frontage × Depth</th><td>@selectedBlock.FrontageMetres.ToString("F1")m × @selectedBlock.DepthMetres.ToString("F1")m</td></tr>
+                                    <tr><th>Zoning</th><td>@selectedBlock.Zoning</td></tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <h6>Select a Home Design to Test-Fit</h6>
+                        @if (availableModels is null)
+                        {
+                            <p><em>Loading designs...</em></p>
+                        }
+                        else if (!availableModels.Any())
+                        {
+                            <p class="text-muted">No home designs available. Create one first.</p>
+                        }
+                        else
+                        {
+                            <div class="list-group">
+                                @foreach (var model in availableModels)
+                                {
+                                    <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                                            @onclick="() => TestFit(model)">
+                                        <div>
+                                            <strong>@model.Name</strong> —
+                                            @model.Bedrooms bed, @model.Bathrooms bath, @model.FloorAreaSquareMetres.ToString("F0") m²
+                                        </div>
+                                        <span class="badge bg-primary">Test-Fit →</span>
+                                    </button>
+                                }
+                            </div>
+                        }
+
+                        @if (placementResult is not null)
+                        {
+                            <div class="alert alert-success mt-3">
+                                <strong>✅ Placement Created!</strong><br />
+                                Placement ID: <code>@placementResult.Id</code><br />
+                                Offset: @placementResult.OffsetXMetres.ToString("F1")m × @placementResult.OffsetYMetres.ToString("F1")m |
+                                Rotation: @placementResult.RotationDegrees° | Scale: @placementResult.ScaleFactor
+                            </div>
+                        }
+
+                        @if (placementError is not null)
+                        {
+                            <div class="alert alert-danger mt-3">
+                                <strong>❌ Placement Failed</strong><br />@placementError
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<LandBlock>? blocks;
+    private string searchSuburb = "";
+    private string searchState = "";
+    private LandBlock? selectedBlock;
+    private IReadOnlyList<HomeModel>? availableModels;
+    private SitePlacement? placementResult;
+    private string? placementError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        blocks = await LandBlockService.SearchAsync(
+            string.IsNullOrWhiteSpace(searchSuburb) ? null : searchSuburb,
+            string.IsNullOrWhiteSpace(searchState) ? null : searchState);
+    }
+
+    private async Task SelectBlock(LandBlock block)
+    {
+        selectedBlock = block;
+        placementResult = null;
+        placementError = null;
+        availableModels = await HomeModelService.SearchAsync(null, null);
+    }
+
+    private async Task TestFit(HomeModel model)
+    {
+        try
+        {
+            placementError = null;
+            var placement = new SitePlacement(
+                Guid.NewGuid(), model.Id, selectedBlock!.Id,
+                0.0, 0.0, 0.0, 1.0,
+                Guid.NewGuid(), DateTimeOffset.UtcNow);
+            placementResult = await SitePlacementService.PlaceAsync(placement);
+        }
+        catch (Exception ex)
+        {
+            placementError = ex.Message;
+            placementResult = null;
+        }
+    }
+
+    private void CloseModal()
+    {
+        selectedBlock = null;
+        availableModels = null;
+        placementResult = null;
+        placementError = null;
+    }
+}

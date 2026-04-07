@@ -91,7 +91,31 @@ dotnet build
 
 # Run the tests
 dotnet test
+
+# Run the Blazor Web UI
+dotnet run --project src/Web
+
+# Run the REST API (separate terminal)
+dotnet run --project src/Platform.Api
 ```
+
+### Web UI
+
+The Blazor Server UI runs at **http://localhost:5000** and provides:
+
+| Page | Description |
+|---|---|
+| Home | Landing page with platform overview |
+| Villages | Browse virtual 3D neighbourhoods |
+| Home Designs | Gallery of 3D home models |
+| Land Blocks | Search land and test-fit designs |
+| Marketplace | Property listings from agents/builders |
+| My Journey | Guided buyer journey from browsing to quoting |
+| Dashboard | Active journeys, notifications, analytics |
+
+### REST API
+
+The REST API runs at **http://localhost:5200** with 137 endpoints across 29 resource groups.
 
 ## Project Structure
 

@@ -20,74 +20,62 @@
 >
 > This rule is mandatory for every AI agent session. Never leave done rows in milestones.md.
 
+> **UAT READINESS RULE — Confirm when the app is ready for customer use.**
+>
+> When the application has a working UI and all backend services are wired end-to-end:
+> 1. Confirm explicitly: **"The implementation is ready for UAT."**
+> 2. The app must fully work as expected per the requirements — not partially, not with stubs.
+> 3. The app must be ready for the customer to use: all features functional, all endpoints wired, all validations in place, all tests passing.
+> 4. Do not declare UAT readiness until the Platform.Api (or future web UI) is runnable and exercises every service end-to-end.
+> 5. Include clear run instructions (e.g. `dotnet run --project src/Platform.Api`) and a summary of all available endpoints/features.
+
 ## Completed Phases
 
 ✅ Phase 1 complete — see `rules/completion-log.md` for full history.
 
 1 src project (Contracts). Initial solution scaffold with rules, docs, and test infrastructure.
 
----
+✅ Phase 2 complete — see `rules/completion-log.md` for full history.
 
-## Phase 2 — Core Platform Services
+6 src projects (Models3D, Land, SitePlacement, Quoting, Marketplace, Compliance) + Platform.Api. Core platform services with real in-memory implementations, validation, and REST API.
 
-**Goal:** Build the core service layer for 3D model management, land data integration, quoting engine, and marketplace.
+✅ Phase 3 complete — see `rules/completion-log.md` for full history.
 
-| Chunk | Scope | Status |
-|-------|-------|--------|
-| 002 | 3D Model Service — model upload, storage, metadata, format validation | not-started |
-| 003 | Land Data Service — government land data integration, block analysis, zoning lookup | not-started |
-| 004 | Site Placement Engine — test-fit 3D models onto land blocks with real dimensions | not-started |
-| 005 | Quoting Engine — aggregate quotes from builders, landscapers, furniture, smart home | not-started |
-| 006 | Marketplace Service — home listings, search, filtering, agent/owner management | not-started |
-| 007 | Compliance Engine — AI-powered building regulation checks per jurisdiction | not-started |
+PartnerIntegration project with 6 services: Builder, Landscaper, Furniture, SmartHome, Solicitor, RealEstateAgent. All wired into Platform.Api with 30+ partner endpoints.
 
----
+✅ Phase 4 complete — see `rules/completion-log.md` for full history.
 
-## Phase 3 — Partner Integration
+Immersive3D project with 5 services: VirtualVillage, Walkthrough, DesignEditor, VideoToModel, Content. 3D neighbourhood scenes, immersive tours, real-time editing, AI video-to-3D, user-generated content.
 
-**Goal:** Connect external partners (builders, landscapers, furniture suppliers, solicitors, real estate agents) via standardised APIs.
+✅ Phase 5 complete — see `rules/completion-log.md` for full history.
 
-| Chunk | Scope | Status |
-|-------|-------|--------|
-| 008 | Builder Integration — volume/custom builder APIs, quote request/response | not-started |
-| 009 | Landscaper Integration — landscaping provider APIs, design templates | not-started |
-| 010 | Furniture & Interior Integration — supplier catalog, room fitting, pricing | not-started |
-| 011 | Smart Home Integration — smart home supplier APIs, compatibility checks | not-started |
-| 012 | Solicitor Integration — property lawyer matching, contract templates | not-started |
-| 013 | Real Estate Agent Integration — land/home listings sync, MLS feeds | not-started |
+Infrastructure project with 3 services: Auth, Observability, Tenant. Authentication with hashed passwords and RBAC, structured audit logging with health checks and metrics, multi-tenant isolation.
 
----
+✅ Phase 6 complete — see `rules/completion-log.md` for full history.
 
-## Phase 4 — Immersive 3D Experience
+Journey project with 3 services: BuyerJourney, QuoteAggregator, Referral. Full buyer lifecycle orchestration from browsing through to partner referral, cross-partner cost aggregation, qualified lead generation.
 
-**Goal:** Build the immersive 3D virtual village, walkthroughs, and real-time modification tools.
+✅ Phase 7 complete — see `rules/completion-log.md` for full history.
 
-| Chunk | Scope | Status |
-|-------|-------|--------|
-| 014 | Virtual Village — 3D neighbourhood of fully designed homes | not-started |
-| 015 | Home Walkthrough — immersive 3D tour (like Envis/Matterport) | not-started |
-| 016 | Real-Time 3D Editor — modify home design on-block in real time | not-started |
-| 017 | AI Video-to-3D — record house turning into 3D model | not-started |
-| 018 | User-Generated Content — agents/users post their own built homes | not-started |
+Notifications project with 3 services: Notification, EventBus, Webhook. In-app notification delivery with read tracking, in-memory pub/sub event bus with correlation, webhook registration and simulated delivery for partners.
 
----
+✅ Phase 8 complete — see `rules/completion-log.md` for full history.
 
-## Phase 5 — Platform Infrastructure
+Analytics project with 3 services: Search, Analytics, Reporting. Cross-entity full-text search with relevance scoring, user engagement tracking with summaries and popular entities, markdown report generation.
 
-**Goal:** Observability, security, multi-tenancy, deployment.
+✅ Phase 9 complete — see `rules/completion-log.md` for full history.
 
-| Chunk | Scope | Status |
-|-------|-------|--------|
-| 019 | Authentication & Authorization — OAuth, RBAC, user/agent/partner roles | not-started |
-| 020 | Observability — structured logging, health checks, metrics, tracing | not-started |
-| 021 | Multi-Tenancy — tenant isolation for partner data, user data, quotes | not-started |
-| 022 | Deployment — Kubernetes manifests, Helm charts, CI/CD pipeline | not-started |
+IntegrationTests project with 56 WebApplicationFactory-based tests exercising every API endpoint group end-to-end. Fixed multi-body parameter binding bugs in 5 partner endpoints (Builder, Landscaper, Solicitor, RealEstateAgent, Webhook).
+
+✅ Phase 10 complete — see `rules/completion-log.md` for full history.
+
+Blazor Server Web UI with 7 pages: Home (landing), Villages (browse/search/detail), Home Designs (gallery/search/detail), Land Blocks (search/test-fit), Marketplace (browse/search/filter), Buyer Journey (guided E2E flow), Dashboard (stats/journeys/notifications). All 29 services wired directly via DI.
 
 ---
 
 ## Next Chunk
 
-**Chunk 002** — 3D Model Service (Phase 2)
+All phases (1–10) are complete. 15 src projects, 446 tests (390 unit + 56 integration). The platform now has a full Blazor Server web UI wired end-to-end with all backend services.
 
 ---
 
