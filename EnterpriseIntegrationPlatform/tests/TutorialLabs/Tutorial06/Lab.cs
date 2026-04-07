@@ -1,11 +1,22 @@
 // ============================================================================
-// Tutorial 06 – Messaging Channels (Lab)
+// Tutorial 06 – Messaging Channels (Lab · Guided Practice)
 // ============================================================================
-// EIP Patterns: Point-to-Point Channel, Publish-Subscribe Channel,
-//               Datatype Channel, Invalid Message Channel
-// Real Integrations: All channel tests use real NATS JetStream via Aspire.
-// Wire real channel classes with NatsBrokerEndpoint — send through each
-// channel type and verify delivery semantics through real broker.
+// PURPOSE: Run each test in order to see how messaging channel patterns work
+//          through real NATS JetStream via Aspire. Read the code and comments
+//          to understand each concept before moving to the Exam.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Point-to-Point send — single consumer delivery via queue channel
+//   2. Point-to-Point receive — handler triggered on message arrival
+//   3. Point-to-Point multiple sends — messages accumulate in order
+//   4. Publish-Subscribe publish — event delivered to channel
+//   5. Publish-Subscribe fan-out — multiple subscribers receive copies
+//   6. Datatype Channel routing — message routed by MessageType
+//   7. Datatype Channel resolve — topic name computed from type
+//   8. Invalid Message Channel — malformed message routed to invalid topic
+//   9. Invalid Message Channel raw — raw data captured with reason
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

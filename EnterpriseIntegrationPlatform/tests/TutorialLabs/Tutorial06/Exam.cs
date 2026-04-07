@@ -1,8 +1,22 @@
 // ============================================================================
-// Tutorial 06 – Messaging Channels (Exam)
+// Tutorial 06 – Messaging Channels (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: messaging bridge via Point-to-Point, pub-sub fan-out with
-// verification, and type-based routing with multiple message types.
+// PURPOSE: Prove you can apply messaging channel patterns in realistic
+//          scenarios — bridging between channels, fan-out verification,
+//          and multi-type routing.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Bridge messages between two Point-to-Point channels
+//   🟡 Intermediate — Pub-Sub fan-out delivers to all three subscriber groups
+//   🔴 Advanced     — Datatype Channel routes multiple message types to correct topics
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,8 +31,18 @@ namespace TutorialLabs.Tutorial06;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Point-to-Point Bridge Relay ──────────────────────────
+    //
+    // SCENARIO: A legacy order system publishes to an inbound queue. A bridge
+    // component must relay each message to an outbound queue for the modern
+    // fulfilment system. Both channels use Point-to-Point semantics.
+    //
+    // WHAT YOU PROVE: You can wire ReceiveAsync on one channel to SendAsync
+    // on another, creating a messaging bridge between two endpoints.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_Bridge_PointToPointRelay()
+    public async Task Starter_Bridge_PointToPointRelay()
     {
         await using var source = new MockEndpoint("source");
         await using var target = new MockEndpoint("target");
@@ -41,8 +65,18 @@ public sealed class Exam
         target.AssertReceivedOnTopic("outbound-q", 1);
     }
 
+    // ── 🟡 INTERMEDIATE — Pub-Sub Fan-Out Verification ─────────────────────
+    //
+    // SCENARIO: A notification service broadcasts a single event to three
+    // subscriber groups — email, SMS, and push. All three must receive the
+    // identical broadcast message.
+    //
+    // WHAT YOU PROVE: You can set up multiple Pub-Sub subscribers and verify
+    // that fan-out delivers the message to every registered group.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_PubSubFanOut_ThreeSubscribersReceive()
+    public async Task Intermediate_PubSubFanOut_ThreeSubscribersReceive()
     {
         await using var endpoint = new MockEndpoint("fanout");
         var channel = new PublishSubscribeChannel(
@@ -66,8 +100,18 @@ public sealed class Exam
         Assert.That(results, Does.Contain("push"));
     }
 
+    // ── 🔴 ADVANCED — Multi-Type Datatype Channel Routing ──────────────────
+    //
+    // SCENARIO: An integration hub receives order, payment, and inventory
+    // events. Each message type must be automatically routed to its own
+    // dedicated topic using the Datatype Channel pattern.
+    //
+    // WHAT YOU PROVE: You can configure DatatypeChannel to route multiple
+    // message types to type-specific topics and verify per-topic delivery.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_DatatypeChannel_MultipleTypesRoutedCorrectly()
+    public async Task Advanced_DatatypeChannel_MultipleTypesRoutedCorrectly()
     {
         await using var endpoint = new MockEndpoint("datatype");
         var options = Options.Create(new DatatypeChannelOptions
