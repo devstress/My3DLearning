@@ -105,9 +105,11 @@ public sealed class NatsBrokerEndpoint : IMessageBrokerProducer, IMessageBrokerC
                     var env = EnvelopeSerializer.Deserialize<T>(msg.Data);
                     if (env is not null)
                     {
-                        _consumed.Enqueue(new ReceivedMessage(env!, topic, DateTimeOffset.UtcNow));
                         _inbound.Enqueue(env!);
                         await handler(env);
+                        // Enqueue to _consumed AFTER handler completes so
+                        // WaitForConsumedAsync only returns once the handler is done.
+                        _consumed.Enqueue(new ReceivedMessage(env!, topic, DateTimeOffset.UtcNow));
                     }
                     await msg.AckAsync(cancellationToken: cts.Token);
                 }
