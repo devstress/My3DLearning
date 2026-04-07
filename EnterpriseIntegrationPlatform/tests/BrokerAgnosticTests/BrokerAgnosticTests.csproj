@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit3TestAdapter" />
+    <PackageReference Include="NUnit.Analyzers" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Ingestion\Ingestion.csproj" />
+    <ProjectReference Include="..\..\src\Processing.DeadLetter\Processing.DeadLetter.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Retry\Processing.Retry.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Routing\Processing.Routing.csproj" />
+    <ProjectReference Include="..\..\src\RuleEngine\RuleEngine.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Splitter\Processing.Splitter.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Aggregator\Processing.Aggregator.csproj" />
+    <ProjectReference Include="..\..\src\Processing.Resequencer\Processing.Resequencer.csproj" />
+    <ProjectReference Include="..\..\src\Processing.ScatterGather\Processing.ScatterGather.csproj" />
+    <ProjectReference Include="..\..\src\Testing\Testing.csproj" />
+  </ItemGroup>
+</Project>

@@ -61,11 +61,10 @@ transactions, channels, competing consumers) work through the same interfaces.
 
 | Chunk | Scope | Status |
 |-------|-------|--------|
-| 107 | **DLQ + Retry + Channels on Postgres** — Verify `DeadLetterPublisher<T>`, `ExponentialBackoffRetryPolicy`, `InvalidMessageChannel`, `PointToPointChannel`, `PublishSubscribeChannel`, `DatatypeChannel`, `MessagingBridge` all work unchanged with Postgres producer/consumer. Integration tests exercising each EIP pattern end-to-end through Postgres. | `not-started` |
 | 108 | **DI wiring + Aspire integration** — `AddPostgresBroker(services, connectionString)` extension. Register in `IngestionServiceExtensions.BrokerRegistrations`. Add Postgres container to `tests/TestAppHost/Program.cs`. `PostgresBrokerEndpoint` test helper (mirrors `NatsBrokerEndpoint`). Connectivity integration tests. | `not-started` |
 | 109 | **Routing + advanced EIP on Postgres** — Integration tests: `ContentBasedRouter`, `DynamicRouter`, `RecipientListRouter`, `RoutingSlipRouter`, `MessageFilter`, `Detour`, `ScatterGather`, `Splitter`, `Aggregator`, `Resequencer` — all wired to Postgres broker. Proves every EIP routing pattern works on Postgres transport. | `not-started` |
 
-**Next Chunk:** 107
+**Next Chunk:** 108
 
 ---
 

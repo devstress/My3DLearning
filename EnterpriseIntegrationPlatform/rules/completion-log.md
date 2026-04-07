@@ -4,6 +4,29 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 107 – Broker-Agnostic EIP Integration Tests (DLQ, Retry, Channels, Routing, Splitter, Aggregator)
+
+- **Date**: 2026-04-07
+- **Phase**: 28 — PostgreSQL Message Broker (EIP-Complete, ≤ 5k TPS)
+- **Status**: done
+- **Goal**: Create comprehensive integration tests proving all EIP components (DLQ, retry, routing, channels, splitter, aggregator) work identically with ANY broker via IMessageBrokerProducer/IMessageBrokerConsumer.
+- **Architecture**:
+  - New `tests/BrokerAgnosticTests/` project: 38 NUnit tests across 5 test files
+  - All tests use MockEndpoint (IMessageBrokerProducer + IMessageBrokerConsumer) — swap for Postgres/NATS/Kafka/Pulsar and tests pass unchanged
+  - Covers: DeadLetterPublisher (routing, correlation, wrapping, multi-reason), ExponentialBackoffRetryPolicy (success, retry, exhaustion, backoff, cancellation), PointToPointChannel, PublishSubscribeChannel, DatatypeChannel, InvalidMessageChannel, MessagingBridge (forwarding + deduplication), ContentBasedRouter (message type, source, metadata, regex, priority), MessageFilter, Splitter (split + causation chain), Aggregator (group completion + separate groups)
+  - BrokerInterchangeabilityTests: full pipeline (Ingest→Route→Split), Route→DLQ, Channel→Route→Invalid, bridge between two brokers
+- **Files created**:
+  - `tests/BrokerAgnosticTests/BrokerAgnosticTests.csproj`
+  - `tests/BrokerAgnosticTests/DeadLetterTests.cs` (5 tests)
+  - `tests/BrokerAgnosticTests/RetryPolicyTests.cs` (6 tests)
+  - `tests/BrokerAgnosticTests/ChannelTests.cs` (12 tests)
+  - `tests/BrokerAgnosticTests/RoutingTests.cs` (7 tests)
+  - `tests/BrokerAgnosticTests/SplitterAggregatorTests.cs` (5 tests)
+  - `tests/BrokerAgnosticTests/BrokerInterchangeabilityTests.cs` (5 tests — 3 full pipelines + enum check + bridge)
+- **Files modified**:
+  - `EnterpriseIntegrationPlatform.sln` — Added BrokerAgnosticTests project
+- **Test counts**: 38 BrokerAgnosticTests pass. 522 TutorialLabs tests unchanged. 49 src projects, 0 errors, 0 warnings.
+
 ## Chunks 103–106 – PostgreSQL Message Broker (Ingestion.Postgres)
 
 - **Date**: 2026-04-07
