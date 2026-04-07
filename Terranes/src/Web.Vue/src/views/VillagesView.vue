@@ -2,9 +2,9 @@
 import { ref, onMounted, watch } from 'vue';
 import { api } from '../api/client';
 import type { VirtualVillage, VillageLot } from '../types';
-import LoadingSpinner from '../components/LoadingSpinner.vue';
 import DetailModal from '../components/DetailModal.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import SkeletonCard from '../components/SkeletonCard.vue';
 
 const villages = ref<VirtualVillage[] | null>(null);
 const searchName = ref('');
@@ -52,7 +52,7 @@ watch([searchName, selectedLayout], search);
       </div>
     </div>
 
-    <LoadingSpinner v-if="villages === null" message="Loading villages..." />
+    <SkeletonCard v-if="villages === null" :count="3" :columns="3" />
     <div v-else-if="villages.length === 0" class="alert alert-info">
       No villages found. Create one to get started!
     </div>

@@ -2,9 +2,9 @@
 import { ref, onMounted, watch } from 'vue';
 import { api } from '../api/client';
 import type { PropertyListing } from '../types';
-import LoadingSpinner from '../components/LoadingSpinner.vue';
 import DetailModal from '../components/DetailModal.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import SkeletonCard from '../components/SkeletonCard.vue';
 
 const listings = ref<PropertyListing[] | null>(null);
 const searchSuburb = ref('');
@@ -59,7 +59,7 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
       </div>
     </div>
 
-    <LoadingSpinner v-if="listings === null" message="Loading listings..." />
+    <SkeletonCard v-if="listings === null" :count="2" :columns="2" />
     <div v-else-if="listings.length === 0" class="alert alert-info">
       No listings found matching your criteria.
     </div>

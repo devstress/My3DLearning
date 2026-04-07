@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { RouterLink, RouterView } from 'vue-router';
+import ToastContainer from './components/ToastContainer.vue';
 
 const sidebarOpen = ref(false);
 function toggleSidebar() {
@@ -66,8 +67,14 @@ function toggleSidebar() {
         <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
       </div>
       <article class="content px-4">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <Transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </Transition>
+        </RouterView>
       </article>
     </main>
+
+    <ToastContainer />
   </div>
 </template>

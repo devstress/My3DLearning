@@ -59,7 +59,7 @@ describe('LandBlocksView', () => {
     const wrapper = mount(LandBlocksView, {
       global: { plugins: [createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' } }] })] },
     });
-    expect(wrapper.text()).toContain('Loading land blocks...');
+    expect(wrapper.find('.placeholder-glow').exists()).toBe(true);
   });
 
   it('displays land blocks in a table after data loads', async () => {

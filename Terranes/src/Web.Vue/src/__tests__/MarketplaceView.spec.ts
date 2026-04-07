@@ -45,7 +45,7 @@ describe('MarketplaceView', () => {
     const wrapper = mount(MarketplaceView, {
       global: { plugins: [createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' } }] })] },
     });
-    expect(wrapper.text()).toContain('Loading listings...');
+    expect(wrapper.find('.placeholder-glow').exists()).toBe(true);
   });
 
   it('displays listing cards after data loads', async () => {

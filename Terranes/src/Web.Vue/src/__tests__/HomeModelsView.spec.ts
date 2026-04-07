@@ -45,7 +45,7 @@ describe('HomeModelsView', () => {
     const wrapper = mount(HomeModelsView, {
       global: { plugins: [createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' } }] })] },
     });
-    expect(wrapper.text()).toContain('Loading home designs...');
+    expect(wrapper.find('.placeholder-glow').exists()).toBe(true);
   });
 
   it('displays home model cards after data loads', async () => {

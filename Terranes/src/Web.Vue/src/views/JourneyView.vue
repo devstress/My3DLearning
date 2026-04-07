@@ -4,6 +4,10 @@ import { api } from '../api/client';
 import type { BuyerJourney, HomeModel, LandBlock } from '../types';
 import StatusBadge from '../components/StatusBadge.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
+import ActionButton from '../components/ActionButton.vue';
+import { useToast } from '../composables/useToast';
+
+const { showSuccess, showError, showInfo } = useToast();
 
 const DEMO_BUYER_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -12,6 +16,7 @@ const pastJourneys = ref<BuyerJourney[] | null>(null);
 const availableModels = ref<HomeModel[] | null>(null);
 const availableLand = ref<LandBlock[] | null>(null);
 const errorMessage = ref<string | null>(null);
+const actionLoading = ref(false);
 
 const journeyStages = [
   'Browsing', 'DesignSelected', 'PlacedOnLand',
@@ -34,59 +39,101 @@ async function loadStageData() {
 }
 
 async function startJourney() {
-  currentJourney.value = await api.createJourney(DEMO_BUYER_ID);
-  await loadStageData();
+  actionLoading.value = true;
+  try {
+    currentJourney.value = await api.createJourney(DEMO_BUYER_ID);
+    showSuccess('Journey started! Browse our home designs to begin.');
+    await loadStageData();
+  } catch (err: unknown) {
+    showError(err instanceof Error ? err.message : 'Failed to start journey');
+  } finally {
+    actionLoading.value = false;
+  }
 }
 
 async function selectDesign(modelId: string) {
+  actionLoading.value = true;
   try {
     currentJourney.value = await api.advanceJourney(currentJourney.value!.id, 'DesignSelected', modelId);
+    showSuccess('Design selected! Now choose a land block.');
     await loadStageData();
   } catch (err: unknown) {
     errorMessage.value = err instanceof Error ? err.message : 'Unknown error';
+    showError('Failed to select design. Please try again.');
+  } finally {
+    actionLoading.value = false;
   }
 }
 
 async function selectLand(blockId: string) {
+  actionLoading.value = true;
   try {
     currentJourney.value = await api.advanceJourney(currentJourney.value!.id, 'PlacedOnLand', blockId);
+    showSuccess('Land block selected! Your design has been placed.');
     await loadStageData();
   } catch (err: unknown) {
     errorMessage.value = err instanceof Error ? err.message : 'Unknown error';
+    showError('Failed to place design on land.');
+  } finally {
+    actionLoading.value = false;
   }
 }
 
 async function moveToCustomising() {
+  actionLoading.value = true;
   try {
     currentJourney.value = await api.advanceJourney(currentJourney.value!.id, 'Customising');
+    showInfo('Customisation mode enabled.');
     await loadStageData();
   } catch (err: unknown) {
     errorMessage.value = err instanceof Error ? err.message : 'Unknown error';
+    showError('Failed to start customisation.');
+  } finally {
+    actionLoading.value = false;
   }
 }
 
 async function requestQuote() {
+  actionLoading.value = true;
   try {
     currentJourney.value = await api.advanceJourney(currentJourney.value!.id, 'QuoteRequested');
+    showSuccess('Quote requested! Our partner network is preparing your quote.');
     await loadStageData();
   } catch (err: unknown) {
     errorMessage.value = err instanceof Error ? err.message : 'Unknown error';
+    showError('Failed to request quote.');
+  } finally {
+    actionLoading.value = false;
   }
 }
 
 async function checkQuoteReady() {
+  actionLoading.value = true;
   try {
     currentJourney.value = await api.getJourney(currentJourney.value!.id);
+    if (currentJourney.value.currentStage === 'QuoteReceived') {
+      showSuccess('Your quote is ready!');
+    } else {
+      showInfo('Quote is still being prepared. Check back soon.');
+    }
   } catch (err: unknown) {
     errorMessage.value = err instanceof Error ? err.message : 'Unknown error';
+    showError('Failed to check quote status.');
+  } finally {
+    actionLoading.value = false;
   }
 }
 
 async function completeJourney() {
+  actionLoading.value = true;
   try {
     currentJourney.value = await api.advanceJourney(currentJourney.value!.id, 'Completed');
+    showSuccess('🎉 Journey complete! Thank you for using Terranes.');
   } catch (err: unknown) {
     errorMessage.value = err instanceof Error ? err.message : 'Unknown error';
+    showError('Failed to complete journey.');
+  } finally {
+    actionLoading.value = false;
   }
 }
 
@@ -118,7 +165,7 @@ onMounted(async () => {
         <div class="card-body text-center py-5">
           <h4>Start Your Journey</h4>
           <p class="text-muted">Begin by browsing our virtual villages and finding your dream home.</p>
-          <button class="btn btn-primary btn-lg" @click="startJourney">🚀 Begin Journey</button>
+          <ActionButton :loading="actionLoading" variant="primary" size="lg" loading-text="Starting..." @click="startJourney">🚀 Begin Journey</ActionButton>
         </div>
       </div>
 
@@ -185,7 +232,10 @@ onMounted(async () => {
                   <small>{{ model.bedrooms }} bed, {{ model.bathrooms }} bath, {{ model.floorAreaSqm.toFixed(0) }} m²</small>
                 </div>
                 <div class="card-footer">
-                  <button class="btn btn-sm btn-primary w-100" @click="selectDesign(model.id)">Select Design</button>
+                  <button class="btn btn-sm btn-primary w-100" :disabled="actionLoading" @click="selectDesign(model.id)">
+                    <span v-if="actionLoading" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    Select Design
+                  </button>
                 </div>
               </div>
             </div>
@@ -217,7 +267,7 @@ onMounted(async () => {
         <div class="card-body">
           <h5>Step 3: Customise Your Design</h5>
           <p>Your design has been placed on the land. Move to customisation.</p>
-          <button class="btn btn-primary" @click="moveToCustomising">Start Customising →</button>
+          <ActionButton :loading="actionLoading" loading-text="Starting customisation..." @click="moveToCustomising">Start Customising →</ActionButton>
         </div>
       </div>
 
@@ -226,7 +276,7 @@ onMounted(async () => {
         <div class="card-body">
           <h5>Step 4: Request a Quote</h5>
           <p>Your design is customised. Request an indicative quote from our partner network.</p>
-          <button class="btn btn-primary" @click="requestQuote">💰 Request Indicative Quote</button>
+          <ActionButton :loading="actionLoading" loading-text="Requesting quote..." @click="requestQuote">💰 Request Indicative Quote</ActionButton>
         </div>
       </div>
 
@@ -235,7 +285,7 @@ onMounted(async () => {
         <div class="card-body text-center">
           <h5>Quote Requested</h5>
           <p class="text-muted">Your quote is being prepared by our partner network...</p>
-          <button class="btn btn-outline-primary" @click="checkQuoteReady">Refresh Status</button>
+          <ActionButton :loading="actionLoading" variant="outline-primary" loading-text="Checking..." @click="checkQuoteReady">Refresh Status</ActionButton>
         </div>
       </div>
 
@@ -244,7 +294,7 @@ onMounted(async () => {
         <div class="card-body">
           <h5>✅ Quote Received!</h5>
           <p>Your indicative quote is ready. You can proceed to partner referral.</p>
-          <button class="btn btn-success" @click="completeJourney">🎉 Complete Journey</button>
+          <ActionButton :loading="actionLoading" variant="success" loading-text="Completing..." @click="completeJourney">🎉 Complete Journey</ActionButton>
         </div>
       </div>
 
@@ -252,7 +302,7 @@ onMounted(async () => {
       <div v-if="currentJourney.currentStage === 'Completed' || currentJourney.currentStage === 'Referred'" class="alert alert-success text-center">
         <h4>🎉 Journey Complete!</h4>
         <p>Your journey is complete. Thank you for using Terranes!</p>
-        <button class="btn btn-outline-primary" @click="startNewJourney">Start New Journey</button>
+        <ActionButton :loading="actionLoading" variant="outline-primary" loading-text="Starting..." @click="startNewJourney">Start New Journey</ActionButton>
       </div>
 
       <ErrorAlert :message="errorMessage" />

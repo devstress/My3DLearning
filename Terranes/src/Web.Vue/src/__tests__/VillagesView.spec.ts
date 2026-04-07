@@ -51,7 +51,7 @@ describe('VillagesView', () => {
     const wrapper = mount(VillagesView, {
       global: { plugins: [createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' } }] })] },
     });
-    expect(wrapper.text()).toContain('Loading villages...');
+    expect(wrapper.find('.placeholder-glow').exists()).toBe(true);
   });
 
   it('displays village cards after data loads', async () => {

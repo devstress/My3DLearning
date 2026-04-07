@@ -689,3 +689,54 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - .NET tests: `dotnet test` in Terranes/
 
 **Tests:** 495 total (390 NUnit unit + 56 NUnit integration + 49 Vitest component), all passing
+
+---
+
+## Phase 13 — UX & UI Polish (AI-Driven)
+
+### Chunk 050 — Toast Notifications & Action Feedback (2026-04-07)
+
+**Goal:** Add user-facing feedback for every async action. Create toast notification system and loading-disabled buttons so users always know what's happening.
+
+**Files created:**
+- `rules/ux-rules.md` — AI agent rule for UX/UI implementation (component conventions, design principles, forbidden patterns)
+- `src/Web.Vue/src/composables/useToast.ts` — Global toast state composable: showSuccess, showError, showInfo, removeToast. Auto-dismiss after 5s for success/info, manual dismiss for errors.
+- `src/Web.Vue/src/composables/useAsyncAction.ts` — Loading + toast wrapper for async actions
+- `src/Web.Vue/src/components/ToastContainer.vue` — Bottom-right stacked toast display with enter/leave transitions, aria-live polite region
+- `src/Web.Vue/src/components/ActionButton.vue` — Button with spinner, disabled state, aria-busy during loading
+- `src/Web.Vue/src/__tests__/composables/useToast.spec.ts` — 7 tests: add/remove, auto-dismiss, persistence
+- `src/Web.Vue/src/__tests__/composables/useAsyncAction.spec.ts` — 6 tests: loading state, success/error toasts, result handling
+- `src/Web.Vue/src/__tests__/components/ToastContainer.spec.ts` — 5 tests: empty, success, error, dismiss, stacking
+- `src/Web.Vue/src/__tests__/components/ActionButton.spec.ts` — 8 tests: slots, loading, disabled, variant, size, click, aria-busy
+
+**Files modified:**
+- `src/Web.Vue/src/App.vue` — Added ToastContainer mount
+- `src/Web.Vue/src/views/JourneyView.vue` — All 7 async actions now show toast feedback + ActionButton with loading states
+- `src/Web.Vue/src/views/LandBlocksView.vue` — Test-fit success/error toasts added
+- `src/Web.Vue/package.json` — Added vitest, @vue/test-utils, jsdom devDeps; added test/test:watch scripts
+- `src/Web.Vue/tsconfig.app.json` — Excluded test files from app build
+- `src/Web.Vue/.gitignore` — Added vue-tsc build artifact patterns
+- `rules/milestones.md` — Added Phase 13 with 13 UX chunks; marked Chunk 050 done
+
+**Tests:** 521 total (390 NUnit unit + 56 NUnit integration + 75 Vitest component), all passing
+
+### Chunk 051 — Skeleton Loaders & Smooth Transitions (2026-04-07)
+
+**Goal:** Replace text-based loading indicators with skeleton placeholders that match the final layout shape. Add smooth fade transitions between routes.
+
+**Files created:**
+- `src/Web.Vue/src/components/SkeletonCard.vue` — Configurable card-grid skeleton with count/columns props. Uses Bootstrap's placeholder-glow animation. aria-hidden for screen readers.
+- `src/Web.Vue/src/components/SkeletonTable.vue` — Configurable table skeleton with rows/cols props. Animated placeholder cells.
+- `src/Web.Vue/src/__tests__/components/SkeletonCard.spec.ts` — 5 tests: default count, custom count, column class, animation, accessibility
+- `src/Web.Vue/src/__tests__/components/SkeletonTable.spec.ts` — 3 tests: default rows/cols, custom rows/cols, animation
+
+**Files modified:**
+- `src/Web.Vue/src/App.vue` — Added `<Transition name="fade" mode="out-in">` on RouterView for smooth route transitions
+- `src/Web.Vue/src/style.css` — Added fade transition CSS with prefers-reduced-motion respect
+- `src/Web.Vue/src/views/VillagesView.vue` — Replaced LoadingSpinner with SkeletonCard (3 cards, 3 columns)
+- `src/Web.Vue/src/views/HomeModelsView.vue` — Replaced LoadingSpinner with SkeletonCard (3 cards, 3 columns)
+- `src/Web.Vue/src/views/MarketplaceView.vue` — Replaced LoadingSpinner with SkeletonCard (2 cards, 2 columns)
+- `src/Web.Vue/src/views/LandBlocksView.vue` — Replaced LoadingSpinner with SkeletonTable (5 rows, 8 columns)
+- Updated 4 view tests to check for placeholder-glow instead of text-based loading messages
+
+**Tests:** 529 total (390 NUnit unit + 56 NUnit integration + 83 Vitest component), all passing

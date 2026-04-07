@@ -5,6 +5,10 @@ import type { LandBlock, HomeModel, SitePlacement } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
 import DetailModal from '../components/DetailModal.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
+import SkeletonTable from '../components/SkeletonTable.vue';
+import { useToast } from '../composables/useToast';
+
+const { showSuccess, showError } = useToast();
 
 const blocks = ref<LandBlock[] | null>(null);
 const searchSuburb = ref('');
@@ -32,9 +36,11 @@ async function testFit(model: HomeModel) {
   try {
     placementError.value = null;
     placementResult.value = await api.createSitePlacement(selectedBlock.value!.id, model.id);
+    showSuccess(`✅ ${model.name} placed successfully on ${selectedBlock.value!.address}`);
   } catch (err: unknown) {
     placementError.value = err instanceof Error ? err.message : 'Unknown error';
     placementResult.value = null;
+    showError('Test-fit failed. The design may not fit this block.');
   }
 }
 
@@ -63,7 +69,7 @@ watch([searchSuburb, searchState], search);
       </div>
     </div>
 
-    <LoadingSpinner v-if="blocks === null" message="Loading land blocks..." />
+    <SkeletonTable v-if="blocks === null" :rows="5" :cols="8" />
     <div v-else-if="blocks.length === 0" class="alert alert-info">
       No land blocks found. Try a different search.
     </div>

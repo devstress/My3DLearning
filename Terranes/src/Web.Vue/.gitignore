@@ -1,3 +1,6 @@
 node_modules
 dist
 *.local
+src/**/*.vue.js
+src/**/*.js
+!src/__tests__/**

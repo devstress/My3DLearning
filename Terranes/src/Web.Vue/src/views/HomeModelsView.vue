@@ -2,8 +2,8 @@
 import { ref, onMounted, watch } from 'vue';
 import { api } from '../api/client';
 import type { HomeModel } from '../types';
-import LoadingSpinner from '../components/LoadingSpinner.vue';
 import DetailModal from '../components/DetailModal.vue';
+import SkeletonCard from '../components/SkeletonCard.vue';
 
 const models = ref<HomeModel[] | null>(null);
 const minBedrooms = ref<number | undefined>(undefined);
@@ -50,7 +50,7 @@ watch([minBedrooms, selectedFormat], search);
       </div>
     </div>
 
-    <LoadingSpinner v-if="models === null" message="Loading home designs..." />
+    <SkeletonCard v-if="models === null" :count="3" :columns="3" />
     <div v-else-if="models.length === 0" class="alert alert-info">
       No home designs found matching your criteria.
     </div>
