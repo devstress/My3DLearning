@@ -2,10 +2,8 @@
 // Tutorial 04 – Integration Envelope (Lab)
 // ============================================================================
 // EIP Pattern: Envelope Wrapper, Fault Message
-// End-to-End: Record immutability (`with` expressions), FaultEnvelope
-// creation from failed messages, MessageHistoryEntry for processing audits,
-// all wrapper fields preserved through PointToPointChannel, and complex
-// payloads with complete metadata.
+// Real Integrations: Channel tests use real NATS JetStream via Aspire.
+// Record immutability and FaultEnvelope tests are pure data-structure tests.
 // ============================================================================
 
 using NUnit.Framework;
@@ -22,14 +20,6 @@ public sealed record ShipmentPayload(
 [TestFixture]
 public sealed class Lab
 {
-    private MockEndpoint _output = null!;
-
-    [SetUp]
-    public void SetUp() => _output = new MockEndpoint("output");
-
-    [TearDown]
-    public async Task TearDown() => await _output.DisposeAsync();
-
     // ── 1. Record Immutability & `with` Expressions ─────────────────────
 
     [Test]
@@ -120,24 +110,25 @@ public sealed class Lab
         Assert.That(entries[3].Detail, Is.EqualTo("Timeout"));
     }
 
-    // ── 3. Envelope Fields End-to-End Through Channel ───────────────────
+    // ── 3. Envelope Fields End-to-End Through Real NATS ─────────────────
 
     [Test]
     public async Task Envelope_ExpiresAt_SurvivedChannelDelivery()
     {
-        // ExpiresAt + IsExpired implement the Message Expiration pattern.
-        // The channel preserves the timestamp for downstream consumers
-        // to check and dead-letter expired messages.
+        // ExpiresAt + IsExpired preserved through real NATS JetStream channel.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t04-expiry");
+        var topic = AspireFixture.UniqueTopic("t04-expiry");
+
         var channel = new PointToPointChannel(
-            _output, _output, NullLogger<PointToPointChannel>.Instance);
+            nats, nats, NullLogger<PointToPointChannel>.Instance);
 
         var expiry = DateTimeOffset.UtcNow.AddHours(1);
         var envelope = IntegrationEnvelope<string>.Create(
             "expiring", "source", "type") with { ExpiresAt = expiry };
 
-        await channel.SendAsync(envelope, "topic", CancellationToken.None);
+        await channel.SendAsync(envelope, topic, CancellationToken.None);
 
-        var received = _output.GetReceived<string>();
+        var received = nats.GetReceived<string>();
         Assert.That(received.ExpiresAt, Is.EqualTo(expiry));
         Assert.That(received.IsExpired, Is.False);
     }
@@ -145,10 +136,12 @@ public sealed class Lab
     [Test]
     public async Task Envelope_ReplyTo_RequestReplyPatternThroughChannel()
     {
-        // ReplyTo carries the Return Address — the topic where the sender
-        // expects replies. This enables the Request-Reply EIP pattern.
+        // ReplyTo carries the Return Address through real NATS.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t04-reply");
+        var topic = AspireFixture.UniqueTopic("t04-reply");
+
         var channel = new PointToPointChannel(
-            _output, _output, NullLogger<PointToPointChannel>.Instance);
+            nats, nats, NullLogger<PointToPointChannel>.Instance);
 
         var envelope = IntegrationEnvelope<string>.Create(
             "get-price", "PricingClient", "price.request") with
@@ -157,9 +150,9 @@ public sealed class Lab
             Intent = MessageIntent.Command,
         };
 
-        await channel.SendAsync(envelope, "pricing-requests", CancellationToken.None);
+        await channel.SendAsync(envelope, topic, CancellationToken.None);
 
-        var received = _output.GetReceived<string>();
+        var received = nats.GetReceived<string>();
         Assert.That(received.ReplyTo, Is.EqualTo("pricing-replies"));
         Assert.That(received.Intent, Is.EqualTo(MessageIntent.Command));
     }
@@ -167,11 +160,13 @@ public sealed class Lab
     [Test]
     public async Task Envelope_SplitSequence_ThroughChannel()
     {
-        // SequenceNumber + TotalCount track position within a split batch.
-        // All parts share the same CorrelationId for reassembly.
-        var channel = new PointToPointChannel(
-            _output, _output, NullLogger<PointToPointChannel>.Instance);
+        // SequenceNumber + TotalCount preserved through real NATS.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t04-split");
+        var topic = AspireFixture.UniqueTopic("t04-parts");
         var correlationId = Guid.NewGuid();
+
+        var channel = new PointToPointChannel(
+            nats, nats, NullLogger<PointToPointChannel>.Instance);
 
         for (var i = 0; i < 3; i++)
         {
@@ -182,11 +177,11 @@ public sealed class Lab
                 SequenceNumber = i,
                 TotalCount = 3,
             };
-            await channel.SendAsync(part, "parts", CancellationToken.None);
+            await channel.SendAsync(part, topic, CancellationToken.None);
         }
 
-        _output.AssertReceivedCount(3);
-        var all = _output.GetAllReceived<string>("parts");
+        nats.AssertReceivedCount(3);
+        var all = nats.GetAllReceived<string>(topic);
         Assert.That(all[0].SequenceNumber, Is.EqualTo(0));
         Assert.That(all[2].SequenceNumber, Is.EqualTo(2));
         Assert.That(all.Select(m => m.CorrelationId).Distinct().Count(), Is.EqualTo(1));
@@ -195,8 +190,10 @@ public sealed class Lab
     [Test]
     public async Task Envelope_MetadataHeaders_WellKnownConstants()
     {
-        // MessageHeaders provides well-known keys for the Metadata dictionary.
-        // Using constants prevents typos and ensures cross-service consistency.
+        // MessageHeaders constants preserved through real NATS.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t04-headers");
+        var topic = AspireFixture.UniqueTopic("t04-headers");
+
         var envelope = IntegrationEnvelope<string>.Create(
             "traced", "source", "type") with
         {
@@ -209,9 +206,9 @@ public sealed class Lab
             },
         };
 
-        await _output.PublishAsync(envelope, "events");
+        await nats.PublishAsync(envelope, topic);
 
-        var received = _output.GetReceived<string>();
+        var received = nats.GetReceived<string>();
         Assert.That(received.Metadata, Has.Count.EqualTo(4));
         Assert.That(received.Metadata[MessageHeaders.ContentType], Is.EqualTo("application/json"));
         Assert.That(received.Metadata[MessageHeaders.TraceId], Is.EqualTo("abc-123"));
@@ -220,10 +217,12 @@ public sealed class Lab
     [Test]
     public async Task Envelope_AllFields_ComplexPayloadThroughChannel()
     {
-        // A real-world envelope carries every wrapper field simultaneously.
-        // The channel preserves the complete envelope without field loss.
+        // A real-world envelope with every field survives real NATS channel delivery.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t04-allfields");
+        var topic = AspireFixture.UniqueTopic("t04-ship");
+
         var channel = new PointToPointChannel(
-            _output, _output, NullLogger<PointToPointChannel>.Instance);
+            nats, nats, NullLogger<PointToPointChannel>.Instance);
 
         var shipment = new ShipmentPayload("SHIP-1", "FedEx", 12.5m,
             new[] { "SKU-001", "SKU-002" });
@@ -246,10 +245,10 @@ public sealed class Lab
             },
         };
 
-        await channel.SendAsync(envelope, "shipments", CancellationToken.None);
+        await channel.SendAsync(envelope, topic, CancellationToken.None);
 
-        _output.AssertReceivedCount(1);
-        var received = _output.GetReceived<ShipmentPayload>();
+        nats.AssertReceivedCount(1);
+        var received = nats.GetReceived<ShipmentPayload>();
         Assert.That(received.Payload.ShipmentId, Is.EqualTo("SHIP-1"));
         Assert.That(received.Payload.Carrier, Is.EqualTo("FedEx"));
         Assert.That(received.SchemaVersion, Is.EqualTo("2.0"));
