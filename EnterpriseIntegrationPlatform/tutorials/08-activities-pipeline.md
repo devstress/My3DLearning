@@ -2,7 +2,15 @@
 
 Activity service interfaces, the Pipes-and-Filters pipeline, and end-to-end message orchestration via Temporal.
 
----
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Validate message payloads using `DefaultMessageValidationService` with JSON schema checks
+2. Construct `IntegrationPipelineInput` and `IntegrationPipelineResult` records for workflow execution
+3. Build multi-stage pipelines (Validate → Publish, Persist → Validate → Publish)
+4. Route validation failures to the Invalid Message Channel as a dead-letter queue
+5. Chain four pipeline stages (Persist → Validate → Log → Publish) with audit trail verification
 
 ## Key Types
 
@@ -74,138 +82,47 @@ public sealed record IntegrationPipelineInput(
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Verify activity classes exist with expected methods
+> **Purpose:** Run each test in order to see how validation, pipeline input/result records,
+> and multi-stage pipeline patterns work through DefaultMessageValidationService and MockEndpoint.
+> Read the code and comments to understand each concept before moving to the Exam.
 
-```csharp
-var assembly = typeof(TemporalOptions).Assembly;
-
-var integrationActivities = assembly.GetTypes()
-    .FirstOrDefault(t => t.Name == "IntegrationActivities");
-Assert.That(integrationActivities, Is.Not.Null);
-Assert.That(integrationActivities!.GetMethod("ValidateMessageAsync"), Is.Not.Null);
-Assert.That(integrationActivities.GetMethod("LogProcessingStageAsync"), Is.Not.Null);
-
-var pipelineActivities = assembly.GetTypes()
-    .FirstOrDefault(t => t.Name == "PipelineActivities");
-Assert.That(pipelineActivities, Is.Not.Null);
-
-var methodNames = pipelineActivities!
-    .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-    .Select(m => m.Name).ToList();
-
-Assert.That(methodNames, Does.Contain("PersistMessageAsync"));
-Assert.That(methodNames, Does.Contain("UpdateDeliveryStatusAsync"));
-Assert.That(methodNames, Does.Contain("SaveFaultAsync"));
-Assert.That(methodNames, Does.Contain("PublishAckAsync"));
-Assert.That(methodNames, Does.Contain("PublishNackAsync"));
-Assert.That(methodNames, Does.Contain("LogStageAsync"));
-
-var sagaActivities = assembly.GetTypes()
-    .FirstOrDefault(t => t.Name == "SagaCompensationActivities");
-Assert.That(sagaActivities, Is.Not.Null);
-Assert.That(sagaActivities!.GetMethod("CompensateStepAsync"), Is.Not.Null);
-```
-
-### 2. Pipeline: Create → Validate → Transform → Route
-
-```csharp
-var validationService = Substitute.For<IMessageValidationService>();
-var loggingService = Substitute.For<IMessageLoggingService>();
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-const string messageType = "order.created";
-const string payloadJson = "{\"orderId\": \"ORD-500\"}";
-
-// Step 1: Create envelope
-var envelope = IntegrationEnvelope<string>.Create(
-    payloadJson, "OrderService", messageType) with
-{
-    Intent = MessageIntent.Command,
-};
-Assert.That(envelope.MessageId, Is.Not.EqualTo(Guid.Empty));
-
-// Step 2: Validate
-validationService.ValidateAsync(messageType, payloadJson)
-    .Returns(MessageValidationResult.Success);
-var validationResult = await validationService.ValidateAsync(messageType, payloadJson);
-Assert.That(validationResult.IsValid, Is.True);
-
-// Step 3: Transform — enrich metadata
-envelope = envelope with
-{
-    Metadata = new Dictionary<string, string>(envelope.Metadata)
-    {
-        ["region"] = "us-east",
-        ["validated"] = "true",
-    },
-};
-Assert.That(envelope.Metadata["region"], Is.EqualTo("us-east"));
-
-// Step 4: Route — publish to destination
-await producer.PublishAsync(envelope, "orders.us-east");
-
-await producer.Received(1).PublishAsync(
-    Arg.Is<IntegrationEnvelope<string>>(
-        e => e.Metadata.ContainsKey("region") && e.Metadata["region"] == "us-east"),
-    Arg.Is("orders.us-east"),
-    Arg.Any<CancellationToken>());
-```
-
-### 3. Chained activities: Persist → Log → Validate → Log
-
-```csharp
-var persistenceService = Substitute.For<IPersistenceActivityService>();
-var loggingService = Substitute.For<IMessageLoggingService>();
-var validationService = Substitute.For<IMessageValidationService>();
-
-var input = new IntegrationPipelineInput(
-    MessageId: Guid.NewGuid(), CorrelationId: Guid.NewGuid(),
-    CausationId: null, Timestamp: DateTimeOffset.UtcNow,
-    Source: "Lab08", MessageType: "lab.pipeline",
-    SchemaVersion: "1.0", Priority: 1,
-    PayloadJson: "{\"item\": \"widget\"}", MetadataJson: null,
-    AckSubject: "ack.lab08", NackSubject: "nack.lab08");
-
-persistenceService.SaveMessageAsync(input, Arg.Any<CancellationToken>())
-    .Returns(Task.CompletedTask);
-loggingService.LogAsync(input.MessageId, input.MessageType, Arg.Any<string>())
-    .Returns(Task.CompletedTask);
-validationService.ValidateAsync(input.MessageType, input.PayloadJson)
-    .Returns(MessageValidationResult.Success);
-
-await persistenceService.SaveMessageAsync(input);
-await loggingService.LogAsync(input.MessageId, input.MessageType, "Received");
-var result = await validationService.ValidateAsync(input.MessageType, input.PayloadJson);
-await loggingService.LogAsync(input.MessageId, input.MessageType,
-    result.IsValid ? "Validated" : "ValidationFailed");
-
-Received.InOrder(() =>
-{
-    persistenceService.SaveMessageAsync(input, Arg.Any<CancellationToken>());
-    loggingService.LogAsync(input.MessageId, input.MessageType, "Received");
-    validationService.ValidateAsync(input.MessageType, input.PayloadJson);
-    loggingService.LogAsync(input.MessageId, input.MessageType, "Validated");
-});
-```
-
----
-
-## Lab
+| # | Test | Concept |
+|---|------|---------|
+| 1 | `ValidationStage_ValidJsonPayload_Succeeds` | Valid JSON payload passes validation |
+| 2 | `ValidationStage_EmptyPayload_FailsWithReason` | Empty payload rejected with reason |
+| 3 | `ValidationStage_NonJsonPayload_FailsWithReason` | Non-JSON payload rejected with reason |
+| 4 | `IntegrationPipelineInput_RecordConstruction_AllFields` | Pipeline input record construction |
+| 5 | `IntegrationPipelineResult_SuccessAndFailure_RecordSemantics` | Pipeline result success/failure semantics |
+| 6 | `PipelineChain_ValidateAndPublish_EndToEnd` | Two-stage pipeline: Validate → Publish |
+| 7 | `PipelineChain_ValidationFails_RoutesToInvalidChannel` | Validation failure routes to Invalid Message Channel |
+| 8 | `PipelineChain_PersistValidatePublish_ThreeStages` | Three-stage pipeline: Persist → Validate → Publish |
+| 9 | `PipelineChain_PersistValidateLogPublish_FourStages` | Four-stage pipeline with audit logging |
 
 > 💻 [`tests/TutorialLabs/Tutorial08/Lab.cs`](../tests/TutorialLabs/Tutorial08/Lab.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial08.Lab"
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial08.Lab"
 ```
 
-## Exam
+---
+
+## Exam — Assessment Challenges
+
+> **Purpose:** Prove you can apply pipeline patterns in realistic scenarios —
+> metadata enrichment, DLQ routing on failure, and full multi-stage verification.
+
+| Difficulty | Challenge | What you prove |
+|------------|-----------|---------------|
+| 🟢 Starter | `Starter_EnrichAndPublish_MetadataPreserved` | Enrich envelope metadata and verify preservation through pipeline |
+| 🟡 Intermediate | `Intermediate_ValidationFailure_RoutesDlqAndSkipsOutput` | Route invalid messages to DLQ while skipping normal output |
+| 🔴 Advanced | `Advanced_MultiStage_PersistValidatePublishVerify` | Full Persist → Validate → Publish pipeline with audit logging |
 
 > 💻 [`tests/TutorialLabs/Tutorial08/Exam.cs`](../tests/TutorialLabs/Tutorial08/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial08.Exam"
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial08.Exam"
 ```
 
 ---
