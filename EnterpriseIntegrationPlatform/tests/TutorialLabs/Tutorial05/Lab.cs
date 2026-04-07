@@ -35,11 +35,12 @@ public sealed class Lab
     [Test]
     public void BrokerType_AllProtocols_Enumerated()
     {
-        // The platform supports three broker protocols.
-        Assert.That(Enum.GetValues<BrokerType>(), Has.Length.EqualTo(3));
+        // The platform supports four broker protocols.
+        Assert.That(Enum.GetValues<BrokerType>(), Has.Length.EqualTo(4));
         Assert.That((int)BrokerType.NatsJetStream, Is.EqualTo(0));
         Assert.That((int)BrokerType.Kafka, Is.EqualTo(1));
         Assert.That((int)BrokerType.Pulsar, Is.EqualTo(2));
+        Assert.That((int)BrokerType.Postgres, Is.EqualTo(3));
     }
 
     // ── 2. Protocol-Agnostic Publishing (Real NATS) ─────────────────────
