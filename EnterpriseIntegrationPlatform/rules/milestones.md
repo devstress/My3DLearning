@@ -102,14 +102,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Chunk 301 — ✅ Done — see `rules/completion-log.md`
 
-### Chunk 302 — Kafka provider hardening
-
-| Status | `not-started` |
-|---|---|
-| **Goal** | Harden `Ingestion.Kafka` from demo-grade to production-grade. |
-| **Changes** | (a) Add `KafkaOptions` class (IOptions pattern) with `BootstrapServers`, `Acks`, `EnableIdempotence`, `CompressionType`, `LingerMs`, `BatchSize`, `SessionTimeoutMs`, `GroupId`, `AutoOffsetReset`, `EnableAutoCommit`. (b) Implement `IAsyncDisposable` on Producer (flush + dispose) and Consumer (close + dispose). (c) Add `KafkaHealthCheck : IHealthCheck` that queries broker metadata. (d) Update `KafkaServiceExtensions` to use `IOptions<KafkaOptions>`, register health check, apply tuning defaults. (e) Remove `Program.cs` stub or replace with proper hosted-service wiring. (f) Add OpenTelemetry `ActivitySource` tracing on produce/consume. |
-| **Tests** | New/expanded unit tests: `KafkaOptionsTests.cs` (validation, defaults, tuning), `KafkaHealthCheckTests.cs` (healthy/unhealthy), update existing `KafkaServiceExtensionsTests.cs`. Minimum 12 new tests. |
-| **Acceptance** | `dotnet build` 0 warnings. All existing + new tests pass. Kafka provider LOC increases from ~207 to ~450+. |
+### Chunk 302 — ✅ Done — see `rules/completion-log.md`
 
 ### Chunk 303 — Pulsar provider hardening
 
@@ -162,7 +155,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Next Chunk
 
-**Chunk 302** — Kafka provider hardening.
+**Chunk 303** — Pulsar provider hardening.
 
 ---
 

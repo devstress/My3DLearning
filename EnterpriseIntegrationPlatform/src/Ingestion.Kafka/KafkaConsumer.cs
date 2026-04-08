@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Confluent.Kafka;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
@@ -12,8 +13,12 @@ namespace EnterpriseIntegrationPlatform.Ingestion.Kafka;
 /// </summary>
 public sealed class KafkaConsumer : IMessageBrokerConsumer
 {
+    internal static readonly ActivitySource ActivitySource = new("EIP.Ingestion.Kafka.Consumer");
+
     private readonly ConsumerConfig _config;
     private readonly ILogger<KafkaConsumer> _logger;
+    private readonly CancellationTokenSource _disposeCts = new();
+    private bool _disposed;
 
     /// <summary>Initialises a new <see cref="KafkaConsumer"/>.</summary>
     public KafkaConsumer(ConsumerConfig config, ILogger<KafkaConsumer> logger)
@@ -31,6 +36,7 @@ public sealed class KafkaConsumer : IMessageBrokerConsumer
         Func<IntegrationEnvelope<T>, Task> handler,
         CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(topic);
         ArgumentException.ThrowIfNullOrWhiteSpace(consumerGroup);
         ArgumentNullException.ThrowIfNull(handler);
@@ -42,6 +48,7 @@ public sealed class KafkaConsumer : IMessageBrokerConsumer
             EnableAutoCommit = false,
         };
 
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
         using var consumer = new ConsumerBuilder<string, byte[]>(config).Build();
         consumer.Subscribe(topic);
 
@@ -49,11 +56,15 @@ public sealed class KafkaConsumer : IMessageBrokerConsumer
             "Subscribed to Kafka topic {Topic} with consumer group {Group}",
             topic, consumerGroup);
 
-        while (!cancellationToken.IsCancellationRequested)
+        while (!linked.Token.IsCancellationRequested)
         {
+            using var activity = ActivitySource.StartActivity("Kafka.Consume");
+            activity?.SetTag("messaging.system", "kafka");
+            activity?.SetTag("messaging.destination", topic);
+
             try
             {
-                var result = consumer.Consume(cancellationToken);
+                var result = consumer.Consume(linked.Token);
                 if (result?.Message?.Value is null)
                 {
                     continue;
@@ -67,6 +78,8 @@ public sealed class KafkaConsumer : IMessageBrokerConsumer
                     consumer.Commit(result);
                     continue;
                 }
+
+                activity?.SetTag("messaging.message_id", envelope.MessageId.ToString());
 
                 await handler(envelope);
                 consumer.Commit(result);
@@ -86,8 +99,17 @@ public sealed class KafkaConsumer : IMessageBrokerConsumer
                     "Error processing message from Kafka topic {Topic}", topic);
             }
         }
+
+        consumer.Close();
     }
 
     /// <inheritdoc />
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await _disposeCts.CancelAsync();
+        _disposeCts.Dispose();
+    }
 }

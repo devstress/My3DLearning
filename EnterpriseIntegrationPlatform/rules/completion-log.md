@@ -4,6 +4,28 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 302 — Kafka provider hardening
+
+- **Date**: 2026-04-08
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Harden Kafka provider with IOptions pattern, health check, ActivitySource tracing, proper IAsyncDisposable (flush+dispose on producer, cancel+close on consumer), ObjectDisposedException guards.
+- **Files created**:
+  - `src/Ingestion.Kafka/KafkaOptions.cs` — 11 configurable properties (BootstrapServers, Acks, EnableIdempotence, CompressionType, LingerMs, BatchSize, SessionTimeoutMs, GroupId, AutoOffsetReset, EnableAutoCommit) + Validate()
+  - `src/Ingestion.Kafka/KafkaHealthCheck.cs` — IHealthCheck verifying producer handle health
+  - `tests/UnitTests/KafkaOptionsTests.cs` — 20 tests: defaults, section name, validation happy/error paths
+  - `tests/UnitTests/KafkaHealthCheckTests.cs` — 5 tests: constructor validation, healthy/unhealthy paths
+- **Files modified**:
+  - `src/Ingestion.Kafka/KafkaProducer.cs` — Added IAsyncDisposable, ActivitySource tracing, ObjectDisposedException guard, flush before dispose
+  - `src/Ingestion.Kafka/KafkaConsumer.cs` — Added ActivitySource tracing, linked CancellationTokenSource for DisposeAsync, ObjectDisposedException guard, consumer.Close() on exit
+  - `src/Ingestion.Kafka/KafkaServiceExtensions.cs` — IOptions<KafkaOptions>, producer tuning (Acks, idempotence, compression, linger, batch), consumer tuning (session timeout, auto-offset, auto-commit), KafkaHealthCheck registration
+  - `src/Ingestion.Kafka/Ingestion.Kafka.csproj` — Added HealthChecks.Abstractions + Options package refs
+  - `tests/UnitTests/KafkaProducerTests.cs` — Added 4 tests: flush+dispose, double-dispose, DisposeAsync, ObjectDisposedException after dispose
+  - `tests/UnitTests/KafkaConsumerTests.cs` — Replaced trivial DisposeAsync test with 3 real tests: safe dispose, double-dispose, ObjectDisposedException after dispose
+  - `tests/UnitTests/KafkaServiceExtensionsTests.cs` — Added 2 tests: IOptions<KafkaOptions> registration, KafkaHealthCheck registration
+- **Test counts after**:
+  - UnitTests: 1591 (was 1560, +31 new tests)
+
 ## Chunk 301 — NATS JetStream provider hardening
 
 - **Date**: 2026-04-08
