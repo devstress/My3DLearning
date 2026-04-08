@@ -1,6 +1,6 @@
 # Enterprise Integration Platform
 
-A .NET 10 integration platform that implements the complete pattern catalog from [*Enterprise Integration Patterns*](https://www.enterpriseintegrationpatterns.com/) by Gregor Hohpe and Bobby Woolf. The platform provides interchangeable message brokers (NATS JetStream, Kafka, Pulsar, PostgreSQL), durable workflow orchestration via [Temporal.io](https://temporal.io/), and a self-hosted RAG system for developer productivity.
+An AI-driven integration platform built on [.NET Aspire](https://learn.microsoft.com/dotnet/aspire/), [Temporal.io](https://temporal.io/), and interchangeable message brokers (NATS JetStream, Kafka, Pulsar, PostgreSQL). The platform implements the complete [*Enterprise Integration Patterns*](https://www.enterpriseintegrationpatterns.com/) catalog by Gregor Hohpe and Bobby Woolf, with AI embedded throughout the development lifecycle — from code generation and knowledge retrieval to natural-language observability and intelligent message tracing. Temporal.io's polyglot SDK support (Go, Java, Python, TypeScript, .NET, PHP) enables teams to extend workflows in the language best suited to each task.
 
 ---
 
@@ -30,11 +30,12 @@ Apache Camel is a mature, widely adopted integration framework with over 300 con
 |---|---|---|
 | **Workflow orchestration** | Camel routes are stateless. Long-running processes requiring durable state, restart recovery, or saga compensation require a separate workflow engine (e.g., Temporal, Camunda). | Temporal.io is integrated as the workflow engine. Workflows are durable, survive process restarts and infrastructure failures, and support saga compensation natively. |
 | **Broker abstraction** | Routes are written against specific broker components (`camel-kafka`, `camel-jms`, etc.). Changing the underlying broker typically requires route modifications. | The broker is a deployment-time configuration choice. Integration code runs unchanged on NATS JetStream, Kafka, Pulsar, or PostgreSQL. |
-| **Language ecosystem** | Java/JVM-centric. Camel K and Quarkus provide cloud-native deployment options within the JVM ecosystem. | .NET/C# throughout. This is relevant for organizations already running .NET — particularly former BizTalk environments — where a JVM migration would introduce additional ecosystem complexity. |
-| **Operational features** | Administration dashboards, tenant isolation, and business activity monitoring must be built or sourced separately (e.g., Red Hat Fuse, Hawtio). | Includes Admin API, admin dashboard, multi-tenant isolation, OpenTelemetry observability, and message lifecycle tracing. |
+| **Language support** | Java/JVM-centric. Camel K and Quarkus provide cloud-native deployment options within the JVM ecosystem. | Polyglot via Temporal.io SDKs. The platform core is .NET/C#, but workflow activities and workers can be implemented in Go, Java, Python, TypeScript, or PHP through Temporal's native multi-language support. .NET Aspire orchestrates services regardless of runtime. |
+| **AI integration** | No built-in AI capabilities. AI-assisted development, observability, or knowledge retrieval must be sourced separately. | AI is a core architectural pillar: self-hosted RAG (RagFlow + Ollama) for developer context retrieval, natural-language message tracing (OpenClaw), and AI-assisted code generation integrated into the development workflow. |
+| **Operational features** | Administration dashboards, tenant isolation, and business activity monitoring must be built or sourced separately (e.g., Red Hat Fuse, Hawtio). | Includes Admin API, admin dashboard, multi-tenant isolation, OpenTelemetry observability, and AI-powered message lifecycle tracing. |
 | **Security model** | Security is configured at the individual component level. Centralized input sanitization, payload validation, secret rotation, and tenant isolation are left to the implementation team. | Security, secret management (Azure Key Vault, HashiCorp Vault), and multi-tenant isolation are built into the platform as cross-cutting concerns. |
 
-**Where Camel is the stronger choice:** Camel's connector ecosystem (300+ components) is substantially broader than this platform's four connector types (HTTP, SFTP, Email, File). Organizations whose primary requirement is connecting to a wide variety of heterogeneous systems with minimal custom code will find Camel more immediately productive. This platform prioritizes depth of EIP pattern implementation, broker interchangeability, and operational completeness over connector breadth.
+**Where Camel is the stronger choice:** Camel's connector ecosystem (300+ components) is substantially broader than this platform's four connector types (HTTP, SFTP, Email, File). Organizations whose primary requirement is connecting to a wide variety of heterogeneous systems with minimal custom code will find Camel more immediately productive. This platform prioritizes AI-driven development, depth of EIP pattern implementation, broker interchangeability, and operational completeness over connector breadth.
 
 ### Comparison with Azure Integration Services
 
@@ -63,57 +64,84 @@ However, the book's implementation context predates modern infrastructure:
 
 This platform addresses that gap. Every pattern from every chapter — Messaging Channels, Message Construction, Message Routing, Message Transformation, Messaging Endpoints, and System Management — is mapped to a platform component, implemented in C#, and covered by automated tests. See [`docs/eip-mapping.md`](docs/eip-mapping.md) for the complete pattern-to-implementation mapping.
 
-### AI Integration Strategy
+### AI-Driven Architecture
 
-This platform takes a focused approach to AI, applying it to two specific problem areas rather than positioning AI as a general-purpose integration capability:
+AI is a core architectural pillar of this platform, embedded across the development lifecycle rather than limited to a single feature:
 
-1. **Developer context retrieval (RAG):** A self-hosted RagFlow + Ollama deployment indexes the platform's source code, documentation, and architectural rules. Developers query this knowledge base through the OpenClaw API and use the retrieved context with their preferred AI code generation tool (GitHub Copilot, OpenAI Codex, Claude Code, etc.). All data remains on-premises; no source code or documentation is transmitted to external services.
+1. **AI-Assisted Development (RAG):** A self-hosted RagFlow + Ollama deployment indexes the platform's source code, documentation, and architectural rules. Developers query this knowledge base through the OpenClaw API and use the retrieved context with their preferred AI code generation tool (GitHub Copilot, OpenAI Codex, Claude Code, etc.). The RAG system accelerates onboarding, reduces context-switching overhead, and ensures AI-generated code aligns with platform conventions. All data remains on-premises; no source code or documentation is transmitted to external services.
 
-2. **Message lifecycle tracing (OpenClaw):** The OpenClaw web UI accepts natural-language queries such as "where is my message?" and translates them into structured queries against the OpenTelemetry observability layer (backed by Grafana Loki). This is an AI-assisted search interface over structured telemetry data, designed for operations and support teams troubleshooting message flows.
+2. **AI-Powered Observability (OpenClaw):** The OpenClaw web UI accepts natural-language queries — "where is my message?", "show me failed orders from tenant X" — and translates them into structured queries against the OpenTelemetry observability layer (backed by Grafana Loki). This transforms operations from manual log-trawling into an AI-assisted investigation workflow, reducing mean time to resolution for support teams.
 
-The platform does not position AI as a substitute for integration architecture expertise. AI-generated code follows the same validation pipeline as manually written code: compilation, static analysis, automated tests, and human review.
+3. **AI-Driven Code Generation Workflow:** The platform's architecture rules, coding standards, and EIP pattern mappings are structured specifically for AI consumption. AI agents (GitHub Copilot, Claude Code, etc.) can generate compliant integration code, transformation activities, and workflow definitions by referencing the platform's RAG-indexed knowledge base. Generated code follows the same validation pipeline as manually written code: compilation, static analysis, 2,000+ automated tests, and human review.
+
+4. **Intelligent Knowledge Management:** The `AI.RagKnowledge` module parses the platform's documentation and source code into queryable knowledge fragments. This enables both human developers and AI agents to discover pattern implementations, find code examples, and understand architectural decisions through natural-language queries rather than manual file navigation.
+
+### Polyglot Language Support via Temporal.io
+
+While the platform core is implemented in .NET/C# 14, [Temporal.io](https://temporal.io/) provides native polyglot workflow support through its multi-language SDK architecture. Organizations can implement workflow activities and workers in the language best suited to each task:
+
+| Language | Temporal SDK | Use Case |
+|---|---|---|
+| .NET/C# | [Temporalio for .NET](https://github.com/temporalio/sdk-dotnet) | Platform core, EIP pattern activities, business rules |
+| Go | [Temporal Go SDK](https://github.com/temporalio/sdk-go) | High-performance data processing, infrastructure automation |
+| Java | [Temporal Java SDK](https://github.com/temporalio/sdk-java) | JVM-based legacy system integration, Apache Camel bridge |
+| Python | [Temporal Python SDK](https://github.com/temporalio/sdk-python) | Data science pipelines, ML model inference, ETL scripts |
+| TypeScript | [Temporal TypeScript SDK](https://github.com/temporalio/sdk-typescript) | Frontend-adjacent workflows, Node.js service integration |
+| PHP | [Temporal PHP SDK](https://github.com/temporalio/sdk-php) | Legacy PHP system integration |
+
+This polyglot capability means teams are not locked into a single language ecosystem. A .NET-native organization can adopt the platform immediately using C#, then extend it with Python-based ML activities or Go-based high-throughput processors as requirements evolve — all orchestrated by the same Temporal workflow engine and .NET Aspire orchestrator.
+
+### .NET Aspire as the Orchestration Layer
+
+[.NET Aspire](https://learn.microsoft.com/dotnet/aspire/) serves as the platform's orchestration and service composition layer, providing:
+
+- **Single-command local development:** `dotnet run --project src/AppHost` launches all platform services, message brokers, Temporal server, Cassandra, Ollama, and supporting infrastructure in one command.
+- **Service discovery:** Aspire manages service endpoints and connection strings across all platform components, eliminating manual configuration.
+- **Health monitoring:** Built-in health checks and the Aspire dashboard provide real-time visibility into all services, logs, traces, and metrics.
+- **Multi-runtime orchestration:** Aspire orchestrates .NET services, Vue.js frontends, and containerized infrastructure (Kafka, NATS, Pulsar, PostgreSQL, Temporal, Cassandra, Ollama) as a unified application model.
 
 ### Target Use Cases
 
 This platform is designed for organizations that:
 
-1. **Operate on the .NET ecosystem** and require integration middleware that aligns with existing development practices and toolchains.
-2. **Require broker flexibility** — the ability to select NATS JetStream, Kafka, Pulsar, or PostgreSQL at deployment time without modifying integration code.
-3. **Require durable workflow orchestration** — long-running processes with saga compensation that survive infrastructure failures.
-4. **Have data sovereignty requirements** — all data remains within organizational infrastructure, with no external cloud provider dependency.
-5. **Are migrating from BizTalk Server** — documented concept mapping from BizTalk artifacts (orchestrations, maps, pipelines, ports) to platform equivalents is provided in [`docs/migration-from-biztalk.md`](docs/migration-from-biztalk.md).
+1. **Require AI-driven integration development** — AI-assisted code generation, natural-language observability, and RAG-powered knowledge retrieval embedded throughout the development and operations lifecycle.
+2. **Operate on the .NET ecosystem** and require integration middleware that aligns with existing development practices and toolchains, with the flexibility to extend workflows in other languages via Temporal.io.
+3. **Require broker flexibility** — the ability to select NATS JetStream, Kafka, Pulsar, or PostgreSQL at deployment time without modifying integration code.
+4. **Require durable workflow orchestration** — long-running processes with saga compensation that survive infrastructure failures, with polyglot language support for workflow activities.
+5. **Have data sovereignty requirements** — all data, including AI models and RAG indices, remains within organizational infrastructure with no external cloud provider dependency.
+6. **Are migrating from BizTalk Server** — documented concept mapping from BizTalk artifacts (orchestrations, maps, pipelines, ports) to platform equivalents is provided in [`docs/migration-from-biztalk.md`](docs/migration-from-biztalk.md).
 
 ### Scope and Limitations
 
-- **Code-first platform.** All integrations are implemented in C#. This platform does not provide low-code or visual design tooling. Organizations requiring drag-and-drop integration design should evaluate Logic Apps, MuleSoft Anypoint, or Boomi.
+- **Code-first platform.** All integrations are implemented in code. The platform core uses C#, with polyglot extension support via Temporal.io SDKs. This platform does not provide low-code or visual design tooling. Organizations requiring drag-and-drop integration design should evaluate Logic Apps, MuleSoft Anypoint, or Boomi.
 - **Limited connector catalog.** The platform includes four connector types: HTTP, SFTP, Email, and File. Organizations requiring broad connectivity to heterogeneous systems (databases, SaaS APIs, mainframes) should evaluate Apache Camel (300+ connectors) or MuleSoft (1,000+ connectors).
 - **Production maturity.** The platform is well-architected and covered by 2,000+ automated tests across unit, integration, contract, workflow, browser, and load test suites. However, it has not been validated at scale in high-throughput production environments. BizTalk Server, Apache Camel, and MuleSoft have established production track records measured in billions of messages.
-- **Not a universal Camel replacement.** For Java/JVM organizations whose primary requirement is connecting to diverse systems with minimal custom code, Apache Camel remains the more appropriate choice.
+- **Not a universal Camel replacement.** For Java/JVM organizations whose primary requirement is connecting to diverse systems with minimal custom code, Apache Camel remains the more appropriate choice. However, Temporal.io's polyglot SDKs enable JVM teams to participate in workflows without migrating away from Java.
 
 ---
 
 ## Highlights
 
+- **AI-Driven Development** — Self-hosted RAG (RagFlow + Ollama) indexes the platform's source code and documentation. AI-powered code generation, natural-language observability queries, and intelligent knowledge retrieval are embedded across the development and operations lifecycle. All data remains on-premises.
 - **Interchangeable Message Brokers** — NATS JetStream (default), Apache Kafka, Apache Pulsar Key_Shared, or PostgreSQL (SKIP LOCKED). Broker selection is a deployment-time configuration choice. Per-recipient message isolation ensures that slow consumers do not block other recipients.
-- **Temporal Workflow Orchestration** — Durable, stateful workflows with automatic retry, saga compensation, and signal handling via [Temporal.io](https://temporal.io/). Workflows survive process crashes and infrastructure failures.
+- **Temporal Workflow Orchestration** — Durable, stateful workflows with automatic retry, saga compensation, and signal handling via [Temporal.io](https://temporal.io/). Workflows survive process crashes and infrastructure failures. Polyglot SDK support enables activities in Go, Java, Python, TypeScript, .NET, or PHP.
 - **Complete EIP Pattern Coverage** — Systematic implementation of every pattern from the Hohpe/Woolf catalog across all six chapters. See [`docs/eip-mapping.md`](docs/eip-mapping.md).
-- **Self-Hosted RAG (OpenClaw)** — RagFlow + Ollama index the platform's source code and documentation. Developers retrieve context via API and use their preferred AI provider for code generation. All data remains on-premises.
-- **.NET Aspire Orchestration** — Single-command local orchestration of all services, brokers, and infrastructure containers.
-- **OpenTelemetry Observability** — Vendor-neutral distributed tracing, Prometheus metrics, and structured logging across every platform layer.
+- **.NET Aspire Orchestration** — Single-command orchestration of all services, message brokers, Temporal server, AI runtime, and infrastructure containers via [.NET Aspire](https://learn.microsoft.com/dotnet/aspire/).
+- **OpenTelemetry Observability** — Vendor-neutral distributed tracing, Prometheus metrics, and structured logging across every platform layer, with AI-powered natural-language query support via OpenClaw.
 
 ## Architecture
 
 ```
-                         Enterprise Integration Platform
+                         Enterprise Integration Platform (AI-Driven)
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                                                                          │
 │  ┌──────────┐    ┌───────────┐    ┌───────────┐    ┌──────────────────┐  │
 │  │ Ingress  │───▶│  Broker   │───▶│ Temporal  │───▶│   Activities     │  │
 │  │ Adapters │    │  Layer    │    │ Workflows │    │ (Transform/Route)│  │
 │  └──────────┘    └───────────┘    └───────────┘    └────────┬─────────┘  │
-│       ▲                │                                    │            │
-│       │                ▼                                    ▼            │
-│  ┌────┴─────┐    ┌───────────┐                     ┌──────────────────┐ │
+│       ▲                │            (Polyglot)              │            │
+│       │                ▼           Go/Java/Python           ▼            │
+│  ┌────┴─────┐    ┌───────────┐    .NET/TS/PHP      ┌──────────────────┐ │
 │  │ External │    │   DLQ     │                     │   Connectors     │ │
 │  │ Systems  │    │  Topics   │                     │ (HTTP/SFTP/Email)│ │
 │  └──────────┘    └───────────┘                     └────────┬─────────┘ │
@@ -122,9 +150,14 @@ This platform is designed for organizations that:
 │  │                                                                      │
 │  ▼                                                                      │
 │  ┌──────────────┐    ┌──────────────────┐    ┌────────────────────────┐ │
-│  │  Cassandra   │    │  OpenTelemetry   │    │   Ollama AI Runtime   │ │
-│  │  (Storage)   │    │  (Observability) │    │   (RAG Retrieval)     │ │
-│  └──────────────┘    └──────────────────┘    └────────────────────────┘ │
+│  │  Cassandra   │    │  OpenTelemetry   │    │  AI Runtime (Ollama)  │ │
+│  │  (Storage)   │    │  (Observability) │    │  RAG · Code Gen ·     │ │
+│  └──────────────┘    └──────────────────┘    │  NL Observability     │ │
+│                                              └────────────────────────┘ │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │                    .NET Aspire Orchestrator                        │  │
+│  │     Services · Brokers · Temporal · AI · Infrastructure           │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -244,10 +277,11 @@ EnterpriseIntegrationPlatform/
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Workflow engine | Temporal over Durable Functions | Portable, language-agnostic, mature saga/compensation support |
+| AI strategy | Self-hosted RAG (RagFlow + Ollama) + AI-driven development | AI is a core pillar: context retrieval, code generation, natural-language observability. All data on-premises; developers use their preferred AI provider |
+| Workflow engine | Temporal over Durable Functions | Portable, polyglot (Go, Java, Python, TypeScript, .NET, PHP), mature saga/compensation support |
+| Orchestration | .NET Aspire | Single-command orchestration of all services, brokers, AI runtime, and infrastructure; service discovery; health monitoring |
 | Broker strategy | Kafka + NATS/Pulsar/PostgreSQL | Kafka for streaming; NATS/Pulsar for task delivery without head-of-line blocking; PostgreSQL for teams that already run Postgres and want to avoid a dedicated broker |
-| Observability store | Grafana Loki | LogQL queries, lightweight, pairs with OpenTelemetry |
-| AI provider | Self-hosted RAG (RagFlow + Ollama) | Context retrieval on-premises; developers use their own AI provider (Copilot, Codex, Claude Code) for code generation |
+| Observability store | Grafana Loki + OpenTelemetry | LogQL queries, lightweight, vendor-neutral; AI-powered natural-language queries via OpenClaw |
 
 See [`docs/adr/`](docs/adr/) for full Architecture Decision Records.
 
