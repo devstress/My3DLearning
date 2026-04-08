@@ -1,6 +1,6 @@
 # Tutorial 05 — Message Brokers
 
-Configure the four broker implementations (NATS JetStream, Kafka, Pulsar, Postgres) via `BrokerOptions` and publish messages through the broker abstraction.
+Configure the four broker implementations (NATS JetStream, Kafka, Pulsar, Postgres) via `BrokerOptions` and publish messages through the broker abstraction. All four brokers run as real containers via .NET Aspire — every test proves end-to-end delivery through real infrastructure.
 
 ## Learning Objectives
 
@@ -12,6 +12,7 @@ After completing this tutorial you will be able to:
 4. Register event-driven consumers with push-based message handlers
 5. Use polling consumers to retrieve batches of messages with max-message limits
 6. Apply selective consumers with predicate-based priority filtering
+7. Publish to all four brokers (NATS, Kafka, Pulsar, Postgres) via Aspire and verify identical delivery
 
 ## Key Types
 
@@ -45,7 +46,9 @@ public interface IMessageBrokerProducer
 ## Lab — Guided Practice
 
 > **Purpose:** Run each test in order to see how broker configuration, protocol-agnostic
-> publishing, and consumer patterns work through real NATS JetStream via Aspire.
+> publishing, and consumer patterns work through all four brokers via Aspire.
+> Tests 1–8 use NATS JetStream. Tests 9–12 prove Kafka, Pulsar, Postgres,
+> and cross-broker interchangeability — all through real Aspire containers.
 
 | # | Test | Concept |
 |---|------|---------|
@@ -57,12 +60,29 @@ public interface IMessageBrokerProducer
 | 6 | `PollingConsumer_BatchRetrieval_MaxMessagesRespected` | Pull-based polling with max-message limit |
 | 7 | `SelectiveConsumer_PredicateFilters_OnlyMatchingDelivered` | Priority-based predicate filtering |
 | 8 | `SubscribeConsumer_MultipleHandlers_AllInvoked` | Multiple independent subscription handlers |
+| 9 | `Publish_Kafka_RealBrokerDelivery` | E2E publish through real Apache Kafka via Aspire |
+| 10 | `Publish_Pulsar_RealBrokerDelivery` | E2E publish through real Apache Pulsar via Aspire |
+| 11 | `Publish_Postgres_RealBrokerDelivery` | E2E publish through real PostgreSQL broker via Aspire |
+| 12 | `AllFourBrokers_SameAbstraction_InterchangeableDelivery` | Cross-broker proof: same abstraction, all four brokers |
 
 > 💻 [`tests/TutorialLabs/Tutorial05/Lab.cs`](../tests/TutorialLabs/Tutorial05/Lab.cs)
 
 ```bash
 dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial05.Lab"
 ```
+
+### Aspire Infrastructure
+
+All four brokers run as real containers via the `TestAppHost`:
+
+| Broker | Container | Aspire Endpoint | Test Helper |
+|--------|-----------|-----------------|-------------|
+| NATS JetStream | `nats:latest` | `nats-client` | `NatsBrokerEndpoint` |
+| Apache Kafka | `bitnami/kafka:3.9.0` (KRaft) | `kafka-tcp` | `KafkaBrokerEndpoint` |
+| Apache Pulsar | `apachepulsar/pulsar:4.0.4` | `pulsar-tcp` | `PulsarBrokerEndpoint` |
+| PostgreSQL | `postgres:17` | `postgres-tcp` | `PostgresBrokerEndpoint` |
+
+Tests gracefully skip when Docker is unavailable (CI without containers).
 
 ---
 

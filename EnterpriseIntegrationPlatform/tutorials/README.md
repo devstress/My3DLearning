@@ -174,7 +174,7 @@ tests/TutorialLabs/
     └── Exam.Answers.cs
 ```
 
-**512 total tests** across 50 tutorials (362 Lab + 150 ExamAnswers).
+**516 total tests** across 50 tutorials (366 Lab + 150 ExamAnswers).
 
 ## Quick Reference
 
