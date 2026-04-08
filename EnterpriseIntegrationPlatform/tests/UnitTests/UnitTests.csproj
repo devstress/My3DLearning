@@ -55,6 +55,5 @@
     <ProjectReference Include="..\..\src\AI.RagKnowledge\AI.RagKnowledge.csproj" />
     <ProjectReference Include="..\..\src\Ingestion.Kafka\Ingestion.Kafka.csproj" />
     <ProjectReference Include="..\..\src\Ingestion.Pulsar\Ingestion.Pulsar.csproj" />
-    <ProjectReference Include="..\..\src\Ingestion.Northguard\Ingestion.Northguard.csproj" />
   </ItemGroup>
 </Project>

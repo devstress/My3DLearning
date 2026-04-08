@@ -205,20 +205,6 @@ public sealed class TransactionalClientTests
         Assert.That(sut.SupportsNativeTransactions, Is.False);
     }
 
-    [Test]
-    public void SupportsNativeTransactions_Northguard_ReturnsFalse()
-    {
-        var northguardOptions = Options.Create(new BrokerOptions
-        {
-            BrokerType = BrokerType.Northguard,
-            TransactionTimeoutSeconds = 5,
-        });
-
-        var sut = new BrokerTransactionalClient(_producer, northguardOptions, _logger);
-
-        Assert.That(sut.SupportsNativeTransactions, Is.False);
-    }
-
     // ── Empty Transaction ───────────────────────────────────────────────────
 
     [Test]

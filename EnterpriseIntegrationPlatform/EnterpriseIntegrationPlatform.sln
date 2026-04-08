@@ -125,8 +125,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ingestion.Postgres", "src\I
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BrokerAgnosticTests", "tests\BrokerAgnosticTests\BrokerAgnosticTests.csproj", "{F89FE768-35C5-439F-9725-1E54CB8C3009}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ingestion.Northguard", "src\Ingestion.Northguard\Ingestion.Northguard.csproj", "{18508AFC-F744-4CEA-ACB4-21DE34F7F600}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -809,18 +807,6 @@ Global
 		{F89FE768-35C5-439F-9725-1E54CB8C3009}.Release|x64.Build.0 = Release|Any CPU
 		{F89FE768-35C5-439F-9725-1E54CB8C3009}.Release|x86.ActiveCfg = Release|Any CPU
 		{F89FE768-35C5-439F-9725-1E54CB8C3009}.Release|x86.Build.0 = Release|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Debug|x64.Build.0 = Debug|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Debug|x86.Build.0 = Debug|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Release|Any CPU.Build.0 = Release|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Release|x64.ActiveCfg = Release|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Release|x64.Build.0 = Release|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Release|x86.ActiveCfg = Release|Any CPU
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -885,6 +871,5 @@ Global
 		{AFAA5258-2646-4159-8D88-8CACD16974E4} = {A1B2C3D4-0001-0001-0001-000000000002}
 		{E21DA4D4-D9E0-49E4-9C36-2544A3EF4CD3} = {A1B2C3D4-0001-0001-0001-000000000001}
 		{F89FE768-35C5-439F-9725-1E54CB8C3009} = {A1B2C3D4-0001-0001-0001-000000000002}
-		{18508AFC-F744-4CEA-ACB4-21DE34F7F600} = {A1B2C3D4-0001-0001-0001-000000000001}
 	EndGlobalSection
 EndGlobal
