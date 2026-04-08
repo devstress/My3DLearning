@@ -1,9 +1,18 @@
 // ============================================================================
-// Tutorial 29 – Throttle and Rate Limiting (Lab)
+// Tutorial 29 – Throttle and Rate Limiting (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Throttle.
-// Real Integrations: TokenBucketThrottle + NatsBrokerEndpoint (real NATS
-// JetStream via Aspire).
+// PURPOSE: Run each test in order to see how the Throttle pattern controls
+//          message throughput with token-bucket rate limiting.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Acquire_WithTokens_IsPermitted                        — available tokens permit acquisition
+//   2. Acquire_ExhaustsTokens_StillPermittedUntilEmpty       — tokens exhaust sequentially
+//   3. Acquire_RejectOnBackpressure_RejectsWhenEmpty          — reject mode rejects when empty
+//   4. AvailableTokens_DecrementsOnAcquire                   — token count decrements on acquire
+//   5. GetMetrics_ReflectsAcquireAndReject                   — metrics track acquires and rejects
+//   6. GetMetrics_RefillRate_MatchesConfig                   — refill rate matches configuration
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

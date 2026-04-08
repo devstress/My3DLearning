@@ -2,6 +2,19 @@
 
 Scale message processing horizontally with competing consumer instances.
 
+---
+
+## Learning Objectives
+
+1. Understand the Competing Consumers pattern for horizontal message processing
+2. Use `CompetingConsumerOrchestrator` to evaluate lag and auto-scale consumer instances
+3. Configure scale-up and scale-down thresholds with `CompetingConsumerOptions`
+4. Verify backpressure signaling when maximum consumer capacity is reached
+5. Confirm minimum consumer floor prevents over-scaling down
+6. Observe steady-state behavior when lag falls between thresholds
+
+---
+
 ## Key Types
 
 ```csharp
@@ -109,105 +122,39 @@ public interface IBackpressureSignal
 }
 ```
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. BackpressureSignal — SignalAndRelease TogglesCorrectly
+> 💻 Run the lab tests to see each Competing Consumers concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var bp = new BackpressureSignal();
-
-Assert.That(bp.IsBackpressured, Is.False);
-
-bp.Signal();
-Assert.That(bp.IsBackpressured, Is.True);
-
-bp.Release();
-Assert.That(bp.IsBackpressured, Is.False);
-```
-
-### 2. InMemoryConsumerScaler — ScaleUp IncreasesCount
-
-```csharp
-var scaler = new InMemoryConsumerScaler(
-    NullLogger<InMemoryConsumerScaler>.Instance, initialCount: 1);
-
-Assert.That(scaler.CurrentCount, Is.EqualTo(1));
-
-await scaler.ScaleAsync(3, CancellationToken.None);
-
-Assert.That(scaler.CurrentCount, Is.EqualTo(3));
-```
-
-### 3. ConsumerLagInfo — RecordProperties AreCorrect
-
-```csharp
-var now = DateTimeOffset.UtcNow;
-var info = new ConsumerLagInfo("group-1", "orders", 500, now);
-
-Assert.That(info.ConsumerGroup, Is.EqualTo("group-1"));
-Assert.That(info.Topic, Is.EqualTo("orders"));
-Assert.That(info.CurrentLag, Is.EqualTo(500));
-Assert.That(info.Timestamp, Is.EqualTo(now));
-```
-
-### 4. InMemoryLagMonitor — ReportAndGet ReturnsReportedLag
-
-```csharp
-var monitor = new InMemoryConsumerLagMonitor();
-var lag = new ConsumerLagInfo("grp", "topic", 1234, DateTimeOffset.UtcNow);
-
-await monitor.ReportLagAsync(lag);
-var retrieved = await monitor.GetLagAsync("topic", "grp", CancellationToken.None);
-
-Assert.That(retrieved.CurrentLag, Is.EqualTo(1234));
-```
-
-### 5. EvaluateAndScale — HighLag ScalesUp
-
-```csharp
-var lagMonitor = Substitute.For<IConsumerLagMonitor>();
-var scaler = Substitute.For<IConsumerScaler>();
-var backpressure = new BackpressureSignal();
-var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
-
-scaler.CurrentCount.Returns(1);
-lagMonitor.GetLagAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-    .Returns(new ConsumerLagInfo("grp", "topic", 5000, DateTimeOffset.UtcNow));
-
-var options = Options.Create(new CompetingConsumerOptions
-{
-    MinConsumers = 1,
-    MaxConsumers = 10,
-    ScaleUpThreshold = 1000,
-    ScaleDownThreshold = 100,
-    CooldownMs = 1000,
-    TargetTopic = "topic",
-    ConsumerGroup = "grp",
-});
-
-var orchestrator = new CompetingConsumerOrchestrator(
-    lagMonitor, scaler, backpressure, options,
-    NullLogger<CompetingConsumerOrchestrator>.Instance, timeProvider);
-
-await orchestrator.EvaluateAndScaleAsync(CancellationToken.None);
-
-await scaler.Received(1).ScaleAsync(2, Arg.Any<CancellationToken>());
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial28/Lab.cs`](../tests/TutorialLabs/Tutorial28/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `HighLag_ScalesUp` | High lag triggers consumer scale-up |
+| 2 | `LowLag_ScalesDown` | Low lag triggers consumer scale-down |
+| 3 | `MaxConsumers_SignalsBackpressure` | At max consumers, backpressure is signaled |
+| 4 | `MinConsumers_DoesNotScaleBelow` | Min consumer floor prevents scale-down |
+| 5 | `ModerateLag_NoScaleChange` | Moderate lag keeps consumer count stable |
+| 6 | `BackpressureReleased_AfterLagDrops` | Backpressure released when lag drops |
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial28.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial28.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial28/Exam.cs`](../tests/TutorialLabs/Tutorial28/Exam.cs)
+## Exam — Assessment Challenges
+
+> 🎯 Prove you can apply the Competing Consumers pattern in realistic, end-to-end scenarios.
+> Each challenge combines multiple concepts and uses a business-like domain.
+
+| # | Challenge | Difficulty |
+|---|-----------|------------|
+| 1 | `Starter_ProgressiveScaleUp_ReachesMax` | 🟢 Starter |
+| 2 | `Intermediate_ZeroLag_DefaultsReturned` | 🟡 Intermediate |
+| 3 | `Advanced_BackpressureAtMax_ThenRelease` | 🔴 Advanced |
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial28.Exam"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial28.Exam"
 ```
 
 ---

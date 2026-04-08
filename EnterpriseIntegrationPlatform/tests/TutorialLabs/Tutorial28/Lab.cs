@@ -1,10 +1,18 @@
 // ============================================================================
-// Tutorial 28 – Competing Consumers (Lab)
+// Tutorial 28 – Competing Consumers (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Competing Consumers.
-// Real Integrations: CompetingConsumerOrchestrator with InMemory scaler/lag
-// monitor + NatsBrokerEndpoint (real NATS JetStream via Aspire) to verify
-// scale decisions are published.
+// PURPOSE: Run each test in order to see how the Competing Consumers pattern
+//          evaluates lag and auto-scales consumer instances.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. HighLag_ScalesUp                      — high lag triggers consumer scale-up
+//   2. LowLag_ScalesDown                     — low lag triggers consumer scale-down
+//   3. MaxConsumers_SignalsBackpressure       — at max consumers, backpressure is signaled
+//   4. MinConsumers_DoesNotScaleBelow         — min consumer floor prevents scale-down
+//   5. ModerateLag_NoScaleChange              — moderate lag keeps consumer count stable
+//   6. BackpressureReleased_AfterLagDrops     — backpressure released when lag drops
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

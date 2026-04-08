@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 29 – Throttle and Rate Limiting (Exam)
+// Tutorial 29 – Throttle and Rate Limiting (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: burst exhaustion, metric accumulation, backpressure reject
-// across multiple messages.
+// PURPOSE: Prove you can apply the Throttle pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Burst exhaustion permits then rejects
+//   🟡 Intermediate — Metric accumulation tracks all operations
+//   🔴 Advanced     — Single token alternates permit and reject
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,8 +30,16 @@ namespace TutorialLabs.Tutorial29;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Burst exhaustion ─────────────────────────────────
+    //
+    // SCENARIO: Five messages arrive but burst capacity is only 3. The first
+    //           three are permitted; the remaining two are rejected.
+    //
+    // WHAT YOU PROVE: Token exhaustion correctly rejects excess messages.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_BurstExhaustion_PermittedThenRejected()
+    public async Task Starter_BurstExhaustion_PermittedThenRejected()
     {
         await using var output = new MockEndpoint("throttle-burst");
         using var throttle = CreateThrottle(burstCapacity: 3, rejectOnBackpressure: true);
@@ -45,8 +66,17 @@ public sealed class Exam
         output.AssertReceivedOnTopic("ok", 3);
     }
 
+    // ── 🟡 INTERMEDIATE — Metric accumulation ────────────────────────
+    //
+    // SCENARIO: Four messages are sent with burst capacity of 2. Metrics
+    //           must reflect both acquired and rejected totals accurately.
+    //
+    // WHAT YOU PROVE: ThrottleMetrics correctly accumulates acquired,
+    //                 rejected, and wait-time statistics across operations.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_MetricAccumulation_TracksAllOperations()
+    public async Task Intermediate_MetricAccumulation_TracksAllOperations()
     {
         await using var output = new MockEndpoint("throttle-metrics");
         using var throttle = CreateThrottle(burstCapacity: 2, rejectOnBackpressure: true);
@@ -67,8 +97,17 @@ public sealed class Exam
         output.AssertReceivedOnTopic("processed", 2);
     }
 
+    // ── 🔴 ADVANCED — Single token alternate ──────────────────────────
+    //
+    // SCENARIO: Only one token is available. The first acquire succeeds,
+    //           the second is immediately rejected with zero remaining.
+    //
+    // WHAT YOU PROVE: With a single token and reject-on-backpressure, the
+    //                 throttle alternates between permit and reject cleanly.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_SingleToken_AlternatePermitReject()
+    public async Task Advanced_SingleToken_AlternatePermitReject()
     {
         await using var output = new MockEndpoint("throttle-single");
         using var throttle = CreateThrottle(burstCapacity: 1, rejectOnBackpressure: true);

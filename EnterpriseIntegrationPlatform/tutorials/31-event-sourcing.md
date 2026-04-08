@@ -2,6 +2,19 @@
 
 Store domain events as an append-only log and rebuild state by replaying them.
 
+---
+
+## Learning Objectives
+
+1. Understand the Event Sourcing pattern and append-only event storage
+2. Use `InMemoryEventStore` to append events and read streams forward and backward
+3. Verify version incrementing and optimistic concurrency conflict detection
+4. Read subsets of a stream by starting from a specific version
+5. Confirm empty streams return empty results gracefully
+6. Publish event notifications to an endpoint after reading the event stream
+
+---
+
 ## Key Types
 
 ```csharp
@@ -65,105 +78,40 @@ public static class TemporalQuery
 }
 ```
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. AppendAsync — AndReadStreamAsync Roundtrip
+> 💻 Run the lab tests to see each Event Sourcing concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var envelope = new EventEnvelope(
-    Guid.NewGuid(), "stream-1", "OrderCreated",
-    """{"total":42}""", 0, DateTimeOffset.UtcNow, []);
-
-await _store.AppendAsync("stream-1", [envelope], expectedVersion: 0);
-
-var events = await _store.ReadStreamAsync("stream-1", fromVersion: 1, count: 100);
-
-Assert.That(events, Has.Count.EqualTo(1));
-Assert.That(events[0].StreamId, Is.EqualTo("stream-1"));
-Assert.That(events[0].EventType, Is.EqualTo("OrderCreated"));
-Assert.That(events[0].Version, Is.EqualTo(1));
-```
-
-### 2. AppendMultiple — ReadAllBack InOrder
-
-```csharp
-var e1 = new EventEnvelope(Guid.NewGuid(), "s", "A", "d1", 0, DateTimeOffset.UtcNow, []);
-var e2 = new EventEnvelope(Guid.NewGuid(), "s", "B", "d2", 0, DateTimeOffset.UtcNow, []);
-var e3 = new EventEnvelope(Guid.NewGuid(), "s", "C", "d3", 0, DateTimeOffset.UtcNow, []);
-
-await _store.AppendAsync("s", [e1], expectedVersion: 0);
-await _store.AppendAsync("s", [e2], expectedVersion: 1);
-await _store.AppendAsync("s", [e3], expectedVersion: 2);
-
-var events = await _store.ReadStreamAsync("s", fromVersion: 1, count: 100);
-
-Assert.That(events, Has.Count.EqualTo(3));
-Assert.That(events[0].Version, Is.EqualTo(1));
-Assert.That(events[1].Version, Is.EqualTo(2));
-Assert.That(events[2].Version, Is.EqualTo(3));
-Assert.That(events[0].EventType, Is.EqualTo("A"));
-Assert.That(events[2].EventType, Is.EqualTo("C"));
-```
-
-### 3. AppendAsync — VersionConflict ThrowsOptimisticConcurrencyException
-
-```csharp
-var e = new EventEnvelope(Guid.NewGuid(), "s", "E", "d", 0, DateTimeOffset.UtcNow, []);
-await _store.AppendAsync("s", [e], expectedVersion: 0);
-
-var e2 = new EventEnvelope(Guid.NewGuid(), "s", "E2", "d2", 0, DateTimeOffset.UtcNow, []);
-
-var ex = Assert.ThrowsAsync<OptimisticConcurrencyException>(
-    () => _store.AppendAsync("s", [e2], expectedVersion: 0));
-
-Assert.That(ex!.StreamId, Is.EqualTo("s"));
-Assert.That(ex.ExpectedVersion, Is.EqualTo(0));
-Assert.That(ex.ActualVersion, Is.EqualTo(1));
-```
-
-### 4. ReadStreamBackwardAsync — ReturnsReversedOrder
-
-```csharp
-var e1 = new EventEnvelope(Guid.NewGuid(), "s", "A", "d1", 0, DateTimeOffset.UtcNow, []);
-var e2 = new EventEnvelope(Guid.NewGuid(), "s", "B", "d2", 0, DateTimeOffset.UtcNow, []);
-var e3 = new EventEnvelope(Guid.NewGuid(), "s", "C", "d3", 0, DateTimeOffset.UtcNow, []);
-
-await _store.AppendAsync("s", [e1, e2, e3], expectedVersion: 0);
-
-var events = await _store.ReadStreamBackwardAsync("s", fromVersion: 3, count: 100);
-
-Assert.That(events, Has.Count.EqualTo(3));
-Assert.That(events[0].Version, Is.EqualTo(3));
-Assert.That(events[1].Version, Is.EqualTo(2));
-Assert.That(events[2].Version, Is.EqualTo(1));
-```
-
-### 5. SnapshotStore — SaveAndLoad Roundtrip
-
-```csharp
-var snapshots = new InMemorySnapshotStore<int>();
-
-await snapshots.SaveAsync("stream-1", 42, 5);
-var (state, version) = await snapshots.LoadAsync("stream-1");
-
-Assert.That(state, Is.EqualTo(42));
-Assert.That(version, Is.EqualTo(5));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial31/Lab.cs`](../tests/TutorialLabs/Tutorial31/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `AppendAndReadForward_RoundTrip` | Append and read-forward round trip |
+| 2 | `AppendMultipleEvents_VersionsIncrement` | Multiple events increment versions |
+| 3 | `ReadStreamBackward_ReturnsDescendingOrder` | Backward read returns descending order |
+| 4 | `OptimisticConcurrency_ThrowsOnVersionMismatch` | Version mismatch throws concurrency exception |
+| 5 | `ReadFromMiddleOfStream_ReturnsSubset` | Read from middle returns subset |
+| 6 | `EmptyStream_ReturnsEmptyList` | Empty stream returns empty list |
+| 7 | `PublishAllEventsToMockEndpoint` | Events publish to endpoint |
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial31.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial31.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial31/Exam.cs`](../tests/TutorialLabs/Tutorial31/Exam.cs)
+## Exam — Assessment Challenges
+
+> 🎯 Prove you can apply the Event Sourcing pattern in realistic, end-to-end scenarios.
+> Each challenge combines multiple concepts and uses a business-like domain.
+
+| # | Challenge | Difficulty |
+|---|-----------|------------|
+| 1 | `Starter_ProjectionEngine_RebuildsSumFromEvents` | 🟢 Starter |
+| 2 | `Intermediate_SnapshotAcceleratesRebuild` | 🟡 Intermediate |
+| 3 | `Advanced_ConcurrentAppend_DetectsConflict` | 🔴 Advanced |
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial31.Exam"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial31.Exam"
 ```
 
 ---

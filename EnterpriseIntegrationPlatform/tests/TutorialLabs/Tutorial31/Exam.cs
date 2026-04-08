@@ -1,9 +1,21 @@
 // ============================================================================
-// Tutorial 31 – Event Sourcing (Exam)
+// Tutorial 31 – Event Sourcing (Exam · Assessment Challenges)
 // ============================================================================
-// EIP Pattern: Event Sourcing
-// E2E: Projection rebuild, snapshot integration, and concurrent append
-//      detection with MockEndpoint for event notification publishing.
+// PURPOSE: Prove you can apply the Event Sourcing pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Projection engine rebuilds sum from events
+//   🟡 Intermediate — Snapshot accelerates rebuild from midstream
+//   🔴 Advanced     — Concurrent append detects optimistic concurrency conflict
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.EventSourcing;
@@ -18,8 +30,17 @@ namespace TutorialLabs.Tutorial31;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Projection rebuild ──────────────────────────────
+    //
+    // SCENARIO: Two deposit events are appended. The projection engine
+    //           replays them to rebuild the running total from scratch.
+    //
+    // WHAT YOU PROVE: The projection engine rebuilds aggregate state
+    //                 correctly by replaying all events in the stream.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_ProjectionEngine_RebuildsSumFromEvents()
+    public async Task Starter_ProjectionEngine_RebuildsSumFromEvents()
     {
         await using var output = new MockEndpoint("exam-es");
         var store = new InMemoryEventStore(
@@ -50,8 +71,18 @@ public sealed class Exam
         output.AssertReceivedOnTopic("projections", 1);
     }
 
+    // ── 🟡 INTERMEDIATE — Snapshot-accelerated rebuild ──────────────────
+    //
+    // SCENARIO: Five events are appended but a snapshot at version 3 with
+    //           state=30 is pre-saved. The rebuild starts from the snapshot
+    //           and only replays events 4-5.
+    //
+    // WHAT YOU PROVE: Snapshots accelerate rebuilds by skipping already-
+    //                 projected events, and the final state is correct.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_SnapshotAcceleratesRebuild()
+    public async Task Intermediate_SnapshotAcceleratesRebuild()
     {
         await using var output = new MockEndpoint("exam-snap");
         var store = new InMemoryEventStore(
@@ -84,8 +115,18 @@ public sealed class Exam
         output.AssertReceivedOnTopic("snapshot-results", 1);
     }
 
+    // ── 🔴 ADVANCED — Concurrent append conflict detection ─────────────
+    //
+    // SCENARIO: One event is appended at version 0→1. A second append also
+    //           claims expectedVersion=0, triggering a conflict.
+    //
+    // WHAT YOU PROVE: Optimistic concurrency correctly detects the version
+    //                 mismatch and throws OptimisticConcurrencyException
+    //                 with accurate StreamId, ExpectedVersion, and ActualVersion.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_ConcurrentAppend_DetectsConflict()
+    public async Task Advanced_ConcurrentAppend_DetectsConflict()
     {
         await using var output = new MockEndpoint("exam-conflict");
         var store = new InMemoryEventStore(

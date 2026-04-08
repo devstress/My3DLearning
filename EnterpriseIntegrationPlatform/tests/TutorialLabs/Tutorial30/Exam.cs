@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 30 – Business Rule Engine (Exam)
+// Tutorial 30 – Business Rule Engine (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: multi-rule evaluation, reject action, In operator with
-// comma-separated values.
+// PURPOSE: Prove you can apply the Rule Engine pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Multi-rule evaluation collects all matches
+//   🟡 Intermediate — Reject action blocks routing
+//   🔴 Advanced     — In operator matches comma-separated value list
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,8 +30,17 @@ namespace TutorialLabs.Tutorial30;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Multi-rule evaluation ─────────────────────────────
+    //
+    // SCENARIO: Two non-stop rules both match the same message. The engine
+    //           collects all matched rules and their actions.
+    //
+    // WHAT YOU PROVE: Multiple matching rules accumulate when StopOnMatch
+    //                 is false, and each action is collected.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_MultiRuleEvaluation_CollectsAllMatches()
+    public async Task Starter_MultiRuleEvaluation_CollectsAllMatches()
     {
         await using var output = new MockEndpoint("rules-multi");
         var store = new InMemoryRuleStore();
@@ -50,8 +72,17 @@ public sealed class Exam
         output.AssertReceivedCount(2);
     }
 
+    // ── 🟡 INTERMEDIATE — Reject action blocks routing ─────────────────
+    //
+    // SCENARIO: A rule matches a message from a blocked source and issues
+    //           a Reject action. No messages should be routed.
+    //
+    // WHAT YOU PROVE: The Reject action type correctly prevents routing
+    //                 and provides the rejection reason.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_RejectAction_NoRouting()
+    public async Task Intermediate_RejectAction_NoRouting()
     {
         await using var output = new MockEndpoint("rules-reject");
         var store = new InMemoryRuleStore();
@@ -74,8 +105,18 @@ public sealed class Exam
         output.AssertNoneReceived();
     }
 
+    // ── 🔴 ADVANCED — In operator with comma list ─────────────────────
+    //
+    // SCENARIO: A rule uses the In operator on a metadata field with a
+    //           comma-separated value list. One message matches; another
+    //           with a region not in the list does not.
+    //
+    // WHAT YOU PROVE: The In operator correctly matches against any value
+    //                 in a comma-separated list and rejects non-members.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_InOperator_MatchesCommaList()
+    public async Task Advanced_InOperator_MatchesCommaList()
     {
         await using var output = new MockEndpoint("rules-in");
         var store = new InMemoryRuleStore();
