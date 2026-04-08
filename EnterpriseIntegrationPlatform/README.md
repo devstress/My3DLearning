@@ -22,7 +22,7 @@ Microsoft BizTalk Server 2020 is the final release. Mainstream support ends Apri
 - Long-running stateful orchestrations require careful redesign. Logic Apps stateful workflows exist but don't match BizTalk's dehydration/rehydration model in all scenarios.
 - Migration is not "lift and shift." Sandro Pereira (Microsoft MVP) calls it "impossible to migrate a BizTalk Server environment to Logic Apps" — what you really do is re-architect from scratch using a combination of Logic Apps, Azure Functions, Service Bus, and Event Grid.
 
-**The real risk:** Organisations running BizTalk have 2–4 years before they lose security patches. Many have hundreds of orchestrations, maps, and pipelines that are poorly documented. The clock is ticking, and the migration path is expensive and architecturally disruptive.
+**The real risk:** Organizations running BizTalk have 2–4 years before they lose security patches. Many have hundreds of orchestrations, maps, and pipelines that are poorly documented. The clock is ticking, and the migration path is expensive and architecturally disruptive.
 
 **2. Apache Camel is powerful but solves a different (narrower) problem.**
 
@@ -32,11 +32,11 @@ Camel is an excellent integration framework with 300+ connectors and a mature im
 |---|---|---|
 | **Stateful workflow orchestration** | Not built-in. Camel routes are fundamentally stateless. Long-running processes that survive restarts, need compensation (saga), or run for days/weeks require bolting on a separate workflow engine. | Temporal.io provides durable execution out of the box. Workflows survive process crashes, infrastructure failures, and can run for months. Saga compensation is a first-class concept. |
 | **Broker lock-in** | Camel connects to many brokers, but routes are typically written against a specific broker's component. Switching from `camel-kafka` to `camel-nats` means rewriting routes. | Broker is a deployment-time configuration choice. The same integration code runs on NATS, Kafka, Pulsar, or PostgreSQL without code changes. |
-| **Language ecosystem** | Java/JVM. Excellent if your team is Java-native. Camel K and Quarkus improve cloud-native support but the ecosystem is Java-centric. | .NET/C#. If your organisation runs on .NET — and many BizTalk shops do, because BizTalk is a Microsoft product — this is a natural migration path without a full language/ecosystem shift. |
+| **Language ecosystem** | Java/JVM. Excellent if your team is Java-native. Camel K and Quarkus improve cloud-native support but the ecosystem is Java-centric. | .NET/C#. If your organization runs on .NET — and many BizTalk shops do, because BizTalk is a Microsoft product — this is a natural migration path without a full language/ecosystem shift. |
 | **Enterprise management** | No built-in admin dashboard, BAM-equivalent, or tenant isolation. You build these yourself or adopt a commercial wrapper (Red Hat Fuse, etc.). | Includes Admin API, admin dashboard, multi-tenancy, OpenTelemetry observability, and "where is my message?" tracing out of the box. |
-| **Security model** | Camel provides individual component-level security, but centralised input sanitisation, payload guards, secret rotation, and tenant isolation must be built by the team. | Security, secret management, and multi-tenant isolation are platform-level concerns, not per-route afterthoughts. |
+| **Security model** | Camel provides individual component-level security, but centralized input sanitization, payload guards, secret rotation, and tenant isolation must be built by the team. | Security, secret management, and multi-tenant isolation are platform-level concerns, not per-route afterthoughts. |
 
-**Honest caveat:** Camel's connector ecosystem (300+ components) is vastly larger than this platform's four connector types (HTTP, SFTP, Email, File). If your primary need is connecting to a wide variety of systems with minimal custom code, Camel is a better choice today. This platform prioritises depth of pattern implementation and operational completeness over breadth of connectors.
+**Honest caveat:** Camel's connector ecosystem (300+ components) is vastly larger than this platform's four connector types (HTTP, SFTP, Email, File). If your primary need is connecting to a wide variety of systems with minimal custom code, Camel is a better choice today. This platform prioritizes depth of pattern implementation and operational completeness over breadth of connectors.
 
 **3. The EIP book patterns are still sound, but the book's tooling context is obsolete.**
 
@@ -77,7 +77,7 @@ If you are fully committed to Azure and comfortable with vendor lock-in, Azure I
 
 ### What This Platform Actually Is
 
-It is a .NET 10 implementation of the full Enterprise Integration Patterns catalog, with four interchangeable message brokers, Temporal.io for durable workflow orchestration, and a self-hosted RAG system for developer productivity. It is designed for organisations that:
+It is a .NET 10 implementation of the full Enterprise Integration Patterns catalog, with four interchangeable message brokers, Temporal.io for durable workflow orchestration, and a self-hosted RAG system for developer productivity. It is designed for organizations that:
 
 1. **Run on .NET** and want to stay on .NET for integration middleware.
 2. **Need broker flexibility** — choose NATS, Kafka, Pulsar, or PostgreSQL at deployment time without code changes.
