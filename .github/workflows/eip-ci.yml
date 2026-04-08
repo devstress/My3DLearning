@@ -133,14 +133,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-browsers-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+          key: playwright-chromium-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
-      - name: Install Playwright browsers
+      - name: Install Playwright Chromium with OS dependencies
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pwsh tests/PlaywrightTests/bin/Release/net10.0/playwright.ps1 install
+        run: pwsh tests/PlaywrightTests/bin/Release/net10.0/playwright.ps1 install chromium --with-deps
 
-      - name: Install Playwright OS dependencies
-        run: pwsh tests/PlaywrightTests/bin/Release/net10.0/playwright.ps1 install-deps
+      - name: Install Playwright OS dependencies (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pwsh tests/PlaywrightTests/bin/Release/net10.0/playwright.ps1 install-deps chromium
 
       - name: Run Playwright E2E tests
         env:
