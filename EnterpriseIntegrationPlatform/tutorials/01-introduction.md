@@ -73,23 +73,26 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> **Purpose:** Prove you can apply channels, envelopes, and pipelines in realistic
-> integration scenarios. Each challenge builds on the previous one.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| Difficulty | Challenge | What you prove |
-|------------|-----------|---------------|
-| 🟢 Starter | `Starter_CommandToEvent_SingleChannelHop` | Transform a command into an event through one channel hop |
-| 🟡 Intermediate | `Intermediate_FanOutPipeline_MultipleDownstreamChannels` | Fan out an event to audit + notification downstream channels |
-| 🔴 Advanced | `Advanced_ImmutableEnrichment_OriginalAndEnriched_SeparateChannels` | Record immutability — enrich without mutating the original |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_CommandToEvent_SingleChannelHop` | 🟢 Starter | CommandToEvent — SingleChannelHop |
+| 2 | `Intermediate_FanOutPipeline_MultipleDownstreamChannels` | 🟡 Intermediate | FanOutPipeline — MultipleDownstreamChannels |
+| 3 | `Advanced_ImmutableEnrichment_OriginalAndEnriched_SeparateChannels` | 🔴 Advanced | ImmutableEnrichment — OriginalAndEnriched SeparateChannels |
 
 > 💻 [`tests/TutorialLabs/Tutorial01/Exam.cs`](../tests/TutorialLabs/Tutorial01/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial01.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial01.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial01.ExamAnswers"
+```
 ---
 
 **Next: [Tutorial 02 — Setting Up Your Environment →](02-environment-setup.md)**

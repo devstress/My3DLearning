@@ -72,21 +72,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial23.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Request-Reply pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_RequestEnvelope_HasIntentAndReplyTo` | 🟢 Starter |
-| 2 | `Intermediate_ConcurrentRequests_CorrelateCorrectly` | 🟡 Intermediate |
-| 3 | `Advanced_Timeout_DurationIsReasonable` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_RequestEnvelope_HasIntentAndReplyTo` | 🟢 Starter | RequestEnvelope — HasIntentAndReplyTo |
+| 2 | `Intermediate_ConcurrentRequests_CorrelateCorrectly` | 🟡 Intermediate | ConcurrentRequests — CorrelateCorrectly |
+| 3 | `Advanced_Timeout_DurationIsReasonable` | 🔴 Advanced | Timeout — DurationIsReasonable |
+
+> 💻 [`tests/TutorialLabs/Tutorial23/Exam.cs`](../tests/TutorialLabs/Tutorial23/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial23.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial23.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial23.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 22 — Scatter-Gather](22-scatter-gather.md)** | **Next: [Tutorial 24 — Retry Framework →](24-retry-framework.md)**

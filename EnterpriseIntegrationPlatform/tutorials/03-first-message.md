@@ -84,23 +84,26 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> **Purpose:** Prove you can apply envelope construction, causation chains, and
-> channel semantics in realistic integration scenarios.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| Difficulty | Challenge | What you prove |
-|------------|-----------|---------------|
-| 🟢 Starter | `Starter_CausationChain_ThreeGenerationLineage` | Three-generation causation chain with shared CorrelationId |
-| 🟡 Intermediate | `Intermediate_PointToPointVsPubSub_ChannelSemantics` | P2P vs PubSub delivery semantics side-by-side |
-| 🔴 Advanced | `Advanced_PriorityExpiration_MessageLifecycle` | Priority, intent, expiration, and metadata lifecycle |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_CausationChain_ThreeGenerationLineage` | 🟢 Starter | CausationChain — ThreeGenerationLineage |
+| 2 | `Intermediate_PointToPointVsPubSub_ChannelSemantics` | 🟡 Intermediate | PointToPointVsPubSub — ChannelSemantics |
+| 3 | `Advanced_PriorityExpiration_MessageLifecycle` | 🔴 Advanced | PriorityExpiration — MessageLifecycle |
 
 > 💻 [`tests/TutorialLabs/Tutorial03/Exam.cs`](../tests/TutorialLabs/Tutorial03/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial03.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial03.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial03.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 02 — Environment Setup](02-environment-setup.md)** | **Next: [Tutorial 04 — The Integration Envelope →](04-integration-envelope.md)**

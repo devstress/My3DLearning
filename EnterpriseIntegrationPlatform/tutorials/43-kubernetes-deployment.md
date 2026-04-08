@@ -14,6 +14,25 @@ After completing this tutorial you will be able to:
 
 ---
 
+## Key Types
+
+```csharp
+// src/Configuration/IConfigurationStore.cs — configuration key-value storage
+public interface IConfigurationStore
+{
+    Task<string?> GetAsync(string key, string? environment = null, CancellationToken ct = default);
+    Task SetAsync(string key, string value, string? environment = null, CancellationToken ct = default);
+}
+
+// src/Configuration/IFeatureFlagService.cs — feature flag evaluation
+public interface IFeatureFlagService
+{
+    Task<bool> IsEnabledAsync(string flagName, string? tenantId = null, CancellationToken ct = default);
+}
+```
+
+---
+
 ## Lab — Guided Practice
 
 > 💻 Run the lab tests to see each concept demonstrated in isolation.

@@ -62,21 +62,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial19.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Content Filter pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_JsonPathFilterStep_FiltersInPipeline` | 🟢 Starter |
-| 2 | `Intermediate_DeeplyNestedFilter_ExtractsCorrectly` | 🟡 Intermediate |
-| 3 | `Advanced_BatchFilter_MultipleMessagesPublished` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_JsonPathFilterStep_FiltersInPipeline` | 🟢 Starter | JsonPathFilterStep — FiltersInPipeline |
+| 2 | `Intermediate_DeeplyNestedFilter_ExtractsCorrectly` | 🟡 Intermediate | DeeplyNestedFilter — ExtractsCorrectly |
+| 3 | `Advanced_BatchFilter_MultipleMessagesPublished` | 🔴 Advanced | BatchFilter — MultipleMessagesPublished |
+
+> 💻 [`tests/TutorialLabs/Tutorial19/Exam.cs`](../tests/TutorialLabs/Tutorial19/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial19.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial19.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial19.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 18 — Content Enricher](18-content-enricher.md)** | **Next: [Tutorial 20 — Splitter →](20-splitter.md)**

@@ -70,21 +70,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial22.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Scatter-Gather pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_MixedResponses_SuccessAndFailure` | 🟢 Starter |
-| 2 | `Intermediate_Duration_IsTracked` | 🟡 Intermediate |
-| 3 | `Advanced_ConcurrentOperations_IsolateByCorrelation` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_MixedResponses_SuccessAndFailure` | 🟢 Starter | MixedResponses — SuccessAndFailure |
+| 2 | `Intermediate_Duration_IsTracked` | 🟡 Intermediate | Duration — IsTracked |
+| 3 | `Advanced_ConcurrentOperations_IsolateByCorrelation` | 🔴 Advanced | ConcurrentOperations — IsolateByCorrelation |
+
+> 💻 [`tests/TutorialLabs/Tutorial22/Exam.cs`](../tests/TutorialLabs/Tutorial22/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial22.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial22.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial22.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 21 — Aggregator](21-aggregator.md)** | **Next: [Tutorial 23 — Request-Reply →](23-request-reply.md)**

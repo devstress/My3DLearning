@@ -14,6 +14,29 @@ After completing this tutorial you will be able to:
 
 ---
 
+## Key Types
+
+```csharp
+// src/Observability/MessageEvent.cs — lifecycle event record
+public sealed record MessageEvent
+{
+    public Guid EventId { get; init; }
+    public Guid MessageId { get; init; }
+    public string Stage { get; init; }
+    public string? BusinessKey { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+}
+
+// src/Observability/IObservabilityEventLog.cs — lifecycle event storage
+public interface IObservabilityEventLog
+{
+    Task RecordAsync(MessageEvent evt, CancellationToken ct = default);
+    Task<IReadOnlyList<MessageEvent>> QueryByCorrelationAsync(Guid correlationId, CancellationToken ct = default);
+}
+```
+
+---
+
 ## Lab — Guided Practice
 
 > 💻 Run the lab tests to see each concept demonstrated in isolation.

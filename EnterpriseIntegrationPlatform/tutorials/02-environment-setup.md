@@ -87,23 +87,26 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> **Purpose:** Prove you can apply Temporal workflow orchestration in realistic
-> scenarios. Each challenge builds on the previous one.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| Difficulty | Challenge | What you prove |
-|------------|-----------|---------------|
-| 🟢 Starter | `Starter_SagaCompensation_TracksStepsAndRollsBack` | Multi-step saga with LIFO compensation tracking |
-| 🟡 Intermediate | `Intermediate_FanOut_AggregatesResultsFromParallelWorkflows` | Fan-out with per-workflow success/failure aggregation |
-| 🔴 Advanced | `Advanced_NotificationsEnabled_AckSubjectConfigured` | Notification-enabled workflow with custom Ack/Nack subjects via DI |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_SagaCompensation_TracksStepsAndRollsBack` | 🟢 Starter | SagaCompensation — TracksStepsAndRollsBack |
+| 2 | `Intermediate_FanOut_AggregatesResultsFromParallelWorkflows` | 🟡 Intermediate | FanOut — AggregatesResultsFromParallelWorkflows |
+| 3 | `Advanced_NotificationsEnabled_AckSubjectConfigured` | 🔴 Advanced | NotificationsEnabled — AckSubjectConfigured |
 
 > 💻 [`tests/TutorialLabs/Tutorial02/Exam.cs`](../tests/TutorialLabs/Tutorial02/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial02.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial02.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial02.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 01 — Introduction](01-introduction.md)** | **Next: [Tutorial 03 — Your First Message →](03-first-message.md)**

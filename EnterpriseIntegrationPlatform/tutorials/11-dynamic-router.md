@@ -81,22 +81,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial11.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 The Exam combines multiple Dynamic Router concepts into realistic
-> integration scenarios. Each challenge is self-contained — read the scenario,
-> run the test, and verify the end-to-end flow.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_MultiParticipantTopology_RoutesCorrectly` | 🟢 Starter |
-| 2 | `Intermediate_RouteReplacement_NewParticipantOverrides` | 🟡 Intermediate |
-| 3 | `Advanced_CaseInsensitive_MatchesRegardlessOfCase` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_MultiParticipantTopology_RoutesCorrectly` | 🟢 Starter | MultiParticipantTopology — RoutesCorrectly |
+| 2 | `Intermediate_RouteReplacement_NewParticipantOverrides` | 🟡 Intermediate | RouteReplacement — NewParticipantOverrides |
+| 3 | `Advanced_CaseInsensitive_MatchesRegardlessOfCase` | 🔴 Advanced | CaseInsensitive — MatchesRegardlessOfCase |
+
+> 💻 [`tests/TutorialLabs/Tutorial11/Exam.cs`](../tests/TutorialLabs/Tutorial11/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial11.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial11.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial11.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 10 — Message Filter](10-message-filter.md)** | **Next: [Tutorial 12 — Recipient List →](12-recipient-list.md)**

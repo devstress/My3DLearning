@@ -119,23 +119,26 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> **Purpose:** Prove you can apply messaging channel patterns in realistic scenarios —
-> bridging between channels, fan-out verification, and multi-type routing.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| Difficulty | Challenge | What you prove |
-|------------|-----------|---------------|
-| 🟢 Starter | `Starter_Bridge_PointToPointRelay` | Bridge messages between two Point-to-Point channels |
-| 🟡 Intermediate | `Intermediate_PubSubFanOut_ThreeSubscribersReceive` | Pub-Sub fan-out delivers to all three subscriber groups |
-| 🔴 Advanced | `Advanced_DatatypeChannel_MultipleTypesRoutedCorrectly` | Datatype Channel routes multiple message types to correct topics |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_Bridge_PointToPointRelay` | 🟢 Starter | Bridge — PointToPointRelay |
+| 2 | `Intermediate_PubSubFanOut_ThreeSubscribersReceive` | 🟡 Intermediate | PubSubFanOut — ThreeSubscribersReceive |
+| 3 | `Advanced_DatatypeChannel_MultipleTypesRoutedCorrectly` | 🔴 Advanced | DatatypeChannel — MultipleTypesRoutedCorrectly |
 
 > 💻 [`tests/TutorialLabs/Tutorial06/Exam.cs`](../tests/TutorialLabs/Tutorial06/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial06.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial06.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial06.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 05 — Message Brokers](05-message-brokers.md)** | **Next: [Tutorial 07 — Temporal Workflows →](07-temporal-workflows.md)**

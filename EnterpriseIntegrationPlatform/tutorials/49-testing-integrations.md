@@ -14,6 +14,31 @@ After completing this tutorial you will be able to:
 
 ---
 
+## Key Types
+
+```csharp
+// src/Contracts/IntegrationEnvelope.cs — the universal message wrapper
+public record IntegrationEnvelope<T>
+{
+    public Guid MessageId { get; init; }
+    public Guid CorrelationId { get; init; }
+    public Guid? CausationId { get; init; }
+    public string Source { get; init; }
+    public string MessageType { get; init; }
+    public T Payload { get; init; }
+}
+
+// src/Contracts/FaultEnvelope.cs — wraps a failed message
+public record FaultEnvelope
+{
+    public Guid OriginalMessageId { get; init; }
+    public string ExceptionType { get; init; }
+    public string ExceptionMessage { get; init; }
+}
+```
+
+---
+
 ## Lab — Guided Practice
 
 > 💻 Run the lab tests to see each concept demonstrated in isolation.

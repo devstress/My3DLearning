@@ -4,6 +4,24 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 200 — Rescan & Clean All 50 Tutorial Markdowns
+
+- **Date**: 2026-04-08
+- **Status**: done
+- **Goal**: Convert all 50 tutorial markdowns to consistent "Fill in the Blanks" format, add missing Key Types sections, clean README.md
+- **Changes**:
+  - Converted 30 tutorials (01-15, 17-31) from "Assessment Challenges" to "Fill in the Blanks" exam format
+  - Updated exam section intro to reference `// TODO:` blanks and `Exam.Answers.cs`
+  - Updated exam table format: added `#` column, changed "What you prove" to "What You Fill In"
+  - Added dual `dotnet test` commands (exam blanks + answer key) to all 30 tutorials
+  - Added missing `## Key Types` sections to tutorials 41, 43, 49, 50
+  - Updated `tutorials/README.md`: replaced "Assessment Challenges" with "Fill in the Blanks", updated project structure to show `Exam.Answers.cs`, fixed test commands, corrected test count to 512
+- **Files modified** (31 files):
+  - `tutorials/01-introduction.md` through `tutorials/31-event-sourcing.md` (30 markdown files — exam section rewritten)
+  - `tutorials/41-openclaw-web.md`, `43-kubernetes-deployment.md`, `49-testing-integrations.md`, `50-best-practices.md` (Key Types added)
+  - `tutorials/README.md` (updated format, commands, test counts)
+- **Test counts**: 512 TutorialLabs tests pass. 0 warnings, 0 errors. Build succeeds.
+
 ## Phase 29 — Tutorial Redesign (Chunks 201–250)
 
 - **Date**: 2026-04-08

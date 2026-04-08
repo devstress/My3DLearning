@@ -86,21 +86,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial21.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Aggregator pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_InterleavedGroups_CompleteIndependently` | 🟢 Starter |
-| 2 | `Intermediate_MetadataConflict_LaterOverridesEarlier` | 🟡 Intermediate |
-| 3 | `Advanced_DuplicateMessage_IsIdempotent` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_InterleavedGroups_CompleteIndependently` | 🟢 Starter | InterleavedGroups — CompleteIndependently |
+| 2 | `Intermediate_MetadataConflict_LaterOverridesEarlier` | 🟡 Intermediate | MetadataConflict — LaterOverridesEarlier |
+| 3 | `Advanced_DuplicateMessage_IsIdempotent` | 🔴 Advanced | DuplicateMessage — IsIdempotent |
+
+> 💻 [`tests/TutorialLabs/Tutorial21/Exam.cs`](../tests/TutorialLabs/Tutorial21/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial21.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial21.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial21.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 20 — Splitter](20-splitter.md)** | **Next: [Tutorial 22 — Scatter-Gather →](22-scatter-gather.md)**

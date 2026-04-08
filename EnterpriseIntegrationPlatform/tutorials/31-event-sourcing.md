@@ -99,21 +99,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial31.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Event Sourcing pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_ProjectionEngine_RebuildsSumFromEvents` | 🟢 Starter |
-| 2 | `Intermediate_SnapshotAcceleratesRebuild` | 🟡 Intermediate |
-| 3 | `Advanced_ConcurrentAppend_DetectsConflict` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_ProjectionEngine_RebuildsSumFromEvents` | 🟢 Starter | ProjectionEngine — RebuildsSumFromEvents |
+| 2 | `Intermediate_SnapshotAcceleratesRebuild` | 🟡 Intermediate | SnapshotAcceleratesRebuild |
+| 3 | `Advanced_ConcurrentAppend_DetectsConflict` | 🔴 Advanced | ConcurrentAppend — DetectsConflict |
+
+> 💻 [`tests/TutorialLabs/Tutorial31/Exam.cs`](../tests/TutorialLabs/Tutorial31/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial31.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial31.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial31.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 30 — Rule Engine](30-rule-engine.md)** | **Next: [Tutorial 32 — Multi-Tenancy →](32-multi-tenancy.md)**

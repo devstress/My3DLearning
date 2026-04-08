@@ -72,21 +72,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial24.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Retry Framework pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_ExhaustRetries_CapturesLastException` | 🟢 Starter |
-| 2 | `Intermediate_CancellationDuringRetry_ThrowsOperationCanceled` | 🟡 Intermediate |
-| 3 | `Advanced_RetrySuccessThenPublish_FullPipeline` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_ExhaustRetries_CapturesLastException` | 🟢 Starter | ExhaustRetries — CapturesLastException |
+| 2 | `Intermediate_CancellationDuringRetry_ThrowsOperationCanceled` | 🟡 Intermediate | CancellationDuringRetry — ThrowsOperationCanceled |
+| 3 | `Advanced_RetrySuccessThenPublish_FullPipeline` | 🔴 Advanced | RetrySuccessThenPublish — FullPipeline |
+
+> 💻 [`tests/TutorialLabs/Tutorial24/Exam.cs`](../tests/TutorialLabs/Tutorial24/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial24.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial24.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial24.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 23 — Request-Reply](23-request-reply.md)** | **Next: [Tutorial 25 — Dead Letter Queue →](25-dead-letter-queue.md)**

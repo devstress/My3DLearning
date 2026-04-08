@@ -81,23 +81,25 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> **Purpose:** Prove you can apply envelope patterns in realistic integration
-> scenarios — fault handling, multi-hop causation, and split-sequence reassembly.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| Difficulty | Challenge | What you prove |
-|------------|-----------|---------------|
-| 🟢 Starter | `Starter_FaultEnvelope_RetryExhaustion` | FaultEnvelope lifecycle with exception capture and retry exhaustion |
-| 🟡 Intermediate | `Intermediate_CausationChain_ThreeHopsThroughChannel` | Multi-hop causation chain (Command → Event → Document) through channel |
-| 🔴 Advanced | `Advanced_SplitSequence_AllPartsWithMetadataPreserved` | Split-sequence reassembly with full metadata verification |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Intermediate_CausationChain_ThreeHopsThroughChannel` | 🟡 Intermediate | CausationChain — ThreeHopsThroughChannel |
+| 2 | `Advanced_SplitSequence_AllPartsWithMetadataPreserved` | 🔴 Advanced | SplitSequence — AllPartsWithMetadataPreserved |
 
 > 💻 [`tests/TutorialLabs/Tutorial04/Exam.cs`](../tests/TutorialLabs/Tutorial04/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial04.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial04.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial04.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 03 — Your First Message](03-first-message.md)** | **Next: [Tutorial 05 — Message Brokers →](05-message-brokers.md)**

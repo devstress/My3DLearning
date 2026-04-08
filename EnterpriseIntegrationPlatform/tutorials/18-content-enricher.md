@@ -69,21 +69,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial18.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Content Enricher pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_DeepNestedMerge_EnrichesAtNestedPath` | 🟢 Starter |
-| 2 | `Intermediate_NumericLookupKey_ExtractsCorrectly` | 🟡 Intermediate |
-| 3 | `Advanced_BatchEnrichment_MultipleMessagesPublished` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_DeepNestedMerge_EnrichesAtNestedPath` | 🟢 Starter | DeepNestedMerge — EnrichesAtNestedPath |
+| 2 | `Intermediate_NumericLookupKey_ExtractsCorrectly` | 🟡 Intermediate | NumericLookupKey — ExtractsCorrectly |
+| 3 | `Advanced_BatchEnrichment_MultipleMessagesPublished` | 🔴 Advanced | BatchEnrichment — MultipleMessagesPublished |
+
+> 💻 [`tests/TutorialLabs/Tutorial18/Exam.cs`](../tests/TutorialLabs/Tutorial18/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial18.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial18.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial18.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 17 — Normalizer](17-normalizer.md)** | **Next: [Tutorial 19 — Content Filter →](19-content-filter.md)**

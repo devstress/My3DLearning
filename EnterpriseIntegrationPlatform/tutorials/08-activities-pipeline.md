@@ -108,23 +108,26 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> **Purpose:** Prove you can apply pipeline patterns in realistic scenarios —
-> metadata enrichment, DLQ routing on failure, and full multi-stage verification.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| Difficulty | Challenge | What you prove |
-|------------|-----------|---------------|
-| 🟢 Starter | `Starter_EnrichAndPublish_MetadataPreserved` | Enrich envelope metadata and verify preservation through pipeline |
-| 🟡 Intermediate | `Intermediate_ValidationFailure_RoutesDlqAndSkipsOutput` | Route invalid messages to DLQ while skipping normal output |
-| 🔴 Advanced | `Advanced_MultiStage_PersistValidatePublishVerify` | Full Persist → Validate → Publish pipeline with audit logging |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_EnrichAndPublish_MetadataPreserved` | 🟢 Starter | EnrichAndPublish — MetadataPreserved |
+| 2 | `Intermediate_ValidationFailure_RoutesDlqAndSkipsOutput` | 🟡 Intermediate | ValidationFailure — RoutesDlqAndSkipsOutput |
+| 3 | `Advanced_MultiStage_PersistValidatePublishVerify` | 🔴 Advanced | MultiStage — PersistValidatePublishVerify |
 
 > 💻 [`tests/TutorialLabs/Tutorial08/Exam.cs`](../tests/TutorialLabs/Tutorial08/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial08.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial08.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial08.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 07 — Temporal Workflows](07-temporal-workflows.md)** | **Next: [Tutorial 09 — Content-Based Router →](09-content-based-router.md)**

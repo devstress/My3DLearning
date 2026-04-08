@@ -14,6 +14,26 @@ After completing this tutorial you will be able to:
 
 ---
 
+## Key Types
+
+```csharp
+// src/Contracts/IntegrationEnvelope.cs — the universal message wrapper
+public record IntegrationEnvelope<T>
+{
+    public Guid MessageId { get; init; }
+    public string Source { get; init; }
+    public string MessageType { get; init; }
+    public T Payload { get; init; }
+    public string SchemaVersion { get; init; }
+    public IReadOnlyDictionary<string, string> Metadata { get; init; }
+}
+
+// src/Security/InputSanitizer.cs — strips dangerous content
+// src/MultiTenancy/TenantResolver.cs — resolves tenant from context
+```
+
+---
+
 ## Lab — Guided Practice
 
 > 💻 Run the lab tests to see each concept demonstrated in isolation.

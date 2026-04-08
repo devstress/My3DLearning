@@ -70,21 +70,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial17.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Normalizer pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_XmlRepeatedElements_ProducesJsonArrays` | 🟢 Starter |
-| 2 | `Intermediate_CsvCustomDelimiter_ParsesCorrectly` | 🟡 Intermediate |
-| 3 | `Advanced_MultiformatBatch_NormalizeAndPublish` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_XmlRepeatedElements_ProducesJsonArrays` | 🟢 Starter | XmlRepeatedElements — ProducesJsonArrays |
+| 2 | `Intermediate_CsvCustomDelimiter_ParsesCorrectly` | 🟡 Intermediate | CsvCustomDelimiter — ParsesCorrectly |
+| 3 | `Advanced_MultiformatBatch_NormalizeAndPublish` | 🔴 Advanced | MultiformatBatch — NormalizeAndPublish |
+
+> 💻 [`tests/TutorialLabs/Tutorial17/Exam.cs`](../tests/TutorialLabs/Tutorial17/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial17.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial17.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial17.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 16 — Transform Pipeline](16-transform-pipeline.md)** | **Next: [Tutorial 18 — Content Enricher →](18-content-enricher.md)**

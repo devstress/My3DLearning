@@ -98,21 +98,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial30.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Rule Engine pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_MultiRuleEvaluation_CollectsAllMatches` | 🟢 Starter |
-| 2 | `Intermediate_RejectAction_NoRouting` | 🟡 Intermediate |
-| 3 | `Advanced_InOperator_MatchesCommaList` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_MultiRuleEvaluation_CollectsAllMatches` | 🟢 Starter | MultiRuleEvaluation — CollectsAllMatches |
+| 2 | `Intermediate_RejectAction_NoRouting` | 🟡 Intermediate | RejectAction — NoRouting |
+| 3 | `Advanced_InOperator_MatchesCommaList` | 🔴 Advanced | InOperator — MatchesCommaList |
+
+> 💻 [`tests/TutorialLabs/Tutorial30/Exam.cs`](../tests/TutorialLabs/Tutorial30/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial30.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial30.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial30.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 29 — Throttle & Rate Limiting](29-throttle-rate-limiting.md)** | **Next: [Tutorial 31 — Event Sourcing →](31-event-sourcing.md)**

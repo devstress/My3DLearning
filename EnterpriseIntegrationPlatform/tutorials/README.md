@@ -1,6 +1,6 @@
 # Enterprise Integration Platform — Tutorial Course
 
-50 tutorials. Each one: learning objectives, key types, guided labs, and tiered exam challenges. No theory walls.
+50 tutorials. Each one: learning objectives, key types, guided labs, and fill-in-the-blank exams with answer keys. No theory walls.
 
 ## Prerequisites
 
@@ -11,7 +11,7 @@
 ## Running Labs & Exams
 
 ```bash
-# All exercises
+# All tests
 dotnet test tests/TutorialLabs/TutorialLabs.csproj
 
 # Single tutorial (e.g. Tutorial 09)
@@ -20,8 +20,11 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 # Only labs
 dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial09.Lab"
 
-# Only exams
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial09.Exam"
+# Only exam answers (answer key — always passes)
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial09.ExamAnswers"
+
+# Only exam blanks (will fail until you fill in the TODO blanks)
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial09.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 ```
 
 ## Tutorial Format
@@ -31,16 +34,16 @@ Every tutorial follows the same structure:
 1. **Learning Objectives** — what you will be able to do after completing the tutorial
 2. **Key Types** — actual interfaces/records/enums from `src/`
 3. **Lab — Guided Practice** — link to `Lab.cs` with a table mapping each test to its concept (6–10 tests per tutorial)
-4. **Exam — Assessment Challenges** — link to `Exam.cs` with 3 difficulty-tiered challenges per tutorial
+4. **Exam — Fill in the Blanks** — link to `Exam.cs` with `// TODO:` blanks + `Exam.Answers.cs` answer key (3 difficulty-tiered challenges per tutorial)
 
 ## Lab vs Exam — How They Differ
 
-| Aspect | Lab (Guided Practice) | Exam (Assessment) |
-|--------|----------------------|-------------------|
-| **Purpose** | Learn concepts by reading and running | Prove understanding in realistic scenarios |
+| Aspect | Lab (Guided Practice) | Exam (Fill in the Blanks) |
+|--------|----------------------|---------------------------|
+| **Purpose** | Learn concepts by reading and running | Fill in `// TODO:` blanks to prove understanding |
 | **Scope** | One concept per test | Multiple concepts per challenge |
 | **Complexity** | Simple, focused | Realistic, integrated |
-| **Business context** | Generic examples | Specific domains (e-commerce, IoT, finance) |
+| **Answer key** | Code is complete — just run it | `Exam.Answers.cs` has the full solutions |
 | **Error handling** | Happy path | Edge cases + failure scenarios |
 | **Difficulty** | Uniform | 🟢 Starter → 🟡 Intermediate → 🔴 Advanced |
 
@@ -157,18 +160,21 @@ Every tutorial follows the same structure:
 tests/TutorialLabs/
 ├── TutorialLabs.csproj
 ├── Tutorial01/
-│   ├── Lab.cs       # Runnable tests demonstrating the pattern
-│   └── Exam.cs      # Coding challenges — make the tests pass
+│   ├── Lab.cs              # Runnable tests demonstrating the pattern
+│   ├── Exam.cs             # Fill-in-the-blank — TODO blanks for you to complete
+│   └── Exam.Answers.cs     # Answer key — full working code (DO NOT PEEK)
 ├── Tutorial02/
 │   ├── Lab.cs
-│   └── Exam.cs
+│   ├── Exam.cs
+│   └── Exam.Answers.cs
 ├── ...
 └── Tutorial50/
     ├── Lab.cs
-    └── Exam.cs
+    ├── Exam.cs
+    └── Exam.Answers.cs
 ```
 
-**522 total exercises** across 50 tutorials.
+**512 total tests** across 50 tutorials (362 Lab + 150 ExamAnswers).
 
 ## Quick Reference
 

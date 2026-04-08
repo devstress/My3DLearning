@@ -88,21 +88,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial13.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Routing Slip pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_FullPipeline_ExecutesAllStepsSequentially` | 🟢 Starter |
-| 2 | `Intermediate_PartialFailure_StopsAtFailedStep` | 🟡 Intermediate |
-| 3 | `Advanced_MissingSlip_ThrowsInvalidOperation` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_FullPipeline_ExecutesAllStepsSequentially` | 🟢 Starter | FullPipeline — ExecutesAllStepsSequentially |
+| 2 | `Intermediate_PartialFailure_StopsAtFailedStep` | 🟡 Intermediate | PartialFailure — StopsAtFailedStep |
+| 3 | `Advanced_MissingSlip_ThrowsInvalidOperation` | 🔴 Advanced | MissingSlip — ThrowsInvalidOperation |
+
+> 💻 [`tests/TutorialLabs/Tutorial13/Exam.cs`](../tests/TutorialLabs/Tutorial13/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial13.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial13.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial13.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 12 — Recipient List](12-recipient-list.md)** | **Next: [Tutorial 14 — Process Manager →](14-process-manager.md)**

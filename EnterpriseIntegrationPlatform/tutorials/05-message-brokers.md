@@ -65,23 +65,26 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> **Purpose:** Prove you can apply message broker patterns in realistic scenarios —
-> multi-broker fan-out, selective filtering, and DI-wired pipelines.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| Difficulty | Challenge | What you prove |
-|------------|-----------|---------------|
-| 🟢 Starter | `Starter_MultiBrokerFanOut_AllEndpointsReceive` | Fan out one event to NATS + Kafka + Pulsar simultaneously |
-| 🟡 Intermediate | `Intermediate_SelectiveConsumer_PriorityGate` | Priority-based triage with selective consumer predicate |
-| 🔴 Advanced | `Advanced_DIHost_BrokerOptionsConfigured` | AspireIntegrationTestHost DI pipeline with BrokerOptions |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_MultiBrokerFanOut_AllEndpointsReceive` | 🟢 Starter | MultiBrokerFanOut — AllEndpointsReceive |
+| 2 | `Intermediate_SelectiveConsumer_PriorityGate` | 🟡 Intermediate | SelectiveConsumer — PriorityGate |
+| 3 | `Advanced_DIHost_BrokerOptionsConfigured` | 🔴 Advanced | DIHost — BrokerOptionsConfigured |
 
 > 💻 [`tests/TutorialLabs/Tutorial05/Exam.cs`](../tests/TutorialLabs/Tutorial05/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial05.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial05.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial05.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 04 — Integration Envelope](04-integration-envelope.md)** | **Next: [Tutorial 06 — Messaging Channels →](06-messaging-channels.md)**

@@ -82,23 +82,26 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> **Purpose:** Prove you can apply content-based routing in realistic scenarios —
-> regional routing, payload-based routing with JSON, and batch verification.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| Difficulty | Challenge | What you prove |
-|------------|-----------|---------------|
-| 🟢 Starter | `Starter_RegionalRouting_MatchesAndFallsBack` | Multi-rule regional routing with fallback to global |
-| 🟡 Intermediate | `Intermediate_PayloadRouting_JsonElementField` | Route by JSON payload fields using JsonElement |
-| 🔴 Advanced | `Advanced_BatchRouting_MultipleMessagesVerifyTopics` | Batch routing with per-topic count verification |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_RegionalRouting_MatchesAndFallsBack` | 🟢 Starter | RegionalRouting — MatchesAndFallsBack |
+| 2 | `Intermediate_PayloadRouting_JsonElementField` | 🟡 Intermediate | PayloadRouting — JsonElementField |
+| 3 | `Advanced_BatchRouting_MultipleMessagesVerifyTopics` | 🔴 Advanced | BatchRouting — MultipleMessagesVerifyTopics |
 
 > 💻 [`tests/TutorialLabs/Tutorial09/Exam.cs`](../tests/TutorialLabs/Tutorial09/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial09.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial09.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial09.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 08 — Activities and the Pipeline](08-activities-pipeline.md)** | **Next: [Tutorial 10 — Message Filter →](10-message-filter.md)**

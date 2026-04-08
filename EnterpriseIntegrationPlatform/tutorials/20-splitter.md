@@ -76,21 +76,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial20.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Splitter pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_TargetMessageTypeOverride_AppliedToAll` | 🟢 Starter |
-| 2 | `Intermediate_MetadataPreserved_AcrossSplitEnvelopes` | 🟡 Intermediate |
-| 3 | `Advanced_LargeBatch_AllItemsPublished` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_TargetMessageTypeOverride_AppliedToAll` | 🟢 Starter | TargetMessageTypeOverride — AppliedToAll |
+| 2 | `Intermediate_MetadataPreserved_AcrossSplitEnvelopes` | 🟡 Intermediate | MetadataPreserved — AcrossSplitEnvelopes |
+| 3 | `Advanced_LargeBatch_AllItemsPublished` | 🔴 Advanced | LargeBatch — AllItemsPublished |
+
+> 💻 [`tests/TutorialLabs/Tutorial20/Exam.cs`](../tests/TutorialLabs/Tutorial20/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial20.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial20.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial20.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 19 — Content Filter](19-content-filter.md)** | **Next: [Tutorial 21 — Aggregator →](21-aggregator.md)**

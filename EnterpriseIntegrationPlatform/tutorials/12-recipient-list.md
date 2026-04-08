@@ -64,20 +64,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial12.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 💻 Prove you can apply the Recipient List pattern in realistic, multi-constraint scenarios. Each challenge combines concepts from the lab into an end-to-end flow.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| Challenge | Test | Difficulty |
-|-----------|------|------------|
-| 1 | `Starter_EventNotificationFanOut_RoutesToAllSubscribers` | 🟢 Starter |
-| 2 | `Intermediate_RulesAndMetadataCombined_MergesDestinations` | 🟡 Intermediate |
-| 3 | `Advanced_CrossRuleDedup_RemovesDuplicateDestinations` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_EventNotificationFanOut_RoutesToAllSubscribers` | 🟢 Starter | EventNotificationFanOut — RoutesToAllSubscribers |
+| 2 | `Intermediate_RulesAndMetadataCombined_MergesDestinations` | 🟡 Intermediate | RulesAndMetadataCombined — MergesDestinations |
+| 3 | `Advanced_CrossRuleDedup_RemovesDuplicateDestinations` | 🔴 Advanced | CrossRuleDedup — RemovesDuplicateDestinations |
+
+> 💻 [`tests/TutorialLabs/Tutorial12/Exam.cs`](../tests/TutorialLabs/Tutorial12/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial12.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial12.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial12.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 11 — Dynamic Router](11-dynamic-router.md)** | **Next: [Tutorial 13 — Routing Slip →](13-routing-slip.md)**

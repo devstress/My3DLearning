@@ -81,23 +81,26 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> **Purpose:** Prove you can apply message filter patterns in realistic scenarios —
-> spam filtering, priority-based triage, and multi-condition metadata filtering.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| Difficulty | Challenge | What you prove |
-|------------|-----------|---------------|
-| 🟢 Starter | `Starter_SpamFilter_AcceptsTrustedRejectsOthers` | Filter trusted partners using In operator, quarantine others |
-| 🟡 Intermediate | `Intermediate_PriorityFilter_OnlyHighCriticalPass` | Priority-based triage — only High/Critical pass through |
-| 🔴 Advanced | `Advanced_MetadataFilter_AndLogic_BothConditionsRequired` | Multi-condition AND filter on tenant and environment metadata |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_SpamFilter_AcceptsTrustedRejectsOthers` | 🟢 Starter | SpamFilter — AcceptsTrustedRejectsOthers |
+| 2 | `Intermediate_PriorityFilter_OnlyHighCriticalPass` | 🟡 Intermediate | PriorityFilter — OnlyHighCriticalPass |
+| 3 | `Advanced_MetadataFilter_AndLogic_BothConditionsRequired` | 🔴 Advanced | MetadataFilter — AndLogic BothConditionsRequired |
 
 > 💻 [`tests/TutorialLabs/Tutorial10/Exam.cs`](../tests/TutorialLabs/Tutorial10/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial10.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial10.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial10.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 09 — Content-Based Router](09-content-based-router.md)** | **Next: [Tutorial 11 — Dynamic Router →](11-dynamic-router.md)**

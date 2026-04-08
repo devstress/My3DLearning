@@ -98,23 +98,26 @@ dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> **Purpose:** Prove you can apply Temporal workflow patterns in realistic scenarios —
-> host-based DI wiring, failure handling, and correlation propagation.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| Difficulty | Challenge | What you prove |
-|------------|-----------|---------------|
-| 🟢 Starter | `Starter_AspireHost_OrchestratorDispatchesViaDI` | Wire PipelineOrchestrator via DI and dispatch through Aspire host |
-| 🟡 Intermediate | `Intermediate_WorkflowFailure_LogsWarning` | Handle workflow failure result gracefully |
-| 🔴 Advanced | `Advanced_CorrelationAndCausation_PropagatedToInput` | Correlation and causation IDs propagated through dispatch |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_AspireHost_OrchestratorDispatchesViaDI` | 🟢 Starter | AspireHost — OrchestratorDispatchesViaDI |
+| 2 | `Intermediate_WorkflowFailure_LogsWarning` | 🟡 Intermediate | WorkflowFailure — LogsWarning |
+| 3 | `Advanced_CorrelationAndCausation_PropagatedToInput` | 🔴 Advanced | CorrelationAndCausation — PropagatedToInput |
 
 > 💻 [`tests/TutorialLabs/Tutorial07/Exam.cs`](../tests/TutorialLabs/Tutorial07/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial07.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial07.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial07.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 06 — Messaging Channels](06-messaging-channels.md)** | **Next: [Tutorial 08 — Activities and the Pipeline →](08-activities-pipeline.md)**

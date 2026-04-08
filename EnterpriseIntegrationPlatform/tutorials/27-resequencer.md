@@ -57,21 +57,26 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial27.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Resequencer pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_LargeOutOfOrderBatch_ReleasedInSequence` | 🟢 Starter |
-| 2 | `Intermediate_InterleavedSequences_EachReleasedIndependently` | 🟡 Intermediate |
-| 3 | `Advanced_TimeoutPartialRelease_ThenCompleteNewSequence` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_LargeOutOfOrderBatch_ReleasedInSequence` | 🟢 Starter | LargeOutOfOrderBatch — ReleasedInSequence |
+| 2 | `Intermediate_InterleavedSequences_EachReleasedIndependently` | 🟡 Intermediate | InterleavedSequences — EachReleasedIndependently |
+| 3 | `Advanced_TimeoutPartialRelease_ThenCompleteNewSequence` | 🔴 Advanced | TimeoutPartialRelease — ThenCompleteNewSequence |
+
+> 💻 [`tests/TutorialLabs/Tutorial27/Exam.cs`](../tests/TutorialLabs/Tutorial27/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial27.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial27.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial27.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 26 — Message Replay](26-message-replay.md)** | **Next: [Tutorial 28 — Competing Consumers →](28-competing-consumers.md)**
