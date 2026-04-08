@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 22 – Scatter-Gather (Exam)
+// Tutorial 22 – Scatter-Gather (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: mixed success/failure responses, duration tracking,
-// and concurrent scatter-gather operations.
+// PURPOSE: Prove you can apply the Scatter-Gather pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Mixed success/failure responses are both collected
+//   🟡 Intermediate — Duration is tracked and greater than zero
+//   🔴 Advanced     — Concurrent scatter-gather operations isolate by CorrelationId
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Processing.ScatterGather;
@@ -16,8 +29,18 @@ namespace TutorialLabs.Tutorial22;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Mixed success and failure responses ────────────────
+    //
+    // SCENARIO: Two recipients are scattered to: "ok-svc" responds successfully
+    //           and "fail-svc" responds with an error. The gather phase must
+    //           collect both and report one success, one failure, no timeout.
+    //
+    // WHAT YOU PROVE: The scatter-gather correctly collects mixed success/failure
+    //                 responses without timing out.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_MixedResponses_SuccessAndFailure()
+    public async Task Starter_MixedResponses_SuccessAndFailure()
     {
         await using var output = new MockEndpoint("exam-sg");
         var sg = CreateScatterGatherer(output, timeoutMs: 500);
@@ -39,8 +62,17 @@ public sealed class Exam
         output.AssertReceivedCount(2);
     }
 
+    // ── 🟡 INTERMEDIATE — Duration tracking ────────────────────────────
+    //
+    // SCENARIO: A single recipient responds quickly. The result's Duration
+    //           must be greater than zero and TimedOut must be false.
+    //
+    // WHAT YOU PROVE: The scatter-gather accurately tracks how long the
+    //                 operation takes from scatter to final gather.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_Duration_IsTracked()
+    public async Task Intermediate_Duration_IsTracked()
     {
         await using var output = new MockEndpoint("exam-dur");
         var sg = CreateScatterGatherer(output, timeoutMs: 500);
@@ -57,8 +89,19 @@ public sealed class Exam
         Assert.That(result.TimedOut, Is.False);
     }
 
+    // ── 🔴 ADVANCED — Concurrent operations isolate by CorrelationId ───
+    //
+    // SCENARIO: Two scatter-gather operations run concurrently with different
+    //           CorrelationIds. Responses are submitted out of order (corr2
+    //           first, then corr1). Each result must contain only its own
+    //           responses with the correct payload.
+    //
+    // WHAT YOU PROVE: The scatter-gather correctly isolates concurrent
+    //                 operations so responses never cross-contaminate.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_ConcurrentOperations_IsolateByCorrelation()
+    public async Task Advanced_ConcurrentOperations_IsolateByCorrelation()
     {
         await using var output = new MockEndpoint("exam-conc");
         var sg = CreateScatterGatherer(output, timeoutMs: 1000);

@@ -1,9 +1,21 @@
 // ============================================================================
-// Tutorial 20 – Splitter (Exam)
+// Tutorial 20 – Splitter (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: split with custom message type override, metadata
-// preservation across splits, and large batch split with MockEndpoint
-// verification.
+// PURPOSE: Prove you can apply the Splitter pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Target message type override applied to all split envelopes
+//   🟡 Intermediate — Metadata, priority, and schema version preserved across splits
+//   🔴 Advanced     — Large batch of 50 items all published with correct sequence numbers
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -18,8 +30,18 @@ namespace TutorialLabs.Tutorial20;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Target message type override ──────────────────────
+    //
+    // SCENARIO: An order batch "X,Y,Z" arrives from OriginalSvc. The splitter
+    //           is configured with TargetMessageType and TargetSource overrides.
+    //           Every split envelope must carry the overridden values.
+    //
+    // WHAT YOU PROVE: SplitterOptions.TargetMessageType and TargetSource are
+    //                 applied to every split envelope and all items are published.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_TargetMessageTypeOverride_AppliedToAll()
+    public async Task Starter_TargetMessageTypeOverride_AppliedToAll()
     {
         await using var output = new MockEndpoint("exam-splitter-1");
 
@@ -48,8 +70,18 @@ public sealed class Exam
         output.AssertReceivedOnTopic("items-topic", 3);
     }
 
+    // ── 🟡 INTERMEDIATE — Metadata preserved across split envelopes ────
+    //
+    // SCENARIO: A batch message "A|B" carries region/priority metadata,
+    //           MessagePriority.High, and SchemaVersion "2.0". After splitting,
+    //           every child envelope must retain all of these properties.
+    //
+    // WHAT YOU PROVE: The splitter faithfully copies metadata, priority, and
+    //                 schema version from the source envelope to every split.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_MetadataPreserved_AcrossSplitEnvelopes()
+    public async Task Intermediate_MetadataPreserved_AcrossSplitEnvelopes()
     {
         await using var output = new MockEndpoint("exam-splitter-2");
 
@@ -85,8 +117,19 @@ public sealed class Exam
         output.AssertReceivedOnTopic("meta-topic", 2);
     }
 
+    // ── 🔴 ADVANCED — Large batch split with full verification ─────────
+    //
+    // SCENARIO: Fifty items are joined into a single comma-separated payload.
+    //           The splitter must produce exactly 50 envelopes, publish all to
+    //           "bulk-topic", and assign SequenceNumbers 0..49 with TotalCount 50
+    //           on every envelope.
+    //
+    // WHAT YOU PROVE: The splitter handles large batches end-to-end with
+    //                 correct sequence numbering and total count metadata.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_LargeBatch_AllItemsPublished()
+    public async Task Advanced_LargeBatch_AllItemsPublished()
     {
         await using var output = new MockEndpoint("exam-splitter-3");
 

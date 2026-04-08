@@ -4,6 +4,17 @@ Break composite messages into individual items using `IMessageSplitter<T>` with 
 
 ---
 
+## Learning Objectives
+
+1. Understand the Splitter pattern and how it decomposes composite messages into individual items
+2. Use `MessageSplitter<T>` with `FuncSplitStrategy<T>` to split comma-separated payloads
+3. Verify that split envelopes preserve `CorrelationId` and set `CausationId` to the source message
+4. Confirm that `SequenceNumber` and `TotalCount` metadata are set on every split envelope
+5. Validate edge cases: empty split results produce no publishes, missing target topic throws
+6. Use `JsonArraySplitStrategy` to split JSON arrays into individual element envelopes
+
+---
+
 ## Key Types
 
 ```csharp
@@ -44,132 +55,37 @@ public sealed class SplitterOptions
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### Exercise 1: Split comma-separated string into individual envelopes
+> 💻 Run the lab tests to see each Splitter concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var strategy = new FuncSplitStrategy<string>(
-    composite => composite.Split(',').ToList());
-
-var options = Options.Create(new SplitterOptions { TargetTopic = "items-topic" });
-var splitter = new MessageSplitter<string>(
-    strategy, producer, options,
-    NullLogger<MessageSplitter<string>>.Instance);
-
-var source = IntegrationEnvelope<string>.Create(
-    "apple,banana,cherry", "InventoryService", "batch.items");
-
-var result = await splitter.SplitAsync(source);
-
-Assert.That(result.ItemCount, Is.EqualTo(3));
-Assert.That(result.TargetTopic, Is.EqualTo("items-topic"));
-Assert.That(result.SourceMessageId, Is.EqualTo(source.MessageId));
-Assert.That(result.SplitEnvelopes[0].Payload, Is.EqualTo("apple"));
-Assert.That(result.SplitEnvelopes[1].Payload, Is.EqualTo("banana"));
-Assert.That(result.SplitEnvelopes[2].Payload, Is.EqualTo("cherry"));
-```
-
-### Exercise 2: Split preserves CorrelationId and sets CausationId
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var strategy = new FuncSplitStrategy<string>(s => new[] { s });
-
-var options = Options.Create(new SplitterOptions { TargetTopic = "topic" });
-var splitter = new MessageSplitter<string>(
-    strategy, producer, options,
-    NullLogger<MessageSplitter<string>>.Instance);
-
-var source = IntegrationEnvelope<string>.Create(
-    "payload", "Service", "event.type");
-
-var result = await splitter.SplitAsync(source);
-
-var splitEnv = result.SplitEnvelopes[0];
-Assert.That(splitEnv.CorrelationId, Is.EqualTo(source.CorrelationId));
-Assert.That(splitEnv.CausationId, Is.EqualTo(source.MessageId));
-Assert.That(splitEnv.MessageId, Is.Not.EqualTo(source.MessageId));
-```
-
-### Exercise 3: No target topic configured throws
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var strategy = new FuncSplitStrategy<string>(s => new[] { s });
-
-var options = Options.Create(new SplitterOptions { TargetTopic = "" });
-var splitter = new MessageSplitter<string>(
-    strategy, producer, options,
-    NullLogger<MessageSplitter<string>>.Instance);
-
-var source = IntegrationEnvelope<string>.Create("data", "Svc", "evt");
-
-Assert.ThrowsAsync<InvalidOperationException>(
-    () => splitter.SplitAsync(source));
-```
-
-### Exercise 4: Zero items returns empty result, no publish
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var strategy = new FuncSplitStrategy<string>(_ => Array.Empty<string>());
-
-var options = Options.Create(new SplitterOptions { TargetTopic = "topic" });
-var splitter = new MessageSplitter<string>(
-    strategy, producer, options,
-    NullLogger<MessageSplitter<string>>.Instance);
-
-var source = IntegrationEnvelope<string>.Create("empty", "Svc", "evt");
-
-var result = await splitter.SplitAsync(source);
-
-Assert.That(result.ItemCount, Is.EqualTo(0));
-Assert.That(result.SplitEnvelopes, Is.Empty);
-await producer.DidNotReceive()
-    .PublishAsync(Arg.Any<IntegrationEnvelope<string>>(),
-        Arg.Any<string>(), Arg.Any<CancellationToken>());
-```
-
-### Exercise 5: JsonArraySplitStrategy splits top-level array
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var splitOptions = Options.Create(new SplitterOptions { TargetTopic = "json-items" });
-var strategy = new JsonArraySplitStrategy(splitOptions);
-
-var splitter = new MessageSplitter<JsonElement>(
-    strategy, producer, splitOptions,
-    NullLogger<MessageSplitter<JsonElement>>.Instance);
-
-var jsonArray = JsonSerializer.Deserialize<JsonElement>(
-    """[{"id":1},{"id":2},{"id":3}]""");
-
-var source = IntegrationEnvelope<JsonElement>.Create(
-    jsonArray, "BatchService", "batch.created");
-
-var result = await splitter.SplitAsync(source);
-
-Assert.That(result.ItemCount, Is.EqualTo(3));
-Assert.That(result.SplitEnvelopes[0].Payload.GetProperty("id").GetInt32(), Is.EqualTo(1));
-Assert.That(result.SplitEnvelopes[1].Payload.GetProperty("id").GetInt32(), Is.EqualTo(2));
-Assert.That(result.SplitEnvelopes[2].Payload.GetProperty("id").GetInt32(), Is.EqualTo(3));
-```
-
----
-
-## Lab
-
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial20/Lab.cs`](../tests/TutorialLabs/Tutorial20/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Split_ProducesCorrectItemCount` | Split a composite string and verify item count and envelope count |
+| 2 | `Split_PreservesCorrelationId` | Split envelopes inherit the source CorrelationId |
+| 3 | `Split_SetsCausationIdToSourceMessageId` | Each split envelope's CausationId equals the source MessageId |
+| 4 | `Split_SequenceNumbers_AreZeroBased` | Split envelopes have zero-based SequenceNumber values |
+| 5 | `Split_TotalCount_MatchesItemCount` | Every split envelope's TotalCount matches the total item count |
+| 6 | `Split_EmptyResult_ReturnsZeroItems` | Empty strategy result produces zero items and no publishes |
+| 7 | `Split_SourceMessageId_CapturedInResult` | SplitResult captures the original source MessageId and topic |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial20.Lab"
 ```
 
-## Exam
+---
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial20/Exam.cs`](../tests/TutorialLabs/Tutorial20/Exam.cs)
+## Exam — Assessment Challenges
+
+> 🎯 Prove you can apply the Splitter pattern in realistic, end-to-end scenarios.
+> Each challenge combines multiple concepts and uses a business-like domain.
+
+| # | Challenge | Difficulty |
+|---|-----------|------------|
+| 1 | `Starter_TargetMessageTypeOverride_AppliedToAll` | 🟢 Starter |
+| 2 | `Intermediate_MetadataPreserved_AcrossSplitEnvelopes` | 🟡 Intermediate |
+| 3 | `Advanced_LargeBatch_AllItemsPublished` | 🔴 Advanced |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial20.Exam"

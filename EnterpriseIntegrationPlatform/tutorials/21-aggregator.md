@@ -4,6 +4,17 @@ Collect related messages by `CorrelationId` and combine them into a single aggre
 
 ---
 
+## Learning Objectives
+
+1. Understand the Aggregator pattern and how it collects related messages into a single aggregate
+2. Use `InMemoryMessageAggregateStore` to group envelopes by `CorrelationId`
+3. Apply `CountCompletionStrategy` to detect when a group has reached its expected size
+4. Verify that incomplete groups return `IsComplete = false` with no aggregate envelope
+5. Confirm that the aggregate envelope merges metadata and preserves the highest priority
+6. Validate that different `CorrelationId` values form separate, isolated groups
+
+---
+
 ## Key Types
 
 ```csharp
@@ -54,163 +65,37 @@ public sealed record AggregateResult<TAggregate>(
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### Exercise 1: Store groups items by CorrelationId
+> 💻 Run the lab tests to see each Aggregator concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var store = new InMemoryMessageAggregateStore<string>();
-var correlationId = Guid.NewGuid();
-
-var e1 = IntegrationEnvelope<string>.Create(
-    "item-1", "Svc", "line", correlationId: correlationId);
-var e2 = IntegrationEnvelope<string>.Create(
-    "item-2", "Svc", "line", correlationId: correlationId);
-
-await store.AddAsync(e1);
-var group = await store.AddAsync(e2);
-
-Assert.That(group.Count, Is.EqualTo(2));
-Assert.That(group[0].Payload, Is.EqualTo("item-1"));
-Assert.That(group[1].Payload, Is.EqualTo("item-2"));
-```
-
-### Exercise 2: CountCompletionStrategy fires when count reached
-
-```csharp
-var strategy = new CountCompletionStrategy<string>(2);
-var envelopes = new[]
-{
-    IntegrationEnvelope<string>.Create("a", "Svc", "t"),
-    IntegrationEnvelope<string>.Create("b", "Svc", "t"),
-};
-
-Assert.That(strategy.IsComplete(envelopes), Is.True);
-```
-
-### Exercise 3: Aggregator returns incomplete when group not ready
-
-```csharp
-var store = new InMemoryMessageAggregateStore<string>();
-var completion = new CountCompletionStrategy<string>(3);
-var aggregation = Substitute.For<IAggregationStrategy<string, string>>();
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var options = Options.Create(new AggregatorOptions
-{
-    TargetTopic = "aggregated-topic",
-    ExpectedCount = 3,
-});
-
-var aggregator = new MessageAggregator<string, string>(
-    store, completion, aggregation, producer, options,
-    NullLogger<MessageAggregator<string, string>>.Instance);
-
-var correlationId = Guid.NewGuid();
-var envelope = IntegrationEnvelope<string>.Create(
-    "item-1", "Svc", "line", correlationId: correlationId);
-
-var result = await aggregator.AggregateAsync(envelope);
-
-Assert.That(result.IsComplete, Is.False);
-Assert.That(result.AggregateEnvelope, Is.Null);
-Assert.That(result.ReceivedCount, Is.EqualTo(1));
-Assert.That(result.CorrelationId, Is.EqualTo(correlationId));
-```
-
-### Exercise 4: Aggregator completes and publishes when count reached
-
-```csharp
-var store = new InMemoryMessageAggregateStore<string>();
-var completion = new CountCompletionStrategy<string>(2);
-var aggregation = Substitute.For<IAggregationStrategy<string, string>>();
-aggregation
-    .Aggregate(Arg.Any<IReadOnlyList<string>>())
-    .Returns(ci =>
-    {
-        var items = ci.Arg<IReadOnlyList<string>>();
-        return string.Join(",", items);
-    });
-
-var producer = Substitute.For<IMessageBrokerProducer>();
-var options = Options.Create(new AggregatorOptions
-{
-    TargetTopic = "agg-out",
-    TargetMessageType = "order.batch",
-    ExpectedCount = 2,
-});
-
-var aggregator = new MessageAggregator<string, string>(
-    store, completion, aggregation, producer, options,
-    NullLogger<MessageAggregator<string, string>>.Instance);
-
-var correlationId = Guid.NewGuid();
-var e1 = IntegrationEnvelope<string>.Create(
-    "A", "Svc", "line", correlationId: correlationId);
-var e2 = IntegrationEnvelope<string>.Create(
-    "B", "Svc", "line", correlationId: correlationId);
-
-await aggregator.AggregateAsync(e1);
-var result = await aggregator.AggregateAsync(e2);
-
-Assert.That(result.IsComplete, Is.True);
-Assert.That(result.ReceivedCount, Is.EqualTo(2));
-Assert.That(result.AggregateEnvelope, Is.Not.Null);
-Assert.That(result.AggregateEnvelope!.Payload, Is.EqualTo("A,B"));
-Assert.That(result.AggregateEnvelope.MessageType, Is.EqualTo("order.batch"));
-Assert.That(result.AggregateEnvelope.CorrelationId, Is.EqualTo(correlationId));
-```
-
-### Exercise 5: Aggregator merges metadata from all envelopes
-
-```csharp
-var store = new InMemoryMessageAggregateStore<string>();
-var completion = new CountCompletionStrategy<string>(2);
-var aggregation = Substitute.For<IAggregationStrategy<string, string>>();
-aggregation.Aggregate(Arg.Any<IReadOnlyList<string>>()).Returns("merged");
-var producer = Substitute.For<IMessageBrokerProducer>();
-var options = Options.Create(new AggregatorOptions
-{
-    TargetTopic = "merged-topic",
-    ExpectedCount = 2,
-});
-
-var aggregator = new MessageAggregator<string, string>(
-    store, completion, aggregation, producer, options,
-    NullLogger<MessageAggregator<string, string>>.Instance);
-
-var correlationId = Guid.NewGuid();
-var e1 = IntegrationEnvelope<string>.Create(
-    "A", "Svc", "line", correlationId: correlationId) with
-{
-    Metadata = new Dictionary<string, string> { ["key1"] = "val1" },
-};
-var e2 = IntegrationEnvelope<string>.Create(
-    "B", "Svc", "line", correlationId: correlationId) with
-{
-    Metadata = new Dictionary<string, string> { ["key2"] = "val2" },
-};
-
-await aggregator.AggregateAsync(e1);
-var result = await aggregator.AggregateAsync(e2);
-
-Assert.That(result.AggregateEnvelope!.Metadata, Contains.Key("key1"));
-Assert.That(result.AggregateEnvelope.Metadata, Contains.Key("key2"));
-```
-
----
-
-## Lab
-
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial21/Lab.cs`](../tests/TutorialLabs/Tutorial21/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Aggregate_SingleMessage_GroupNotComplete` | Single message does not complete the group |
+| 2 | `Aggregate_ReachesCount_CompletesAndPublishes` | Group completes and publishes when count is reached |
+| 3 | `Aggregate_PreservesCorrelationId` | Aggregate envelope preserves the original CorrelationId |
+| 4 | `Aggregate_DifferentCorrelationIds_FormSeparateGroups` | Different CorrelationIds form isolated groups |
+| 5 | `Aggregate_CountCompletion_ExactThreshold` | Exact threshold triggers completion on the final message |
+| 6 | `Aggregate_MergesMetadata_FromAllEnvelopes` | Metadata from all envelopes is merged into the aggregate |
+| 7 | `Aggregate_UsesHighestPriority` | Aggregate envelope uses the highest priority from the group |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial21.Lab"
 ```
 
-## Exam
+---
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial21/Exam.cs`](../tests/TutorialLabs/Tutorial21/Exam.cs)
+## Exam — Assessment Challenges
+
+> 🎯 Prove you can apply the Aggregator pattern in realistic, end-to-end scenarios.
+> Each challenge combines multiple concepts and uses a business-like domain.
+
+| # | Challenge | Difficulty |
+|---|-----------|------------|
+| 1 | `Starter_InterleavedGroups_CompleteIndependently` | 🟢 Starter |
+| 2 | `Intermediate_MetadataConflict_LaterOverridesEarlier` | 🟡 Intermediate |
+| 3 | `Advanced_DuplicateMessage_IsIdempotent` | 🔴 Advanced |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial21.Exam"

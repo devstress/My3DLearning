@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 21 – Aggregator (Exam)
+// Tutorial 21 – Aggregator (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: multi-group interleaved aggregation, metadata override on
-// key conflict, and idempotent duplicate rejection.
+// PURPOSE: Prove you can apply the Aggregator pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Interleaved groups with different CorrelationIds complete independently
+//   🟡 Intermediate — Metadata key conflict where later envelope overrides earlier
+//   🔴 Advanced     — Duplicate message by MessageId is idempotently rejected
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -18,8 +31,18 @@ namespace TutorialLabs.Tutorial21;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Interleaved groups complete independently ──────────
+    //
+    // SCENARIO: Two order groups (corrA and corrB) with expectedCount=2 are
+    //           interleaved: a1, b1, a2, b2. Each group must complete
+    //           independently and publish its own aggregate.
+    //
+    // WHAT YOU PROVE: The aggregator correctly isolates groups by CorrelationId
+    //                 even when messages arrive interleaved.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_InterleavedGroups_CompleteIndependently()
+    public async Task Starter_InterleavedGroups_CompleteIndependently()
     {
         await using var output = new MockEndpoint("exam-agg");
         var aggregator = CreateAggregator(output, expectedCount: 2);
@@ -40,8 +63,18 @@ public sealed class Exam
         output.AssertReceivedOnTopic("aggregated-topic", 2);
     }
 
+    // ── 🟡 INTERMEDIATE — Metadata conflict: later overrides earlier ────
+    //
+    // SCENARIO: Two envelopes share the same metadata key "key" but with
+    //           different values ("first" and "second"). The aggregate must
+    //           retain the value from the later envelope.
+    //
+    // WHAT YOU PROVE: When metadata keys conflict during aggregation, the
+    //                 later envelope's value wins.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_MetadataConflict_LaterOverridesEarlier()
+    public async Task Intermediate_MetadataConflict_LaterOverridesEarlier()
     {
         await using var output = new MockEndpoint("exam-meta");
         var aggregator = CreateAggregator(output, expectedCount: 2);
@@ -63,8 +96,18 @@ public sealed class Exam
         output.AssertReceivedOnTopic("aggregated-topic", 1);
     }
 
+    // ── 🔴 ADVANCED — Duplicate message is idempotently rejected ────────
+    //
+    // SCENARIO: Envelope e1 is sent twice before e2 arrives. The duplicate
+    //           must be ignored (idempotent), so the group still needs e2
+    //           to complete. Only one aggregate is published.
+    //
+    // WHAT YOU PROVE: The aggregator deduplicates by MessageId and does not
+    //                 double-count retransmitted messages.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_DuplicateMessage_IsIdempotent()
+    public async Task Advanced_DuplicateMessage_IsIdempotent()
     {
         await using var output = new MockEndpoint("exam-dup");
         var aggregator = CreateAggregator(output, expectedCount: 2);

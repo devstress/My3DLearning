@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 23 – Request-Reply (Exam)
+// Tutorial 23 – Request-Reply (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: request envelope intent/replyTo, concurrent requests with
-// different correlation IDs, and timeout duration accuracy.
+// PURPOSE: Prove you can apply the Request-Reply pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Request envelope has Intent=Command and ReplyTo set correctly
+//   🟡 Intermediate — Concurrent requests correlate replies to the correct caller
+//   🔴 Advanced     — Timeout duration is within a reasonable range
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,8 +30,19 @@ namespace TutorialLabs.Tutorial23;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Request envelope has intent and ReplyTo ────────────
+    //
+    // SCENARIO: A request-reply correlator sends a request with a specific
+    //           CorrelationId. The published envelope must have ReplyTo set
+    //           to the reply topic, Intent = Command, and the correct
+    //           CorrelationId.
+    //
+    // WHAT YOU PROVE: The correlator correctly stamps the outgoing request
+    //                 envelope with all required routing properties.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_RequestEnvelope_HasIntentAndReplyTo()
+    public async Task Starter_RequestEnvelope_HasIntentAndReplyTo()
     {
         await using var producer = new MockEndpoint("exam-prod");
         await using var consumer = new MockEndpoint("exam-cons");
@@ -36,8 +60,18 @@ public sealed class Exam
         producer.AssertReceivedOnTopic("req-topic", 1);
     }
 
+    // ── 🟡 INTERMEDIATE — Concurrent requests correlate correctly ──────
+    //
+    // SCENARIO: Two requests are sent concurrently with different CorrelationIds.
+    //           A reply is sent for corr1 after a short delay. The result must
+    //           match the correct CorrelationId and contain the expected payload.
+    //
+    // WHAT YOU PROVE: The correlator correctly matches replies to their
+    //                 originating requests even under concurrent usage.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_ConcurrentRequests_CorrelateCorrectly()
+    public async Task Intermediate_ConcurrentRequests_CorrelateCorrectly()
     {
         await using var producer = new MockEndpoint("exam-conc-prod");
         await using var consumer = new MockEndpoint("exam-conc-cons");
@@ -66,8 +100,18 @@ public sealed class Exam
         Assert.That(result1.CorrelationId, Is.EqualTo(corr1));
     }
 
+    // ── 🔴 ADVANCED — Timeout duration is within a reasonable range ─────
+    //
+    // SCENARIO: A request is sent with a 300ms timeout and no reply arrives.
+    //           The result must show TimedOut = true, Reply = null, and a
+    //           Duration between 200ms and 2000ms.
+    //
+    // WHAT YOU PROVE: The correlator respects the configured timeout and
+    //                 accurately reports the elapsed duration.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_Timeout_DurationIsReasonable()
+    public async Task Advanced_Timeout_DurationIsReasonable()
     {
         await using var producer = new MockEndpoint("exam-to-prod");
         await using var consumer = new MockEndpoint("exam-to-cons");

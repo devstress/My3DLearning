@@ -1,10 +1,20 @@
 // ============================================================================
-// Tutorial 21 – Aggregator (Lab)
+// Tutorial 21 – Aggregator (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Aggregator.
-// Real Integrations: MessageAggregator with InMemoryMessageAggregateStore,
-// CountCompletionStrategy, MockAggregationStrategy, and NatsBrokerEndpoint
-// (real NATS JetStream via Aspire).
+// PURPOSE: Run each test in order to see how the Aggregator pattern collects
+//          related messages by CorrelationId and combines them into a single
+//          aggregate when the group is complete.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Aggregate_SingleMessage_GroupNotComplete            — single message does not complete the group
+//   2. Aggregate_ReachesCount_CompletesAndPublishes        — group completes and publishes when count reached
+//   3. Aggregate_PreservesCorrelationId                    — aggregate preserves the original CorrelationId
+//   4. Aggregate_DifferentCorrelationIds_FormSeparateGroups — different CorrelationIds form isolated groups
+//   5. Aggregate_CountCompletion_ExactThreshold            — exact threshold triggers completion on final message
+//   6. Aggregate_MergesMetadata_FromAllEnvelopes           — metadata from all envelopes is merged
+//   7. Aggregate_UsesHighestPriority                       — aggregate uses the highest priority from the group
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

@@ -1,10 +1,19 @@
 // ============================================================================
-// Tutorial 23 – Request-Reply (Lab)
+// Tutorial 23 – Request-Reply (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Request-Reply.
-// Real Integrations: RequestReplyCorrelator with NatsBrokerEndpoint
-// (real NATS JetStream via Aspire) for both producer and consumer.
-// Simulate reply delivery via NatsBrokerEndpoint.SendAsync.
+// PURPOSE: Run each test in order to see how the Request-Reply pattern sends
+//          a request over an async channel and correlates the response by
+//          CorrelationId with timeout support.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. SendAndReceive_PublishesRequestToTopic   — request is published with CorrelationId and ReplyTo
+//   2. SendAndReceive_ReceivesCorrelatedReply   — correlated reply received before timeout
+//   3. SendAndReceive_TimesOut_ReturnsNullReply — timeout returns TimedOut = true and Reply = null
+//   4. SendAndReceive_DurationIsTracked         — duration is tracked and greater than zero
+//   5. SendAndReceive_EmptyRequestTopic_Throws  — empty RequestTopic throws ArgumentException
+//   6. SendAndReceive_EmptyReplyTopic_Throws    — empty ReplyTopic throws ArgumentException
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
