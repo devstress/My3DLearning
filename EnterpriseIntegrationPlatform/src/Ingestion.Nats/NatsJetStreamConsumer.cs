@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
 using Microsoft.Extensions.Logging;
@@ -14,9 +15,13 @@ namespace EnterpriseIntegrationPlatform.Ingestion.Nats;
 /// </summary>
 public sealed class NatsJetStreamConsumer : IMessageBrokerConsumer
 {
+    internal static readonly ActivitySource ActivitySource = new("EIP.Ingestion.Nats.Consumer");
+
     private readonly INatsConnection _connection;
     private readonly INatsJSContext _js;
     private readonly ILogger<NatsJetStreamConsumer> _logger;
+    private readonly CancellationTokenSource _disposeCts = new();
+    private bool _disposed;
 
     /// <summary>Initialises a new <see cref="NatsJetStreamConsumer"/>.</summary>
     public NatsJetStreamConsumer(INatsConnection connection, ILogger<NatsJetStreamConsumer> logger)
@@ -33,13 +38,17 @@ public sealed class NatsJetStreamConsumer : IMessageBrokerConsumer
         Func<IntegrationEnvelope<T>, Task> handler,
         CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(topic);
         ArgumentException.ThrowIfNullOrWhiteSpace(consumerGroup);
         ArgumentNullException.ThrowIfNull(handler);
 
         var streamName = topic.Replace(".", "-");
 
-        await EnsureStreamAsync(streamName, topic, cancellationToken);
+        // Link caller's token with the dispose token so DisposeAsync cancels active subscriptions.
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
+
+        await EnsureStreamAsync(streamName, topic, linked.Token);
 
         var consumer = await _js.CreateOrUpdateConsumerAsync(
             streamName,
@@ -49,20 +58,24 @@ public sealed class NatsJetStreamConsumer : IMessageBrokerConsumer
                 DeliverPolicy = ConsumerConfigDeliverPolicy.All,
                 AckPolicy = ConsumerConfigAckPolicy.Explicit,
             },
-            cancellationToken);
+            linked.Token);
 
         _logger.LogInformation(
             "Subscribed to NATS JetStream subject {Subject} with consumer group {Group}",
             topic, consumerGroup);
 
-        await foreach (var msg in consumer.ConsumeAsync<byte[]>(cancellationToken: cancellationToken))
+        await foreach (var msg in consumer.ConsumeAsync<byte[]>(cancellationToken: linked.Token))
         {
+            using var activity = ActivitySource.StartActivity("NatsJetStream.Consume");
+            activity?.SetTag("messaging.system", "nats");
+            activity?.SetTag("messaging.destination", topic);
+
             try
             {
                 if (msg.Data is null)
                 {
                     _logger.LogWarning("Received null data on subject {Subject}", topic);
-                    await msg.AckAsync(cancellationToken: cancellationToken);
+                    await msg.AckAsync(cancellationToken: linked.Token);
                     continue;
                 }
 
@@ -71,12 +84,14 @@ public sealed class NatsJetStreamConsumer : IMessageBrokerConsumer
                 {
                     _logger.LogWarning(
                         "Failed to deserialise message on subject {Subject}", topic);
-                    await msg.AckAsync(cancellationToken: cancellationToken);
+                    await msg.AckAsync(cancellationToken: linked.Token);
                     continue;
                 }
 
+                activity?.SetTag("messaging.message_id", envelope.MessageId.ToString());
+
                 await handler(envelope);
-                await msg.AckAsync(cancellationToken: cancellationToken);
+                await msg.AckAsync(cancellationToken: linked.Token);
 
                 _logger.LogDebug(
                     "Processed message {MessageId} from NATS subject {Subject}",
@@ -86,13 +101,20 @@ public sealed class NatsJetStreamConsumer : IMessageBrokerConsumer
             {
                 _logger.LogError(ex,
                     "Error processing message from NATS subject {Subject}", topic);
-                await msg.NakAsync(cancellationToken: cancellationToken);
+                await msg.NakAsync(cancellationToken: linked.Token);
             }
         }
     }
 
     /// <inheritdoc />
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await _disposeCts.CancelAsync();
+        _disposeCts.Dispose();
+    }
 
     private async Task EnsureStreamAsync(string streamName, string topic, CancellationToken ct)
     {
