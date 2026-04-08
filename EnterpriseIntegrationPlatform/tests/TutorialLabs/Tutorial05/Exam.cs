@@ -16,6 +16,7 @@ using TutorialLabs.Infrastructure;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial05;
 
 [TestFixture]
@@ -158,3 +159,4 @@ public sealed class Exam
         await output.DisposeAsync();
     }
 }
+#endif

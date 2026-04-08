@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 14 – Process Manager (Exam · Assessment Challenges)
+// Tutorial 14 – Process Manager (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Process Manager pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Verify priority enum is cast to int in pipeline input
-//   🟡 Intermediate — Confirm workflow ID is deterministic and idempotent
-//   🔴 Advanced     — Ensure causation ID, timestamp, and schema version survive mapping
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockTemporalWorkflowDispatcher, PipelineOrchestrator, NUnit
+//   🟢 Starter       — Verify priority enum is cast to int in pipeline input
+//   🟡 Intermediate  — Confirm workflow ID is deterministic and idempotent
+//   🔴 Advanced      — Ensure causation ID, timestamp, and schema version survive mapping
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Activities;
@@ -27,6 +23,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial14;
 
 [TestFixture]
@@ -45,18 +42,16 @@ public sealed class Exam
     [Test]
     public async Task Starter_PriorityMapping_CastsEnumToInt()
     {
-        var dispatcher = new MockTemporalWorkflowDispatcher();
+        // TODO: Create a MockTemporalWorkflowDispatcher with appropriate configuration
+        dynamic dispatcher = null!;
         var orchestrator = CreateOrchestrator(dispatcher);
 
         var json = JsonSerializer.Deserialize<JsonElement>("{\"item\":\"widget\"}");
-        var envelope = IntegrationEnvelope<JsonElement>.Create(
-            json, "Svc", "order.created") with
-        {
-            Priority = MessagePriority.High,
-        };
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
 
         dispatcher.ReturnsSuccess();
-        await orchestrator.ProcessAsync(envelope);
+        // TODO: await orchestrator.ProcessAsync(...)
 
         var captured = dispatcher.LastInput;
         Assert.That(captured!.Priority, Is.EqualTo((int)MessagePriority.High));
@@ -75,15 +70,16 @@ public sealed class Exam
     [Test]
     public async Task Intermediate_IdempotentWorkflowId_DeterministicFromMessageId()
     {
-        var dispatcher = new MockTemporalWorkflowDispatcher();
+        // TODO: Create a MockTemporalWorkflowDispatcher with appropriate configuration
+        dynamic dispatcher = null!;
         var orchestrator = CreateOrchestrator(dispatcher);
 
         var json = JsonSerializer.Deserialize<JsonElement>("{\"data\":1}");
-        var envelope = IntegrationEnvelope<JsonElement>.Create(
-            json, "Svc", "test.type");
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
 
         dispatcher.ReturnsSuccess();
-        await orchestrator.ProcessAsync(envelope);
+        // TODO: await orchestrator.ProcessAsync(...)
 
         var expectedId = $"integration-{envelope.MessageId}";
         Assert.That(dispatcher.LastWorkflowId, Is.EqualTo(expectedId));
@@ -102,21 +98,18 @@ public sealed class Exam
     [Test]
     public async Task Advanced_CausationIdAndTimestamp_PreservedInInput()
     {
-        var dispatcher = new MockTemporalWorkflowDispatcher();
+        // TODO: Create a MockTemporalWorkflowDispatcher with appropriate configuration
+        dynamic dispatcher = null!;
         var orchestrator = CreateOrchestrator(dispatcher);
 
         var causationId = Guid.NewGuid();
         var timestamp = DateTimeOffset.UtcNow.AddMinutes(-5);
         var json = JsonSerializer.Deserialize<JsonElement>("{\"v\":1}");
-        var envelope = IntegrationEnvelope<JsonElement>.Create(
-            json, "Svc", "test.type") with
-        {
-            CausationId = causationId,
-            Timestamp = timestamp,
-        };
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
 
         dispatcher.ReturnsSuccess();
-        await orchestrator.ProcessAsync(envelope);
+        // TODO: await orchestrator.ProcessAsync(...)
 
         var captured = dispatcher.LastInput;
         Assert.That(captured!.CausationId, Is.EqualTo(causationId));
@@ -136,3 +129,4 @@ public sealed class Exam
             dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
     }
 }
+#endif

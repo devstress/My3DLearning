@@ -1,10 +1,19 @@
 // ============================================================================
-// Tutorial 35 – SFTP Connector (Exam)
+// Tutorial 35 – SFTP Connector (Exam · Fill in the Blanks)
 // ============================================================================
-// EIP Pattern: Connector
-// E2E: Connection pool lifecycle, upload serialization roundtrip,
-//      and SftpConnectorAdapter as IConnector with MockEndpoint.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — connection pool lifecycle
+//   🟡 Intermediate  — upload serialization round trip
+//   🔴 Advanced      — adapter implements i connector
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
+
 using System.Text;
 using EnterpriseIntegrationPlatform.Connector.Sftp;
 using EnterpriseIntegrationPlatform.Connectors;
@@ -15,25 +24,28 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial35;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_ConnectionPoolLifecycle()
+    public async Task Starter_ConnectionPoolLifecycle()
     {
         await using var output = new MockEndpoint("exam-pool");
-        var client = new MockSftpClient();
-        var pool = new MockSftpConnectionPool(client);
+        // TODO: Create a MockSftpClient with appropriate configuration
+        dynamic client = null!;
+        // TODO: Create a MockSftpConnectionPool with appropriate configuration
+        dynamic pool = null!;
 
-        var connector = new SftpConnector(
-            pool,
-            Options.Create(new SftpConnectorOptions { RootPath = "/test" }),
-            NullLogger<SftpConnector>.Instance);
+        // TODO: Create a SftpConnector with appropriate configuration
+        dynamic connector = null!;
 
-        var e1 = IntegrationEnvelope<string>.Create("data1", "src", "Upload");
-        var e2 = IntegrationEnvelope<string>.Create("data2", "src", "Upload");
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic e1 = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic e2 = null!;
 
         await connector.UploadAsync(e1, "f1.txt", s => Encoding.UTF8.GetBytes(s), default);
         await connector.UploadAsync(e2, "f2.txt", s => Encoding.UTF8.GetBytes(s), default);
@@ -41,26 +53,27 @@ public sealed class Exam
         Assert.That(pool.AcquireCount, Is.EqualTo(2));
         Assert.That(pool.ReleaseCount, Is.EqualTo(2));
 
-        await output.PublishAsync(e1, "pool-lifecycle", default);
-        await output.PublishAsync(e2, "pool-lifecycle", default);
+        // TODO: await output.PublishAsync(...)
+        // TODO: await output.PublishAsync(...)
         output.AssertReceivedOnTopic("pool-lifecycle", 2);
     }
 
     [Test]
-    public async Task Challenge2_UploadSerializationRoundTrip()
+    public async Task Intermediate_UploadSerializationRoundTrip()
     {
         await using var output = new MockEndpoint("exam-serial");
 
-        var client = new MockSftpClient();
-        var pool = new MockSftpConnectionPool(client);
+        // TODO: Create a MockSftpClient with appropriate configuration
+        dynamic client = null!;
+        // TODO: Create a MockSftpConnectionPool with appropriate configuration
+        dynamic pool = null!;
 
-        var connector = new SftpConnector(
-            pool,
-            Options.Create(new SftpConnectorOptions()),
-            NullLogger<SftpConnector>.Instance);
+        // TODO: Create a SftpConnector with appropriate configuration
+        dynamic connector = null!;
 
         var payload = "Hello SFTP World!";
-        var envelope = IntegrationEnvelope<string>.Create(payload, "test", "Upload");
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
         await connector.UploadAsync(
             envelope, "hello.txt", s => Encoding.UTF8.GetBytes(s), default);
 
@@ -70,34 +83,36 @@ public sealed class Exam
         Assert.That(capturedBytes, Is.Not.Null);
         Assert.That(Encoding.UTF8.GetString(capturedBytes), Is.EqualTo(payload));
 
-        await output.PublishAsync(envelope, "roundtrip", default);
+        // TODO: await output.PublishAsync(...)
         output.AssertReceivedOnTopic("roundtrip", 1);
     }
 
     [Test]
-    public async Task Challenge3_AdapterImplementsIConnector()
+    public async Task Advanced_AdapterImplementsIConnector()
     {
         await using var output = new MockEndpoint("exam-adapter");
-        var client = new MockSftpClient();
+        // TODO: Create a MockSftpClient with appropriate configuration
+        dynamic client = null!;
         client.Connect();
-        var sftpConnector = new MockSftpConnector(client);
+        // TODO: Create a MockSftpConnector with appropriate configuration
+        dynamic sftpConnector = null!;
 
-        var adapter = new SftpConnectorAdapter(
-            "my-sftp", sftpConnector, client,
-            NullLogger<SftpConnectorAdapter>.Instance);
+        // TODO: Create a SftpConnectorAdapter with appropriate configuration
+        dynamic adapter = null!;
 
         Assert.That(adapter.Name, Is.EqualTo("my-sftp"));
         Assert.That(adapter.ConnectorType, Is.EqualTo(ConnectorType.Sftp));
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "{\"key\":\"value\"}", "app", "Transfer");
-        var result = await adapter.SendAsync(
-            envelope, new ConnectorSendOptions { Destination = "data.json" });
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: var result = await adapter.SendAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.Success, Is.True);
         Assert.That(result.ConnectorName, Is.EqualTo("my-sftp"));
 
-        await output.PublishAsync(envelope, "adapter-results", default);
+        // TODO: await output.PublishAsync(...)
         output.AssertReceivedOnTopic("adapter-results", 1);
     }
 }
+#endif

@@ -17,6 +17,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial01;
 
 [TestFixture]
@@ -235,3 +236,4 @@ public sealed class Exam
         Assert.That(rawMsg.MessageId, Is.EqualTo(alertMsg.MessageId));
     }
 }
+#endif

@@ -1,9 +1,18 @@
 // ============================================================================
-// Tutorial 40 – RAG & Ollama / AI (Exam)
+// Tutorial 40 – RAG & Ollama / AI (Exam · Fill in the Blanks)
 // ============================================================================
-// E2E challenges: full RAG chat flow with MockEndpoint, Ollama analysis with
-// system prompt, and RagFlow dataset listing and health check.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — full rag chat flow_ through mock endpoint
+//   🟡 Intermediate  — ollama analysis_ with system prompt
+//   🔴 Advanced      — rag flow dataset listing_ and health check
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.AI.Ollama;
 using EnterpriseIntegrationPlatform.AI.RagFlow;
@@ -12,30 +21,20 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial40;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_FullRagChatFlow_ThroughMockEndpoint()
+    public async Task Starter_FullRagChatFlow_ThroughMockEndpoint()
     {
         await using var input = new MockEndpoint("exam-rag-in");
         await using var output = new MockEndpoint("exam-rag-out");
 
-        var ragFlow = new MockRagFlowService()
-            .WithChatResponse("What is EIP?", null, new RagFlowChatResponse(
-                "EIP stands for Enterprise Integration Patterns", "conv-abc",
-                new List<RagFlowReference>
-                {
-                    new("EIP is a set of patterns...", "eip-book.pdf", 0.97),
-                }))
-            .WithChatResponse("Give me an example", "conv-abc", new RagFlowChatResponse(
-                "Content-Based Router is a common EIP pattern", "conv-abc",
-                new List<RagFlowReference>
-                {
-                    new("A Content-Based Router inspects...", "eip-book.pdf", 0.91),
-                }));
+        // TODO: Create a MockRagFlowService with appropriate configuration
+        dynamic ragFlow = null!;
 
         await input.SubscribeAsync<string>("rag-topic", "rag-group",
             async envelope =>
@@ -53,31 +52,29 @@ public sealed class Exam
             });
 
         // First question
-        var q1 = IntegrationEnvelope<string>.Create("What is EIP?", "UserSvc", "rag.query");
-        await input.SendAsync(q1);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic q1 = null!;
+        // TODO: await input.SendAsync(...)
 
         output.AssertReceivedOnTopic("rag-results", 1);
         var r1 = output.GetReceived<string>();
         Assert.That(r1.Metadata["rag-answer"], Does.Contain("Enterprise Integration Patterns"));
 
         // Follow-up (direct call to verify conversation continuity)
-        var followUp = await ragFlow.ChatAsync("Give me an example", "conv-abc");
+        // TODO: var followUp = await ragFlow.ChatAsync(...)
+        dynamic followUp = null!;
         Assert.That(followUp.Answer, Does.Contain("Content-Based Router"));
         Assert.That(followUp.ConversationId, Is.EqualTo("conv-abc"));
     }
 
     [Test]
-    public async Task Challenge2_OllamaAnalysis_WithSystemPrompt()
+    public async Task Intermediate_OllamaAnalysis_WithSystemPrompt()
     {
-        var ollama = new MockOllamaService()
-            .WithAnalyseResponse(
-                "The message was routed to dead-letter after 3 retries.",
-                "The message likely failed due to a schema validation error. " +
-                     "After exhausting retries, it was moved to the dead-letter queue.");
+        // TODO: Create a MockOllamaService with appropriate configuration
+        dynamic ollama = null!;
 
-        var analysis = await ollama.AnalyseAsync(
-            "You are an expert in message routing patterns.",
-            "The message was routed to dead-letter after 3 retries.");
+        // TODO: var analysis = await ollama.AnalyseAsync(...)
+        dynamic analysis = null!;
 
         Assert.That(analysis, Does.Contain("dead-letter"));
         Assert.That(analysis, Does.Contain("schema validation"));
@@ -88,19 +85,17 @@ public sealed class Exam
     }
 
     [Test]
-    public async Task Challenge3_RagFlowDatasetListing_AndHealthCheck()
+    public async Task Advanced_RagFlowDatasetListing_AndHealthCheck()
     {
-        var ragFlow = new MockRagFlowService()
-            .WithHealthy(true)
-            .WithDatasets(
-                new RagFlowDataset("ds-1", "EIP Patterns", 42),
-                new RagFlowDataset("ds-2", "System Management Docs", 15),
-                new RagFlowDataset("ds-3", "API Reference", 108));
+        // TODO: Create a MockRagFlowService with appropriate configuration
+        dynamic ragFlow = null!;
 
-        var healthy = await ragFlow.IsHealthyAsync();
+        // TODO: var healthy = await ragFlow.IsHealthyAsync(...)
+        dynamic healthy = null!;
         Assert.That(healthy, Is.True);
 
-        var datasets = await ragFlow.ListDatasetsAsync();
+        // TODO: var datasets = await ragFlow.ListDatasetsAsync(...)
+        dynamic datasets = null!;
         Assert.That(datasets, Has.Count.EqualTo(3));
         Assert.That(datasets[0].Id, Is.EqualTo("ds-1"));
         Assert.That(datasets[0].Name, Is.EqualTo("EIP Patterns"));
@@ -109,3 +104,4 @@ public sealed class Exam
         Assert.That(datasets[2].DocumentCount, Is.EqualTo(108));
     }
 }
+#endif

@@ -1,22 +1,19 @@
 // ============================================================================
-// Tutorial 31 – Event Sourcing (Exam · Assessment Challenges)
+// Tutorial 31 – Event Sourcing (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Event Sourcing pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Projection engine rebuilds sum from events
-//   🟡 Intermediate — Snapshot accelerates rebuild from midstream
-//   🔴 Advanced     — Concurrent append detects optimistic concurrency conflict
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
+//   🟢 Starter       — Projection engine rebuilds sum from events
+//   🟡 Intermediate  — Snapshot accelerates rebuild from midstream
+//   🔴 Advanced      — Concurrent append detects optimistic concurrency conflict
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
+
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.EventSourcing;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -25,6 +22,7 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial31;
 
 [TestFixture]
@@ -43,31 +41,30 @@ public sealed class Exam
     public async Task Starter_ProjectionEngine_RebuildsSumFromEvents()
     {
         await using var output = new MockEndpoint("exam-es");
-        var store = new InMemoryEventStore(
-            Options.Create(new EventSourcingOptions()),
-            NullLogger<InMemoryEventStore>.Instance);
+        // TODO: Create a InMemoryEventStore with appropriate configuration
+        dynamic store = null!;
 
-        var e1 = new EventEnvelope(Guid.NewGuid(), "account-1", "Deposit", "50", 1,
-            DateTimeOffset.UtcNow, new Dictionary<string, string>());
-        var e2 = new EventEnvelope(Guid.NewGuid(), "account-1", "Deposit", "30", 2,
-            DateTimeOffset.UtcNow, new Dictionary<string, string>());
+        // TODO: Create a EventEnvelope with appropriate configuration
+        dynamic e1 = null!;
+        // TODO: Create a EventEnvelope with appropriate configuration
+        dynamic e2 = null!;
         await store.AppendAsync("account-1", [e1, e2], 0);
 
-        var projection = new MockEventProjection<int>((state, envelope) => state + int.Parse(envelope.Data));
+        // TODO: Create a MockEventProjection with appropriate configuration
+        dynamic projection = null!;
 
-        var snapStore = new InMemorySnapshotStore<int>();
-        var engine = new EventProjectionEngine<int>(
-            store, snapStore, projection,
-            Options.Create(new EventSourcingOptions { SnapshotInterval = 100 }),
-            NullLogger<EventProjectionEngine<int>>.Instance);
+        // TODO: Create a InMemorySnapshotStore with appropriate configuration
+        dynamic snapStore = null!;
+        // TODO: Create a EventProjectionEngine with appropriate configuration
+        dynamic engine = null!;
 
         var (state, version) = await engine.RebuildAsync("account-1", 0);
         Assert.That(state, Is.EqualTo(80));
         Assert.That(version, Is.EqualTo(2));
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            state.ToString(), "projection", "BalanceRebuilt");
-        await output.PublishAsync(envelope, "projections", default);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: await output.PublishAsync(...)
         output.AssertReceivedOnTopic("projections", 1);
     }
 
@@ -85,9 +82,8 @@ public sealed class Exam
     public async Task Intermediate_SnapshotAcceleratesRebuild()
     {
         await using var output = new MockEndpoint("exam-snap");
-        var store = new InMemoryEventStore(
-            Options.Create(new EventSourcingOptions()),
-            NullLogger<InMemoryEventStore>.Instance);
+        // TODO: Create a InMemoryEventStore with appropriate configuration
+        dynamic store = null!;
 
         var events = Enumerable.Range(1, 5)
             .Select(i => new EventEnvelope(Guid.NewGuid(), "s1", "Inc", "10", i,
@@ -95,23 +91,23 @@ public sealed class Exam
             .ToList();
         await store.AppendAsync("s1", events, 0);
 
-        var snapStore = new InMemorySnapshotStore<int>();
+        // TODO: Create a InMemorySnapshotStore with appropriate configuration
+        dynamic snapStore = null!;
         await snapStore.SaveAsync("s1", 30, 3);
 
-        var projection = new MockEventProjection<int>((state, envelope) => state + int.Parse(envelope.Data));
+        // TODO: Create a MockEventProjection with appropriate configuration
+        dynamic projection = null!;
 
-        var engine = new EventProjectionEngine<int>(
-            store, snapStore, projection,
-            Options.Create(new EventSourcingOptions { SnapshotInterval = 100 }),
-            NullLogger<EventProjectionEngine<int>>.Instance);
+        // TODO: Create a EventProjectionEngine with appropriate configuration
+        dynamic engine = null!;
 
         var (state, version) = await engine.RebuildAsync("s1", 0);
         Assert.That(state, Is.EqualTo(50));
         Assert.That(version, Is.EqualTo(5));
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            state.ToString(), "projection", "Rebuilt");
-        await output.PublishAsync(envelope, "snapshot-results", default);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: await output.PublishAsync(...)
         output.AssertReceivedOnTopic("snapshot-results", 1);
     }
 
@@ -129,16 +125,15 @@ public sealed class Exam
     public async Task Advanced_ConcurrentAppend_DetectsConflict()
     {
         await using var output = new MockEndpoint("exam-conflict");
-        var store = new InMemoryEventStore(
-            Options.Create(new EventSourcingOptions()),
-            NullLogger<InMemoryEventStore>.Instance);
+        // TODO: Create a InMemoryEventStore with appropriate configuration
+        dynamic store = null!;
 
-        var e1 = new EventEnvelope(Guid.NewGuid(), "conflict-s", "Init", "{}", 1,
-            DateTimeOffset.UtcNow, new Dictionary<string, string>());
+        // TODO: Create a EventEnvelope with appropriate configuration
+        dynamic e1 = null!;
         await store.AppendAsync("conflict-s", [e1], 0);
 
-        var conflict = new EventEnvelope(Guid.NewGuid(), "conflict-s", "Bad", "{}", 2,
-            DateTimeOffset.UtcNow, new Dictionary<string, string>());
+        // TODO: Create a EventEnvelope with appropriate configuration
+        dynamic conflict = null!;
         var ex = Assert.ThrowsAsync<OptimisticConcurrencyException>(
             () => store.AppendAsync("conflict-s", [conflict], 0));
 
@@ -146,9 +141,10 @@ public sealed class Exam
         Assert.That(ex.ExpectedVersion, Is.EqualTo(0));
         Assert.That(ex.ActualVersion, Is.EqualTo(1));
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            $"Conflict on {ex.StreamId}", "guard", "ConflictDetected");
-        await output.PublishAsync(envelope, "conflicts", default);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: await output.PublishAsync(...)
         output.AssertReceivedOnTopic("conflicts", 1);
     }
 }
+#endif

@@ -19,6 +19,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 #pragma warning disable CS0219 // Variable is assigned but its value is never used (expected in fill-in-blank exam)
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial03;
 
 [TestFixture]
@@ -199,3 +200,4 @@ public sealed class Exam
         await output.DisposeAsync();
     }
 }
+#endif

@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 22 – Scatter-Gather (Exam · Assessment Challenges)
+// Tutorial 22 – Scatter-Gather (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Scatter-Gather pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Mixed success/failure responses are both collected
-//   🟡 Intermediate — Duration is tracked and greater than zero
-//   🔴 Advanced     — Concurrent scatter-gather operations isolate by CorrelationId
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
+//   🟢 Starter       — Mixed success/failure responses are both collected
+//   🟡 Intermediate  — Duration is tracked and greater than zero
+//   🔴 Advanced      — Concurrent scatter-gather operations isolate by CorrelationId
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Processing.ScatterGather;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -24,6 +20,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial22;
 
 [TestFixture]
@@ -45,8 +42,8 @@ public sealed class Exam
         await using var output = new MockEndpoint("exam-sg");
         var sg = CreateScatterGatherer(output, timeoutMs: 500);
         var correlationId = Guid.NewGuid();
-        var request = new ScatterRequest<string>(correlationId, "req",
-            new[] { "ok-svc", "fail-svc" });
+        // TODO: Create a ScatterRequest with appropriate configuration
+        dynamic request = null!;
 
         var task = sg.ScatterGatherAsync(request);
         await sg.SubmitResponseAsync(correlationId,
@@ -77,8 +74,8 @@ public sealed class Exam
         await using var output = new MockEndpoint("exam-dur");
         var sg = CreateScatterGatherer(output, timeoutMs: 500);
         var correlationId = Guid.NewGuid();
-        var request = new ScatterRequest<string>(correlationId, "req",
-            new[] { "topic-1" });
+        // TODO: Create a ScatterRequest with appropriate configuration
+        dynamic request = null!;
 
         var task = sg.ScatterGatherAsync(request);
         await sg.SubmitResponseAsync(correlationId,
@@ -108,8 +105,10 @@ public sealed class Exam
 
         var corr1 = Guid.NewGuid();
         var corr2 = Guid.NewGuid();
-        var req1 = new ScatterRequest<string>(corr1, "req1", new[] { "svc-a" });
-        var req2 = new ScatterRequest<string>(corr2, "req2", new[] { "svc-b" });
+        // TODO: Create a ScatterRequest with appropriate configuration
+        dynamic req1 = null!;
+        // TODO: Create a ScatterRequest with appropriate configuration
+        dynamic req2 = null!;
 
         var task1 = sg.ScatterGatherAsync(req1);
         var task2 = sg.ScatterGatherAsync(req2);
@@ -143,3 +142,4 @@ public sealed class Exam
             NullLogger<ScatterGatherer<string, string>>.Instance);
     }
 }
+#endif

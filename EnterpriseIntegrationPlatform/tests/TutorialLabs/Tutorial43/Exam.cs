@@ -1,66 +1,81 @@
 // ============================================================================
-// Tutorial 43 – Kubernetes Deployment / Configuration Options (Exam)
+// Tutorial 43 – Kubernetes Deployment (Exam · Fill in the Blanks)
 // ============================================================================
-// EIP Pattern: Environment Cascade + Configuration Resolution
-// E2E: Full config cascade across all levels, multi-key resolution, and
-//      deployment-scenario configuration — all via NatsBrokerEndpoint
-//      (real NATS JetStream via Aspire).
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — full config cascade_ with nats broker endpoint
+//   🟡 Intermediate  — multi key resolution_ across environments
+//   🔴 Advanced      — deployment config scenario_ publish all resolved
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
+
 using EnterpriseIntegrationPlatform.Configuration;
 using EnterpriseIntegrationPlatform.Contracts;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial43;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_FullConfigCascade_WithNatsBrokerEndpoint()
+    public async Task Starter_FullConfigCascade_WithNatsBrokerEndpoint()
     {
         using var notifier = new ConfigurationChangeNotifier();
         await using var nats = AspireFixture.CreateNatsEndpoint("t43-exam-cascade");
         var topic = AspireFixture.UniqueTopic("t43-exam-cascade-results");
 
-        var store = new InMemoryConfigurationStore(notifier);
+        // TODO: Create a InMemoryConfigurationStore with appropriate configuration
+        dynamic store = null!;
 
         // Set up cascade: default → environment-specific
         await store.SetAsync(new ConfigurationEntry("Database:Host", "localhost", "default"));
         await store.SetAsync(new ConfigurationEntry("Database:Host", "staging-db.internal", "staging"));
         await store.SetAsync(new ConfigurationEntry("Database:Port", "5432", "default"));
 
-        var provider = new EnvironmentOverrideProvider(store);
+        // TODO: Create a EnvironmentOverrideProvider with appropriate configuration
+        dynamic provider = null!;
 
         // Staging gets specific host, default port
-        var host = await provider.ResolveAsync("Database:Host", "staging");
-        var port = await provider.ResolveAsync("Database:Port", "staging");
+        // TODO: var host = await provider.ResolveAsync(...)
+        dynamic host = null!;
+        // TODO: var port = await provider.ResolveAsync(...)
+        dynamic port = null!;
         Assert.That(host!.Value, Is.EqualTo("staging-db.internal"));
         Assert.That(port!.Value, Is.EqualTo("5432"));
 
         // Dev falls back to default for both
-        var devHost = await provider.ResolveAsync("Database:Host", "dev");
+        // TODO: var devHost = await provider.ResolveAsync(...)
+        dynamic devHost = null!;
         Assert.That(devHost!.Value, Is.EqualTo("localhost"));
 
         var results = new[] { host, port, devHost };
         foreach (var entry in results)
         {
-            var envelope = IntegrationEnvelope<string>.Create(
-                $"{entry!.Key}={entry.Value}", "config-resolver", "config.cascade");
-            await nats.PublishAsync(envelope, topic, default);
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic envelope = null!;
+            // TODO: await nats.PublishAsync(...)
         }
 
         nats.AssertReceivedOnTopic(topic, 3);
     }
 
     [Test]
-    public async Task Challenge2_MultiKeyResolution_AcrossEnvironments()
+    public async Task Intermediate_MultiKeyResolution_AcrossEnvironments()
     {
         using var notifier = new ConfigurationChangeNotifier();
         await using var nats = AspireFixture.CreateNatsEndpoint("t43-exam-multikey");
         var topic = AspireFixture.UniqueTopic("t43-exam-prod-config");
 
-        var store = new InMemoryConfigurationStore(notifier);
+        // TODO: Create a InMemoryConfigurationStore with appropriate configuration
+        dynamic store = null!;
 
         await store.SetAsync(new ConfigurationEntry("Broker:Url", "nats://localhost:4222", "default"));
         await store.SetAsync(new ConfigurationEntry("Broker:Url", "nats://prod:4222", "prod"));
@@ -68,10 +83,12 @@ public sealed class Exam
         await store.SetAsync(new ConfigurationEntry("Cache:Ttl", "300", "prod"));
         await store.SetAsync(new ConfigurationEntry("App:Version", "1.0.0", "default"));
 
-        var provider = new EnvironmentOverrideProvider(store);
+        // TODO: Create a EnvironmentOverrideProvider with appropriate configuration
+        dynamic provider = null!;
         var keys = new[] { "Broker:Url", "Cache:Ttl", "App:Version" };
 
-        var prodConfig = await provider.ResolveManyAsync(keys, "prod");
+        // TODO: var prodConfig = await provider.ResolveManyAsync(...)
+        dynamic prodConfig = null!;
         Assert.That(prodConfig, Has.Count.EqualTo(3));
         Assert.That(prodConfig["Broker:Url"].Value, Is.EqualTo("nats://prod:4222"));
         Assert.That(prodConfig["Cache:Ttl"].Value, Is.EqualTo("300"));
@@ -79,22 +96,23 @@ public sealed class Exam
 
         foreach (var kvp in prodConfig)
         {
-            var envelope = IntegrationEnvelope<string>.Create(
-                $"{kvp.Key}={kvp.Value.Value}", "config-resolver", "config.multi");
-            await nats.PublishAsync(envelope, topic, default);
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic envelope = null!;
+            // TODO: await nats.PublishAsync(...)
         }
 
         nats.AssertReceivedOnTopic(topic, 3);
     }
 
     [Test]
-    public async Task Challenge3_DeploymentConfigScenario_PublishAllResolved()
+    public async Task Advanced_DeploymentConfigScenario_PublishAllResolved()
     {
         using var notifier = new ConfigurationChangeNotifier();
         await using var nats = AspireFixture.CreateNatsEndpoint("t43-exam-deploy");
         var topic = AspireFixture.UniqueTopic("t43-exam-deploy-manifest");
 
-        var store = new InMemoryConfigurationStore(notifier);
+        // TODO: Create a InMemoryConfigurationStore with appropriate configuration
+        dynamic store = null!;
 
         // Simulate K8s-style config: defaults + per-namespace overrides
         await store.SetAsync(new ConfigurationEntry("Replicas", "1", "default"));
@@ -104,12 +122,15 @@ public sealed class Exam
         await store.SetAsync(new ConfigurationEntry("Log:Level", "Debug", "default"));
         await store.SetAsync(new ConfigurationEntry("Log:Level", "Warning", "prod"));
 
-        var provider = new EnvironmentOverrideProvider(store);
+        // TODO: Create a EnvironmentOverrideProvider with appropriate configuration
+        dynamic provider = null!;
         var keys = new[] { "Replicas", "Memory:Limit", "Log:Level" };
 
         // Compare default vs prod
-        var defaultConfig = await provider.ResolveManyAsync(keys, "dev");
-        var prodConfig = await provider.ResolveManyAsync(keys, "prod");
+        // TODO: var defaultConfig = await provider.ResolveManyAsync(...)
+        dynamic defaultConfig = null!;
+        // TODO: var prodConfig = await provider.ResolveManyAsync(...)
+        dynamic prodConfig = null!;
 
         Assert.That(defaultConfig["Replicas"].Value, Is.EqualTo("1"));
         Assert.That(prodConfig["Replicas"].Value, Is.EqualTo("3"));
@@ -117,11 +138,12 @@ public sealed class Exam
 
         foreach (var kvp in prodConfig)
         {
-            var envelope = IntegrationEnvelope<string>.Create(
-                kvp.Value.Value, "deployer", "deploy.config");
-            await nats.PublishAsync(envelope, topic, default);
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic envelope = null!;
+            // TODO: await nats.PublishAsync(...)
         }
 
         nats.AssertReceivedOnTopic(topic, 3);
     }
 }
+#endif

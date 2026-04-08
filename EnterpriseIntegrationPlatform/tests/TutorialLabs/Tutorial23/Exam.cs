@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 23 – Request-Reply (Exam · Assessment Challenges)
+// Tutorial 23 – Request-Reply (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Request-Reply pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Request envelope has Intent=Command and ReplyTo set correctly
-//   🟡 Intermediate — Concurrent requests correlate replies to the correct caller
-//   🔴 Advanced     — Timeout duration is within a reasonable range
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
+//   🟢 Starter       — Request envelope has Intent=Command and ReplyTo set correctly
+//   🟡 Intermediate  — Concurrent requests correlate replies to the correct caller
+//   🔴 Advanced      — Timeout duration is within a reasonable range
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.RequestReply;
@@ -25,6 +21,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial23;
 
 [TestFixture]
@@ -48,8 +45,8 @@ public sealed class Exam
         await using var consumer = new MockEndpoint("exam-cons");
         var correlator = CreateCorrelator(producer, consumer, timeoutMs: 200);
         var correlationId = Guid.NewGuid();
-        var request = new RequestReplyMessage<string>(
-            "payload", "req-topic", "rep-topic", "source", "type", correlationId);
+        // TODO: Create a RequestReplyMessage with appropriate configuration
+        dynamic request = null!;
 
         await correlator.SendAndReceiveAsync(request);
 
@@ -79,10 +76,10 @@ public sealed class Exam
 
         var corr1 = Guid.NewGuid();
         var corr2 = Guid.NewGuid();
-        var req1 = new RequestReplyMessage<string>(
-            "r1", "req-topic", "rep-topic", "svc", "type", corr1);
-        var req2 = new RequestReplyMessage<string>(
-            "r2", "req-topic", "rep-topic", "svc", "type", corr2);
+        // TODO: Create a RequestReplyMessage with appropriate configuration
+        dynamic req1 = null!;
+        // TODO: Create a RequestReplyMessage with appropriate configuration
+        dynamic req2 = null!;
 
         var task1 = correlator.SendAndReceiveAsync(req1);
 
@@ -90,8 +87,9 @@ public sealed class Exam
         await Task.Delay(50);
 
         // Send reply for corr1
-        var reply1 = IntegrationEnvelope<string>.Create("ans1", "be", "resp", corr1);
-        await consumer.SendAsync(reply1);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic reply1 = null!;
+        // TODO: await consumer.SendAsync(...)
 
         var result1 = await task1;
 
@@ -117,10 +115,11 @@ public sealed class Exam
         await using var consumer = new MockEndpoint("exam-to-cons");
         var correlator = CreateCorrelator(producer, consumer, timeoutMs: 300);
 
-        var request = new RequestReplyMessage<string>(
-            "data", "req", "rep", "svc", "type");
+        // TODO: Create a RequestReplyMessage with appropriate configuration
+        dynamic request = null!;
 
-        var result = await correlator.SendAndReceiveAsync(request);
+        // TODO: var result = await correlator.SendAndReceiveAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.TimedOut, Is.True);
         Assert.That(result.Reply, Is.Null);
@@ -142,3 +141,4 @@ public sealed class Exam
             NullLogger<RequestReplyCorrelator<string, string>>.Instance);
     }
 }
+#endif

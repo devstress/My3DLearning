@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 19 – Content Filter (Exam · Assessment Challenges)
+// Tutorial 19 – Content Filter (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Content Filter pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — JsonPathFilterStep filters fields inside a transform pipeline
-//   🟡 Intermediate — Deeply nested filter extracts correct leaf values
-//   🔴 Advanced     — Batch filter of multiple messages published via MockEndpoint
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
+//   🟢 Starter       — JsonPathFilterStep filters fields inside a transform pipeline
+//   🟡 Intermediate  — Deeply nested filter extracts correct leaf values
+//   🔴 Advanced      — Batch filter of multiple messages published via MockEndpoint
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Transform;
@@ -25,6 +21,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial19;
 
 [TestFixture]
@@ -43,14 +40,16 @@ public sealed class Exam
     [Test]
     public async Task Starter_JsonPathFilterStep_FiltersInPipeline()
     {
-        var step = new JsonPathFilterStep(new[] { "order.id", "customer.name" });
-        var options = Options.Create(new TransformOptions { Enabled = true });
-        var pipeline = new TransformPipeline(
-            new ITransformStep[] { step }, options,
-            NullLogger<TransformPipeline>.Instance);
+        // TODO: Create a JsonPathFilterStep with appropriate configuration
+        dynamic step = null!;
+        // TODO: var options = Options.Create(...)
+        dynamic options = null!;
+        // TODO: Create a TransformPipeline with appropriate configuration
+        dynamic pipeline = null!;
 
         var payload = """{"order":{"id":"ORD-1","total":99},"customer":{"name":"Alice","email":"a@b.com"},"internal":"x"}""";
-        var result = await pipeline.ExecuteAsync(payload, "application/json");
+        // TODO: var result = await pipeline.ExecuteAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.Payload, Does.Contain("ORD-1"));
         Assert.That(result.Payload, Does.Contain("Alice"));
@@ -71,10 +70,12 @@ public sealed class Exam
     [Test]
     public async Task Intermediate_DeeplyNestedFilter_ExtractsCorrectly()
     {
-        var filter = new ContentFilter(NullLogger<ContentFilter>.Instance);
+        // TODO: Create a ContentFilter with appropriate configuration
+        dynamic filter = null!;
 
         var payload = """{"level1":{"level2":{"level3":{"target":"found","other":"skip"}},"sibling":"also-skip"}}""";
-        var result = await filter.FilterAsync(payload, new[] { "level1.level2.level3.target" });
+        // TODO: var result = await filter.FilterAsync(...)
+        dynamic result = null!;
 
         Assert.That(result, Does.Contain("found"));
         Assert.That(result, Does.Not.Contain("skip"));
@@ -96,7 +97,8 @@ public sealed class Exam
     public async Task Advanced_BatchFilter_MultipleMessagesPublished()
     {
         await using var output = new MockEndpoint("exam-filter");
-        var filter = new ContentFilter(NullLogger<ContentFilter>.Instance);
+        // TODO: Create a ContentFilter with appropriate configuration
+        dynamic filter = null!;
 
         var payloads = new[]
         {
@@ -107,10 +109,11 @@ public sealed class Exam
 
         foreach (var p in payloads)
         {
-            var filtered = await filter.FilterAsync(p, new[] { "user", "role" });
-            var envelope = IntegrationEnvelope<string>.Create(
-                filtered, "FilterSvc", "filtered");
-            await output.PublishAsync(envelope, "safe-data", CancellationToken.None);
+            // TODO: var filtered = await filter.FilterAsync(...)
+            dynamic filtered = null!;
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic envelope = null!;
+            // TODO: await output.PublishAsync(...)
         }
 
         output.AssertReceivedOnTopic("safe-data", 3);
@@ -120,3 +123,4 @@ public sealed class Exam
         Assert.That(all[2].Payload, Does.Contain("Charlie"));
     }
 }
+#endif

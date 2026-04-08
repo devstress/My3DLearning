@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 26 – Message Replay (Exam · Assessment Challenges)
+// Tutorial 26 – Message Replay (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Message Replay pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Filter by CorrelationId replays only matching messages
-//   🟡 Intermediate — MaxMessages caps the number of replayed messages
-//   🔴 Advanced     — Missing SourceTopic throws InvalidOperationException
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
+//   🟢 Starter       — Filter by CorrelationId replays only matching messages
+//   🟡 Intermediate  — MaxMessages caps the number of replayed messages
+//   🔴 Advanced      — Missing SourceTopic throws InvalidOperationException
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Replay;
@@ -25,6 +21,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial26;
 
 [TestFixture]
@@ -44,19 +41,26 @@ public sealed class Exam
     public async Task Starter_FilterByCorrelationId_OnlyMatchingReplayed()
     {
         await using var output = new MockEndpoint("replay-corr");
-        var store = new InMemoryMessageReplayStore();
+        // TODO: Create a InMemoryMessageReplayStore with appropriate configuration
+        dynamic store = null!;
         var targetCorrelation = Guid.NewGuid();
 
-        var env1 = IntegrationEnvelope<string>.Create("a", "Svc", "evt") with { CorrelationId = targetCorrelation };
-        var env2 = IntegrationEnvelope<string>.Create("b", "Svc", "evt");
-        var env3 = IntegrationEnvelope<string>.Create("c", "Svc", "evt") with { CorrelationId = targetCorrelation };
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic env1 = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic env2 = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic env3 = null!;
         await store.StoreForReplayAsync(env1, "src", CancellationToken.None);
         await store.StoreForReplayAsync(env2, "src", CancellationToken.None);
         await store.StoreForReplayAsync(env3, "src", CancellationToken.None);
 
-        var opts = Options.Create(new ReplayOptions { SourceTopic = "src", TargetTopic = "tgt", MaxMessages = 100 });
-        var replayer = new MessageReplayer(store, output, opts, NullLogger<MessageReplayer>.Instance);
-        var result = await replayer.ReplayAsync(new ReplayFilter { CorrelationId = targetCorrelation }, CancellationToken.None);
+        // TODO: var opts = Options.Create(...)
+        dynamic opts = null!;
+        // TODO: Create a MessageReplayer with appropriate configuration
+        dynamic replayer = null!;
+        // TODO: var result = await replayer.ReplayAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.ReplayedCount, Is.EqualTo(2));
         output.AssertReceivedOnTopic("tgt", 2);
@@ -75,14 +79,17 @@ public sealed class Exam
     public async Task Intermediate_MaxMessages_CapsReplayCount()
     {
         await using var output = new MockEndpoint("replay-max");
-        var store = new InMemoryMessageReplayStore();
+        // TODO: Create a InMemoryMessageReplayStore with appropriate configuration
+        dynamic store = null!;
         for (var i = 0; i < 10; i++)
-            await store.StoreForReplayAsync(
-                IntegrationEnvelope<string>.Create($"d{i}", "Svc", "evt"), "src", CancellationToken.None);
+            // TODO: await store.StoreForReplayAsync(...)
 
-        var opts = Options.Create(new ReplayOptions { SourceTopic = "src", TargetTopic = "tgt", MaxMessages = 3 });
-        var replayer = new MessageReplayer(store, output, opts, NullLogger<MessageReplayer>.Instance);
-        var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
+        // TODO: var opts = Options.Create(...)
+        dynamic opts = null!;
+        // TODO: Create a MessageReplayer with appropriate configuration
+        dynamic replayer = null!;
+        // TODO: var result = await replayer.ReplayAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.ReplayedCount, Is.EqualTo(3));
         output.AssertReceivedCount(3);
@@ -101,11 +108,15 @@ public sealed class Exam
     public async Task Advanced_MissingSourceTopic_ThrowsInvalidOperation()
     {
         await using var output = new MockEndpoint("replay-err");
-        var store = new InMemoryMessageReplayStore();
-        var opts = Options.Create(new ReplayOptions { SourceTopic = "", TargetTopic = "tgt" });
-        var replayer = new MessageReplayer(store, output, opts, NullLogger<MessageReplayer>.Instance);
+        // TODO: Create a InMemoryMessageReplayStore with appropriate configuration
+        dynamic store = null!;
+        // TODO: var opts = Options.Create(...)
+        dynamic opts = null!;
+        // TODO: Create a MessageReplayer with appropriate configuration
+        dynamic replayer = null!;
 
         Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None));
     }
 }
+#endif

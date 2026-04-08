@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 27 – Resequencer (Exam · Assessment Challenges)
+// Tutorial 27 – Resequencer (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Resequencer pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Large out-of-order batch released in correct sequence
-//   🟡 Intermediate — Interleaved sequences each release independently
-//   🔴 Advanced     — Timeout partial release then complete a new sequence
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
+//   🟢 Starter       — Large out-of-order batch released in correct sequence
+//   🟡 Intermediate  — Interleaved sequences each release independently
+//   🔴 Advanced      — Timeout partial release then complete a new sequence
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Resequencer;
@@ -25,6 +21,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial27;
 
 [TestFixture]
@@ -44,8 +41,8 @@ public sealed class Exam
     public async Task Starter_LargeOutOfOrderBatch_ReleasedInSequence()
     {
         await using var output = new MockEndpoint("reseq-batch");
-        var resequencer = new MessageResequencer(
-            Options.Create(new ResequencerOptions()), NullLogger<MessageResequencer>.Instance);
+        // TODO: Create a MessageResequencer with appropriate configuration
+        dynamic resequencer = null!;
         var correlationId = Guid.NewGuid();
         const int total = 10;
 
@@ -53,10 +50,8 @@ public sealed class Exam
         IReadOnlyList<IntegrationEnvelope<string>> released = [];
         foreach (var i in indices)
         {
-            var env = IntegrationEnvelope<string>.Create($"msg-{i}", "Svc", "evt") with
-            {
-                CorrelationId = correlationId, SequenceNumber = i, TotalCount = total,
-            };
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic env = null!;
             released = resequencer.Accept(env);
         }
 
@@ -65,7 +60,7 @@ public sealed class Exam
             Assert.That(released[i].SequenceNumber, Is.EqualTo(i));
 
         foreach (var env in released)
-            await output.PublishAsync(env, "ordered");
+            // TODO: await output.PublishAsync(...)
 
         output.AssertReceivedOnTopic("ordered", total);
     }
@@ -84,8 +79,8 @@ public sealed class Exam
     public async Task Intermediate_InterleavedSequences_EachReleasedIndependently()
     {
         await using var output = new MockEndpoint("reseq-interleave");
-        var resequencer = new MessageResequencer(
-            Options.Create(new ResequencerOptions()), NullLogger<MessageResequencer>.Instance);
+        // TODO: Create a MessageResequencer with appropriate configuration
+        dynamic resequencer = null!;
 
         var corrA = Guid.NewGuid();
         var corrB = Guid.NewGuid();
@@ -102,7 +97,7 @@ public sealed class Exam
         Assert.That(releasedB[0].Payload, Is.EqualTo("B0"));
 
         foreach (var env in releasedA.Concat(releasedB))
-            await output.PublishAsync(env, "interleaved");
+            // TODO: await output.PublishAsync(...)
 
         output.AssertReceivedOnTopic("interleaved", 4);
     }
@@ -122,8 +117,8 @@ public sealed class Exam
     public async Task Advanced_TimeoutPartialRelease_ThenCompleteNewSequence()
     {
         await using var output = new MockEndpoint("reseq-timeout");
-        var resequencer = new MessageResequencer(
-            Options.Create(new ResequencerOptions()), NullLogger<MessageResequencer>.Instance);
+        // TODO: Create a MessageResequencer with appropriate configuration
+        dynamic resequencer = null!;
 
         var corrOld = Guid.NewGuid();
         resequencer.Accept(CreateEnvelope("old-0", corrOld, 0, 5));
@@ -133,7 +128,7 @@ public sealed class Exam
         Assert.That(partial, Has.Count.EqualTo(2));
 
         foreach (var env in partial)
-            await output.PublishAsync(env, "partial");
+            // TODO: await output.PublishAsync(...)
 
         var corrNew = Guid.NewGuid();
         resequencer.Accept(CreateEnvelope("new-1", corrNew, 1, 2));
@@ -141,7 +136,7 @@ public sealed class Exam
         Assert.That(complete, Has.Count.EqualTo(2));
 
         foreach (var env in complete)
-            await output.PublishAsync(env, "complete");
+            // TODO: await output.PublishAsync(...)
 
         output.AssertReceivedOnTopic("partial", 2);
         output.AssertReceivedOnTopic("complete", 2);
@@ -157,3 +152,4 @@ public sealed class Exam
             TotalCount = totalCount,
         };
 }
+#endif

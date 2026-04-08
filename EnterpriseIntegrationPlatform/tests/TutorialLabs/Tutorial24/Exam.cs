@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 24 – Retry Framework (Exam · Assessment Challenges)
+// Tutorial 24 – Retry Framework (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Retry Framework pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Exhaust retries and capture the last exception message
-//   🟡 Intermediate — Cancellation during retry throws OperationCanceledException
-//   🔴 Advanced     — Retry succeeds then publishes through full pipeline
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
+//   🟢 Starter       — Exhaust retries and capture the last exception message
+//   🟡 Intermediate  — Cancellation during retry throws OperationCanceledException
+//   🔴 Advanced      — Retry succeeds then publishes through full pipeline
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Retry;
@@ -25,6 +21,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial24;
 
 [TestFixture]
@@ -47,20 +44,17 @@ public sealed class Exam
         var policy = CreatePolicy(maxAttempts: 3);
         var attempt = 0;
 
-        var result = await policy.ExecuteAsync<string>(_ =>
-        {
-            attempt++;
-            throw new InvalidOperationException($"fail-{attempt}");
-        }, CancellationToken.None);
+        // TODO: var result = await policy.ExecuteAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.IsSucceeded, Is.False);
         Assert.That(result.Attempts, Is.EqualTo(3));
         Assert.That(result.LastException!.Message, Is.EqualTo("fail-3"));
 
         // Publish failure info to dead-letter via MockEndpoint
-        var envelope = IntegrationEnvelope<string>.Create(
-            result.LastException!.Message, "svc", "retry.exhausted");
-        await output.PublishAsync(envelope, "dlq-topic", CancellationToken.None);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: await output.PublishAsync(...)
         output.AssertReceivedOnTopic("dlq-topic", 1);
     }
 
@@ -82,29 +76,14 @@ public sealed class Exam
         var attempt = 0;
 
         // Create a policy with a delayFunc that cancels on 2nd attempt
-        var optionsValue = Options.Create(new RetryOptions
-        {
-            MaxAttempts = 5,
-            InitialDelayMs = 100,
-            BackoffMultiplier = 2.0,
-            MaxDelayMs = 5000,
-            UseJitter = false,
-        });
-        var cancellablePolicy = new ExponentialBackoffRetryPolicy(
-            optionsValue,
-            NullLogger<ExponentialBackoffRetryPolicy>.Instance,
-            delayFunc: (_, ct) =>
-            {
-                cts.Cancel();
-                return Task.CompletedTask;
-            });
+        // TODO: var optionsValue = Options.Create(...)
+        dynamic optionsValue = null!;
+        // TODO: Create a ExponentialBackoffRetryPolicy with appropriate configuration
+        dynamic cancellablePolicy = null!;
 
-        Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            await cancellablePolicy.ExecuteAsync<string>(_ =>
-            {
-                attempt++;
-                throw new Exception("transient");
-            }, cts.Token));
+        Assert.ThrowsAsync<OperationCanceledException>(async () => {
+            // TODO: await cancellablePolicy.ExecuteAsync(...)
+            });
     }
 
     // ── 🔴 ADVANCED — Retry success then publish full pipeline ─────────
@@ -124,20 +103,16 @@ public sealed class Exam
         var policy = CreatePolicy(maxAttempts: 4);
         var attempt = 0;
 
-        var result = await policy.ExecuteAsync<string>(_ =>
-        {
-            attempt++;
-            if (attempt < 3) throw new Exception("not yet");
-            return Task.FromResult("final-value");
-        }, CancellationToken.None);
+        // TODO: var result = await policy.ExecuteAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.IsSucceeded, Is.True);
         Assert.That(result.Attempts, Is.EqualTo(3));
         Assert.That(result.Result, Is.EqualTo("final-value"));
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            result.Result!, "pipeline-svc", "order.processed");
-        await output.PublishAsync(envelope, "orders-out", CancellationToken.None);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: await output.PublishAsync(...)
         output.AssertReceivedOnTopic("orders-out", 1);
         output.AssertReceivedCount(1);
     }
@@ -159,3 +134,4 @@ public sealed class Exam
             delayFunc: (_, _) => Task.CompletedTask);
     }
 }
+#endif

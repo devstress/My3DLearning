@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 21 – Aggregator (Exam · Assessment Challenges)
+// Tutorial 21 – Aggregator (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Aggregator pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Interleaved groups with different CorrelationIds complete independently
-//   🟡 Intermediate — Metadata key conflict where later envelope overrides earlier
-//   🔴 Advanced     — Duplicate message by MessageId is idempotently rejected
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
+//   🟢 Starter       — Interleaved groups with different CorrelationIds complete independently
+//   🟡 Intermediate  — Metadata key conflict where later envelope overrides earlier
+//   🔴 Advanced      — Duplicate message by MessageId is idempotently rejected
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Aggregator;
@@ -26,6 +22,7 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial21;
 
 [TestFixture]
@@ -50,10 +47,14 @@ public sealed class Exam
         var corrA = Guid.NewGuid();
         var corrB = Guid.NewGuid();
 
-        var a1 = IntegrationEnvelope<string>.Create("a1", "svc", "t", corrA);
-        var b1 = IntegrationEnvelope<string>.Create("b1", "svc", "t", corrB);
-        var a2 = IntegrationEnvelope<string>.Create("a2", "svc", "t", corrA);
-        var b2 = IntegrationEnvelope<string>.Create("b2", "svc", "t", corrB);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic a1 = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic b1 = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic a2 = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic b2 = null!;
 
         Assert.That((await aggregator.AggregateAsync(a1)).IsComplete, Is.False);
         Assert.That((await aggregator.AggregateAsync(b1)).IsComplete, Is.False);
@@ -80,17 +81,14 @@ public sealed class Exam
         var aggregator = CreateAggregator(output, expectedCount: 2);
         var correlationId = Guid.NewGuid();
 
-        var e1 = IntegrationEnvelope<string>.Create("a", "svc", "t", correlationId) with
-        {
-            Metadata = new Dictionary<string, string> { ["key"] = "first" },
-        };
-        var e2 = IntegrationEnvelope<string>.Create("b", "svc", "t", correlationId) with
-        {
-            Metadata = new Dictionary<string, string> { ["key"] = "second" },
-        };
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic e1 = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic e2 = null!;
 
         await aggregator.AggregateAsync(e1);
-        var result = await aggregator.AggregateAsync(e2);
+        // TODO: var result = await aggregator.AggregateAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.AggregateEnvelope!.Metadata["key"], Is.EqualTo("second"));
         output.AssertReceivedOnTopic("aggregated-topic", 1);
@@ -113,16 +111,20 @@ public sealed class Exam
         var aggregator = CreateAggregator(output, expectedCount: 2);
         var correlationId = Guid.NewGuid();
 
-        var e1 = IntegrationEnvelope<string>.Create("a", "svc", "t", correlationId);
-        var e2 = IntegrationEnvelope<string>.Create("b", "svc", "t", correlationId);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic e1 = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic e2 = null!;
 
         await aggregator.AggregateAsync(e1);
         // Resend e1 — duplicate by MessageId should be ignored
-        var dupResult = await aggregator.AggregateAsync(e1);
+        // TODO: var dupResult = await aggregator.AggregateAsync(...)
+        dynamic dupResult = null!;
         Assert.That(dupResult.IsComplete, Is.False);
         Assert.That(dupResult.ReceivedCount, Is.EqualTo(1));
 
-        var final = await aggregator.AggregateAsync(e2);
+        // TODO: var final = await aggregator.AggregateAsync(...)
+        dynamic final = null!;
         Assert.That(final.IsComplete, Is.True);
         Assert.That(final.ReceivedCount, Is.EqualTo(2));
 
@@ -147,3 +149,4 @@ public sealed class Exam
             NullLogger<MessageAggregator<string, string>>.Instance);
     }
 }
+#endif

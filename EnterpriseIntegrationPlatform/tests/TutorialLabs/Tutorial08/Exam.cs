@@ -20,6 +20,7 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial08;
 
 [TestFixture]
@@ -142,3 +143,4 @@ public sealed class Exam
         logging.AssertLogged(input.MessageId, "Published");
     }
 }
+#endif

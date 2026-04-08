@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 17 – Normalizer (Exam · Assessment Challenges)
+// Tutorial 17 – Normalizer (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Normalizer pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — XML with repeated elements produces JSON arrays
-//   🟡 Intermediate — CSV with custom semicolon delimiter parses correctly
-//   🔴 Advanced     — Multi-format batch normalization and publish via MockEndpoint
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
+//   🟢 Starter       — XML with repeated elements produces JSON arrays
+//   🟡 Intermediate  — CSV with custom semicolon delimiter parses correctly
+//   🔴 Advanced      — Multi-format batch normalization and publish via MockEndpoint
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Transform;
@@ -25,6 +21,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial17;
 
 [TestFixture]
@@ -43,12 +40,12 @@ public sealed class Exam
     [Test]
     public async Task Starter_XmlRepeatedElements_ProducesJsonArrays()
     {
-        var normalizer = new MessageNormalizer(
-            Options.Create(new NormalizerOptions()),
-            NullLogger<MessageNormalizer>.Instance);
+        // TODO: Create a MessageNormalizer with appropriate configuration
+        dynamic normalizer = null!;
 
         var xml = "<Root><item>A</item><item>B</item><item>C</item></Root>";
-        var result = await normalizer.NormalizeAsync(xml, "application/xml");
+        // TODO: var result = await normalizer.NormalizeAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.DetectedFormat, Is.EqualTo("XML"));
         Assert.That(result.WasTransformed, Is.True);
@@ -72,16 +69,12 @@ public sealed class Exam
     [Test]
     public async Task Intermediate_CsvCustomDelimiter_ParsesCorrectly()
     {
-        var normalizer = new MessageNormalizer(
-            Options.Create(new NormalizerOptions
-            {
-                CsvDelimiter = ';',
-                CsvHasHeaders = true,
-            }),
-            NullLogger<MessageNormalizer>.Instance);
+        // TODO: Create a MessageNormalizer with appropriate configuration
+        dynamic normalizer = null!;
 
         var csv = "product;price\nWidget;9.99\nGadget;19.99";
-        var result = await normalizer.NormalizeAsync(csv, "text/csv");
+        // TODO: var result = await normalizer.NormalizeAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.DetectedFormat, Is.EqualTo("CSV"));
         Assert.That(result.WasTransformed, Is.True);
@@ -105,22 +98,21 @@ public sealed class Exam
     public async Task Advanced_MultiformatBatch_NormalizeAndPublish()
     {
         await using var output = new MockEndpoint("exam-normalizer");
-        var normalizer = new MessageNormalizer(
-            Options.Create(new NormalizerOptions()),
-            NullLogger<MessageNormalizer>.Instance);
+        // TODO: Create a MessageNormalizer with appropriate configuration
+        dynamic normalizer = null!;
 
-        var jsonResult = await normalizer.NormalizeAsync(
-            """{"status":"ok"}""", "application/json");
-        var xmlResult = await normalizer.NormalizeAsync(
-            "<Root><status>ok</status></Root>", "application/xml");
-        var csvResult = await normalizer.NormalizeAsync(
-            "status\nok\ndone", "text/csv");
+        // TODO: var jsonResult = await normalizer.NormalizeAsync(...)
+        dynamic jsonResult = null!;
+        // TODO: var xmlResult = await normalizer.NormalizeAsync(...)
+        dynamic xmlResult = null!;
+        // TODO: var csvResult = await normalizer.NormalizeAsync(...)
+        dynamic csvResult = null!;
 
         foreach (var r in new[] { jsonResult, xmlResult, csvResult })
         {
-            var envelope = IntegrationEnvelope<string>.Create(
-                r.Payload, "NormSvc", "normalized");
-            await output.PublishAsync(envelope, "canonical-json", CancellationToken.None);
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic envelope = null!;
+            // TODO: await output.PublishAsync(...)
         }
 
         output.AssertReceivedOnTopic("canonical-json", 3);
@@ -129,3 +121,4 @@ public sealed class Exam
         Assert.That(csvResult.DetectedFormat, Is.EqualTo("CSV"));
     }
 }
+#endif

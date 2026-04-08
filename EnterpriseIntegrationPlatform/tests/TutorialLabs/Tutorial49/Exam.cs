@@ -1,33 +1,43 @@
 // ============================================================================
-// Tutorial 49 – Testing Integrations (Exam)
+// Tutorial 49 – Testing Integrations (Exam · Fill in the Blanks)
 // ============================================================================
-// E2E challenges: causation chain verification, fault envelope with exception,
-// and full routing slip lifecycle via NatsBrokerEndpoint (real NATS JetStream via Aspire).
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — causation chain_ three generations published
+//   🔴 Advanced      — routing slip lifecycle_ publishes each step
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial49;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_CausationChain_ThreeGenerationsPublished()
+    public async Task Starter_CausationChain_ThreeGenerationsPublished()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t49-exam-chain");
         var topic = AspireFixture.UniqueTopic("t49-exam-events");
-        var gp = IntegrationEnvelope<string>.Create("gp", "SvcA", "event.a");
-        var parent = IntegrationEnvelope<string>.Create(
-            "p", "SvcB", "event.b", correlationId: gp.CorrelationId, causationId: gp.MessageId);
-        var child = IntegrationEnvelope<string>.Create(
-            "c", "SvcC", "event.c", correlationId: gp.CorrelationId, causationId: parent.MessageId);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic gp = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic parent = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic child = null!;
 
-        await nats.PublishAsync(gp, topic, default);
-        await nats.PublishAsync(parent, topic, default);
-        await nats.PublishAsync(child, topic, default);
+        // TODO: await nats.PublishAsync(...)
+        // TODO: await nats.PublishAsync(...)
+        // TODO: await nats.PublishAsync(...)
 
         nats.AssertReceivedOnTopic(topic, 3);
         Assert.That(parent.CausationId, Is.EqualTo(gp.MessageId));
@@ -36,7 +46,7 @@ public sealed class Exam
     }
 
     [Test]
-    public void Challenge2_FaultEnvelope_WithException()
+    public void Intermediate_FaultEnvelope_WithException()
     {
         var original = IntegrationEnvelope<string>.Create(
             "{\"orderId\":\"ORD-1\"}", "OrderService", "order.created");
@@ -50,25 +60,19 @@ public sealed class Exam
     }
 
     [Test]
-    public async Task Challenge3_RoutingSlipLifecycle_PublishesEachStep()
+    public async Task Advanced_RoutingSlipLifecycle_PublishesEachStep()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t49-exam-slip");
         var topic = AspireFixture.UniqueTopic("t49-exam-steps");
-        var slip = new RoutingSlip(
-        [
-            new RoutingSlipStep("validate", "t1"),
-            new RoutingSlipStep("enrich", "t2"),
-            new RoutingSlipStep("transform", "t3"),
-            new RoutingSlipStep("route", "t4"),
-        ]);
+        // TODO: Create a RoutingSlip with appropriate configuration
+        dynamic slip = null!;
 
-        var visited = new List<string>();
+        // TODO: Create a List with appropriate configuration
+        dynamic visited = null!;
         while (!slip.IsComplete)
         {
             visited.Add(slip.CurrentStep!.StepName);
-            await nats.PublishAsync(
-                IntegrationEnvelope<string>.Create(slip.CurrentStep.StepName, "test", "step.done"),
-                topic, default);
+            // TODO: await nats.PublishAsync(...)
             slip = slip.Advance();
         }
 
@@ -76,3 +80,4 @@ public sealed class Exam
         nats.AssertReceivedCount(4);
     }
 }
+#endif

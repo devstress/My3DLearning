@@ -1,9 +1,18 @@
 // ============================================================================
-// Tutorial 37 – File Connector (Exam)
+// Tutorial 37 – File Connector (Exam · Fill in the Blanks)
 // ============================================================================
-// E2E challenges: write-read roundtrip through MockEndpoint, custom filename
-// pattern resolution, and subdirectory listing.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — write and read roundtrip_ through mock endpoint
+//   🟡 Intermediate  — custom filename pattern_ contains message type and id
+//   🔴 Advanced      — subdirectory listing_ combines root and sub
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using System.Text;
 using EnterpriseIntegrationPlatform.Connector.FileSystem;
@@ -14,25 +23,22 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial37;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_WriteAndReadRoundtrip_ThroughMockEndpoint()
+    public async Task Starter_WriteAndReadRoundtrip_ThroughMockEndpoint()
     {
         await using var input = new MockEndpoint("exam-file-in");
 
-        var fs = new MockFileSystem();
+        // TODO: Create a MockFileSystem with appropriate configuration
+        dynamic fs = null!;
 
-        var connector = new FileConnector(fs,
-            Options.Create(new FileConnectorOptions
-            {
-                RootDirectory = "/data",
-                CreateDirectoryIfNotExists = true,
-            }),
-            NullLogger<FileConnector>.Instance);
+        // TODO: Create a FileConnector with appropriate configuration
+        dynamic connector = null!;
 
         string? writtenPath = null;
         await input.SubscribeAsync<string>("file-topic", "file-group",
@@ -43,31 +49,29 @@ public sealed class Exam
             });
 
         var payload = "roundtrip-test-payload";
-        var env = IntegrationEnvelope<string>.Create(payload, "Svc", "test.roundtrip");
-        await input.SendAsync(env);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic env = null!;
+        // TODO: await input.SendAsync(...)
 
         Assert.That(writtenPath, Is.Not.Null.And.Not.Empty);
         Assert.That(fs.Files.ContainsKey(writtenPath!), Is.True);
 
-        var readBytes = await connector.ReadAsync(writtenPath!, CancellationToken.None);
+        // TODO: var readBytes = await connector.ReadAsync(...)
+        dynamic readBytes = null!;
         Assert.That(Encoding.UTF8.GetString(readBytes), Is.EqualTo(payload));
     }
 
     [Test]
-    public async Task Challenge2_CustomFilenamePattern_ContainsMessageTypeAndId()
+    public async Task Intermediate_CustomFilenamePattern_ContainsMessageTypeAndId()
     {
-        var fs = new MockFileSystem();
+        // TODO: Create a MockFileSystem with appropriate configuration
+        dynamic fs = null!;
 
-        var connector = new FileConnector(fs,
-            Options.Create(new FileConnectorOptions
-            {
-                RootDirectory = "/exports",
-                FilenamePattern = "{MessageType}-{MessageId}.json",
-                CreateDirectoryIfNotExists = false,
-            }),
-            NullLogger<FileConnector>.Instance);
+        // TODO: Create a FileConnector with appropriate configuration
+        dynamic connector = null!;
 
-        var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "invoice.created");
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
 
         await connector.WriteAsync(envelope, s => Encoding.UTF8.GetBytes(s), CancellationToken.None);
 
@@ -78,20 +82,22 @@ public sealed class Exam
     }
 
     [Test]
-    public async Task Challenge3_SubdirectoryListing_CombinesRootAndSub()
+    public async Task Advanced_SubdirectoryListing_CombinesRootAndSub()
     {
-        var fs = new MockFileSystem();
+        // TODO: Create a MockFileSystem with appropriate configuration
+        dynamic fs = null!;
         fs.Files["/root/sub/file1.json"] = Array.Empty<byte>();
         fs.Files["/root/sub/file2.json"] = Array.Empty<byte>();
         fs.Files["/root/sub/file3.json"] = Array.Empty<byte>();
 
-        var connector = new FileConnector(fs,
-            Options.Create(new FileConnectorOptions { RootDirectory = "/root" }),
-            NullLogger<FileConnector>.Instance);
+        // TODO: Create a FileConnector with appropriate configuration
+        dynamic connector = null!;
 
-        var files = await connector.ListFilesAsync("sub", "*.json", CancellationToken.None);
+        // TODO: var files = await connector.ListFilesAsync(...)
+        dynamic files = null!;
 
         Assert.That(files, Has.Count.EqualTo(3));
         Assert.That(files[0], Does.Contain("sub"));
     }
 }
+#endif

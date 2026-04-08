@@ -18,6 +18,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial06;
 
 [TestFixture]
@@ -135,3 +136,4 @@ public sealed class Exam
         Assert.That(endpoint.GetReceivedTopics(), Has.Count.EqualTo(3));
     }
 }
+#endif

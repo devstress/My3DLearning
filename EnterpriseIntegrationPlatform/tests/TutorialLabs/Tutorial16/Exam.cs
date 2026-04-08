@@ -18,6 +18,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial16;
 
 [TestFixture]
@@ -129,3 +130,4 @@ public sealed class Exam
         Assert.That(received.Payload, Is.EqualTo("[PROCESSED] THE BAR IS HERE"));
     }
 }
+#endif

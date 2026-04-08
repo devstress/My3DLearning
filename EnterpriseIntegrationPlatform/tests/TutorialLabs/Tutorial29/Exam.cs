@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 29 – Throttle and Rate Limiting (Exam · Assessment Challenges)
+// Tutorial 29 – Throttle & Rate Limiting (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Throttle pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Burst exhaustion permits then rejects
-//   🟡 Intermediate — Metric accumulation tracks all operations
-//   🔴 Advanced     — Single token alternates permit and reject
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
+//   🟢 Starter       — Burst exhaustion permits then rejects
+//   🟡 Intermediate  — Metric accumulation tracks all operations
+//   🔴 Advanced      — Single token alternates permit and reject
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Throttle;
@@ -25,6 +21,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial29;
 
 [TestFixture]
@@ -48,12 +45,14 @@ public sealed class Exam
         var rejected = 0;
         for (var i = 0; i < 5; i++)
         {
-            var env = IntegrationEnvelope<string>.Create($"msg-{i}", "Svc", "evt");
-            var result = await throttle.AcquireAsync(env);
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic env = null!;
+            // TODO: var result = await throttle.AcquireAsync(...)
+            dynamic result = null!;
             if (result.Permitted)
             {
                 permitted++;
-                await output.PublishAsync(env, "ok");
+                // TODO: await output.PublishAsync(...)
             }
             else
             {
@@ -83,10 +82,13 @@ public sealed class Exam
 
         for (var i = 0; i < 4; i++)
         {
-            var env = IntegrationEnvelope<string>.Create($"m{i}", "Svc", "evt");
-            var result = await throttle.AcquireAsync(env);
-            if (result.Permitted)
-                await output.PublishAsync(env, "processed");
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic env = null!;
+            // TODO: var result = await throttle.AcquireAsync(...)
+            dynamic result = null!;
+            if (result.Permitted) {
+                // TODO: await output.PublishAsync(...)
+            }
         }
 
         var metrics = throttle.GetMetrics();
@@ -112,13 +114,17 @@ public sealed class Exam
         await using var output = new MockEndpoint("throttle-single");
         using var throttle = CreateThrottle(burstCapacity: 1, rejectOnBackpressure: true);
 
-        var env1 = IntegrationEnvelope<string>.Create("first", "Svc", "evt");
-        var r1 = await throttle.AcquireAsync(env1);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic env1 = null!;
+        // TODO: var r1 = await throttle.AcquireAsync(...)
+        dynamic r1 = null!;
         Assert.That(r1.Permitted, Is.True);
-        await output.PublishAsync(env1, "ok");
+        // TODO: await output.PublishAsync(...)
 
-        var env2 = IntegrationEnvelope<string>.Create("second", "Svc", "evt");
-        var r2 = await throttle.AcquireAsync(env2);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic env2 = null!;
+        // TODO: var r2 = await throttle.AcquireAsync(...)
+        dynamic r2 = null!;
         Assert.That(r2.Permitted, Is.False);
         Assert.That(r2.RemainingTokens, Is.EqualTo(0));
 
@@ -139,3 +145,4 @@ public sealed class Exam
         return new TokenBucketThrottle(opts, NullLogger<TokenBucketThrottle>.Instance);
     }
 }
+#endif

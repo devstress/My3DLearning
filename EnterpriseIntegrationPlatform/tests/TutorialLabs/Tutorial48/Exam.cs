@@ -1,10 +1,18 @@
 // ============================================================================
-// Tutorial 48 – Notification Use Cases (Exam)
+// Tutorial 48 – Notification Use Cases (Exam · Fill in the Blanks)
 // ============================================================================
-// E2E challenges: conditional ack/nack, multi-message notification batch,
-// and persistence activity flow via NatsBrokerEndpoint (real NATS JetStream
-// via Aspire).
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — conditional ack nack_ correct topics
+//   🟡 Intermediate  — batch notification_ multiple messages
+//   🔴 Advanced      — persistence activity_ save and update
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Activities;
 using EnterpriseIntegrationPlatform.Contracts;
@@ -13,42 +21,43 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial48;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_ConditionalAckNack_CorrectTopics()
+    public async Task Starter_ConditionalAckNack_CorrectTopics()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t48-exam-cond");
         var ackTopic = AspireFixture.UniqueTopic("t48-exam-ack");
         var nackTopic = AspireFixture.UniqueTopic("t48-exam-nack");
-        var validator = new DefaultMessageValidationService();
+        // TODO: Create a DefaultMessageValidationService with appropriate configuration
+        dynamic validator = null!;
 
         // Valid message → ack
-        var r1 = await validator.ValidateAsync("order.created", "{\"id\":1}");
-        await nats.PublishAsync(
-            IntegrationEnvelope<string>.Create("ok", "pipeline", "notification"),
-            r1.IsValid ? ackTopic : nackTopic, default);
+        // TODO: var r1 = await validator.ValidateAsync(...)
+        dynamic r1 = null!;
+        // TODO: await nats.PublishAsync(...)
 
         nats.AssertReceivedOnTopic(ackTopic, 1);
         nats.AssertReceivedCount(1);
     }
 
     [Test]
-    public async Task Challenge2_BatchNotification_MultipleMessages()
+    public async Task Intermediate_BatchNotification_MultipleMessages()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t48-exam-batch");
         var topic = AspireFixture.UniqueTopic("t48-exam-batch-ack");
-        var validator = new DefaultMessageValidationService();
+        // TODO: Create a DefaultMessageValidationService with appropriate configuration
+        dynamic validator = null!;
 
         for (var i = 0; i < 5; i++)
         {
-            var r = await validator.ValidateAsync("order.created", $"{{\"id\":{i}}}");
-            await nats.PublishAsync(
-                IntegrationEnvelope<string>.Create($"msg-{i}", "pipeline", "batch.notify"),
-                topic, default);
+            // TODO: var r = await validator.ValidateAsync(...)
+            dynamic r = null!;
+            // TODO: await nats.PublishAsync(...)
         }
 
         nats.AssertReceivedCount(5);
@@ -56,15 +65,15 @@ public sealed class Exam
     }
 
     [Test]
-    public async Task Challenge3_PersistenceActivity_SaveAndUpdate()
+    public async Task Advanced_PersistenceActivity_SaveAndUpdate()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t48-exam-persist");
         var topic = AspireFixture.UniqueTopic("t48-exam-delivery");
-        var persistence = new MockPersistenceActivityService();
+        // TODO: Create a MockPersistenceActivityService with appropriate configuration
+        dynamic persistence = null!;
 
-        var input = new IntegrationPipelineInput(
-            Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow,
-            "OrderService", "order.created", "1.0", 1, "{}", null, "ack", "nack");
+        // TODO: Create a IntegrationPipelineInput with appropriate configuration
+        dynamic input = null!;
 
         await persistence.SaveMessageAsync(input, CancellationToken.None);
         await persistence.UpdateDeliveryStatusAsync(
@@ -72,11 +81,10 @@ public sealed class Exam
             "Delivered", CancellationToken.None);
 
         // Publish delivery confirmation
-        await nats.PublishAsync(
-            IntegrationEnvelope<string>.Create("Delivered", "pipeline", "delivery.status"),
-            topic, default);
+        // TODO: await nats.PublishAsync(...)
 
         persistence.AssertSaveCount(1);
         nats.AssertReceivedOnTopic(topic, 1);
     }
 }
+#endif

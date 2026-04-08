@@ -1,10 +1,18 @@
 // ============================================================================
-// Tutorial 46 – Complete Integration / Demo Pipeline (Exam)
+// Tutorial 46 – Complete End-to-End Integration (Exam · Fill in the Blanks)
 // ============================================================================
-// E2E challenges: full dispatch-to-publish flow, service activator
-// request-reply, and pipeline failure handling via NatsBrokerEndpoint
-// (real NATS JetStream via Aspire).
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — full dispatch to publish_ end to end
+//   🟡 Intermediate  — service activator_ request reply flow
+//   🔴 Advanced      — pipeline failure_ handled gracefully
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Activities;
@@ -17,53 +25,47 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial46;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_FullDispatchToPublish_EndToEnd()
+    public async Task Starter_FullDispatchToPublish_EndToEnd()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t46-e2e");
         var topic = AspireFixture.UniqueTopic("t46-orders-processed");
 
-        var dispatcher = new MessageDispatcher(
-            Options.Create(new MessageDispatcherOptions()),
-            NullLogger<MessageDispatcher>.Instance);
+        // TODO: Create a MessageDispatcher with appropriate configuration
+        dynamic dispatcher = null!;
 
-        dispatcher.Register<string>("order.created", async (env, _) =>
-        {
-            var result = IntegrationEnvelope<string>.Create(
-                $"processed:{env.Payload}", "pipeline", "order.processed");
-            await nats.PublishAsync(result, topic, default);
-        });
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic result = null!;
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "{\"orderId\":\"ORD-001\"}", "OrderService", "order.created");
-        var dispatchResult = await dispatcher.DispatchAsync(envelope);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: var dispatchResult = await dispatcher.DispatchAsync(...)
+        dynamic dispatchResult = null!;
 
         Assert.That(dispatchResult.Succeeded, Is.True);
         nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
-    public async Task Challenge2_ServiceActivator_RequestReplyFlow()
+    public async Task Intermediate_ServiceActivator_RequestReplyFlow()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t46-reply-exam");
         var replyTopic = AspireFixture.UniqueTopic("t46-client-replies");
 
-        var activator = new ServiceActivator(
-            nats, Options.Create(new ServiceActivatorOptions()),
-            NullLogger<ServiceActivator>.Instance);
+        // TODO: Create a ServiceActivator with appropriate configuration
+        dynamic activator = null!;
 
-        var request = IntegrationEnvelope<string>.Create("lookup-123", "client", "query.request") with
-        {
-            ReplyTo = replyTopic,
-        };
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic request = null!;
 
-        var result = await activator.InvokeAsync<string, string>(
-            request, (env, _) => Task.FromResult<string?>($"found:{env.Payload}"));
+        // TODO: var result = await activator.InvokeAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.Succeeded, Is.True);
         Assert.That(result.ReplySent, Is.True);
@@ -71,18 +73,18 @@ public sealed class Exam
     }
 
     [Test]
-    public async Task Challenge3_PipelineFailure_HandledGracefully()
+    public async Task Advanced_PipelineFailure_HandledGracefully()
     {
-        var temporal = new MockTemporalWorkflowDispatcher()
-            .ReturnsFailure("Temporal unavailable");
+        // TODO: Create a MockTemporalWorkflowDispatcher with appropriate configuration
+        dynamic temporal = null!;
 
-        var orchestrator = new PipelineOrchestrator(
-            temporal, Options.Create(new PipelineOptions { AckSubject = "ack", NackSubject = "nack" }),
-            NullLogger<PipelineOrchestrator>.Instance);
+        // TODO: Create a PipelineOrchestrator with appropriate configuration
+        dynamic orchestrator = null!;
 
-        var envelope = IntegrationEnvelope<JsonElement>.Create(
-            JsonSerializer.Deserialize<JsonElement>("{}"), "Svc", "evt");
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
 
         Assert.DoesNotThrowAsync(() => orchestrator.ProcessAsync(envelope));
     }
 }
+#endif

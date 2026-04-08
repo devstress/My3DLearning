@@ -1,23 +1,18 @@
 // ============================================================================
-// Tutorial 11 – Dynamic Router (Exam · Assessment Challenges)
+// Tutorial 11 – Dynamic Router (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Dynamic Router pattern in realistic
-//   integration scenarios that combine registration, routing, fallback, and
-//   introspection.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — multi-participant topology routed correctly with fallback
-//   🟡 Intermediate — route replacement semantics when a new participant overrides
-//   🔴 Advanced     — case-insensitive matching across mixed-case condition keys
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
+//   🟢 Starter       — multi-participant topology routed correctly with fallback
+//   🟡 Intermediate  — route replacement semantics when a new participant overrides
+//   🔴 Advanced      — case-insensitive matching across mixed-case condition keys
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Routing;
@@ -26,6 +21,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial11;
 
 [TestFixture]
@@ -46,19 +42,27 @@ public sealed class Exam
         await using var output = new MockEndpoint("multi-participant");
         var router = CreateRouter(output);
 
-        await router.RegisterAsync("order.created", "order-svc-topic", "order-service");
-        await router.RegisterAsync("payment.received", "payment-svc-topic", "payment-service");
-        await router.RegisterAsync("shipment.dispatched", "shipment-svc-topic", "shipment-service");
+        // TODO: await router.RegisterAsync(...)
+        // TODO: await router.RegisterAsync(...)
+        // TODO: await router.RegisterAsync(...)
 
-        var e1 = IntegrationEnvelope<string>.Create("o1", "svc", "order.created");
-        var e2 = IntegrationEnvelope<string>.Create("p1", "svc", "payment.received");
-        var e3 = IntegrationEnvelope<string>.Create("s1", "svc", "shipment.dispatched");
-        var e4 = IntegrationEnvelope<string>.Create("u1", "svc", "unknown.event");
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic e1 = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic e2 = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic e3 = null!;
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic e4 = null!;
 
-        var d1 = await router.RouteAsync(e1);
-        var d2 = await router.RouteAsync(e2);
-        var d3 = await router.RouteAsync(e3);
-        var d4 = await router.RouteAsync(e4);
+        // TODO: var d1 = await router.RouteAsync(...)
+        dynamic d1 = null!;
+        // TODO: var d2 = await router.RouteAsync(...)
+        dynamic d2 = null!;
+        // TODO: var d3 = await router.RouteAsync(...)
+        dynamic d3 = null!;
+        // TODO: var d4 = await router.RouteAsync(...)
+        dynamic d4 = null!;
 
         Assert.That(d1.Destination, Is.EqualTo("order-svc-topic"));
         Assert.That(d2.Destination, Is.EqualTo("payment-svc-topic"));
@@ -86,15 +90,17 @@ public sealed class Exam
         await using var output = new MockEndpoint("replacement");
         var router = CreateRouter(output);
 
-        await router.RegisterAsync("order.created", "old-handler", "participant-v1");
-        await router.RegisterAsync("order.created", "new-handler", "participant-v2");
+        // TODO: await router.RegisterAsync(...)
+        // TODO: await router.RegisterAsync(...)
 
         var table = router.GetRoutingTable();
         Assert.That(table["order.created"].Destination, Is.EqualTo("new-handler"));
         Assert.That(table["order.created"].ParticipantId, Is.EqualTo("participant-v2"));
 
-        var envelope = IntegrationEnvelope<string>.Create("data", "svc", "order.created");
-        var decision = await router.RouteAsync(envelope);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: var decision = await router.RouteAsync(...)
+        dynamic decision = null!;
 
         Assert.That(decision.Destination, Is.EqualTo("new-handler"));
         Assert.That(decision.MatchedEntry!.ParticipantId, Is.EqualTo("participant-v2"));
@@ -115,11 +121,12 @@ public sealed class Exam
         await using var output = new MockEndpoint("case-insensitive");
         var router = CreateRouter(output);
 
-        await router.RegisterAsync("Order.Created", "orders-topic");
+        // TODO: await router.RegisterAsync(...)
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "data", "svc", "order.created");
-        var decision = await router.RouteAsync(envelope);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: var decision = await router.RouteAsync(...)
+        dynamic decision = null!;
 
         Assert.That(decision.Destination, Is.EqualTo("orders-topic"));
         Assert.That(decision.IsFallback, Is.False);
@@ -138,3 +145,4 @@ public sealed class Exam
             output, options, NullLogger<DynamicRouter>.Instance);
     }
 }
+#endif

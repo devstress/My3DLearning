@@ -19,6 +19,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial10;
 
 [TestFixture]
@@ -134,3 +135,4 @@ public sealed class Exam
         output.AssertReceivedOnTopic("non-prod-discard", 2);
     }
 }
+#endif

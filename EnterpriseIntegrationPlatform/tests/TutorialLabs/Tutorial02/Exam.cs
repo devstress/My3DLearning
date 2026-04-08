@@ -24,6 +24,7 @@ using Microsoft.Extensions.Options;
 
 #pragma warning disable CS0219 // Variable is assigned but its value is never used (expected in fill-in-blank exam)
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial02;
 
 [TestFixture]
@@ -183,3 +184,4 @@ public sealed class Exam
         Assert.That(input.Source, Is.EqualTo("NotifySvc"));
     }
 }
+#endif

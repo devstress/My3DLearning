@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 15 – Message Translator (Exam · Assessment Challenges)
+// Tutorial 15 – Message Translator (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Message Translator pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Type-converting translation from string to int
-//   🟡 Intermediate — Metadata and correlation preserved across a two-stage chain
-//   🔴 Advanced     — Source, MessageType, Priority, and SchemaVersion preserved when no override
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint, MessageTranslator, MockPayloadTransform, NUnit
+//   🟢 Starter       — Type-converting translation from string to int
+//   🟡 Intermediate  — Metadata and correlation preserved across a two-stage chain
+//   🔴 Advanced      — Source, MessageType, Priority, and SchemaVersion preserved when no override
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Processing.Translator;
@@ -26,6 +22,7 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial15;
 
 [TestFixture]
@@ -45,20 +42,18 @@ public sealed class Exam
     public async Task Starter_TypeConversion_StringToInt()
     {
         await using var output = new MockEndpoint("type-convert");
-        var transform = new MockPayloadTransform<string, int>(input => int.Parse(input));
+        // TODO: Create a MockPayloadTransform with appropriate configuration
+        dynamic transform = null!;
 
-        var options = Options.Create(new TranslatorOptions
-        {
-            TargetTopic = "int-topic",
-            TargetMessageType = "number.parsed",
-        });
-        var translator = new MessageTranslator<string, int>(
-            transform, output, options,
-            NullLogger<MessageTranslator<string, int>>.Instance);
+        // TODO: var options = Options.Create(...)
+        dynamic options = null!;
+        // TODO: Create a MessageTranslator with appropriate configuration
+        dynamic translator = null!;
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "42", "parser-svc", "string.input");
-        var result = await translator.TranslateAsync(envelope);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: var result = await translator.TranslateAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.TranslatedEnvelope.Payload, Is.EqualTo(42));
         Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("number.parsed"));
@@ -83,26 +78,25 @@ public sealed class Exam
         await using var output1 = new MockEndpoint("stage1");
         await using var output2 = new MockEndpoint("stage2");
 
-        var transform1 = new MockPayloadTransform<string, string>(input => input.ToUpperInvariant());
+        // TODO: Create a MockPayloadTransform with appropriate configuration
+        dynamic transform1 = null!;
 
-        var transform2 = new MockPayloadTransform<string, string>(input => $"[{input}]");
+        // TODO: Create a MockPayloadTransform with appropriate configuration
+        dynamic transform2 = null!;
 
-        var translator1 = new MessageTranslator<string, string>(
-            transform1, output1, Options.Create(new TranslatorOptions { TargetTopic = "stage1-topic" }),
-            NullLogger<MessageTranslator<string, string>>.Instance);
+        // TODO: Create a MessageTranslator with appropriate configuration
+        dynamic translator1 = null!;
 
-        var translator2 = new MessageTranslator<string, string>(
-            transform2, output2, Options.Create(new TranslatorOptions { TargetTopic = "stage2-topic" }),
-            NullLogger<MessageTranslator<string, string>>.Instance);
+        // TODO: Create a MessageTranslator with appropriate configuration
+        dynamic translator2 = null!;
 
-        var original = IntegrationEnvelope<string>.Create(
-            "hello", "origin", "raw.text") with
-        {
-            Metadata = new Dictionary<string, string> { ["trace"] = "abc123" },
-        };
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic original = null!;
 
-        var r1 = await translator1.TranslateAsync(original);
-        var r2 = await translator2.TranslateAsync(r1.TranslatedEnvelope);
+        // TODO: var r1 = await translator1.TranslateAsync(...)
+        dynamic r1 = null!;
+        // TODO: var r2 = await translator2.TranslateAsync(...)
+        dynamic r2 = null!;
 
         Assert.That(r2.TranslatedEnvelope.Payload, Is.EqualTo("[HELLO]"));
         Assert.That(r2.TranslatedEnvelope.Metadata["trace"], Is.EqualTo("abc123"));
@@ -129,24 +123,19 @@ public sealed class Exam
     public async Task Advanced_PreservesSourceWhenNoOverride()
     {
         await using var output = new MockEndpoint("preserve");
-        var transform = new MockPayloadTransform<string, string>(_ => "out");
+        // TODO: Create a MockPayloadTransform with appropriate configuration
+        dynamic transform = null!;
 
-        var options = Options.Create(new TranslatorOptions
-        {
-            TargetTopic = "dest-topic",
-        });
-        var translator = new MessageTranslator<string, string>(
-            transform, output, options,
-            NullLogger<MessageTranslator<string, string>>.Instance);
+        // TODO: var options = Options.Create(...)
+        dynamic options = null!;
+        // TODO: Create a MessageTranslator with appropriate configuration
+        dynamic translator = null!;
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "data", "OriginalSource", "original.type") with
-        {
-            Priority = MessagePriority.High,
-            SchemaVersion = "2.0",
-        };
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
 
-        var result = await translator.TranslateAsync(envelope);
+        // TODO: var result = await translator.TranslateAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.TranslatedEnvelope.Source, Is.EqualTo("OriginalSource"));
         Assert.That(result.TranslatedEnvelope.MessageType, Is.EqualTo("original.type"));
@@ -155,3 +144,4 @@ public sealed class Exam
         output.AssertReceivedOnTopic("dest-topic", 1);
     }
 }
+#endif

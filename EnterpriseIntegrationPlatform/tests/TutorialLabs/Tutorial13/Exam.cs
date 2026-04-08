@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 13 – Routing Slip (Exam · Assessment Challenges)
+// Tutorial 13 – Routing Slip (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Routing Slip pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Execute a full three-step pipeline sequentially
-//   🟡 Intermediate — Detect partial failure mid-slip and verify it halts
-//   🔴 Advanced     — Handle a missing routing slip with the correct exception
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint, RoutingSlipRouter, NUnit
+//   🟢 Starter       — Execute a full three-step pipeline sequentially
+//   🟡 Intermediate  — Detect partial failure mid-slip and verify it halts
+//   🔴 Advanced      — Handle a missing routing slip with the correct exception
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Contracts;
@@ -25,6 +21,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial13;
 
 [TestFixture]
@@ -44,31 +41,30 @@ public sealed class Exam
     public async Task Starter_FullPipeline_ExecutesAllStepsSequentially()
     {
         await using var output = new MockEndpoint("pipeline");
-        var handlers = new IRoutingSlipStepHandler[]
-        {
-            new TrackingHandler("Validate"),
-            new TrackingHandler("Transform"),
-            new TrackingHandler("Deliver"),
-        };
-        var router = new RoutingSlipRouter(
-            handlers, output, NullLogger<RoutingSlipRouter>.Instance);
+        // TODO: Create a IRoutingSlipStepHandler with appropriate configuration
+        dynamic handlers = null!;
+        // TODO: Create a RoutingSlipRouter with appropriate configuration
+        dynamic router = null!;
 
         var envelope = CreateEnvelopeWithSlip(
             new RoutingSlipStep("Validate", "step1-out"),
             new RoutingSlipStep("Transform", "step2-out"),
             new RoutingSlipStep("Deliver", "step3-out"));
 
-        var r1 = await router.ExecuteCurrentStepAsync(envelope);
+        // TODO: var r1 = await router.ExecuteCurrentStepAsync(...)
+        dynamic r1 = null!;
         Assert.That(r1.Succeeded, Is.True);
         Assert.That(r1.StepName, Is.EqualTo("Validate"));
         Assert.That(r1.RemainingSlip.Steps, Has.Count.EqualTo(2));
 
-        var r2 = await router.ExecuteCurrentStepAsync(envelope);
+        // TODO: var r2 = await router.ExecuteCurrentStepAsync(...)
+        dynamic r2 = null!;
         Assert.That(r2.Succeeded, Is.True);
         Assert.That(r2.StepName, Is.EqualTo("Transform"));
         Assert.That(r2.RemainingSlip.Steps, Has.Count.EqualTo(1));
 
-        var r3 = await router.ExecuteCurrentStepAsync(envelope);
+        // TODO: var r3 = await router.ExecuteCurrentStepAsync(...)
+        dynamic r3 = null!;
         Assert.That(r3.Succeeded, Is.True);
         Assert.That(r3.StepName, Is.EqualTo("Deliver"));
         Assert.That(r3.RemainingSlip.IsComplete, Is.True);
@@ -93,25 +89,23 @@ public sealed class Exam
     public async Task Intermediate_PartialFailure_StopsAtFailedStep()
     {
         await using var output = new MockEndpoint("partial-fail");
-        var handlers = new IRoutingSlipStepHandler[]
-        {
-            new TrackingHandler("Validate"),
-            new FailingHandler("Transform"),
-            new TrackingHandler("Deliver"),
-        };
-        var router = new RoutingSlipRouter(
-            handlers, output, NullLogger<RoutingSlipRouter>.Instance);
+        // TODO: Create a IRoutingSlipStepHandler with appropriate configuration
+        dynamic handlers = null!;
+        // TODO: Create a RoutingSlipRouter with appropriate configuration
+        dynamic router = null!;
 
         var envelope = CreateEnvelopeWithSlip(
             new RoutingSlipStep("Validate", "step1-out"),
             new RoutingSlipStep("Transform", "step2-out"),
             new RoutingSlipStep("Deliver", "step3-out"));
 
-        var r1 = await router.ExecuteCurrentStepAsync(envelope);
+        // TODO: var r1 = await router.ExecuteCurrentStepAsync(...)
+        dynamic r1 = null!;
         Assert.That(r1.Succeeded, Is.True);
         output.AssertReceivedOnTopic("step1-out", 1);
 
-        var r2 = await router.ExecuteCurrentStepAsync(envelope);
+        // TODO: var r2 = await router.ExecuteCurrentStepAsync(...)
+        dynamic r2 = null!;
         Assert.That(r2.Succeeded, Is.False);
         Assert.That(r2.StepName, Is.EqualTo("Transform"));
         Assert.That(r2.FailureReason, Is.Not.Null);
@@ -134,12 +128,11 @@ public sealed class Exam
     public async Task Advanced_MissingSlip_ThrowsInvalidOperation()
     {
         await using var output = new MockEndpoint("no-slip");
-        var router = new RoutingSlipRouter(
-            Array.Empty<IRoutingSlipStepHandler>(),
-            output, NullLogger<RoutingSlipRouter>.Instance);
+        // TODO: Create a RoutingSlipRouter with appropriate configuration
+        dynamic router = null!;
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "data", "svc", "test.event");
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
 
         Assert.ThrowsAsync<InvalidOperationException>(
             async () => await router.ExecuteCurrentStepAsync(envelope));
@@ -190,3 +183,4 @@ public sealed class Exam
             Task.FromResult(false);
     }
 }
+#endif

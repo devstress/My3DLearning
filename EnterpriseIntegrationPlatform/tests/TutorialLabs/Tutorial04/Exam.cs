@@ -17,6 +17,7 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial04;
 
 #pragma warning disable CS0219 // Variable is assigned but its value is never used — intentional for fill-in-the-blank TODOs
@@ -188,3 +189,4 @@ public sealed class Exam
         await output.DisposeAsync();
     }
 }
+#endif

@@ -1,22 +1,18 @@
 // ============================================================================
-// Tutorial 18 – Content Enricher (Exam · Assessment Challenges)
+// Tutorial 18 – Content Enricher (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Content Enricher pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
-//   🟢 Starter      — Deep nested merge path enriches at a nested JSON location
-//   🟡 Intermediate — Numeric lookup key extracted and used for enrichment
-//   🔴 Advanced     — Batch enrichment of multiple messages published via MockEndpoint
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint / MockEnrichmentSource
+//   🟢 Starter       — Deep nested merge path enriches at a nested JSON location
+//   🟡 Intermediate  — Numeric lookup key extracted and used for enrichment
+//   🔴 Advanced      — Batch enrichment of multiple messages published via MockEndpoint
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using System.Text.Json.Nodes;
 using EnterpriseIntegrationPlatform.Contracts;
@@ -27,6 +23,7 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial18;
 
 [TestFixture]
@@ -45,21 +42,17 @@ public sealed class Exam
     [Test]
     public async Task Starter_DeepNestedMerge_EnrichesAtNestedPath()
     {
-        var source = new MockEnrichmentSource()
-            .WithData("WH-1", """{"location":"NYC","capacity":5000}""");
+        // TODO: Create a MockEnrichmentSource with appropriate configuration
+        dynamic source = null!;
 
-        var options = new ContentEnricherOptions
-        {
-            EndpointUrlTemplate = "https://api.example.com/wh/{key}",
-            LookupKeyPath = "shipment.warehouseId",
-            MergeTargetPath = "shipment.warehouseDetails",
-        };
-        var enricher = new ContentEnricher(
-            source, Options.Create(options),
-            NullLogger<ContentEnricher>.Instance);
+        // TODO: Create a ContentEnricherOptions with appropriate configuration
+        dynamic options = null!;
+        // TODO: Create a ContentEnricher with appropriate configuration
+        dynamic enricher = null!;
 
         var payload = """{"shipment":{"warehouseId":"WH-1","items":3}}""";
-        var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
+        // TODO: var result = await enricher.EnrichAsync(...)
+        dynamic result = null!;
 
         Assert.That(result, Does.Contain("NYC"));
         Assert.That(result, Does.Contain("5000"));
@@ -79,21 +72,17 @@ public sealed class Exam
     [Test]
     public async Task Intermediate_NumericLookupKey_ExtractsCorrectly()
     {
-        var source = new MockEnrichmentSource()
-            .WithData("42", """{"status":"active","plan":"enterprise"}""");
+        // TODO: Create a MockEnrichmentSource with appropriate configuration
+        dynamic source = null!;
 
-        var options = new ContentEnricherOptions
-        {
-            EndpointUrlTemplate = "https://api.example.com/accounts/{key}",
-            LookupKeyPath = "accountId",
-            MergeTargetPath = "account",
-        };
-        var enricher = new ContentEnricher(
-            source, Options.Create(options),
-            NullLogger<ContentEnricher>.Instance);
+        // TODO: Create a ContentEnricherOptions with appropriate configuration
+        dynamic options = null!;
+        // TODO: Create a ContentEnricher with appropriate configuration
+        dynamic enricher = null!;
 
         var payload = """{"accountId":42,"action":"upgrade"}""";
-        var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
+        // TODO: var result = await enricher.EnrichAsync(...)
+        dynamic result = null!;
 
         Assert.That(result, Does.Contain("active"));
         Assert.That(result, Does.Contain("enterprise"));
@@ -116,20 +105,13 @@ public sealed class Exam
     {
         await using var output = new MockEndpoint("exam-enricher");
 
-        var source = new MockEnrichmentSource()
-            .WithData("C-1", """{"name":"Alice"}""")
-            .WithData("C-2", """{"name":"Bob"}""")
-            .WithData("C-3", """{"name":"Charlie"}""");
+        // TODO: Create a MockEnrichmentSource with appropriate configuration
+        dynamic source = null!;
 
-        var options = new ContentEnricherOptions
-        {
-            EndpointUrlTemplate = "https://api.example.com/{key}",
-            LookupKeyPath = "customerId",
-            MergeTargetPath = "customer",
-        };
-        var enricher = new ContentEnricher(
-            source, Options.Create(options),
-            NullLogger<ContentEnricher>.Instance);
+        // TODO: Create a ContentEnricherOptions with appropriate configuration
+        dynamic options = null!;
+        // TODO: Create a ContentEnricher with appropriate configuration
+        dynamic enricher = null!;
 
         var payloads = new[]
         {
@@ -140,10 +122,11 @@ public sealed class Exam
 
         foreach (var p in payloads)
         {
-            var enriched = await enricher.EnrichAsync(p, Guid.NewGuid());
-            var envelope = IntegrationEnvelope<string>.Create(
-                enriched, "EnricherSvc", "enriched");
-            await output.PublishAsync(envelope, "enriched-orders", CancellationToken.None);
+            // TODO: var enriched = await enricher.EnrichAsync(...)
+            dynamic enriched = null!;
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic envelope = null!;
+            // TODO: await output.PublishAsync(...)
         }
 
         output.AssertReceivedOnTopic("enriched-orders", 3);
@@ -153,3 +136,4 @@ public sealed class Exam
         Assert.That(all[2].Payload, Does.Contain("Charlie"));
     }
 }
+#endif
