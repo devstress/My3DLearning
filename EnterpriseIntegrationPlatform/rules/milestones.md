@@ -100,9 +100,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Chunk 300 — ✅ Done — see `rules/completion-log.md`
 
-### Chunk 301 — NATS JetStream provider hardening
-
-| Status | `not-started` |
+### Chunk 301 — ✅ Done — see `rules/completion-log.md`
 |---|---|
 | **Goal** | Harden `Ingestion.Nats` from demo-grade to production-grade. |
 | **Changes** | (a) Add `NatsOptions` class (IOptions pattern) with `Url`, `MaxReconnectRetries`, `ReconnectWaitMs`, `StreamCreateRetries`. (b) Implement `IAsyncDisposable` on both Producer and Consumer with real resource cleanup. (c) Add `NatsHealthCheck : IHealthCheck` that verifies JetStream API responsiveness. (d) Update `NatsServiceExtensions` to use `IOptions<NatsOptions>`, register health check, validate configuration. (e) Add OpenTelemetry `ActivitySource` tracing on publish/consume. (f) Fix infinite-loop risk in `EnsureStreamAsync` — throw after max retries exhausted. |

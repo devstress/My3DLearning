@@ -4,6 +4,30 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 301 — NATS JetStream provider hardening
+
+- **Date**: 2026-04-08
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Harden NATS JetStream provider with IOptions pattern, health check, ActivitySource tracing, proper IAsyncDisposable, and finite retry logic.
+- **Files created**:
+  - `src/Ingestion.Nats/NatsOptions.cs` — IOptions-based config with Validate(), section binding, linear backoff params
+  - `src/Ingestion.Nats/NatsHealthCheck.cs` — IHealthCheck verifying JetStream API responsiveness
+  - `tests/UnitTests/NatsOptionsTests.cs` — 9 tests for options defaults, section name, validation
+  - `tests/UnitTests/NatsHealthCheckTests.cs` — 3 tests for health check constructor and unhealthy paths
+  - `tests/UnitTests/NatsServiceExtensionsFullTests.cs` — 7 tests for DI registration, options, health check, argument validation
+- **Files modified**:
+  - `src/Ingestion.Nats/NatsJetStreamProducer.cs` — Added IAsyncDisposable, ActivitySource tracing, IOptions-driven retries, InvalidOperationException after max retries
+  - `src/Ingestion.Nats/NatsJetStreamConsumer.cs` — Added ActivitySource tracing, linked CancellationTokenSource, ObjectDisposedException guard
+  - `src/Ingestion.Nats/NatsServiceExtensions.cs` — Register IOptions<NatsOptions>, NatsHealthCheck, validate on connection creation
+  - `src/Ingestion.Nats/Ingestion.Nats.csproj` — Added HealthChecks.Abstractions + Options package refs
+  - `Directory.Packages.props` — Added Microsoft.Extensions.Options 10.0.5
+  - `tests/UnitTests/UnitTests.csproj` — Added Ingestion.Nats project reference
+  - `rules/milestones.md` — Chunk 301 marked done
+- **Test counts after**:
+  - UnitTests: 1560 (was 1540, +20 new tests)
+  - **Total: 2,259** (was 2,239, +20)
+
 ## Chunk 300 — Housekeeping: Remove placeholder tests + fix README test counts
 
 - **Date**: 2026-04-08
