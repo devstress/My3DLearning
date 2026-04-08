@@ -2,7 +2,9 @@
 // TestAppHost – Lightweight Aspire AppHost for tutorial integration tests.
 // ============================================================================
 // Mirrors the production AppHost but starts only the infrastructure containers
-// that tutorials actually need: NATS JetStream, Temporal, SFTP, and SMTP.
+// that tutorials actually need: NATS JetStream, Temporal, SFTP, SMTP,
+// PostgreSQL, Kafka, and Pulsar. All brokers are mandatory — tests verify
+// real end-to-end broker delivery.
 // No Ollama/RagFlow/Cassandra/Grafana = fast startup for test suites.
 // ============================================================================
 
@@ -40,17 +42,21 @@ var postgres = builder.AddContainer("postgres", "postgres", "17")
 
 // ── Apache Kafka (via Bitnami image) — high-throughput event streaming ───────
 // Uses KRaft mode (no ZooKeeper) for minimal resource footprint in tests.
+// IMPORTANT: The EXTERNAL listener port MUST be pinned (port: 29094) and the
+// KAFKA_CFG_ADVERTISED_LISTENERS EXTERNAL address MUST match, otherwise Kafka
+// advertises the container-internal port in metadata and the Confluent.Kafka
+// producer reconnects to the wrong address after the initial bootstrap.
 var kafka = builder.AddContainer("kafka", "bitnami/kafka", "3.9.0")
     .WithEnvironment("KAFKA_CFG_NODE_ID", "0")
     .WithEnvironment("KAFKA_CFG_PROCESS_ROLES", "controller,broker")
     .WithEnvironment("KAFKA_CFG_CONTROLLER_QUORUM_VOTERS", "0@localhost:9093")
     .WithEnvironment("KAFKA_CFG_CONTROLLER_LISTENER_NAMES", "CONTROLLER")
     .WithEnvironment("KAFKA_CFG_LISTENERS", "PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094")
-    .WithEnvironment("KAFKA_CFG_ADVERTISED_LISTENERS", "PLAINTEXT://localhost:9092,EXTERNAL://localhost:9094")
+    .WithEnvironment("KAFKA_CFG_ADVERTISED_LISTENERS", "PLAINTEXT://localhost:9092,EXTERNAL://localhost:29094")
     .WithEnvironment("KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP", "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT")
     .WithEnvironment("KAFKA_CFG_INTER_BROKER_LISTENER_NAME", "PLAINTEXT")
     .WithEnvironment("KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE", "true")
-    .WithEndpoint(targetPort: 9094, name: "kafka-tcp", scheme: "tcp");
+    .WithEndpoint(port: 29094, targetPort: 9094, name: "kafka-tcp", scheme: "tcp");
 
 // ── Apache Pulsar — Key_Shared subscription for recipient-keyed distribution ─
 // Standalone mode includes broker + bookie + ZooKeeper in a single container.

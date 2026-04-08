@@ -53,13 +53,22 @@ public sealed class AspireFixture
 
         if (IsAvailable)
         {
+            // Fast lookups (containers already healthy or instant endpoint resolution)
             NatsUrl = await SharedTestAppHost.GetNatsUrlAsync();
             TemporalAddress = await SharedTestAppHost.GetTemporalAddressAsync();
             SftpEndpoint = await SharedTestAppHost.GetSftpEndpointAsync();
             SmtpEndpoint = await SharedTestAppHost.GetSmtpEndpointAsync();
-            PostgresConnectionString = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-            KafkaBootstrapServers = await SharedTestAppHost.GetKafkaBootstrapServersAsync();
-            PulsarServiceUrl = await SharedTestAppHost.GetPulsarServiceUrlAsync();
+
+            // Slow container readiness probes — run in parallel to reduce startup time.
+            // Kafka ~30s, Pulsar ~60-120s, Postgres ~10s. Sequential = ~200s. Parallel = ~120s.
+            var pgTask = SharedTestAppHost.GetPostgresConnectionStringAsync();
+            var kafkaTask = SharedTestAppHost.GetKafkaBootstrapServersAsync();
+            var pulsarTask = SharedTestAppHost.GetPulsarServiceUrlAsync();
+            await Task.WhenAll(pgTask, kafkaTask, pulsarTask);
+
+            PostgresConnectionString = pgTask.Result;
+            KafkaBootstrapServers = kafkaTask.Result;
+            PulsarServiceUrl = pulsarTask.Result;
         }
     }
 

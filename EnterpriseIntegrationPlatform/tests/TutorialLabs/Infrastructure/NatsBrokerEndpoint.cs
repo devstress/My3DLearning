@@ -279,15 +279,32 @@ public sealed class NatsBrokerEndpoint : IMessageBrokerProducer, IMessageBrokerC
 
     private async Task EnsureStreamAsync(string streamName, string topic, CancellationToken ct)
     {
-        try
+        const int maxRetries = 3;
+        for (var attempt = 1; ; attempt++)
         {
-            await _js.GetStreamAsync(streamName, cancellationToken: ct);
-        }
-        catch (NatsJSApiException ex) when (ex.Error.Code == 404)
-        {
-            await _js.CreateStreamAsync(
-                new StreamConfig(streamName, [topic]),
-                ct);
+            try
+            {
+                await _js.GetStreamAsync(streamName, cancellationToken: ct);
+                return;
+            }
+            catch (NatsJSApiException ex) when (ex.Error.Code == 404)
+            {
+                try
+                {
+                    await _js.CreateStreamAsync(
+                        new StreamConfig(streamName, [topic]),
+                        ct);
+                    return;
+                }
+                catch (NatsJSApiNoResponseException) when (attempt < maxRetries)
+                {
+                    await Task.Delay(1_000 * attempt, ct);
+                }
+            }
+            catch (NatsJSApiNoResponseException) when (attempt < maxRetries)
+            {
+                await Task.Delay(1_000 * attempt, ct);
+            }
         }
     }
 }
