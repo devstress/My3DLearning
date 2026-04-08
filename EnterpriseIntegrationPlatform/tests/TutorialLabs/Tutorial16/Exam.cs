@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 16 – Transform Pipeline (Exam)
+// Tutorial 16 – Transform Pipeline (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: regex replace step, JsonPathFilter step, and multi-step
-// pipeline with metadata verification via MockEndpoint.
+// PURPOSE: Prove you can apply the Transform Pipeline pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Regex replace step masks phone numbers in a pipeline
+//   🟡 Intermediate — JsonPathFilter step retains only specified JSON paths
+//   🔴 Advanced     — Multi-step pipeline transforms and publishes via MockEndpoint
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,8 +30,18 @@ namespace TutorialLabs.Tutorial16;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Regex replace step masks phone numbers ──────────────
+    //
+    // SCENARIO: A customer-support transcript contains phone numbers that
+    //           must be masked before downstream processing. A RegexReplaceStep
+    //           is configured to replace phone patterns with "***-****".
+    //
+    // WHAT YOU PROVE: A single RegexReplaceStep inside a pipeline correctly
+    //                 masks all matching patterns and reports StepsApplied = 1.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_RegexReplace_MasksPhoneNumbers()
+    public async Task Starter_RegexReplace_MasksPhoneNumbers()
     {
         var step = new RegexReplaceStep(@"\d{3}-\d{4}", "***-****");
         var options = Options.Create(new TransformOptions { Enabled = true });
@@ -33,8 +56,19 @@ public sealed class Exam
         Assert.That(result.StepsApplied, Is.EqualTo(1));
     }
 
+    // ── 🟡 INTERMEDIATE — JsonPathFilter retains only specified paths ────
+    //
+    // SCENARIO: An order payload arrives with order details, customer PII,
+    //           and internal fields. Only the order ID and customer name
+    //           should survive for the downstream analytics service.
+    //
+    // WHAT YOU PROVE: A JsonPathFilterStep inside a pipeline strips all
+    //                 fields except the specified keep-paths, preserving
+    //                 nested structure.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_JsonPathFilter_RetainsOnlySpecifiedPaths()
+    public async Task Intermediate_JsonPathFilter_RetainsOnlySpecifiedPaths()
     {
         var step = new JsonPathFilterStep(new[] { "order.id", "customer.name" });
         var options = Options.Create(new TransformOptions { Enabled = true });
@@ -52,8 +86,19 @@ public sealed class Exam
         Assert.That(result.Payload, Does.Not.Contain("a@b.com"));
     }
 
+    // ── 🔴 ADVANCED — Multi-step transform and publish ─────────────────
+    //
+    // SCENARIO: A raw message flows through three pipeline steps: regex
+    //           replacement, upper-casing, and prefix tagging. The final
+    //           transformed payload is published to a MockEndpoint and the
+    //           received message must match exactly.
+    //
+    // WHAT YOU PROVE: A multi-step pipeline chains transforms in the correct
+    //                 order and the result is faithfully published end-to-end.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_MultiStep_TransformAndPublish()
+    public async Task Advanced_MultiStep_TransformAndPublish()
     {
         await using var output = new MockEndpoint("exam-transform");
 

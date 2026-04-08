@@ -4,6 +4,16 @@ Augment messages with external data via `IContentEnricher`, merging fetched fiel
 
 ---
 
+## Learning Objectives
+
+1. Understand the Content Enricher pattern and how it augments messages with external data
+2. Use `ContentEnricher` with an `IEnrichmentSource` to fetch and merge data at a target path
+3. Extract lookup keys from nested JSON paths using `LookupKeyPath` configuration
+4. Configure fallback behaviour when the enrichment source returns null or the lookup key is missing
+5. Verify that enrichment preserves all existing payload fields without overwriting
+
+---
+
 ## Key Types
 
 ```csharp
@@ -39,160 +49,36 @@ public interface IEnrichmentSource
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### Exercise 1: Merge external data at target path
+> 💻 Run the lab tests to see each Content Enricher concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var source = Substitute.For<IEnrichmentSource>();
-source.FetchAsync("CUST-1", Arg.Any<CancellationToken>())
-    .Returns(JsonNode.Parse("""{"name":"Alice","tier":"Gold"}"""));
-
-var options = Options.Create(new ContentEnricherOptions
-{
-    EndpointUrlTemplate = "https://api.example.com/customers/{key}",
-    LookupKeyPath = "customerId",
-    MergeTargetPath = "customer",
-});
-
-var enricher = new ContentEnricher(
-    source, options, NullLogger<ContentEnricher>.Instance);
-
-var payload = """{"orderId":"ORD-1","customerId":"CUST-1","total":100}""";
-
-var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
-
-using var doc = JsonDocument.Parse(result);
-Assert.That(doc.RootElement.GetProperty("orderId").GetString(), Is.EqualTo("ORD-1"));
-Assert.That(
-    doc.RootElement.GetProperty("customer").GetProperty("name").GetString(),
-    Is.EqualTo("Alice"));
-Assert.That(
-    doc.RootElement.GetProperty("customer").GetProperty("tier").GetString(),
-    Is.EqualTo("Gold"));
-```
-
-### Exercise 2: Nested lookup key path extracts correct value
-
-```csharp
-var source = Substitute.For<IEnrichmentSource>();
-source.FetchAsync("ADDR-7", Arg.Any<CancellationToken>())
-    .Returns(JsonNode.Parse("""{"city":"Seattle","zip":"98101"}"""));
-
-var options = Options.Create(new ContentEnricherOptions
-{
-    EndpointUrlTemplate = "https://api.example.com/addresses/{key}",
-    LookupKeyPath = "order.addressId",
-    MergeTargetPath = "shippingAddress",
-});
-
-var enricher = new ContentEnricher(
-    source, options, NullLogger<ContentEnricher>.Instance);
-
-var payload = """{"order":{"id":"ORD-2","addressId":"ADDR-7"}}""";
-
-var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
-
-using var doc = JsonDocument.Parse(result);
-Assert.That(
-    doc.RootElement.GetProperty("shippingAddress").GetProperty("city").GetString(),
-    Is.EqualTo("Seattle"));
-```
-
-### Exercise 3: Missing lookup key with fallback returns original
-
-```csharp
-var source = Substitute.For<IEnrichmentSource>();
-
-var options = Options.Create(new ContentEnricherOptions
-{
-    EndpointUrlTemplate = "https://api.example.com/{key}",
-    LookupKeyPath = "nonExistentField",
-    MergeTargetPath = "extra",
-    FallbackOnFailure = true,
-});
-
-var enricher = new ContentEnricher(
-    source, options, NullLogger<ContentEnricher>.Instance);
-
-var payload = """{"id":"X"}""";
-
-var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
-
-using var doc = JsonDocument.Parse(result);
-Assert.That(doc.RootElement.GetProperty("id").GetString(), Is.EqualTo("X"));
-await source.DidNotReceive().FetchAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-```
-
-### Exercise 4: Source returns null — fallback value merged
-
-```csharp
-var source = Substitute.For<IEnrichmentSource>();
-source.FetchAsync("KEY-1", Arg.Any<CancellationToken>())
-    .Returns((JsonNode?)null);
-
-var options = Options.Create(new ContentEnricherOptions
-{
-    EndpointUrlTemplate = "https://api.example.com/{key}",
-    LookupKeyPath = "key",
-    MergeTargetPath = "extra",
-    FallbackOnFailure = true,
-    FallbackValue = """{"status":"unknown"}""",
-});
-
-var enricher = new ContentEnricher(
-    source, options, NullLogger<ContentEnricher>.Instance);
-
-var payload = """{"key":"KEY-1"}""";
-
-var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
-
-using var doc = JsonDocument.Parse(result);
-Assert.That(
-    doc.RootElement.GetProperty("extra").GetProperty("status").GetString(),
-    Is.EqualTo("unknown"));
-```
-
-### Exercise 5: Enrichment preserves all existing fields
-
-```csharp
-var source = Substitute.For<IEnrichmentSource>();
-source.FetchAsync("C-1", Arg.Any<CancellationToken>())
-    .Returns(JsonNode.Parse("""{"loyalty":true}"""));
-
-var options = Options.Create(new ContentEnricherOptions
-{
-    EndpointUrlTemplate = "https://api.example.com/{key}",
-    LookupKeyPath = "cid",
-    MergeTargetPath = "loyalty",
-});
-
-var enricher = new ContentEnricher(
-    source, options, NullLogger<ContentEnricher>.Instance);
-
-var payload = """{"cid":"C-1","amount":50,"currency":"USD"}""";
-
-var result = await enricher.EnrichAsync(payload, Guid.NewGuid());
-
-using var doc = JsonDocument.Parse(result);
-Assert.That(doc.RootElement.GetProperty("cid").GetString(), Is.EqualTo("C-1"));
-Assert.That(doc.RootElement.GetProperty("amount").GetInt32(), Is.EqualTo(50));
-Assert.That(doc.RootElement.GetProperty("currency").GetString(), Is.EqualTo("USD"));
-```
-
----
-
-## Lab
-
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial18/Lab.cs`](../tests/TutorialLabs/Tutorial18/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Enrich_MergesExternalData` | Merge external data at a target path |
+| 2 | `Enrich_NestedLookup_ExtractsCorrectKey` | Nested lookup key path extracts correct value |
+| 3 | `Enrich_SourceReturnsNull_UsesFallback` | Source returns null — fallback value merged |
+| 4 | `Enrich_MissingLookupKey_FallsBack` | Missing lookup key with fallback returns gracefully |
+| 5 | `Enrich_MissingLookupKey_ThrowsWhenNoFallback` | Missing lookup key without fallback throws |
+| 6 | `Enrich_E2E_PublishEnrichedToNatsEndpoint` | End-to-end enrich and publish via real NATS |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial18.Lab"
 ```
 
-## Exam
+---
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial18/Exam.cs`](../tests/TutorialLabs/Tutorial18/Exam.cs)
+## Exam — Assessment Challenges
+
+> 🎯 Prove you can apply the Content Enricher pattern in realistic, end-to-end scenarios.
+> Each challenge combines multiple concepts and uses a business-like domain.
+
+| # | Challenge | Difficulty |
+|---|-----------|------------|
+| 1 | `Starter_DeepNestedMerge_EnrichesAtNestedPath` | 🟢 Starter |
+| 2 | `Intermediate_NumericLookupKey_ExtractsCorrectly` | 🟡 Intermediate |
+| 3 | `Advanced_BatchEnrichment_MultipleMessagesPublished` | 🔴 Advanced |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial18.Exam"

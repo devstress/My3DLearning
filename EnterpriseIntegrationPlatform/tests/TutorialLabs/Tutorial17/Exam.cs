@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 17 – Normalizer (Exam)
+// Tutorial 17 – Normalizer (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: XML with repeated elements (arrays), CSV with custom
-// delimiter, and multi-format batch normalization via MockEndpoint.
+// PURPOSE: Prove you can apply the Normalizer pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — XML with repeated elements produces JSON arrays
+//   🟡 Intermediate — CSV with custom semicolon delimiter parses correctly
+//   🔴 Advanced     — Multi-format batch normalization and publish via MockEndpoint
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,8 +30,18 @@ namespace TutorialLabs.Tutorial17;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — XML repeated elements produce JSON arrays ──────────
+    //
+    // SCENARIO: An inventory feed arrives as XML with repeated <item>
+    //           elements. After normalization, the repeated siblings must
+    //           appear as a JSON array containing all values.
+    //
+    // WHAT YOU PROVE: The normalizer correctly converts repeated XML
+    //                 sibling elements into a JSON array structure.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_XmlRepeatedElements_ProducesJsonArrays()
+    public async Task Starter_XmlRepeatedElements_ProducesJsonArrays()
     {
         var normalizer = new MessageNormalizer(
             Options.Create(new NormalizerOptions()),
@@ -36,8 +59,18 @@ public sealed class Exam
         Assert.That(result.Payload, Does.Contain("C"));
     }
 
+    // ── 🟡 INTERMEDIATE — CSV with custom semicolon delimiter ───────────
+    //
+    // SCENARIO: A European partner sends product data as semicolon-delimited
+    //           CSV. The normalizer must be configured with CsvDelimiter = ';'
+    //           to correctly parse the fields.
+    //
+    // WHAT YOU PROVE: Custom delimiter configuration allows the normalizer
+    //                 to parse non-standard CSV formats into canonical JSON.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_CsvCustomDelimiter_ParsesCorrectly()
+    public async Task Intermediate_CsvCustomDelimiter_ParsesCorrectly()
     {
         var normalizer = new MessageNormalizer(
             Options.Create(new NormalizerOptions
@@ -57,8 +90,19 @@ public sealed class Exam
         Assert.That(result.Payload, Does.Contain("Gadget"));
     }
 
+    // ── 🔴 ADVANCED — Multi-format batch normalize and publish ──────────
+    //
+    // SCENARIO: A gateway receives messages in JSON, XML, and CSV formats
+    //           in a single batch. Each must be normalized to canonical JSON
+    //           and published to a shared topic. All three formats must be
+    //           correctly detected and the batch count verified.
+    //
+    // WHAT YOU PROVE: The normalizer handles a heterogeneous batch of
+    //                 formats, normalizes each, and publishes end-to-end.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_MultiformatBatch_NormalizeAndPublish()
+    public async Task Advanced_MultiformatBatch_NormalizeAndPublish()
     {
         await using var output = new MockEndpoint("exam-normalizer");
         var normalizer = new MessageNormalizer(

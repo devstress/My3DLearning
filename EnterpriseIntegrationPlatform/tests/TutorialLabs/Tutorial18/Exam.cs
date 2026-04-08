@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 18 – Content Enricher (Exam)
+// Tutorial 18 – Content Enricher (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: deep nested merge path, enrichment with numeric lookup key,
-// and multi-message enrichment batch verification via MockEndpoint.
+// PURPOSE: Prove you can apply the Content Enricher pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Deep nested merge path enriches at a nested JSON location
+//   🟡 Intermediate — Numeric lookup key extracted and used for enrichment
+//   🔴 Advanced     — Batch enrichment of multiple messages published via MockEndpoint
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint / MockEnrichmentSource
 // ============================================================================
 
 using System.Text.Json.Nodes;
@@ -19,8 +32,18 @@ namespace TutorialLabs.Tutorial18;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Deep nested merge at a nested path ─────────────────
+    //
+    // SCENARIO: A shipment payload contains a warehouseId nested under
+    //           "shipment". The enricher must fetch warehouse details and
+    //           merge them at "shipment.warehouseDetails".
+    //
+    // WHAT YOU PROVE: The enricher correctly extracts a nested lookup key,
+    //                 fetches external data, and merges at a deep target path.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_DeepNestedMerge_EnrichesAtNestedPath()
+    public async Task Starter_DeepNestedMerge_EnrichesAtNestedPath()
     {
         var source = new MockEnrichmentSource()
             .WithData("WH-1", """{"location":"NYC","capacity":5000}""");
@@ -43,8 +66,18 @@ public sealed class Exam
         Assert.That(result, Does.Contain("WH-1"));
     }
 
+    // ── 🟡 INTERMEDIATE — Numeric lookup key extraction ─────────────────
+    //
+    // SCENARIO: An account payload has a numeric accountId (42). The enricher
+    //           must extract the numeric value as a string key and fetch
+    //           the associated account details.
+    //
+    // WHAT YOU PROVE: The enricher handles numeric JSON values as lookup
+    //                 keys by converting them to string for the fetch call.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_NumericLookupKey_ExtractsCorrectly()
+    public async Task Intermediate_NumericLookupKey_ExtractsCorrectly()
     {
         var source = new MockEnrichmentSource()
             .WithData("42", """{"status":"active","plan":"enterprise"}""");
@@ -66,8 +99,20 @@ public sealed class Exam
         Assert.That(result, Does.Contain("enterprise"));
     }
 
+    // ── 🔴 ADVANCED — Batch enrichment of multiple messages ─────────────
+    //
+    // SCENARIO: Three order messages arrive, each with a different customerId.
+    //           Each must be enriched with the customer's name from an external
+    //           source and published to a shared topic. The batch count and
+    //           per-message content must be verified.
+    //
+    // WHAT YOU PROVE: The enricher handles a batch of messages end-to-end,
+    //                 enriching each with the correct external data and
+    //                 publishing all results faithfully.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_BatchEnrichment_MultipleMessagesPublished()
+    public async Task Advanced_BatchEnrichment_MultipleMessagesPublished()
     {
         await using var output = new MockEndpoint("exam-enricher");
 

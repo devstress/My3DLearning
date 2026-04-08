@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 19 – Content Filter (Exam)
+// Tutorial 19 – Content Filter (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: JsonPathFilterStep in a pipeline, filter with deeply nested
-// data, and multi-message filter batch verification via MockEndpoint.
+// PURPOSE: Prove you can apply the Content Filter pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — JsonPathFilterStep filters fields inside a transform pipeline
+//   🟡 Intermediate — Deeply nested filter extracts correct leaf values
+//   🔴 Advanced     — Batch filter of multiple messages published via MockEndpoint
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,8 +30,18 @@ namespace TutorialLabs.Tutorial19;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — JsonPathFilterStep filters in a pipeline ───────────
+    //
+    // SCENARIO: An order event payload contains order details, customer PII,
+    //           and internal fields. A JsonPathFilterStep in a transform
+    //           pipeline must retain only order.id and customer.name.
+    //
+    // WHAT YOU PROVE: A JsonPathFilterStep works correctly as a pipeline
+    //                 step, stripping all fields except the keep-paths.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_JsonPathFilterStep_FiltersInPipeline()
+    public async Task Starter_JsonPathFilterStep_FiltersInPipeline()
     {
         var step = new JsonPathFilterStep(new[] { "order.id", "customer.name" });
         var options = Options.Create(new TransformOptions { Enabled = true });
@@ -35,8 +58,18 @@ public sealed class Exam
         Assert.That(result.StepsApplied, Is.EqualTo(1));
     }
 
+    // ── 🟡 INTERMEDIATE — Deeply nested filter extraction ───────────────
+    //
+    // SCENARIO: A configuration payload has data nested four levels deep.
+    //           Only the leaf value at "level1.level2.level3.target" should
+    //           survive filtering; all sibling and ancestor fields are removed.
+    //
+    // WHAT YOU PROVE: The content filter correctly navigates and extracts
+    //                 deeply nested paths while stripping everything else.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_DeeplyNestedFilter_ExtractsCorrectly()
+    public async Task Intermediate_DeeplyNestedFilter_ExtractsCorrectly()
     {
         var filter = new ContentFilter(NullLogger<ContentFilter>.Instance);
 
@@ -47,8 +80,20 @@ public sealed class Exam
         Assert.That(result, Does.Not.Contain("skip"));
     }
 
+    // ── 🔴 ADVANCED — Batch filter of multiple messages ─────────────────
+    //
+    // SCENARIO: Three employee records arrive containing user, role, and
+    //           salary fields. Only user and role should survive filtering.
+    //           All filtered messages are published to a "safe-data" topic
+    //           and the batch count and content verified.
+    //
+    // WHAT YOU PROVE: The content filter handles a batch of messages
+    //                 end-to-end, stripping sensitive fields and publishing
+    //                 all results faithfully.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_BatchFilter_MultipleMessagesPublished()
+    public async Task Advanced_BatchFilter_MultipleMessagesPublished()
     {
         await using var output = new MockEndpoint("exam-filter");
         var filter = new ContentFilter(NullLogger<ContentFilter>.Instance);
