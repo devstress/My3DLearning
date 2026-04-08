@@ -171,7 +171,7 @@ public sealed class Lab
 
     // ── 3. Advanced Recipient Sources (Real NATS) ────────────────────
 
-    [Test]
+    [Test, Retry(2)] // NATS JetStream may timeout transiently in CI when creating 3 streams
     public async Task Route_MetadataRecipients_AddsDestinations()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t12-meta");
