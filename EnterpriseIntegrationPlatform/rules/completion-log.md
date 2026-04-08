@@ -4,6 +4,29 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 300 — Housekeeping: Remove placeholder tests + fix README test counts
+
+- **Date**: 2026-04-08
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Delete 4 `SampleTest.cs` placeholder files containing only `Assert.Pass()`. Fix all stale test counts in README.md.
+- **Files deleted**:
+  - `tests/UnitTests/SampleTest.cs`
+  - `tests/IntegrationTests/SampleTest.cs`
+  - `tests/ContractTests/SampleTest.cs`
+  - `tests/LoadTests/SampleTest.cs`
+- **Files modified**:
+  - `README.md` — Updated project structure section: UnitTests 969→1540, TutorialLabs 522→526, ContractTests 29→57, WorkflowTests 24→29, IntegrationTests 17→16, LoadTests 10→9. Updated "2,000+" claims to exact "2,239". Fixed grammar in production maturity section.
+  - `rules/milestones.md` — Chunk 300 marked done
+- **Test counts after**:
+  - UnitTests: 1540 (was 1541, −1 placeholder)
+  - ContractTests: 57 (was 58, −1 placeholder)
+  - IntegrationTests: 16 (was 17, −1 placeholder)
+  - LoadTests: 9 (was 10, −1 placeholder)
+  - WorkflowTests: 29 (unchanged — SampleTest.cs had real tests)
+  - BrokerAgnosticTests: 38 (unchanged)
+  - **Total: 2,239** (was 2,243, −4 placeholders)
+
 ## Chunk 251 — Final Validation
 
 - **Date**: 2026-04-08

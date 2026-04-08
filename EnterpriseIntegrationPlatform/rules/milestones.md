@@ -98,13 +98,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 > Every chunk in this phase addresses a verified gap with production-quality code
 > and new unit tests. No scaffolding, no placeholders, no conceptual work.
 
-### Chunk 300 — Housekeeping: Remove placeholder tests + fix README test counts
-
-| Status | `not-started` |
-|---|---|
-| **Goal** | Delete the 4 `SampleTest.cs` placeholder files (UnitTests, IntegrationTests, ContractTests, LoadTests — each contains only `Assert.Pass()`). Update README.md project-structure section with accurate test counts matching actual `dotnet test` output. |
-| **Scope** | Delete `tests/UnitTests/SampleTest.cs`, `tests/IntegrationTests/SampleTest.cs`, `tests/ContractTests/SampleTest.cs`, `tests/LoadTests/SampleTest.cs`. Edit `README.md` lines ~339–347 to replace stale counts (e.g. "969 tests" → actual 1541). |
-| **Acceptance** | `dotnet build` 0 warnings. All existing tests still pass (counts drop by exactly 4 placeholders). README numbers match `dotnet test` output. |
+### Chunk 300 — ✅ Done — see `rules/completion-log.md`
 
 ### Chunk 301 — NATS JetStream provider hardening
 
@@ -175,7 +169,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Next Chunk
 
-**Chunk 300** — Housekeeping: Remove placeholder tests + fix README test counts.
+**Chunk 301** — NATS JetStream provider hardening.
 
 ---
 
