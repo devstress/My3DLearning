@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
@@ -30,19 +29,19 @@ namespace EnterpriseIntegrationPlatform.Ingestion.Northguard;
 /// </remarks>
 public sealed class NorthguardConsumer : IMessageBrokerConsumer
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<NorthguardConsumer> _logger;
 
     /// <summary>Initialises a new <see cref="NorthguardConsumer"/>.</summary>
-    /// <param name="httpClient">
-    /// Pre-configured <see cref="HttpClient"/> pointing at the Northguard consume endpoint.
+    /// <param name="httpClientFactory">
+    /// Factory for creating <see cref="HttpClient"/> instances configured for the Northguard endpoint.
     /// </param>
     /// <param name="logger">Logger for diagnostics.</param>
-    public NorthguardConsumer(HttpClient httpClient, ILogger<NorthguardConsumer> logger)
+    public NorthguardConsumer(IHttpClientFactory httpClientFactory, ILogger<NorthguardConsumer> logger)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
+        ArgumentNullException.ThrowIfNull(httpClientFactory);
         ArgumentNullException.ThrowIfNull(logger);
-        _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
@@ -65,10 +64,13 @@ public sealed class NorthguardConsumer : IMessageBrokerConsumer
         {
             try
             {
+                using var client = _httpClientFactory.CreateClient(
+                    NorthguardServiceExtensions.HttpClientName);
+
                 var requestUri = $"/v1/topics/{Uri.EscapeDataString(topic)}/consume" +
                                  $"?group={Uri.EscapeDataString(consumerGroup)}&timeout=30";
 
-                var response = await _httpClient.GetAsync(requestUri, cancellationToken);
+                var response = await client.GetAsync(requestUri, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -96,12 +98,14 @@ public sealed class NorthguardConsumer : IMessageBrokerConsumer
                 await handler(envelope);
 
                 // Acknowledge the message
+                using var ackClient = _httpClientFactory.CreateClient(
+                    NorthguardServiceExtensions.HttpClientName);
                 using var ackContent = new StringContent(
                     JsonSerializer.Serialize(new { messageId = envelope.MessageId }),
                     System.Text.Encoding.UTF8,
                     "application/json");
 
-                await _httpClient.PostAsync(
+                await ackClient.PostAsync(
                     $"/v1/topics/{Uri.EscapeDataString(topic)}/ack" +
                     $"?group={Uri.EscapeDataString(consumerGroup)}",
                     ackContent,

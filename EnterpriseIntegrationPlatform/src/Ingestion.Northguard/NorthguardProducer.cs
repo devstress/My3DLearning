@@ -28,21 +28,21 @@ namespace EnterpriseIntegrationPlatform.Ingestion.Northguard;
 /// available or when running inside LinkedIn's infrastructure.
 /// </para>
 /// </remarks>
-public sealed class NorthguardProducer : IMessageBrokerProducer, IAsyncDisposable
+public sealed class NorthguardProducer : IMessageBrokerProducer
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<NorthguardProducer> _logger;
 
     /// <summary>Initialises a new <see cref="NorthguardProducer"/>.</summary>
-    /// <param name="httpClient">
-    /// Pre-configured <see cref="HttpClient"/> pointing at the Northguard ingest endpoint.
+    /// <param name="httpClientFactory">
+    /// Factory for creating <see cref="HttpClient"/> instances configured for the Northguard endpoint.
     /// </param>
     /// <param name="logger">Logger for diagnostics.</param>
-    public NorthguardProducer(HttpClient httpClient, ILogger<NorthguardProducer> logger)
+    public NorthguardProducer(IHttpClientFactory httpClientFactory, ILogger<NorthguardProducer> logger)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
+        ArgumentNullException.ThrowIfNull(httpClientFactory);
         ArgumentNullException.ThrowIfNull(logger);
-        _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
@@ -63,7 +63,8 @@ public sealed class NorthguardProducer : IMessageBrokerProducer, IAsyncDisposabl
         content.Headers.Add("X-Northguard-Key", envelope.CorrelationId.ToString());
         content.Headers.Add("X-Northguard-MessageId", envelope.MessageId.ToString());
 
-        var response = await _httpClient.PostAsync(
+        using var client = _httpClientFactory.CreateClient(NorthguardServiceExtensions.HttpClientName);
+        var response = await client.PostAsync(
             $"/v1/topics/{Uri.EscapeDataString(topic)}/produce",
             content,
             cancellationToken);
@@ -73,12 +74,5 @@ public sealed class NorthguardProducer : IMessageBrokerProducer, IAsyncDisposabl
         _logger.LogDebug(
             "Published message {MessageId} to Northguard topic {Topic} with key {Key}",
             envelope.MessageId, topic, envelope.CorrelationId);
-    }
-
-    /// <inheritdoc />
-    public ValueTask DisposeAsync()
-    {
-        _httpClient.Dispose();
-        return ValueTask.CompletedTask;
     }
 }

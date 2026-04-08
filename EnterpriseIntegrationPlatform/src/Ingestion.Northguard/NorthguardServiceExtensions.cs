@@ -9,7 +9,13 @@ namespace EnterpriseIntegrationPlatform.Ingestion.Northguard;
 public static class NorthguardServiceExtensions
 {
     /// <summary>
+    /// Client name used for <see cref="IHttpClientFactory"/> registration.
+    /// </summary>
+    internal const string HttpClientName = "Northguard";
+
+    /// <summary>
     /// Registers the Northguard message broker producer and consumer.
+    /// Uses <see cref="IHttpClientFactory"/> for proper connection pooling and DNS refresh.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="serviceUrl">
@@ -23,15 +29,11 @@ public static class NorthguardServiceExtensions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceUrl);
 
-        services.AddSingleton(_ =>
+        services.AddHttpClient(HttpClientName, client =>
         {
-            var client = new HttpClient
-            {
-                BaseAddress = new Uri(serviceUrl),
-                Timeout = TimeSpan.FromSeconds(60),
-            };
+            client.BaseAddress = new Uri(serviceUrl);
+            client.Timeout = TimeSpan.FromSeconds(60);
             client.DefaultRequestHeaders.Add("Accept", "application/octet-stream");
-            return client;
         });
 
         services.AddSingleton<IMessageBrokerProducer, NorthguardProducer>();

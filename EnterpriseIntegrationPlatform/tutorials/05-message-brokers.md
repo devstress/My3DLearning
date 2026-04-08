@@ -1,6 +1,6 @@
 # Tutorial 05 — Message Brokers
 
-Configure the three broker implementations (NATS JetStream, Kafka, Pulsar) via `BrokerOptions` and publish messages through the broker abstraction.
+Configure the five broker implementations (NATS JetStream, Kafka, Pulsar, Postgres, Northguard) via `BrokerOptions` and publish messages through the broker abstraction.
 
 > **New:** Northguard (LinkedIn's Kafka replacement) is now available as a fifth broker.
 > See [Northguard Scenarios](#northguard--when-to-use-it) below for guidance on when to choose it.
