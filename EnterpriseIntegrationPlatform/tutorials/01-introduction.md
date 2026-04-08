@@ -2,11 +2,20 @@
 
 Enterprise integration connects applications through messaging. This platform implements 65+ EIP patterns in .NET 10.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Create an `IntegrationEnvelope<T>` with auto-generated identity fields
+2. Send messages through a `PointToPointChannel` (queue semantics — one consumer)
+3. Fan out messages through a `PublishSubscribeChannel` (every subscriber receives)
+4. Wire multi-hop pipelines across channels
+5. Build causation chains that track parent→child message lineage
+
 ## Key Types
 
 ```csharp
-// The universal message wrapper — every message in the platform is an IntegrationEnvelope<T>
-// src/Contracts/IntegrationEnvelope.cs
+// src/Contracts/IntegrationEnvelope.cs — the universal message wrapper
 public record IntegrationEnvelope<T>
 {
     public Guid MessageId { get; init; }
@@ -21,7 +30,6 @@ public record IntegrationEnvelope<T>
     public IReadOnlyDictionary<string, string> Metadata { get; init; }
 }
 
-// Publish and consume via broker abstractions
 // src/Ingestion/IMessageBrokerProducer.cs
 public interface IMessageBrokerProducer
 {
@@ -34,101 +42,57 @@ public interface IMessageBrokerConsumer : IAsyncDisposable
     Task SubscribeAsync<T>(string topic, Func<IntegrationEnvelope<T>, Task> handler, CancellationToken ct = default);
 }
 
-// Real channels that wrap the broker interfaces:
-// PointToPointChannel — queue semantics, one consumer per message
-// PublishSubscribeChannel — fan-out, every subscriber gets every message
+// src/Ingestion/Channels/PointToPointChannel.cs — queue semantics
+// src/Ingestion/Channels/PublishSubscribeChannel.cs — fan-out delivery
 ```
 
-## Exercises
+---
 
-### 1. Send a command through a real PointToPointChannel
+## Lab — Guided Practice
 
-```csharp
-var broker = new MockEndpoint("broker");
-var channel = new PointToPointChannel(broker, broker, NullLogger<PointToPointChannel>.Instance);
+> **Purpose:** Run each test, read the code, understand how channels and envelopes work
+> with a real NATS JetStream broker.
 
-var order = IntegrationEnvelope<string>.Create(
-    "PlaceOrder:ORD-001", "WebApp", "order.place") with
-{
-    Intent = MessageIntent.Command,
-};
-await channel.SendAsync(order, "orders-queue", CancellationToken.None);
+The lab demonstrates each concept step by step using `NatsBrokerEndpoint` (real NATS
+via Aspire). Each test focuses on **one concept** — run them in order.
 
-// The channel published to the broker — message arrived
-broker.AssertReceivedOnTopic("orders-queue", 1);
-```
+| # | Test | Concept |
+|---|------|---------|
+| 1 | `PointToPoint_SendAndReceive_MessageFlowsThroughChannel` | Send a command via P2P, verify delivery |
+| 2 | `PubSub_MultipleSubscribers_AllReceiveFanOut` | Fan-out event to two subscribers |
+| 3 | `PointToPoint_MultipleMessages_AllDeliveredInSequence` | Batch of 5 messages in sequence |
+| 4 | `PointToPoint_DomainObject_FlowsThroughChannel` | Typed record `OrderPayload` through P2P |
+| 5 | `ChannelHop_P2PToHandler_ThenPubSubFanOut` | P2P → enrichment handler → PubSub hop |
+| 6 | `PubSub_CausationChain_PreservedThroughChannelHops` | Causation chain across channels |
 
-### 2. Subscribe and receive through a real channel
-
-```csharp
-IntegrationEnvelope<string>? received = null;
-await channel.ReceiveAsync<string>("orders-queue", "processor",
-    msg => { received = msg; return Task.CompletedTask; }, CancellationToken.None);
-
-await broker.SendAsync(order);
-// Handler was invoked — received is now populated
-```
-
-### 3. Fan-out with PublishSubscribeChannel
-
-```csharp
-var channel = new PublishSubscribeChannel(broker, broker, NullLogger<PublishSubscribeChannel>.Instance);
-
-await channel.SubscribeAsync<string>("events-topic", "audit-service",
-    msg => { /* audit */ return Task.CompletedTask; }, CancellationToken.None);
-await channel.SubscribeAsync<string>("events-topic", "notification-service",
-    msg => { /* notify */ return Task.CompletedTask; }, CancellationToken.None);
-
-await channel.PublishAsync(evt, "events-topic", CancellationToken.None);
-// Both subscribers receive the message
-```
-
-### 4. Multi-hop pipeline: P2P → handler → PubSub
-
-```csharp
-// Handler receives from P2P, enriches, and publishes to PubSub
-await inputChannel.ReceiveAsync<string>("ingest-queue", "enricher",
-    async msg =>
-    {
-        var enriched = msg with
-        {
-            Metadata = new Dictionary<string, string> { ["enriched"] = "true" },
-        };
-        await fanoutChannel.PublishAsync(enriched, "enriched-events", CancellationToken.None);
-    }, CancellationToken.None);
-```
-
-### 5. Causation chain through real channels
-
-```csharp
-var command = IntegrationEnvelope<string>.Create("CreateUser", "WebApp", "user.create") with
-{
-    Intent = MessageIntent.Command,
-};
-var evt = IntegrationEnvelope<string>.Create("UserCreated", "UserService", "user.created",
-    correlationId: command.CorrelationId, causationId: command.MessageId) with
-{
-    Intent = MessageIntent.Event,
-};
-// Both flow through real channels — causation chain preserved
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial01/Lab.cs`](../tests/TutorialLabs/Tutorial01/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial01/Lab.cs`](../tests/TutorialLabs/Tutorial01/Lab.cs)
 
 ```bash
 dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial01.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial01/Exam.cs`](../tests/TutorialLabs/Tutorial01/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_CommandToEvent_SingleChannelHop` | 🟢 Starter | CommandToEvent — SingleChannelHop |
+| 2 | `Intermediate_FanOutPipeline_MultipleDownstreamChannels` | 🟡 Intermediate | FanOutPipeline — MultipleDownstreamChannels |
+| 3 | `Advanced_ImmutableEnrichment_OriginalAndEnriched_SeparateChannels` | 🔴 Advanced | ImmutableEnrichment — OriginalAndEnriched SeparateChannels |
+
+> 💻 [`tests/TutorialLabs/Tutorial01/Exam.cs`](../tests/TutorialLabs/Tutorial01/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial01.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial01.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial01.ExamAnswers"
+```
 ---
 
 **Next: [Tutorial 02 — Setting Up Your Environment →](02-environment-setup.md)**

@@ -1,10 +1,19 @@
 // ============================================================================
-// Tutorial 27 – Resequencer (Lab)
+// Tutorial 27 – Resequencer (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Resequencer.
-// Real Integrations: MessageResequencer buffers out-of-order messages, releases
-// in sequence, then publishes results to NatsBrokerEndpoint (real NATS
-// JetStream via Aspire).
+// PURPOSE: Run each test in order to see how the Resequencer pattern buffers
+//          out-of-order messages and releases them in correct sequence.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Accept_InOrder_ReleasesAllWhenComplete             — complete in-order sequence releases all
+//   2. Accept_OutOfOrder_ReleasesInCorrectSequence        — out-of-order arrivals released in order
+//   3. Accept_DuplicateSequenceNumber_IsIgnored           — duplicate sequence numbers ignored
+//   4. Accept_MissingSequenceInfo_ThrowsArgumentException — missing metadata throws ArgumentException
+//   5. ReleaseOnTimeout_IncompleteSequence_ReleasesBuffered — timeout releases buffered in order
+//   6. ReleaseOnTimeout_UnknownCorrelation_ReturnsEmpty   — unknown correlation returns empty
+//   7. ActiveSequenceCount_TracksBufferedSequences        — tracks number of open sequences
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

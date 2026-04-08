@@ -1,10 +1,19 @@
 // ============================================================================
-// Tutorial 34 – HTTP Connector (Exam)
+// Tutorial 34 – HTTP Connector (Exam · Fill in the Blanks)
 // ============================================================================
-// EIP Pattern: Connector
-// E2E: HttpConnectorAdapter send with custom destination, token caching
-//      lifecycle, and multiple independent connectors with MockEndpoint.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — send to custom destination_ publishes result
+//   🟡 Intermediate  — token caching lifecycle
+//   🔴 Advanced      — multiple connectors_ independent results
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
+
 using System.Text.Json;
 using EnterpriseIntegrationPlatform.Connector.Http;
 using EnterpriseIntegrationPlatform.Connectors;
@@ -16,41 +25,42 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial34;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_SendToCustomDestination_PublishesResult()
+    public async Task Starter_SendToCustomDestination_PublishesResult()
     {
         await using var output = new MockEndpoint("exam-http-dest");
-        var http = new MockHttpConnector()
-            .WithResponse<JsonElement>("/api/orders", JsonDocument.Parse("{\"id\":1}").RootElement);
+        // TODO: Create a MockHttpConnector with appropriate configuration
+        dynamic http = null!;
 
-        var adapter = new HttpConnectorAdapter(
-            "order-http", http,
-            Options.Create(new HttpConnectorOptions { BaseUrl = "http://orders.api" }),
-            NullLogger<HttpConnectorAdapter>.Instance);
+        // TODO: Create a HttpConnectorAdapter with appropriate configuration
+        dynamic adapter = null!;
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "{\"item\":\"widget\"}", "shop", "Order.Create");
-        var result = await adapter.SendAsync(
-            envelope, new ConnectorSendOptions { Destination = "/api/orders" });
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: var result = await adapter.SendAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.Success, Is.True);
         Assert.That(result.ConnectorName, Is.EqualTo("order-http"));
 
-        await output.PublishAsync(envelope, "order-results", default);
+        // TODO: await output.PublishAsync(...)
         output.AssertReceivedOnTopic("order-results", 1);
     }
 
     [Test]
-    public async Task Challenge2_TokenCachingLifecycle()
+    public async Task Intermediate_TokenCachingLifecycle()
     {
         await using var output = new MockEndpoint("exam-token");
-        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
-        var cache = new InMemoryTokenCache(time);
+        // TODO: Create a FakeTimeProvider with appropriate configuration
+        dynamic time = null!;
+        // TODO: Create a InMemoryTokenCache with appropriate configuration
+        dynamic cache = null!;
 
         cache.SetToken("auth-endpoint", "token-abc", TimeSpan.FromSeconds(30));
         Assert.That(cache.TryGetToken("auth-endpoint", out var t1), Is.True);
@@ -63,32 +73,33 @@ public sealed class Exam
         Assert.That(cache.TryGetToken("auth-endpoint", out var t2), Is.True);
         Assert.That(t2, Is.EqualTo("token-xyz"));
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "token-lifecycle-ok", "cache", "TokenStatus");
-        await output.PublishAsync(envelope, "token-events", default);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: await output.PublishAsync(...)
         output.AssertReceivedOnTopic("token-events", 1);
     }
 
     [Test]
-    public async Task Challenge3_MultipleConnectors_IndependentResults()
+    public async Task Advanced_MultipleConnectors_IndependentResults()
     {
         await using var output = new MockEndpoint("exam-multi");
         var connectors = new[] { "api-a", "api-b" };
 
         foreach (var name in connectors)
         {
-            var http = new MockHttpConnector();
+            // TODO: Create a MockHttpConnector with appropriate configuration
+            dynamic http = null!;
 
-            var adapter = new HttpConnectorAdapter(
-                name, http,
-                Options.Create(new HttpConnectorOptions { BaseUrl = $"http://{name}.local" }),
-                NullLogger<HttpConnectorAdapter>.Instance);
+            // TODO: Create a HttpConnectorAdapter with appropriate configuration
+            dynamic adapter = null!;
 
-            var envelope = IntegrationEnvelope<string>.Create($"msg-{name}", "test", "Send");
-            var result = await adapter.SendAsync(envelope, new ConnectorSendOptions());
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic envelope = null!;
+            // TODO: var result = await adapter.SendAsync(...)
+            dynamic result = null!;
             Assert.That(result.Success, Is.True);
 
-            await output.PublishAsync(envelope, $"results.{name}", default);
+            // TODO: await output.PublishAsync(...)
         }
 
         output.AssertReceivedCount(2);
@@ -96,3 +107,4 @@ public sealed class Exam
         output.AssertReceivedOnTopic("results.api-b", 1);
     }
 }
+#endif

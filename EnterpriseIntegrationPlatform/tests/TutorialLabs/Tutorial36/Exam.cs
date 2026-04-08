@@ -1,9 +1,18 @@
 // ============================================================================
-// Tutorial 36 – Email Connector (Exam)
+// Tutorial 36 – Email Connector (Exam · Fill in the Blanks)
 // ============================================================================
-// E2E challenges: ordered SMTP lifecycle, multi-recipient MIME verification,
-// and MockEndpoint-driven custom subject template.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — full smtp lifecycle_ connect auth send disconnect
+//   🟡 Intermediate  — multi recipient_ mime message contains all addresses
+//   🔴 Advanced      — mock endpoint_ custom subject template
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Connector.Email;
 using EnterpriseIntegrationPlatform.Contracts;
@@ -13,51 +22,43 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial36;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_FullSmtpLifecycle_ConnectAuthSendDisconnect()
+    public async Task Starter_FullSmtpLifecycle_ConnectAuthSendDisconnect()
     {
-        var smtp = new MockSmtpClient();
-        var connector = new EmailConnector(smtp,
-            Options.Create(new EmailConnectorOptions
-            {
-                SmtpHost = "smtp.lifecycle.com", SmtpPort = 587, UseTls = true,
-                Username = "admin", Password = "s3cret",
-                DefaultFrom = "system@lifecycle.com",
-            }),
-            NullLogger<EmailConnector>.Instance);
+        // TODO: Create a MockSmtpClient with appropriate configuration
+        dynamic smtp = null!;
+        // TODO: Create a EmailConnector with appropriate configuration
+        dynamic connector = null!;
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            "Order confirmed", "OrderSvc", "order.confirmed");
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
 
-        await connector.SendAsync(
-            envelope, "customer@example.com", "Order Update", p => p, CancellationToken.None);
+        // TODO: await connector.SendAsync(...)
 
         smtp.AssertLifecycleOrder();
     }
 
     [Test]
-    public async Task Challenge2_MultiRecipient_MimeMessageContainsAllAddresses()
+    public async Task Intermediate_MultiRecipient_MimeMessageContainsAllAddresses()
     {
-        var smtp = new MockSmtpClient();
+        // TODO: Create a MockSmtpClient with appropriate configuration
+        dynamic smtp = null!;
 
-        var connector = new EmailConnector(smtp,
-            Options.Create(new EmailConnectorOptions
-            {
-                SmtpHost = "smtp.multi.com", SmtpPort = 587, UseTls = true,
-                Username = "user", Password = "pass",
-                DefaultFrom = "noreply@multi.com",
-            }),
-            NullLogger<EmailConnector>.Instance);
+        // TODO: Create a EmailConnector with appropriate configuration
+        dynamic connector = null!;
 
-        var envelope = IntegrationEnvelope<string>.Create("Alert body", "AlertSvc", "system.alert");
-        var recipients = new List<string> { "admin@multi.com", "ops@multi.com", "dev@multi.com" };
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: Create a List with appropriate configuration
+        dynamic recipients = null!;
 
-        await connector.SendAsync(envelope, recipients, "System Alert", p => p, CancellationToken.None);
+        // TODO: await connector.SendAsync(...)
 
         var captured = smtp.LastSentMessage;
         Assert.That(captured, Is.Not.Null);
@@ -66,20 +67,14 @@ public sealed class Exam
     }
 
     [Test]
-    public async Task Challenge3_MockEndpoint_CustomSubjectTemplate()
+    public async Task Advanced_MockEndpoint_CustomSubjectTemplate()
     {
         await using var input = new MockEndpoint("exam-email-in");
-        var smtp = new MockSmtpClient();
+        // TODO: Create a MockSmtpClient with appropriate configuration
+        dynamic smtp = null!;
 
-        var connector = new EmailConnector(smtp,
-            Options.Create(new EmailConnectorOptions
-            {
-                SmtpHost = "smtp.tpl.com", SmtpPort = 587, UseTls = true,
-                Username = "user", Password = "pass",
-                DefaultFrom = "noreply@tpl.com",
-                DefaultSubjectTemplate = "[EIP] {MessageType} notification",
-            }),
-            NullLogger<EmailConnector>.Instance);
+        // TODO: Create a EmailConnector with appropriate configuration
+        dynamic connector = null!;
 
         await input.SubscribeAsync<string>("email-topic", "email-group",
             async envelope =>
@@ -87,11 +82,13 @@ public sealed class Exam
                 await connector.SendAsync(envelope, "dest@tpl.com", null, p => p, CancellationToken.None);
             });
 
-        var env = IntegrationEnvelope<string>.Create("Body", "Svc", "invoice.created");
-        await input.SendAsync(env);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic env = null!;
+        // TODO: await input.SendAsync(...)
 
         var captured = smtp.LastSentMessage;
         Assert.That(captured, Is.Not.Null);
         Assert.That(captured!.Subject, Is.EqualTo("[EIP] invoice.created notification"));
     }
 }
+#endif

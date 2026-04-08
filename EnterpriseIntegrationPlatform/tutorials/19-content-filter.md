@@ -4,6 +4,17 @@ Strip payloads down to only the fields downstream consumers need using `IContent
 
 ---
 
+## Learning Objectives
+
+1. Understand the Content Filter pattern and how it strips payloads to only needed fields
+2. Use `ContentFilter` and `JsonPathFilterStep` to retain specified JSON paths
+3. Verify that nested paths preserve parent structure while removing unneeded siblings
+4. Confirm that missing paths are silently skipped without errors
+5. Validate error handling for empty keep-paths and non-JSON-object payloads
+6. Integrate `JsonPathFilterStep` as a step in a `TransformPipeline`
+
+---
+
 ## Key Types
 
 ```csharp
@@ -31,122 +42,46 @@ public class JsonPathFilterStep : ITransformStep
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### Exercise 1: Retain only specified top-level paths
+> 💻 Run the lab tests to see each Content Filter concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var step = new JsonPathFilterStep(new[] { "name", "age" });
-var context = new TransformContext(
-    """{"name":"Alice","age":30,"email":"a@b.com","role":"admin"}""",
-    "application/json");
-
-var result = await step.ExecuteAsync(context);
-
-using var doc = JsonDocument.Parse(result.Payload);
-Assert.That(doc.RootElement.TryGetProperty("name", out _), Is.True);
-Assert.That(doc.RootElement.TryGetProperty("age", out _), Is.True);
-Assert.That(doc.RootElement.TryGetProperty("email", out _), Is.False);
-Assert.That(doc.RootElement.TryGetProperty("role", out _), Is.False);
-```
-
-### Exercise 2: Extract nested properties
-
-```csharp
-var step = new JsonPathFilterStep(new[] { "order.id", "customer.name" });
-var payload = """
-    {
-        "order": {"id": "ORD-1", "total": 100},
-        "customer": {"name": "Bob", "email": "bob@test.com"},
-        "internal": "secret"
-    }
-    """;
-
-var context = new TransformContext(payload, "application/json");
-var result = await step.ExecuteAsync(context);
-
-using var doc = JsonDocument.Parse(result.Payload);
-Assert.That(doc.RootElement.GetProperty("order").GetProperty("id").GetString(),
-    Is.EqualTo("ORD-1"));
-Assert.That(doc.RootElement.GetProperty("customer").GetProperty("name").GetString(),
-    Is.EqualTo("Bob"));
-Assert.That(doc.RootElement.TryGetProperty("internal", out _), Is.False);
-```
-
-### Exercise 3: Missing paths are silently skipped
-
-```csharp
-var step = new JsonPathFilterStep(new[] { "name", "nonexistent" });
-var context = new TransformContext(
-    """{"name":"Alice","age":30}""", "application/json");
-
-var result = await step.ExecuteAsync(context);
-
-using var doc = JsonDocument.Parse(result.Payload);
-Assert.That(doc.RootElement.TryGetProperty("name", out _), Is.True);
-Assert.That(doc.RootElement.TryGetProperty("nonexistent", out _), Is.False);
-```
-
-### Exercise 4: Filter step inside a pipeline
-
-```csharp
-var filterStep = new JsonPathFilterStep(new[] { "order.id", "order.total" });
-var options = Options.Create(new TransformOptions());
-var pipeline = new TransformPipeline(
-    new ITransformStep[] { filterStep }, options,
-    NullLogger<TransformPipeline>.Instance);
-
-var payload = """
-    {"order":{"id":"ORD-5","total":250,"items":3},"customer":{"name":"Eve"}}
-    """.Trim();
-
-var result = await pipeline.ExecuteAsync(payload, "application/json");
-
-using var doc = JsonDocument.Parse(result.Payload);
-Assert.That(doc.RootElement.GetProperty("order").GetProperty("id").GetString(),
-    Is.EqualTo("ORD-5"));
-Assert.That(doc.RootElement.GetProperty("order").GetProperty("total").GetInt32(),
-    Is.EqualTo(250));
-Assert.That(doc.RootElement.TryGetProperty("customer", out _), Is.False);
-Assert.That(result.StepsApplied, Is.EqualTo(1));
-```
-
-### Exercise 5: ContentFilter retains only keep paths
-
-```csharp
-var filter = new ContentFilter(NullLogger<ContentFilter>.Instance);
-
-var payload = """
-    {"user":"Alice","age":30,"email":"a@b.com","role":"admin","secret":"x"}
-    """.Trim();
-
-var result = await filter.FilterAsync(payload, new[] { "user", "age" });
-
-using var doc = JsonDocument.Parse(result);
-Assert.That(doc.RootElement.TryGetProperty("user", out _), Is.True);
-Assert.That(doc.RootElement.TryGetProperty("age", out _), Is.True);
-Assert.That(doc.RootElement.TryGetProperty("email", out _), Is.False);
-Assert.That(doc.RootElement.TryGetProperty("secret", out _), Is.False);
-```
-
----
-
-## Lab
-
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial19/Lab.cs`](../tests/TutorialLabs/Tutorial19/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Filter_RetainsSpecifiedPaths` | Retain only specified top-level and nested paths |
+| 2 | `Filter_MissingPath_SkippedSilently` | Missing paths are silently skipped |
+| 3 | `Filter_NestedPaths_PreservesStructure` | Nested paths preserve parent structure |
+| 4 | `Filter_EmptyKeepPaths_ThrowsArgumentException` | Empty keep-paths throws ArgumentException |
+| 5 | `Filter_NonJsonObject_ThrowsInvalidOperation` | Non-JSON-object payload throws InvalidOperationException |
+| 6 | `Filter_E2E_PublishFilteredToNatsEndpoint` | End-to-end filter and publish via real NATS |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial19.Lab"
 ```
 
-## Exam
+---
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial19/Exam.cs`](../tests/TutorialLabs/Tutorial19/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_JsonPathFilterStep_FiltersInPipeline` | 🟢 Starter | JsonPathFilterStep — FiltersInPipeline |
+| 2 | `Intermediate_DeeplyNestedFilter_ExtractsCorrectly` | 🟡 Intermediate | DeeplyNestedFilter — ExtractsCorrectly |
+| 3 | `Advanced_BatchFilter_MultipleMessagesPublished` | 🔴 Advanced | BatchFilter — MultipleMessagesPublished |
+
+> 💻 [`tests/TutorialLabs/Tutorial19/Exam.cs`](../tests/TutorialLabs/Tutorial19/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial19.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial19.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial19.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 18 — Content Enricher](18-content-enricher.md)** | **Next: [Tutorial 20 — Splitter →](20-splitter.md)**

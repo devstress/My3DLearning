@@ -1,12 +1,24 @@
 // ============================================================================
-// Tutorial 03 – Your First Message (Lab)
+// Tutorial 03 – Your First Message (Lab · Guided Practice)
 // ============================================================================
-// EIP Patterns: Message, Message Channel (Point-to-Point, Publish-Subscribe)
-// Real Integrations: All broker tests use real NATS JetStream via Aspire.
-// Envelope anatomy tests (identity, causation, priority) are pure record
-// tests that don't need a broker. Channel tests wire PointToPointChannel
-// and PublishSubscribeChannel to NatsBrokerEndpoint for verified delivery
-// through real NATS.
+// PURPOSE: Run each test in order to see how envelopes are constructed, how
+//          metadata and lifecycle properties work, and how messages flow
+//          through real NATS JetStream channels. Read the code and comments
+//          to understand each concept before moving to the Exam.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Envelope factory — auto-generated MessageId, CorrelationId, Timestamp
+//   2. Domain object payload — typed record survives publish → receive
+//   3. Causation chain — parent→child lineage via CausationId
+//   4. Priority/Intent/SchemaVersion — defaults and `with` overrides
+//   5. Metadata — key-value pairs flow through real NATS
+//   6. Expiration — ExpiresAt + IsExpired pattern
+//   7. Sequence numbers — SequenceNumber + TotalCount for split batch tracking
+//   8. PointToPointChannel — single consumer queue delivery
+//   9. PublishSubscribeChannel — fan-out to all subscribers
+//  10. Topic routing — messages delivered to correct topics
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using NUnit.Framework;

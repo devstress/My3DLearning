@@ -1,10 +1,19 @@
 // ============================================================================
-// Tutorial 19 – Content Filter (Lab)
+// Tutorial 19 – Content Filter (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Content Filter.
-// Real Integrations: ContentFilter keeping only specified JSON paths, verify
-// filtered payload, and publish results via NatsBrokerEndpoint
-// (real NATS JetStream via Aspire).
+// PURPOSE: Run each test in order to see how the Content Filter pattern
+//          strips payloads down to only the fields downstream consumers
+//          need using IContentFilter and JsonPathFilterStep.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Filter_RetainsSpecifiedPaths                   — retain only specified top-level and nested paths
+//   2. Filter_MissingPath_SkippedSilently             — missing paths are silently skipped
+//   3. Filter_NestedPaths_PreservesStructure           — nested paths preserve parent structure
+//   4. Filter_EmptyKeepPaths_ThrowsArgumentException   — empty keep-paths throws ArgumentException
+//   5. Filter_NonJsonObject_ThrowsInvalidOperation     — non-JSON-object payload throws InvalidOperationException
+//   6. Filter_E2E_PublishFilteredToNatsEndpoint        — end-to-end filter and publish via real NATS
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

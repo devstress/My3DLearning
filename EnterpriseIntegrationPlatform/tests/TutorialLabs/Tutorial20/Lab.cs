@@ -1,10 +1,20 @@
 // ============================================================================
-// Tutorial 20 – Splitter (Lab)
+// Tutorial 20 – Splitter (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Splitter.
-// Real Integrations: MessageSplitter with FuncSplitStrategy + NatsBrokerEndpoint
-// (real NATS JetStream via Aspire) to capture split messages, verify
-// SequenceNumber, TotalCount, and CausationId.
+// PURPOSE: Run each test in order to see how the Splitter pattern breaks
+//          composite messages into individual items using IMessageSplitter<T>
+//          with pluggable ISplitStrategy<T>.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Split_ProducesCorrectItemCount           — split a composite string and verify item count
+//   2. Split_PreservesCorrelationId             — split envelopes inherit the source CorrelationId
+//   3. Split_SetsCausationIdToSourceMessageId   — each split envelope's CausationId equals source MessageId
+//   4. Split_SequenceNumbers_AreZeroBased       — split envelopes have zero-based SequenceNumber values
+//   5. Split_TotalCount_MatchesItemCount        — every split envelope's TotalCount matches item count
+//   6. Split_EmptyResult_ReturnsZeroItems       — empty strategy result produces zero items and no publishes
+//   7. Split_SourceMessageId_CapturedInResult   — SplitResult captures the original source MessageId
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

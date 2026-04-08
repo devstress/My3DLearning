@@ -2,6 +2,16 @@
 
 Manage platform configuration with environment overrides, feature flags, and hot reload.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Set, get, update, and delete configuration values via the config store
+2. Observe automatic version increments on configuration updates
+3. List configuration entries filtered by environment
+4. Evaluate feature flags with tenant-targeted rollout
+5. Retrieve feature flag variants and publish routing decisions
+
 ## Key Types
 
 ```csharp
@@ -65,99 +75,50 @@ public sealed record ConfigurationChange(
 public enum ConfigurationChangeType { Created, Updated, Deleted }
 ```
 
-## Exercises
+---
 
-### 1. ConfigurationEntry — Defaults EnvironmentAndVersion
+## Lab — Guided Practice
 
-```csharp
-var entry = new ConfigurationEntry("Database:Host", "localhost");
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-Assert.That(entry.Key, Is.EqualTo("Database:Host"));
-Assert.That(entry.Value, Is.EqualTo("localhost"));
-Assert.That(entry.Environment, Is.EqualTo("default"));
-Assert.That(entry.Version, Is.EqualTo(1));
-Assert.That(entry.ModifiedBy, Is.Null);
-Assert.That(entry.LastModified, Is.Not.EqualTo(default(DateTimeOffset)));
-```
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `SetAndGet_PublishConfigValueToNatsBrokerEndpoint` | Set and get config value via broker |
+| 2 | `UpdateConfig_VersionIncrements_PublishChange` | Config update increments version |
+| 3 | `DeleteConfig_PublishDeletionNotification` | Delete config publishes notification |
+| 4 | `ListByEnvironment_PublishFilteredEntries` | List config entries filtered by environment |
+| 5 | `FeatureFlag_SetAndEvaluate_PublishDecision` | Feature flag evaluation and publish |
+| 6 | `FeatureFlag_TargetTenant_PublishRouting` | Feature flag tenant-targeted routing |
+| 7 | `FeatureFlag_GetVariant_PublishVariantValue` | Feature flag variant retrieval |
 
-### 2. InMemoryConfigurationStore — SetAndGet Roundtrip
-
-```csharp
-using var notifier = new ConfigurationChangeNotifier();
-var store = new InMemoryConfigurationStore(notifier);
-
-var entry = new ConfigurationEntry("App:Name", "MyApp");
-await store.SetAsync(entry);
-
-var retrieved = await store.GetAsync("App:Name");
-
-Assert.That(retrieved, Is.Not.Null);
-Assert.That(retrieved!.Value, Is.EqualTo("MyApp"));
-Assert.That(retrieved.Version, Is.EqualTo(1));
-```
-
-### 3. InMemoryConfigurationStore — SetDeleteGet ReturnsNull
-
-```csharp
-using var notifier = new ConfigurationChangeNotifier();
-var store = new InMemoryConfigurationStore(notifier);
-
-await store.SetAsync(new ConfigurationEntry("Temp:Key", "value"));
-var deleted = await store.DeleteAsync("Temp:Key");
-var retrieved = await store.GetAsync("Temp:Key");
-
-Assert.That(deleted, Is.True);
-Assert.That(retrieved, Is.Null);
-```
-
-### 4. InMemoryConfigurationStore — List ReturnsAllEntries
-
-```csharp
-using var notifier = new ConfigurationChangeNotifier();
-var store = new InMemoryConfigurationStore(notifier);
-
-await store.SetAsync(new ConfigurationEntry("Key1", "Val1", "dev"));
-await store.SetAsync(new ConfigurationEntry("Key2", "Val2", "dev"));
-await store.SetAsync(new ConfigurationEntry("Key3", "Val3", "prod"));
-
-var allEntries = await store.ListAsync();
-Assert.That(allEntries, Has.Count.EqualTo(3));
-
-var devEntries = await store.ListAsync("dev");
-Assert.That(devEntries, Has.Count.EqualTo(2));
-```
-
-### 5. FeatureFlag — RecordShape
-
-```csharp
-var flag = new FeatureFlag(
-    Name: "NewCheckout",
-    IsEnabled: true,
-    Variants: new Dictionary<string, string> { ["control"] = "v1", ["treatment"] = "v2" },
-    RolloutPercentage: 50,
-    TargetTenants: new List<string> { "tenant-a", "tenant-b" });
-
-Assert.That(flag.Name, Is.EqualTo("NewCheckout"));
-Assert.That(flag.IsEnabled, Is.True);
-Assert.That(flag.Variants, Has.Count.EqualTo(2));
-Assert.That(flag.RolloutPercentage, Is.EqualTo(50));
-Assert.That(flag.TargetTenants, Has.Count.EqualTo(2));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial42/Lab.cs`](../tests/TutorialLabs/Tutorial42/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial42/Lab.cs`](../tests/TutorialLabs/Tutorial42/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial42.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial42.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial42/Exam.cs`](../tests/TutorialLabs/Tutorial42/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_MultiEnvironmentConfigDrivenRouting` | 🟢 Starter | Multi-environment config-driven routing |
+| 2 | `Challenge2_FeatureFlagRolloutAndTenantTargeting` | 🟡 Intermediate | Feature flag rollout and tenant targeting |
+| 3 | `Challenge3_ConfigChangeNotification_PublishToNatsBrokerEndpoint` | 🔴 Advanced | Config change notification via NatsBrokerEndpoint |
+
+> 💻 [`tests/TutorialLabs/Tutorial42/Exam.cs`](../tests/TutorialLabs/Tutorial42/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial42.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial42.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial42.ExamAnswers"
 ```
 
 ---

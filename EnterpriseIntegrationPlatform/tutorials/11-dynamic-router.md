@@ -4,6 +4,17 @@ A router whose routing table is built at runtime as downstream participants regi
 
 ---
 
+## Learning Objectives
+
+1. Understand how a Dynamic Router builds its routing table at runtime via a control channel
+2. Register and unregister routes so that messages reach the correct destination topic
+3. Verify fallback behaviour when no route matches an incoming message
+4. Inspect the routing table snapshot to confirm registration state
+5. Apply case-insensitive matching so condition keys are compared without regard to case
+6. Combine multiple participants, route replacement, and case-insensitive routing in end-to-end scenarios
+
+---
+
 ## Key Types
 
 ```csharp
@@ -48,142 +59,48 @@ public sealed record DynamicRouteEntry(
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Register a route and route a matching message
+> 💡 The Lab lets you run pre-written tests one at a time so you can observe each
+> Dynamic Router concept in isolation. Read each test, predict the outcome,
+> then run it to confirm your understanding.
 
-```csharp
-var options = Options.Create(new DynamicRouterOptions
-{
-    ConditionField = "MessageType",
-    FallbackTopic = "unmatched-topic",
-});
-
-var router = new DynamicRouter(producer, options, NullLogger<DynamicRouter>.Instance);
-
-await router.RegisterAsync("order.created", "orders-topic", "OrderService");
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "order-data", "OrderService", "order.created");
-
-var decision = await router.RouteAsync(envelope);
-
-Assert.That(decision.Destination, Is.EqualTo("orders-topic"));
-Assert.That(decision.IsFallback, Is.False);
-Assert.That(decision.MatchedEntry, Is.Not.Null);
-Assert.That(decision.MatchedEntry!.ParticipantId, Is.EqualTo("OrderService"));
-Assert.That(decision.ConditionValue, Is.EqualTo("order.created"));
-```
-
-### 2. Unmatched message falls back to FallbackTopic
-
-```csharp
-var options = Options.Create(new DynamicRouterOptions
-{
-    ConditionField = "MessageType",
-    FallbackTopic = "catch-all-topic",
-});
-
-var router = new DynamicRouter(producer, options, NullLogger<DynamicRouter>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "unknown-data", "UnknownService", "unknown.event");
-
-var decision = await router.RouteAsync(envelope);
-
-Assert.That(decision.Destination, Is.EqualTo("catch-all-topic"));
-Assert.That(decision.IsFallback, Is.True);
-Assert.That(decision.MatchedEntry, Is.Null);
-```
-
-### 3. Unregister removes route — subsequent message uses fallback
-
-```csharp
-var router = new DynamicRouter(producer, options, NullLogger<DynamicRouter>.Instance);
-
-await router.RegisterAsync("order.created", "orders-topic");
-
-var removed = await router.UnregisterAsync("order.created");
-Assert.That(removed, Is.True);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "order-data", "OrderService", "order.created");
-
-var decision = await router.RouteAsync(envelope);
-Assert.That(decision.IsFallback, Is.True);
-Assert.That(decision.Destination, Is.EqualTo("fallback-topic"));
-```
-
-### 4. Case-insensitive routing matches regardless of case
-
-```csharp
-var options = Options.Create(new DynamicRouterOptions
-{
-    ConditionField = "MessageType",
-    FallbackTopic = "fallback",
-    CaseInsensitive = true,
-});
-
-var router = new DynamicRouter(producer, options, NullLogger<DynamicRouter>.Instance);
-
-await router.RegisterAsync("order.created", "orders-topic");
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "data", "Service", "Order.Created");
-
-var decision = await router.RouteAsync(envelope);
-
-Assert.That(decision.Destination, Is.EqualTo("orders-topic"));
-Assert.That(decision.IsFallback, Is.False);
-```
-
-### 5. Route by metadata field
-
-```csharp
-var options = Options.Create(new DynamicRouterOptions
-{
-    ConditionField = "Metadata.region",
-    FallbackTopic = "global-topic",
-});
-
-var router = new DynamicRouter(producer, options, NullLogger<DynamicRouter>.Instance);
-
-await router.RegisterAsync("eu-west", "eu-west-topic", "EUService");
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "eu-data", "RegionalService", "data.sync") with
-{
-    Metadata = new Dictionary<string, string>
-    {
-        ["region"] = "eu-west",
-    },
-};
-
-var decision = await router.RouteAsync(envelope);
-
-Assert.That(decision.Destination, Is.EqualTo("eu-west-topic"));
-Assert.That(decision.IsFallback, Is.False);
-Assert.That(decision.MatchedEntry!.ParticipantId, Is.EqualTo("EUService"));
-```
-
----
-
-## Lab
-
-> 💻 [`tests/TutorialLabs/Tutorial11/Lab.cs`](../tests/TutorialLabs/Tutorial11/Lab.cs)
+| # | Test | Concept |
+|---|------|---------|
+| 1 | `Route_RegisteredKey_RoutesToDestination` | Register a route and verify a matching message reaches the correct topic |
+| 2 | `Route_UnregisteredKey_FallsBackToDefault` | Unmatched condition key triggers fallback routing |
+| 3 | `Route_NoMatchNoFallback_ThrowsInvalidOperation` | Missing fallback topic causes an exception |
+| 4 | `Register_UpdatesExistingRoute` | Re-registering the same key replaces the previous destination |
+| 5 | `Unregister_RemovesRoute_FallsBack` | Unregistering a key removes it so subsequent messages fall back |
+| 6 | `Unregister_NonExistentKey_ReturnsFalse` | Unregistering a key that was never registered returns false |
+| 7 | `GetRoutingTable_ReturnsSnapshot` | Inspecting the routing table after registrations |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial11.Lab"
 ```
 
-## Exam
+---
+
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_MultiParticipantTopology_RoutesCorrectly` | 🟢 Starter | MultiParticipantTopology — RoutesCorrectly |
+| 2 | `Intermediate_RouteReplacement_NewParticipantOverrides` | 🟡 Intermediate | RouteReplacement — NewParticipantOverrides |
+| 3 | `Advanced_CaseInsensitive_MatchesRegardlessOfCase` | 🔴 Advanced | CaseInsensitive — MatchesRegardlessOfCase |
 
 > 💻 [`tests/TutorialLabs/Tutorial11/Exam.cs`](../tests/TutorialLabs/Tutorial11/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial11.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial11.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial11.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 10 — Message Filter](10-message-filter.md)** | **Next: [Tutorial 12 — Recipient List →](12-recipient-list.md)**

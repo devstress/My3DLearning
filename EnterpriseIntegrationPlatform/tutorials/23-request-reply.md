@@ -4,6 +4,17 @@ Send a request over an async channel and correlate the response by `CorrelationI
 
 ---
 
+## Learning Objectives
+
+1. Understand the Request-Reply pattern and how it correlates async responses by `CorrelationId`
+2. Use `RequestReplyCorrelator<TRequest, TResponse>` to send a request and await a correlated reply
+3. Verify that the published request envelope sets `ReplyTo` and `Intent = Command`
+4. Confirm that a correlated reply is received before the timeout and the result contains the payload
+5. Validate timeout behaviour: when no reply arrives, the result has `TimedOut = true` and `Reply = null`
+6. Validate input validation: empty `RequestTopic` or `ReplyTopic` throws `ArgumentException`
+
+---
+
 ## Key Types
 
 ```csharp
@@ -41,124 +52,46 @@ public sealed class RequestReplyOptions
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### Exercise 1: RequestReplyMessage record properties
+> 💻 Run the lab tests to see each Request-Reply concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var correlationId = Guid.NewGuid();
-var msg = new RequestReplyMessage<string>(
-    "payload", "req-topic", "reply-topic", "TestSvc", "cmd.ping", correlationId);
-
-Assert.That(msg.Payload, Is.EqualTo("payload"));
-Assert.That(msg.RequestTopic, Is.EqualTo("req-topic"));
-Assert.That(msg.ReplyTopic, Is.EqualTo("reply-topic"));
-Assert.That(msg.Source, Is.EqualTo("TestSvc"));
-Assert.That(msg.MessageType, Is.EqualTo("cmd.ping"));
-Assert.That(msg.CorrelationId, Is.EqualTo(correlationId));
-```
-
-### Exercise 2: Correlator publishes request with ReplyTo set
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var consumer = Substitute.For<IMessageBrokerConsumer>();
-var options = Options.Create(new RequestReplyOptions { TimeoutMs = 500 });
-
-var correlator = new RequestReplyCorrelator<string, string>(
-    producer, consumer, options,
-    NullLogger<RequestReplyCorrelator<string, string>>.Instance);
-
-var msg = new RequestReplyMessage<string>(
-    "ping", "commands", "replies", "TestSvc", "cmd.ping");
-
-await correlator.SendAndReceiveAsync(msg);
-
-await producer.Received(1).PublishAsync(
-    Arg.Is<IntegrationEnvelope<string>>(e => e.ReplyTo == "replies"),
-    "commands",
-    Arg.Any<CancellationToken>());
-```
-
-### Exercise 3: Correlator sets intent to Command
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var consumer = Substitute.For<IMessageBrokerConsumer>();
-var options = Options.Create(new RequestReplyOptions { TimeoutMs = 500 });
-
-var correlator = new RequestReplyCorrelator<string, string>(
-    producer, consumer, options,
-    NullLogger<RequestReplyCorrelator<string, string>>.Instance);
-
-var msg = new RequestReplyMessage<string>(
-    "data", "req", "rep", "Svc", "cmd.do");
-
-await correlator.SendAndReceiveAsync(msg);
-
-await producer.Received(1).PublishAsync(
-    Arg.Is<IntegrationEnvelope<string>>(e => e.Intent == MessageIntent.Command),
-    "req",
-    Arg.Any<CancellationToken>());
-```
-
-### Exercise 4: Timeout returns TimedOut result
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var consumer = Substitute.For<IMessageBrokerConsumer>();
-var options = Options.Create(new RequestReplyOptions { TimeoutMs = 300 });
-
-var correlator = new RequestReplyCorrelator<string, string>(
-    producer, consumer, options,
-    NullLogger<RequestReplyCorrelator<string, string>>.Instance);
-
-var msg = new RequestReplyMessage<string>(
-    "request-data", "cmd-topic", "reply-topic", "Svc", "cmd.type");
-
-var result = await correlator.SendAndReceiveAsync(msg);
-
-Assert.That(result.TimedOut, Is.True);
-Assert.That(result.Reply, Is.Null);
-Assert.That(result.Duration, Is.GreaterThan(TimeSpan.Zero));
-```
-
-### Exercise 5: Empty RequestTopic throws
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var consumer = Substitute.For<IMessageBrokerConsumer>();
-var options = Options.Create(new RequestReplyOptions { TimeoutMs = 500 });
-
-var correlator = new RequestReplyCorrelator<string, string>(
-    producer, consumer, options,
-    NullLogger<RequestReplyCorrelator<string, string>>.Instance);
-
-var msg = new RequestReplyMessage<string>(
-    "data", "", "reply-topic", "Svc", "type");
-
-Assert.ThrowsAsync<ArgumentException>(
-    () => correlator.SendAndReceiveAsync(msg));
-```
-
----
-
-## Lab
-
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial23/Lab.cs`](../tests/TutorialLabs/Tutorial23/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `SendAndReceive_PublishesRequestToTopic` | Request envelope is published with CorrelationId and ReplyTo set |
+| 2 | `SendAndReceive_ReceivesCorrelatedReply` | Correlated reply is received before timeout with correct payload |
+| 3 | `SendAndReceive_TimesOut_ReturnsNullReply` | Timeout returns TimedOut = true and Reply = null |
+| 4 | `SendAndReceive_DurationIsTracked` | Duration is tracked and greater than zero on successful reply |
+| 5 | `SendAndReceive_EmptyRequestTopic_Throws` | Empty RequestTopic throws ArgumentException |
+| 6 | `SendAndReceive_EmptyReplyTopic_Throws` | Empty ReplyTopic throws ArgumentException |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial23.Lab"
 ```
 
-## Exam
+---
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial23/Exam.cs`](../tests/TutorialLabs/Tutorial23/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_RequestEnvelope_HasIntentAndReplyTo` | 🟢 Starter | RequestEnvelope — HasIntentAndReplyTo |
+| 2 | `Intermediate_ConcurrentRequests_CorrelateCorrectly` | 🟡 Intermediate | ConcurrentRequests — CorrelateCorrectly |
+| 3 | `Advanced_Timeout_DurationIsReasonable` | 🔴 Advanced | Timeout — DurationIsReasonable |
+
+> 💻 [`tests/TutorialLabs/Tutorial23/Exam.cs`](../tests/TutorialLabs/Tutorial23/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial23.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial23.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial23.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 22 — Scatter-Gather](22-scatter-gather.md)** | **Next: [Tutorial 24 — Retry Framework →](24-retry-framework.md)**

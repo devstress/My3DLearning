@@ -2,6 +2,16 @@
 
 Deliver messages as files to remote SFTP servers with connection pooling.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Configure `SftpConnectorOptions` with host, port, and credential defaults
+2. Upload, download, and list files through the SFTP connector adapter
+3. Verify that uploads create metadata sidecar files alongside data
+4. Understand connection pool lifecycle with acquire and release
+5. Publish upload results through a `MockEndpoint`
+
 ## Key Types
 
 ```csharp
@@ -33,118 +43,50 @@ public sealed class SftpConnectorOptions
 }
 ```
 
-## Exercises
+---
 
-### 1. SftpConnectorOptions — Defaults
+## Lab — Guided Practice
 
-```csharp
-var opts = new SftpConnectorOptions();
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-Assert.That(opts.Host, Is.EqualTo(string.Empty));
-Assert.That(opts.Port, Is.EqualTo(22));
-Assert.That(opts.Username, Is.EqualTo(string.Empty));
-Assert.That(opts.Password, Is.EqualTo(string.Empty));
-Assert.That(opts.RootPath, Is.EqualTo("/"));
-Assert.That(opts.TimeoutMs, Is.EqualTo(10000));
-Assert.That(opts.MaxConnectionsPerHost, Is.EqualTo(5));
-```
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `SftpConnectorOptions_Defaults` | Default SFTP connector options |
+| 2 | `Upload_DelegatesToPoolAndClient` | Upload delegates to pool and client |
+| 3 | `Download_DelegatesToPoolAndClient` | Download delegates to pool and client |
+| 4 | `ListFiles_DelegatesToPoolAndClient` | ListFiles delegates to pool and client |
+| 5 | `Upload_CreatesMetadataSidecar` | Upload creates metadata sidecar file |
+| 6 | `PoolRelease_CalledAfterUpload` | Pool connection released after upload |
+| 7 | `UploadResult_PublishedToMockEndpoint` | Upload result published end-to-end |
 
-### 2. SftpConnectorOptions — CustomValues
-
-```csharp
-var opts = new SftpConnectorOptions
-{
-    Host = "sftp.example.com",
-    Port = 2222,
-    Username = "deploy",
-    Password = "p@ss",
-    RootPath = "/uploads",
-    TimeoutMs = 5000,
-    MaxConnectionsPerHost = 10,
-};
-
-Assert.That(opts.Host, Is.EqualTo("sftp.example.com"));
-Assert.That(opts.Port, Is.EqualTo(2222));
-Assert.That(opts.Username, Is.EqualTo("deploy"));
-Assert.That(opts.Password, Is.EqualTo("p@ss"));
-Assert.That(opts.RootPath, Is.EqualTo("/uploads"));
-Assert.That(opts.TimeoutMs, Is.EqualTo(5000));
-Assert.That(opts.MaxConnectionsPerHost, Is.EqualTo(10));
-```
-
-### 3. ISftpClient — InterfaceShape HasExpectedMethods
-
-```csharp
-var type = typeof(ISftpClient);
-
-Assert.That(type.GetMethod("Connect"), Is.Not.Null);
-Assert.That(type.GetMethod("Disconnect"), Is.Not.Null);
-Assert.That(type.GetMethod("UploadFile"), Is.Not.Null);
-Assert.That(type.GetMethod("DownloadFile"), Is.Not.Null);
-Assert.That(type.GetMethod("ListFiles"), Is.Not.Null);
-Assert.That(type.GetMethod("DeleteFile"), Is.Not.Null);
-Assert.That(type.GetProperty("IsConnected"), Is.Not.Null);
-```
-
-### 4. SftpConnectionPool — AcquireAndRelease
-
-```csharp
-var mockClient = Substitute.For<ISftpClient>();
-mockClient.IsConnected.Returns(true);
-
-var pool = new SftpConnectionPool(
-    () => mockClient,
-    Options.Create(new SftpConnectorOptions { MaxConnectionsPerHost = 2 }),
-    NullLogger<SftpConnectionPool>.Instance);
-
-var client = await pool.AcquireAsync();
-Assert.That(client, Is.Not.Null);
-
-mockClient.Received(1).Connect();
-
-pool.Release(client);
-
-await pool.DisposeAsync();
-```
-
-### 5. SftpConnector — Upload DelegatesToPool
-
-```csharp
-var mockClient = Substitute.For<ISftpClient>();
-mockClient.IsConnected.Returns(true);
-
-var mockPool = Substitute.For<ISftpConnectionPool>();
-mockPool.AcquireAsync(Arg.Any<CancellationToken>()).Returns(mockClient);
-
-var connector = new SftpConnector(
-    mockPool,
-    Options.Create(new SftpConnectorOptions { RootPath = "/data" }),
-    NullLogger<SftpConnector>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create("payload", "Svc", "file.upload");
-
-var remotePath = await connector.UploadAsync(
-    envelope, "test.json", s => System.Text.Encoding.UTF8.GetBytes(s), CancellationToken.None);
-
-Assert.That(remotePath, Is.EqualTo("/data/test.json"));
-mockClient.Received(2).UploadFile(Arg.Any<Stream>(), Arg.Any<string>()); // data + meta
-mockPool.Received(1).Release(mockClient);
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial35/Lab.cs`](../tests/TutorialLabs/Tutorial35/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial35/Lab.cs`](../tests/TutorialLabs/Tutorial35/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial35.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial35.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial35/Exam.cs`](../tests/TutorialLabs/Tutorial35/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_ConnectionPoolLifecycle` | 🟢 Starter | Connection pool acquire → use → release lifecycle |
+| 2 | `Challenge2_UploadSerializationRoundTrip` | 🟡 Intermediate | Upload serialisation round-trip |
+| 3 | `Challenge3_AdapterImplementsIConnector` | 🔴 Advanced | Adapter implements IConnector interface |
+
+> 💻 [`tests/TutorialLabs/Tutorial35/Exam.cs`](../tests/TutorialLabs/Tutorial35/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial35.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial35.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial35.ExamAnswers"
 ```
 
 ---

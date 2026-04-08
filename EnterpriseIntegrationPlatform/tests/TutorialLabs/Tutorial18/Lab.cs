@@ -1,10 +1,19 @@
 // ============================================================================
-// Tutorial 18 – Content Enricher (Lab)
+// Tutorial 18 – Content Enricher (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Content Enricher.
-// Real Integrations: ContentEnricher with MockEnrichmentSource, verify enriched
-// JSON payload, fallback behaviour, and publish via NatsBrokerEndpoint
-// (real NATS JetStream via Aspire).
+// PURPOSE: Run each test in order to see how the Content Enricher pattern
+//          augments messages with external data by merging fetched fields
+//          without overwriting existing payload.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Enrich_MergesExternalData                      — merge external data at a target path
+//   2. Enrich_NestedLookup_ExtractsCorrectKey         — nested lookup key path extracts correct value
+//   3. Enrich_SourceReturnsNull_UsesFallback          — source returns null — fallback value merged
+//   4. Enrich_MissingLookupKey_FallsBack              — missing lookup key with fallback returns gracefully
+//   5. Enrich_MissingLookupKey_ThrowsWhenNoFallback   — missing lookup key without fallback throws
+//   6. Enrich_E2E_PublishEnrichedToNatsEndpoint       — end-to-end enrich and publish via real NATS
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire) / MockEnrichmentSource
 // ============================================================================
 
 using System.Text.Json.Nodes;

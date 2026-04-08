@@ -2,6 +2,16 @@
 
 Deliver messages to external HTTP endpoints with retry and timeout configuration.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Configure an `HttpConnectorAdapter` with default and custom options
+2. Send messages via HTTP and inspect success/failure `ConnectorResult`
+3. Use `TokenCache` to store and expire bearer tokens
+4. Understand the `IConnector` adapter pattern and its `Name`/`Type` properties
+5. Publish HTTP connector results through a `MockEndpoint`
+
 ## Key Types
 
 ```csharp
@@ -56,101 +66,50 @@ public sealed record ConnectorResult
 }
 ```
 
-## Exercises
+---
 
-### 1. TokenCache — SetAndGet Roundtrip
+## Lab — Guided Practice
 
-```csharp
-var cache = new InMemoryTokenCache();
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-cache.SetToken("auth", "bearer-token-123", TimeSpan.FromMinutes(5));
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Adapter_NameAndType_AreCorrect` | Adapter identity properties |
+| 2 | `SendAsync_Success_ReturnsOkResult` | Successful send returns OK result |
+| 3 | `SendAsync_Failure_ReturnsFailResult` | Failed send returns failure result |
+| 4 | `SendAsync_DefaultDestination_UsesSlash` | Default destination falls back to `/` |
+| 5 | `TokenCache_SetAndRetrieve` | Token cache set and retrieve |
+| 6 | `TokenCache_Expired_ReturnsFalse` | Expired token returns false |
+| 7 | `HttpConnectorOptions_Defaults` | Options default values |
 
-var found = cache.TryGetToken("auth", out var token);
-
-Assert.That(found, Is.True);
-Assert.That(token, Is.EqualTo("bearer-token-123"));
-```
-
-### 2. TokenCache — MissingKey ReturnsFalse
-
-```csharp
-var cache = new InMemoryTokenCache();
-
-var found = cache.TryGetToken("nonexistent", out var token);
-
-Assert.That(found, Is.False);
-Assert.That(token, Is.Null);
-```
-
-### 3. TokenCache — ExpiredToken ReturnsFalse
-
-```csharp
-var fakeTime = new FakeTimeProvider(DateTimeOffset.UtcNow);
-var cache = new InMemoryTokenCache(fakeTime);
-
-cache.SetToken("auth", "token-value", TimeSpan.FromMinutes(1));
-
-// Advance time past expiry
-fakeTime.Advance(TimeSpan.FromMinutes(2));
-
-var found = cache.TryGetToken("auth", out var token);
-
-Assert.That(found, Is.False);
-Assert.That(token, Is.Null);
-```
-
-### 4. HttpConnectorOptions — Defaults
-
-```csharp
-var opts = new HttpConnectorOptions();
-
-Assert.That(opts.BaseUrl, Is.EqualTo(string.Empty));
-Assert.That(opts.TimeoutSeconds, Is.EqualTo(30));
-Assert.That(opts.MaxRetryAttempts, Is.EqualTo(3));
-Assert.That(opts.RetryDelayMs, Is.EqualTo(1000));
-Assert.That(opts.CacheTokenExpirySeconds, Is.EqualTo(300));
-Assert.That(opts.DefaultHeaders, Is.Not.Null);
-Assert.That(opts.DefaultHeaders, Is.Empty);
-```
-
-### 5. HttpConnectorOptions — CustomValues
-
-```csharp
-var opts = new HttpConnectorOptions
-{
-    BaseUrl = "https://api.example.com",
-    TimeoutSeconds = 60,
-    MaxRetryAttempts = 5,
-    RetryDelayMs = 2000,
-    CacheTokenExpirySeconds = 600,
-    DefaultHeaders = new Dictionary<string, string>
-    {
-        ["X-Api-Key"] = "key123",
-    },
-};
-
-Assert.That(opts.BaseUrl, Is.EqualTo("https://api.example.com"));
-Assert.That(opts.TimeoutSeconds, Is.EqualTo(60));
-Assert.That(opts.MaxRetryAttempts, Is.EqualTo(5));
-Assert.That(opts.RetryDelayMs, Is.EqualTo(2000));
-Assert.That(opts.CacheTokenExpirySeconds, Is.EqualTo(600));
-Assert.That(opts.DefaultHeaders["X-Api-Key"], Is.EqualTo("key123"));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial34/Lab.cs`](../tests/TutorialLabs/Tutorial34/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial34/Lab.cs`](../tests/TutorialLabs/Tutorial34/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial34.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial34.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial34/Exam.cs`](../tests/TutorialLabs/Tutorial34/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_SendToCustomDestination_PublishesResult` | 🟢 Starter | Send to custom destination and publish result |
+| 2 | `Challenge2_TokenCachingLifecycle` | 🟡 Intermediate | Token caching lifecycle (set → hit → expire) |
+| 3 | `Challenge3_MultipleConnectors_IndependentResults` | 🔴 Advanced | Multiple independent connectors with separate results |
+
+> 💻 [`tests/TutorialLabs/Tutorial34/Exam.cs`](../tests/TutorialLabs/Tutorial34/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial34.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial34.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial34.ExamAnswers"
 ```
 
 ---

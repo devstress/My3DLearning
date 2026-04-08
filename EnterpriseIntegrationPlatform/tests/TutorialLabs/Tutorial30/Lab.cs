@@ -1,9 +1,19 @@
 // ============================================================================
-// Tutorial 30 – Business Rule Engine (Lab)
+// Tutorial 30 – Business Rule Engine (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Rule Engine (Message Routing variant).
-// Real Integrations: BusinessRuleEngine with InMemoryRuleStore +
-// NatsBrokerEndpoint (real NATS JetStream via Aspire).
+// PURPOSE: Run each test in order to see how the Rule Engine pattern evaluates
+//          business rules with AND/OR condition logic against message fields.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Evaluate_MatchingRule_ReturnsMatch              — matching rule returns match with action
+//   2. Evaluate_NoMatch_ReturnsEmpty                   — no matching rule returns empty result
+//   3. Evaluate_ContainsOperator_MatchesSubstring      — Contains operator matches substring
+//   4. Evaluate_MetadataCondition_MatchesMetadataField — metadata field condition matching
+//   5. Evaluate_DisabledRule_IsSkipped                 — disabled rules are skipped
+//   6. Evaluate_PriorityOrder_HigherPriorityWins       — higher priority rule wins with StopOnMatch
+//   7. Evaluate_OrLogic_MatchesAnyCondition            — OR logic matches any condition
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

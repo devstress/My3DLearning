@@ -2,6 +2,16 @@
 
 Track messages through their complete lifecycle from ingestion to delivery.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Track outstanding requests with `SmartProxy` and correlate replies
+2. Detect missing `ReplyTo` headers and handle unknown correlation IDs
+3. Publish and subscribe to control commands via the `ControlBus`
+4. Capture control-bus messages through a `MockEndpoint`
+5. Combine Smart Proxy and Control Bus in an end-to-end round-trip
+
 ## Key Types
 
 ```csharp
@@ -69,98 +79,50 @@ public interface IObservabilityEventLog
 }
 ```
 
-## Exercises
+---
 
-### 1. SmartProxy — TrackRequest IncrementsOutstandingCount
+## Lab — Guided Practice
 
-```csharp
-var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-var envelope = CreateEnvelopeWithReplyTo("request", "Svc", "cmd.query", "reply-queue-1");
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `SmartProxy_TrackRequest_IncrementsOutstanding` | Track request increments outstanding count |
+| 2 | `SmartProxy_CorrelateReply_ReturnsCorrelation` | Correlate reply returns stored correlation |
+| 3 | `SmartProxy_CorrelateReply_ReturnsNull_ForUnknown` | Unknown correlation returns null |
+| 4 | `SmartProxy_NoReplyTo_ReturnsFalse` | No ReplyTo header returns false |
+| 5 | `ControlBus_PublishCommand_MockEndpoint_CapturesMessage` | Control bus publish captured by MockEndpoint |
+| 6 | `ControlBus_Subscribe_MockEndpoint_DeliversCommand` | Control bus subscribe delivers command |
+| 7 | `ControlBus_PublishAndSubscribe_E2E_Roundtrip` | Control bus end-to-end round-trip |
 
-var tracked = proxy.TrackRequest(envelope);
-
-Assert.That(tracked, Is.True);
-Assert.That(proxy.OutstandingCount, Is.EqualTo(1));
-```
-
-### 2. SmartProxy — CorrelateReply ReturnsCorrelation
-
-```csharp
-var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
-
-var request = CreateEnvelopeWithReplyTo("request", "Svc", "cmd.query", "reply-queue");
-proxy.TrackRequest(request);
-
-// Create a reply with the same CorrelationId
-var reply = IntegrationEnvelope<string>.Create(
-    "response", "ReplySvc", "cmd.response",
-    correlationId: request.CorrelationId);
-
-var correlation = proxy.CorrelateReply(reply);
-
-Assert.That(correlation, Is.Not.Null);
-Assert.That(correlation!.CorrelationId, Is.EqualTo(request.CorrelationId));
-Assert.That(correlation.OriginalReplyTo, Is.EqualTo("reply-queue"));
-Assert.That(correlation.RequestMessageId, Is.EqualTo(request.MessageId));
-Assert.That(proxy.OutstandingCount, Is.EqualTo(0));
-```
-
-### 3. SmartProxy — CorrelateReply ReturnsNull ForUnknownReply
-
-```csharp
-var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
-
-var unknownReply = IntegrationEnvelope<string>.Create("data", "Svc", "unknown.reply");
-
-var correlation = proxy.CorrelateReply(unknownReply);
-
-Assert.That(correlation, Is.Null);
-```
-
-### 4. TestMessageGenerator — PublishesToTargetTopic
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var generator = new TestMessageGenerator(
-    producer, NullLogger<TestMessageGenerator>.Instance);
-
-var result = await generator.GenerateAsync("test-topic", CancellationToken.None);
-
-Assert.That(result.Succeeded, Is.True);
-Assert.That(result.TargetTopic, Is.EqualTo("test-topic"));
-Assert.That(result.MessageId, Is.Not.EqualTo(Guid.Empty));
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    "test-topic",
-    Arg.Any<CancellationToken>());
-```
-
-### 5. ControlBusOptions — Shape
-
-```csharp
-var opts = new ControlBusOptions();
-
-Assert.That(opts.ControlTopic, Is.EqualTo("eip.control-bus"));
-Assert.That(opts.ConsumerGroup, Is.EqualTo("control-bus-consumers"));
-Assert.That(opts.Source, Is.EqualTo("ControlBus"));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial39/Lab.cs`](../tests/TutorialLabs/Tutorial39/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial39/Lab.cs`](../tests/TutorialLabs/Tutorial39/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial39.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial39.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial39/Exam.cs`](../tests/TutorialLabs/Tutorial39/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_FullSmartProxyLifecycle` | 🟢 Starter | Full Smart Proxy track → correlate lifecycle |
+| 2 | `Challenge2_ControlBus_PublishMultipleCommands_MockEndpoint` | 🟡 Intermediate | Control bus publish multiple commands via MockEndpoint |
+| 3 | `Challenge3_SmartProxy_And_ControlBus_CombinedE2E` | 🔴 Advanced | Smart Proxy + Control Bus combined end-to-end |
+
+> 💻 [`tests/TutorialLabs/Tutorial39/Exam.cs`](../tests/TutorialLabs/Tutorial39/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial39.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial39.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial39.ExamAnswers"
 ```
 
 ---

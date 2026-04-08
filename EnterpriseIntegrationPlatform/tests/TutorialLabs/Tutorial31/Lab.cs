@@ -1,9 +1,19 @@
 // ============================================================================
-// Tutorial 31 – Event Sourcing (Lab)
+// Tutorial 31 – Event Sourcing (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Event Sourcing
-// E2E: InMemoryEventStore — append events, read stream forward/backward,
-//      then publish event notifications to MockEndpoint.
+// PURPOSE: Run each test in order to see how the Event Sourcing pattern stores
+//          domain events as an append-only log and reads them forward/backward.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. AppendAndReadForward_RoundTrip                    — append and read-forward round trip
+//   2. AppendMultipleEvents_VersionsIncrement            — multiple events increment versions
+//   3. ReadStreamBackward_ReturnsDescendingOrder         — backward read returns descending order
+//   4. OptimisticConcurrency_ThrowsOnVersionMismatch     — version mismatch throws concurrency exception
+//   5. ReadFromMiddleOfStream_ReturnsSubset              — read from middle returns subset
+//   6. EmptyStream_ReturnsEmptyList                      — empty stream returns empty list
+//   7. PublishAllEventsToMockEndpoint                    — events publish to endpoint
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.EventSourcing;

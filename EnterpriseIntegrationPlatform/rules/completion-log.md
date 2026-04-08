@@ -4,6 +4,45 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 200 — Rescan & Clean All 50 Tutorial Markdowns
+
+- **Date**: 2026-04-08
+- **Status**: done
+- **Goal**: Convert all 50 tutorial markdowns to consistent "Fill in the Blanks" format, add missing Key Types sections, clean README.md
+- **Changes**:
+  - Converted 30 tutorials (01-15, 17-31) from "Assessment Challenges" to "Fill in the Blanks" exam format
+  - Updated exam section intro to reference `// TODO:` blanks and `Exam.Answers.cs`
+  - Updated exam table format: added `#` column, changed "What you prove" to "What You Fill In"
+  - Added dual `dotnet test` commands (exam blanks + answer key) to all 30 tutorials
+  - Added missing `## Key Types` sections to tutorials 41, 43, 49, 50
+  - Updated `tutorials/README.md`: replaced "Assessment Challenges" with "Fill in the Blanks", updated project structure to show `Exam.Answers.cs`, fixed test commands, corrected test count to 512
+- **Files modified** (31 files):
+  - `tutorials/01-introduction.md` through `tutorials/31-event-sourcing.md` (30 markdown files — exam section rewritten)
+  - `tutorials/41-openclaw-web.md`, `43-kubernetes-deployment.md`, `49-testing-integrations.md`, `50-best-practices.md` (Key Types added)
+  - `tutorials/README.md` (updated format, commands, test counts)
+- **Test counts**: 512 TutorialLabs tests pass. 0 warnings, 0 errors. Build succeeds.
+
+## Phase 29 — Tutorial Redesign (Chunks 201–250)
+
+- **Date**: 2026-04-08
+- **Status**: done
+- **Goal**: All 50 tutorials get Exam.cs (fill-in-blank) + Exam.Answers.cs (answer key)
+- **Architecture**:
+  - Exam.cs: Header "Fill in the Blanks" with INSTRUCTIONS and DIFFICULTY TIERS
+  - Key code lines (envelope creation, router registration, object construction) replaced with `// TODO:` + `dynamic varName = null!;`
+  - Wrapped in `#if EXAM_STUDENT` conditional compilation — disabled by default, students define EXAM_STUDENT to enable
+  - Exam.Answers.cs: Header "DO NOT PEEK", class ExamAnswers, full working code, verbose comments stripped
+  - T32-T50: Challenge1/2/3 methods renamed to Starter/Intermediate/Advanced
+- **Files created** (34 new):
+  - `tests/TutorialLabs/Tutorial17/Exam.Answers.cs` through `Tutorial50/Exam.Answers.cs` (34 files)
+- **Files modified** (50 modified):
+  - `tests/TutorialLabs/Tutorial01/Exam.cs` through `Tutorial50/Exam.cs` (all 50 — header updated, fill-in blanking, #if wrapping)
+- **Test counts**: 512 TutorialLabs tests pass (150 ExamAnswers + 362 Lab/other). 0 warnings, 0 errors.
+- **Notes**:
+  - Prior sessions completed: T01-T10 Exam.cs + Exam.Answers.cs, T11-T15 Exam.Answers.cs, T16 reference example
+  - This session completed: T11-T15 fill-in conversion, T17-T50 both files, all 50 #if EXAM_STUDENT wrapping
+  - Remaining: Chunk 200 (markdown cleanup) and Chunk 251 (final validation)
+
 ## Chunk 109 – Routing + Advanced EIP Patterns on Postgres
 
 - **Date**: 2026-04-07

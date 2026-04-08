@@ -1,9 +1,19 @@
 // ============================================================================
-// Tutorial 25 – Dead Letter Queue (Lab)
+// Tutorial 25 – Dead Letter Queue (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Dead Letter Channel.
-// Real Integrations: DeadLetterPublisher with NatsBrokerEndpoint
-// (real NATS JetStream via Aspire) as producer.
+// PURPOSE: Run each test in order to see how the Dead Letter Channel pattern
+//          captures unprocessable messages with full diagnostic context.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Publish_MaxRetriesExceeded_SendsToDeadLetterTopic — message routed to DLQ topic
+//   2. Publish_PreservesOriginalEnvelope                 — original payload and MessageId preserved
+//   3. Publish_SetsCorrectReason                         — reason and error message recorded
+//   4. Publish_TracksAttemptCount                         — attempt count captured
+//   5. Publish_SetsFailedAtTimestamp                      — FailedAt timestamp set at publish time
+//   6. Publish_PreservesCorrelationId                     — CorrelationId preserved on wrapper
+//   7. Publish_AllReasonValues_AreSupported               — all DeadLetterReason values accepted
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

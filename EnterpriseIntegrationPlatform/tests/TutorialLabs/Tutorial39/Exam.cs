@@ -1,9 +1,17 @@
 // ============================================================================
-// Tutorial 39 – Message Lifecycle / System Management (Exam)
+// Tutorial 39 – Message Lifecycle (Exam · Fill in the Blanks)
 // ============================================================================
-// E2E challenges: full SmartProxy lifecycle, ControlBus publish with
-// MockEndpoint verification, and SmartProxy + ControlBus combined E2E.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟡 Intermediate  — control bus_ publish multiple commands_ mock endpoint
+//   🔴 Advanced      — smart proxy_ and_ control bus_ combined e2 e
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.SystemManagement;
@@ -12,13 +20,14 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial39;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public void Challenge1_FullSmartProxyLifecycle()
+    public void Starter_FullSmartProxyLifecycle()
     {
         var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
 
@@ -58,23 +67,19 @@ public sealed class Exam
     }
 
     [Test]
-    public async Task Challenge2_ControlBus_PublishMultipleCommands_MockEndpoint()
+    public async Task Intermediate_ControlBus_PublishMultipleCommands_MockEndpoint()
     {
         await using var bus = new MockEndpoint("exam-ctrl-bus");
 
-        var publisher = new ControlBusPublisher(
-            bus, bus,
-            Options.Create(new ControlBusOptions
-            {
-                ControlTopic = "eip.control",
-                ConsumerGroup = "ctrl-group",
-                Source = "TestBus",
-            }),
-            NullLogger<ControlBusPublisher>.Instance);
+        // TODO: Create a ControlBusPublisher with appropriate configuration
+        dynamic publisher = null!;
 
-        var r1 = await publisher.PublishCommandAsync("restart", "system.restart");
-        var r2 = await publisher.PublishCommandAsync("scale-up", "system.scale");
-        var r3 = await publisher.PublishCommandAsync("flush", "system.flush");
+        // TODO: var r1 = await publisher.PublishCommandAsync(...)
+        dynamic r1 = null!;
+        // TODO: var r2 = await publisher.PublishCommandAsync(...)
+        dynamic r2 = null!;
+        // TODO: var r3 = await publisher.PublishCommandAsync(...)
+        dynamic r3 = null!;
 
         Assert.That(r1.Succeeded, Is.True);
         Assert.That(r2.Succeeded, Is.True);
@@ -83,10 +88,11 @@ public sealed class Exam
     }
 
     [Test]
-    public async Task Challenge3_SmartProxy_And_ControlBus_CombinedE2E()
+    public async Task Advanced_SmartProxy_And_ControlBus_CombinedE2E()
     {
         await using var bus = new MockEndpoint("exam-combined");
-        var proxy = new SmartProxy(NullLogger<SmartProxy>.Instance);
+        // TODO: Create a SmartProxy with appropriate configuration
+        dynamic proxy = null!;
 
         // Track a request through SmartProxy
         var request = CreateEnvelopeWithReplyTo(
@@ -95,26 +101,18 @@ public sealed class Exam
         Assert.That(proxy.OutstandingCount, Is.EqualTo(1));
 
         // Publish tracking event to ControlBus
-        var publisher = new ControlBusPublisher(
-            bus, bus,
-            Options.Create(new ControlBusOptions
-            {
-                ControlTopic = "eip.control",
-                Source = "SmartProxy",
-            }),
-            NullLogger<ControlBusPublisher>.Instance);
+        // TODO: Create a ControlBusPublisher with appropriate configuration
+        dynamic publisher = null!;
 
-        var trackResult = await publisher.PublishCommandAsync(
-            new { RequestId = request.MessageId, ReplyTo = request.ReplyTo },
-            "proxy.request.tracked");
+        // TODO: var trackResult = await publisher.PublishCommandAsync(...)
+        dynamic trackResult = null!;
 
         Assert.That(trackResult.Succeeded, Is.True);
         bus.AssertReceivedOnTopic("eip.control", 1);
 
         // Simulate reply arriving — correlate it
-        var reply = IntegrationEnvelope<string>.Create(
-            "query-result", "DataSvc", "data.response",
-            correlationId: request.CorrelationId);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic reply = null!;
         var correlation = proxy.CorrelateReply(reply);
 
         Assert.That(correlation, Is.Not.Null);
@@ -135,3 +133,4 @@ public sealed class Exam
             ReplyTo = replyTo,
         };
 }
+#endif

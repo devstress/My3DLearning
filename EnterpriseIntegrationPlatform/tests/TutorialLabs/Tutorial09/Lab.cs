@@ -1,11 +1,20 @@
 // ============================================================================
-// Tutorial 09 – Content-Based Router (Lab)
+// Tutorial 09 – Content-Based Router (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Content-Based Router
-// Real Integrations: Wire real ContentBasedRouter with NatsBrokerEndpoint
-// (real NATS JetStream via Aspire) as producer. Configure routing rules
-// (Equals, Contains, StartsWith, Regex), verify delivery to correct topics,
-// priority ordering, default fallback, and matched rule metadata.
+// PURPOSE: Run each test in order to see how the Content-Based Router
+//          evaluates routing rules with different operators through real
+//          NATS JetStream via Aspire.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Equals operator — exact match on MessageType field
+//   2. Contains operator — substring match in Metadata field
+//   3. StartsWith operator — prefix match on Source field
+//   4. Regex operator — pattern match on MessageType field
+//   5. Default fallback — no rule matches, uses DefaultTopic
+//   6. Priority ordering — lower priority number evaluated first
+//   7. Matched rule metadata — RoutingDecision exposes full rule details
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using System.Text.Json;

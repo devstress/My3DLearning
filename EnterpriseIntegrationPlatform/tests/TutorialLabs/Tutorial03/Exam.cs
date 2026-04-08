@@ -1,10 +1,14 @@
 // ============================================================================
-// Tutorial 03 – Your First Message (Exam)
+// Tutorial 03 – Your First Message (Exam · Fill in the Blanks)
 // ============================================================================
-// EIP Patterns: Message, Message Channel, Causation Chain, Message Expiration
-// End-to-End: Advanced message construction — three-generation causation chain,
-// Point-to-Point vs Publish-Subscribe channel semantics verification, and
-// message lifecycle with priority, intent, and expiration.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Three-generation causation chain with shared CorrelationId
+//   🟡 Intermediate — P2P vs PubSub delivery semantics side-by-side
+//   🔴 Advanced     — Priority, intent, expiration, and metadata lifecycle
 // ============================================================================
 
 using NUnit.Framework;
@@ -13,15 +17,28 @@ using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 
+#pragma warning disable CS0219 // Variable is assigned but its value is never used (expected in fill-in-blank exam)
+
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial03;
 
 [TestFixture]
 public sealed class Exam
 {
-    // ── Challenge 1: Three-Generation Causation Chain ────────────────────
+    // ── 🟢 STARTER — Three-Generation Causation Chain ──────────────────
+    //
+    // SCENARIO: An e-commerce platform processes an order through three
+    // services: OrderService creates it, ValidationService validates it,
+    // FulfillmentService ships it. Each message must carry the correct
+    // causation lineage so distributed tracing can reconstruct the flow.
+    //
+    // WHAT YOU PROVE: You can build a multi-generation causation chain
+    // where all messages share a CorrelationId and each child references
+    // its parent via CausationId.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public async Task Challenge1_CausationChain_ThreeGenerationLineage()
+    public async Task Starter_CausationChain_ThreeGenerationLineage()
     {
         // Build a three-generation message lineage:
         //   Order.Created → Order.Validated → Order.Fulfilled
@@ -29,18 +46,16 @@ public sealed class Exam
         // All share the same CorrelationId for distributed tracing.
         var output = new MockEndpoint("lineage");
 
-        var orderCreated = IntegrationEnvelope<string>.Create(
-            "ORD-500", "OrderService", "order.created");
+        // TODO: Create an IntegrationEnvelope<string> with payload "ORD-500", source "OrderService", type "order.created"
+        IntegrationEnvelope<string> orderCreated = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
 
-        var orderValidated = IntegrationEnvelope<string>.Create(
-            "ORD-500-valid", "ValidationService", "order.validated",
-            correlationId: orderCreated.CorrelationId,
-            causationId: orderCreated.MessageId);
+        // TODO: Create an IntegrationEnvelope<string> with payload "ORD-500-valid", source "ValidationService",
+        //       type "order.validated", correlationId=orderCreated.CorrelationId, causationId=orderCreated.MessageId
+        IntegrationEnvelope<string> orderValidated = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
 
-        var orderFulfilled = IntegrationEnvelope<string>.Create(
-            "ORD-500-shipped", "FulfillmentService", "order.fulfilled",
-            correlationId: orderCreated.CorrelationId,
-            causationId: orderValidated.MessageId);
+        // TODO: Create an IntegrationEnvelope<string> with payload "ORD-500-shipped", source "FulfillmentService",
+        //       type "order.fulfilled", correlationId=orderCreated.CorrelationId, causationId=orderValidated.MessageId
+        IntegrationEnvelope<string> orderFulfilled = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
 
         // Publish all three to trace the lineage
         await output.PublishAsync(orderCreated, "order-events");
@@ -65,10 +80,19 @@ public sealed class Exam
         await output.DisposeAsync();
     }
 
-    // ── Challenge 2: P2P vs Pub/Sub Channel Semantics ───────────────────
+    // ── 🟡 INTERMEDIATE — P2P vs Pub/Sub Channel Semantics ────────────
+    //
+    // SCENARIO: A platform uses P2P channels for commands (one consumer per
+    // message) and PubSub channels for events (all subscribers receive).
+    // You must demonstrate both patterns side-by-side and verify the
+    // fundamental delivery difference.
+    //
+    // WHAT YOU PROVE: You understand the semantic difference between P2P
+    // (queue) and PubSub (fan-out) channels and can wire both correctly.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public async Task Challenge2_PointToPointVsPubSub_ChannelSemantics()
+    public async Task Intermediate_PointToPointVsPubSub_ChannelSemantics()
     {
         // Demonstrate the fundamental difference:
         // - Point-to-Point: one consumer receives each message
@@ -77,27 +101,25 @@ public sealed class Exam
         var pubSubA = new MockEndpoint("sub-a");
         var pubSubB = new MockEndpoint("sub-b");
 
-        var p2pChannel = new PointToPointChannel(
-            p2pOutput, p2pOutput, NullLogger<PointToPointChannel>.Instance);
+        // TODO: Create a PointToPointChannel using p2pOutput for both sender and receiver, with NullLogger.
+        PointToPointChannel p2pChannel = null!; // ← replace with new PointToPointChannel(...)
 
-        var pubSubChannelA = new PublishSubscribeChannel(
-            pubSubA, pubSubA, NullLogger<PublishSubscribeChannel>.Instance);
-        var pubSubChannelB = new PublishSubscribeChannel(
-            pubSubB, pubSubB, NullLogger<PublishSubscribeChannel>.Instance);
+        // TODO: Create two PublishSubscribeChannels — one using pubSubA, one using pubSubB, with NullLogger.
+        PublishSubscribeChannel pubSubChannelA = null!; // ← replace with new PublishSubscribeChannel(...)
+        PublishSubscribeChannel pubSubChannelB = null!; // ← replace with new PublishSubscribeChannel(...)
 
         // Send 3 messages through P2P — all go to the single output
         for (var i = 0; i < 3; i++)
         {
-            var env = IntegrationEnvelope<string>.Create($"cmd-{i}", "svc", "command");
-            await p2pChannel.SendAsync(env, "commands", CancellationToken.None);
+            // TODO: Create an IntegrationEnvelope<string> with payload $"cmd-{i}", source "svc", type "command"
+            //       and send it via p2pChannel to "commands" topic.
         }
 
         // Send 2 messages through Pub/Sub — each subscriber gets both
         for (var i = 0; i < 2; i++)
         {
-            var env = IntegrationEnvelope<string>.Create($"event-{i}", "svc", "event");
-            await pubSubChannelA.PublishAsync(env, "events", CancellationToken.None);
-            await pubSubChannelB.PublishAsync(env, "events", CancellationToken.None);
+            // TODO: Create an IntegrationEnvelope<string> with payload $"event-{i}", source "svc", type "event"
+            //       and publish it via both pubSubChannelA and pubSubChannelB to "events" topic.
         }
 
         // P2P: 3 messages, single consumer
@@ -114,44 +136,38 @@ public sealed class Exam
         await pubSubB.DisposeAsync();
     }
 
-    // ── Challenge 3: Priority, Intent, and Expiration Lifecycle ──────────
+    // ── 🔴 ADVANCED — Priority, Intent, and Expiration Lifecycle ───────
+    //
+    // SCENARIO: An operations platform processes messages at different
+    // priority levels: a critical infrastructure command (expires in 1hr),
+    // a low-priority background report (no expiration), and an already-
+    // expired price update event. All must be delivered with correct
+    // priority, intent, expiration status, and metadata preserved.
+    //
+    // WHAT YOU PROVE: You can construct envelopes with full lifecycle
+    // properties and verify they survive delivery without data loss.
+    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
-    public async Task Challenge3_PriorityExpiration_MessageLifecycle()
+    public async Task Advanced_PriorityExpiration_MessageLifecycle()
     {
         // Build messages with different priorities and intents,
         // verify expiration logic, and confirm metadata survives delivery.
         var output = new MockEndpoint("lifecycle");
 
-        // Critical command that expires in 1 hour
-        var urgentCommand = IntegrationEnvelope<string>.Create(
-            "shutdown-node-5", "OpsService", "infra.command") with
-        {
-            Priority = MessagePriority.Critical,
-            Intent = MessageIntent.Command,
-            ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
-            Metadata = new Dictionary<string, string>
-            {
-                [MessageHeaders.TraceId] = "trace-urgent-001",
-            },
-        };
+        // TODO: Create a Critical command envelope with payload "shutdown-node-5", source "OpsService",
+        //       type "infra.command", Priority=Critical, Intent=Command, ExpiresAt=1hr from now,
+        //       Metadata with TraceId="trace-urgent-001".
+        IntegrationEnvelope<string> urgentCommand = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { ... }
 
-        // Low-priority document (no expiration)
-        var backgroundDoc = IntegrationEnvelope<string>.Create(
-            "monthly-report-data", "ReportService", "report.document") with
-        {
-            Priority = MessagePriority.Low,
-            Intent = MessageIntent.Document,
-        };
+        // TODO: Create a Low-priority document envelope with payload "monthly-report-data",
+        //       source "ReportService", type "report.document", Priority=Low, Intent=Document.
+        IntegrationEnvelope<string> backgroundDoc = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { ... }
 
-        // Already-expired event
-        var expiredEvent = IntegrationEnvelope<string>.Create(
-            "stale-price-update", "PricingService", "price.event") with
-        {
-            Priority = MessagePriority.Normal,
-            Intent = MessageIntent.Event,
-            ExpiresAt = DateTimeOffset.UtcNow.AddHours(-1),
-        };
+        // TODO: Create an already-expired event envelope with payload "stale-price-update",
+        //       source "PricingService", type "price.event", Priority=Normal, Intent=Event,
+        //       ExpiresAt=1hr in the past.
+        IntegrationEnvelope<string> expiredEvent = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { ... }
 
         await output.PublishAsync(urgentCommand, "commands");
         await output.PublishAsync(backgroundDoc, "documents");
@@ -184,3 +200,4 @@ public sealed class Exam
         await output.DisposeAsync();
     }
 }
+#endif

@@ -1,10 +1,19 @@
 // ============================================================================
-// Tutorial 16 – Transform Pipeline (Lab)
+// Tutorial 16 – Transform Pipeline (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Pipes and Filters (Transform variant).
-// Real Integrations: TransformPipeline with real ITransformStep implementations,
-// verify transformed payload, step count, metadata, and publish results via
-// NatsBrokerEndpoint (real NATS JetStream via Aspire).
+// PURPOSE: Run each test in order to see how the Transform Pipeline pattern
+//          chains ordered ITransformStep instances to transform payloads
+//          in sequence.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Pipeline_SingleStep_TransformsPayload           — single step transforms payload and reports StepsApplied
+//   2. Pipeline_MultipleSteps_ChainsTransformations    — multiple steps chain transformations in order
+//   3. Pipeline_Disabled_ReturnsInputUnchanged         — disabled pipeline returns input unchanged
+//   4. Pipeline_StepFailure_SkippedWhenNotStopOnFailure — step failure skipped when StopOnStepFailure is false
+//   5. Pipeline_MaxPayloadSize_RejectsOversized        — payload exceeding max size throws InvalidOperationException
+//   6. Pipeline_E2E_PublishTransformedToNatsEndpoint    — end-to-end transform and publish via real NATS
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

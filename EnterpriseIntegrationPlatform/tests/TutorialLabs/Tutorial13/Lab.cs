@@ -1,10 +1,19 @@
 // ============================================================================
-// Tutorial 13 – Routing Slip (Lab)
+// Tutorial 13 – Routing Slip (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Routing Slip
-// Real Integrations: Wire real RoutingSlipRouter with NatsBrokerEndpoint
-// (real NATS JetStream via Aspire) as producer, execute steps sequentially,
-// verify forwarding to destination topics.
+// PURPOSE: Run each test in order to see how the Routing Slip pattern
+//          attaches a processing itinerary to a message and advances
+//          through steps one at a time.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. ExecuteStep_SingleStep_SucceedsAndForwards        — single-step execution with forwarding
+//   2. ExecuteStep_NoDestination_CompletesInProcess       — step without destination topic
+//   3. ExecuteStep_HandlerFails_ReturnsFalseResult        — handler failure returns false result
+//   4. ExecuteStep_NoHandlerRegistered_FailsGracefully    — missing handler detected gracefully
+//   5. ExecuteStep_MultiStepSlip_AdvancesCorrectly        — multi-step slip advancement
+//   6. ExecuteStep_WithParameters_PassesParametersToHandler — parameter passing to handlers
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint via AspireFixture (NATS JetStream), NUnit
 // ============================================================================
 
 using System.Text.Json;

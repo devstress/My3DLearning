@@ -4,6 +4,17 @@ Fan-out routing that sends the same message to every resolved destination, with 
 
 ---
 
+## Learning Objectives
+
+1. Configure a `RecipientListRouter` with one or more `RecipientListRule` entries to fan-out messages to multiple destinations
+2. Understand how multiple matching rules combine their destination lists into a single set
+3. Verify that duplicate destinations across rules are automatically deduplicated
+4. Use metadata-based recipient resolution via `MetadataRecipientsKey` as an alternative to static rules
+5. Apply regex-based routing operators for flexible pattern matching on envelope fields
+6. Distinguish between resolved count, destination list, and duplicates-removed in `RecipientListResult`
+
+---
+
 ## Key Types
 
 ```csharp
@@ -34,186 +45,45 @@ public sealed class RecipientListRule
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Single rule matches — fan-out to multiple destinations
+> 💻 Run each test in order to see how the Recipient List pattern fans out messages to multiple destinations. Each test isolates one concept — read the assertions, predict the outcome, then run.
 
-```csharp
-var options = Options.Create(new RecipientListOptions
-{
-    Rules =
-    [
-        new RecipientListRule
-        {
-            FieldName = "MessageType",
-            Operator = RoutingOperator.Equals,
-            Value = "order.created",
-            Destinations = ["audit-topic", "analytics-topic", "fulfilment-topic"],
-            Name = "OrderFanOut",
-        },
-    ],
-});
-
-var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "order-data", "OrderService", "order.created");
-
-var result = await router.RouteAsync(envelope);
-
-Assert.That(result.ResolvedCount, Is.EqualTo(3));
-Assert.That(result.Destinations, Contains.Item("audit-topic"));
-Assert.That(result.Destinations, Contains.Item("analytics-topic"));
-Assert.That(result.Destinations, Contains.Item("fulfilment-topic"));
-```
-
-### 2. Duplicate destinations are deduplicated
-
-```csharp
-var options = Options.Create(new RecipientListOptions
-{
-    Rules =
-    [
-        new RecipientListRule
-        {
-            FieldName = "MessageType",
-            Operator = RoutingOperator.Contains,
-            Value = "order",
-            Destinations = ["audit-topic", "analytics-topic"],
-        },
-        new RecipientListRule
-        {
-            FieldName = "Source",
-            Operator = RoutingOperator.Equals,
-            Value = "OrderService",
-            Destinations = ["audit-topic", "fulfilment-topic"],
-        },
-    ],
-});
-
-var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "order-data", "OrderService", "order.created");
-
-var result = await router.RouteAsync(envelope);
-
-Assert.That(result.ResolvedCount, Is.EqualTo(3));
-Assert.That(result.DuplicatesRemoved, Is.EqualTo(1));
-Assert.That(result.Destinations, Contains.Item("audit-topic"));
-Assert.That(result.Destinations, Contains.Item("analytics-topic"));
-Assert.That(result.Destinations, Contains.Item("fulfilment-topic"));
-```
-
-### 3. No rule matches — empty result
-
-```csharp
-var options = Options.Create(new RecipientListOptions
-{
-    Rules =
-    [
-        new RecipientListRule
-        {
-            FieldName = "MessageType",
-            Operator = RoutingOperator.Equals,
-            Value = "order.created",
-            Destinations = ["orders-topic"],
-        },
-    ],
-});
-
-var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "payment-data", "PaymentService", "payment.received");
-
-var result = await router.RouteAsync(envelope);
-
-Assert.That(result.ResolvedCount, Is.EqualTo(0));
-Assert.That(result.Destinations, Is.Empty);
-```
-
-### 4. Metadata-based recipient resolution
-
-```csharp
-var options = Options.Create(new RecipientListOptions
-{
-    Rules = [],
-    MetadataRecipientsKey = "recipients",
-});
-
-var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "data", "Service", "event.occurred") with
-{
-    Metadata = new Dictionary<string, string>
-    {
-        ["recipients"] = "topic-a,topic-b,topic-c",
-    },
-};
-
-var result = await router.RouteAsync(envelope);
-
-Assert.That(result.ResolvedCount, Is.EqualTo(3));
-Assert.That(result.Destinations, Contains.Item("topic-a"));
-Assert.That(result.Destinations, Contains.Item("topic-b"));
-Assert.That(result.Destinations, Contains.Item("topic-c"));
-```
-
-### 5. Verify producer receives all publish calls
-
-```csharp
-var options = Options.Create(new RecipientListOptions
-{
-    Rules =
-    [
-        new RecipientListRule
-        {
-            FieldName = "MessageType",
-            Operator = RoutingOperator.Equals,
-            Value = "order.created",
-            Destinations = ["topic-a", "topic-b"],
-        },
-    ],
-});
-
-var router = new RecipientListRouter(producer, options, NullLogger<RecipientListRouter>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "data", "OrderService", "order.created");
-
-await router.RouteAsync(envelope);
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Is("topic-a"),
-    Arg.Any<CancellationToken>());
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Is("topic-b"),
-    Arg.Any<CancellationToken>());
-```
-
----
-
-## Lab
-
-> 💻 [`tests/TutorialLabs/Tutorial12/Lab.cs`](../tests/TutorialLabs/Tutorial12/Lab.cs)
+| # | Test | Concept |
+|---|------|---------|
+| 1 | `Route_SingleRuleMatch_FansOutToAllDestinations` | Basic single-rule fan-out to three destinations |
+| 2 | `Route_NoRuleMatch_ReturnsEmptyResult` | No matching rule produces an empty result |
+| 3 | `Route_MultipleRulesMatch_CombinesDestinations` | Multiple matching rules combine their destination lists |
+| 4 | `Route_DuplicateDestinations_AreDeduplicated` | Overlapping destinations across rules are deduplicated |
+| 5 | `Route_MetadataRecipients_AddsDestinations` | Metadata-based recipient resolution via envelope metadata key |
+| 6 | `Route_RegexRule_MatchesPattern` | Regex operator matches message-type patterns |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial12.Lab"
 ```
 
-## Exam
+---
+
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_EventNotificationFanOut_RoutesToAllSubscribers` | 🟢 Starter | EventNotificationFanOut — RoutesToAllSubscribers |
+| 2 | `Intermediate_RulesAndMetadataCombined_MergesDestinations` | 🟡 Intermediate | RulesAndMetadataCombined — MergesDestinations |
+| 3 | `Advanced_CrossRuleDedup_RemovesDuplicateDestinations` | 🔴 Advanced | CrossRuleDedup — RemovesDuplicateDestinations |
 
 > 💻 [`tests/TutorialLabs/Tutorial12/Exam.cs`](../tests/TutorialLabs/Tutorial12/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial12.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial12.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial12.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 11 — Dynamic Router](11-dynamic-router.md)** | **Next: [Tutorial 13 — Routing Slip →](13-routing-slip.md)**

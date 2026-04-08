@@ -1,9 +1,17 @@
 // ============================================================================
-// Tutorial 38 – OpenTelemetry / Observability (Exam)
+// Tutorial 38 – OpenTelemetry (Exam · Fill in the Blanks)
 // ============================================================================
-// E2E challenges: full lifecycle tracking through MockEndpoint, WhereIs
-// inspection with mocked services, and CreateSnapshot from envelope.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — full lifecycle tracking_ through mock endpoint
+//   🟡 Intermediate  — where is inspection_ with mocked services
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
 
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Observability;
@@ -12,16 +20,18 @@ using EnterpriseIntegrationPlatform.Testing;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial38;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_FullLifecycleTracking_ThroughMockEndpoint()
+    public async Task Starter_FullLifecycleTracking_ThroughMockEndpoint()
     {
         await using var input = new MockEndpoint("exam-obs-in");
-        var store = new InMemoryMessageStateStore();
+        // TODO: Create a InMemoryMessageStateStore with appropriate configuration
+        dynamic store = null!;
         var correlationId = Guid.NewGuid();
         var messageId = Guid.NewGuid();
 
@@ -57,50 +67,43 @@ public sealed class Exam
         // Feed envelope through each stage
         foreach (var _ in stages)
         {
-            var env = IntegrationEnvelope<string>.Create(
-                "order-data", "OrderSvc", "order.placed", correlationId);
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic env = null!;
             env = env with { MessageId = messageId };
-            await input.SendAsync(env);
+            // TODO: await input.SendAsync(...)
         }
 
-        var trail = await store.GetByCorrelationIdAsync(correlationId);
+        // TODO: var trail = await store.GetByCorrelationIdAsync(...)
+        dynamic trail = null!;
         Assert.That(trail, Has.Count.EqualTo(4));
         Assert.That(trail[0].Stage, Is.EqualTo("Ingestion"));
         Assert.That(trail[^1].Stage, Is.EqualTo("Delivery"));
         Assert.That(trail[^1].Status, Is.EqualTo(DeliveryStatus.Delivered));
 
-        var latest = await store.GetLatestByCorrelationIdAsync(correlationId);
+        // TODO: var latest = await store.GetLatestByCorrelationIdAsync(...)
+        dynamic latest = null!;
         Assert.That(latest, Is.Not.Null);
         Assert.That(latest!.Stage, Is.EqualTo("Delivery"));
     }
 
     [Test]
-    public async Task Challenge2_WhereIsInspection_WithMockedServices()
+    public async Task Intermediate_WhereIsInspection_WithMockedServices()
     {
         var correlationId = Guid.NewGuid();
-        var events = new List<MessageEvent>
-        {
-            new()
-            {
-                MessageId = Guid.NewGuid(),
-                CorrelationId = correlationId,
-                MessageType = "order.placed",
-                Source = "OrderSvc",
-                Stage = "Routing",
-                Status = DeliveryStatus.InFlight,
-                BusinessKey = "ORD-555",
-            },
-        };
+        // TODO: Create a List with appropriate configuration
+        dynamic events = null!;
 
-        var eventLog = new MockObservabilityEventLog().WithEvents(events.ToArray());
+        // TODO: Create a MockObservabilityEventLog with appropriate configuration
+        dynamic eventLog = null!;
 
-        var traceAnalyzer = new MockTraceAnalyzer()
-            .WithWhereIsResponse("Message is currently being routed");
+        // TODO: Create a MockTraceAnalyzer with appropriate configuration
+        dynamic traceAnalyzer = null!;
 
-        var inspector = new MessageStateInspector(
-            eventLog, traceAnalyzer, NullLogger<MessageStateInspector>.Instance);
+        // TODO: Create a MessageStateInspector with appropriate configuration
+        dynamic inspector = null!;
 
-        var result = await inspector.WhereIsAsync("ORD-555");
+        // TODO: var result = await inspector.WhereIsAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.Query, Is.EqualTo("ORD-555"));
         Assert.That(result.Found, Is.True);
@@ -108,7 +111,7 @@ public sealed class Exam
     }
 
     [Test]
-    public void Challenge3_CreateSnapshot_FromEnvelope()
+    public void Advanced_CreateSnapshot_FromEnvelope()
     {
         var eventLog = new MockObservabilityEventLog();
         var traceAnalyzer = new MockTraceAnalyzer();
@@ -129,3 +132,4 @@ public sealed class Exam
         Assert.That(snapshot.DeliveryStatus, Is.EqualTo(DeliveryStatus.Pending));
     }
 }
+#endif

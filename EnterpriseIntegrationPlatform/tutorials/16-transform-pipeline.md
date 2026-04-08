@@ -4,6 +4,17 @@ Chain ordered `ITransformStep` instances through an `ITransformPipeline` to tran
 
 ---
 
+## Learning Objectives
+
+1. Understand the Transform Pipeline pattern and how ordered steps transform payloads in sequence
+2. Create an `ITransformPipeline` with one or more `ITransformStep` implementations
+3. Verify step ordering, payload mutation, and `StepsApplied` count after execution
+4. Configure `TransformOptions` to disable the pipeline or set payload size limits
+5. Handle step failures gracefully when `StopOnStepFailure` is disabled
+6. Inspect `TransformResult` metadata including `ContentType` and step-applied markers
+
+---
+
 ## Key Types
 
 ```csharp
@@ -52,123 +63,43 @@ public sealed record TransformResult(
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### Exercise 1: Single step transforms payload
+> 💻 Run the lab tests to see each Transform Pipeline concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var step = Substitute.For<ITransformStep>();
-step.Name.Returns("Upper");
-step.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-    .Returns(ci =>
-    {
-        var ctx = ci.Arg<TransformContext>();
-        return ctx.WithPayload(ctx.Payload.ToUpperInvariant());
-    });
-
-var options = Options.Create(new TransformOptions());
-var pipeline = new TransformPipeline(
-    new[] { step }, options, NullLogger<TransformPipeline>.Instance);
-
-var result = await pipeline.ExecuteAsync("hello", "text/plain");
-
-Assert.That(result.Payload, Is.EqualTo("HELLO"));
-Assert.That(result.StepsApplied, Is.EqualTo(1));
-Assert.That(result.ContentType, Is.EqualTo("text/plain"));
-```
-
-### Exercise 2: Multiple steps applied in order
-
-```csharp
-var step1 = Substitute.For<ITransformStep>();
-step1.Name.Returns("Append-A");
-step1.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-    .Returns(ci => ci.Arg<TransformContext>().WithPayload(ci.Arg<TransformContext>().Payload + "A"));
-
-var step2 = Substitute.For<ITransformStep>();
-step2.Name.Returns("Append-B");
-step2.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-    .Returns(ci => ci.Arg<TransformContext>().WithPayload(ci.Arg<TransformContext>().Payload + "B"));
-
-var options = Options.Create(new TransformOptions());
-var pipeline = new TransformPipeline(
-    new[] { step1, step2 }, options, NullLogger<TransformPipeline>.Instance);
-
-var result = await pipeline.ExecuteAsync("X", "text/plain");
-
-Assert.That(result.Payload, Is.EqualTo("XAB"));
-Assert.That(result.StepsApplied, Is.EqualTo(2));
-```
-
-### Exercise 3: Disabled pipeline returns input unchanged
-
-```csharp
-var step = Substitute.For<ITransformStep>();
-
-var options = Options.Create(new TransformOptions { Enabled = false });
-var pipeline = new TransformPipeline(
-    new[] { step }, options, NullLogger<TransformPipeline>.Instance);
-
-var result = await pipeline.ExecuteAsync("{\"id\":1}", "application/json");
-
-Assert.That(result.Payload, Is.EqualTo("{\"id\":1}"));
-Assert.That(result.StepsApplied, Is.EqualTo(0));
-await step.DidNotReceive()
-    .ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>());
-```
-
-### Exercise 4: Payload exceeding max size throws
-
-```csharp
-var options = Options.Create(new TransformOptions { MaxPayloadSizeBytes = 10 });
-var pipeline = new TransformPipeline(
-    Array.Empty<ITransformStep>(), options, NullLogger<TransformPipeline>.Instance);
-
-var largePayload = new string('x', 50);
-
-Assert.ThrowsAsync<InvalidOperationException>(
-    () => pipeline.ExecuteAsync(largePayload, "text/plain"));
-```
-
-### Exercise 5: Step failure with StopOnStepFailure = false continues
-
-```csharp
-var failingStep = Substitute.For<ITransformStep>();
-failingStep.Name.Returns("Failing");
-failingStep.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-    .ThrowsAsync(new InvalidOperationException("step error"));
-
-var goodStep = Substitute.For<ITransformStep>();
-goodStep.Name.Returns("Good");
-goodStep.ExecuteAsync(Arg.Any<TransformContext>(), Arg.Any<CancellationToken>())
-    .Returns(ci => ci.Arg<TransformContext>().WithPayload("done"));
-
-var options = Options.Create(new TransformOptions { StopOnStepFailure = false });
-var pipeline = new TransformPipeline(
-    new[] { failingStep, goodStep }, options, NullLogger<TransformPipeline>.Instance);
-
-var result = await pipeline.ExecuteAsync("input", "text/plain");
-
-Assert.That(result.Payload, Is.EqualTo("done"));
-Assert.That(result.StepsApplied, Is.EqualTo(1));
-```
-
----
-
-## Lab
-
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial16/Lab.cs`](../tests/TutorialLabs/Tutorial16/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Pipeline_SingleStep_TransformsPayload` | Single step transforms payload and reports StepsApplied |
+| 2 | `Pipeline_MultipleSteps_ChainsTransformations` | Multiple steps chain transformations in order |
+| 3 | `Pipeline_Disabled_ReturnsInputUnchanged` | Disabled pipeline returns input unchanged |
+| 4 | `Pipeline_StepFailure_SkippedWhenNotStopOnFailure` | Step failure skipped when StopOnStepFailure is false |
+| 5 | `Pipeline_MaxPayloadSize_RejectsOversized` | Payload exceeding max size throws InvalidOperationException |
+| 6 | `Pipeline_E2E_PublishTransformedToNatsEndpoint` | End-to-end transform and publish via real NATS |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial16.Lab"
 ```
 
-## Exam
+---
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial16/Exam.cs`](../tests/TutorialLabs/Tutorial16/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_RegexReplace_MasksPhoneNumbers` | 🟢 Starter | Create a `RegexReplaceStep` and wire it into a `TransformPipeline` |
+| 2 | `Intermediate_JsonPathFilter_RetainsOnlySpecifiedPaths` | 🟡 Intermediate | Create a `JsonPathFilterStep` with keep-paths and build the pipeline |
+| 3 | `Advanced_MultiStep_TransformAndPublish` | 🔴 Advanced | Assemble a 3-step pipeline, execute it, create an envelope, and publish |
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial16.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial16.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial16.ExamAnswers"
 ```
 
 ---

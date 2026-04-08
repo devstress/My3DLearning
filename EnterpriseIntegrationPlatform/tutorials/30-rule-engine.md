@@ -2,6 +2,19 @@
 
 Evaluate business rules with AND/OR condition logic against message fields.
 
+---
+
+## Learning Objectives
+
+1. Understand the Rule Engine pattern for evaluating business rules against messages
+2. Use `BusinessRuleEngine` to evaluate conditions and produce routing actions
+3. Configure rules with `Equals`, `Contains`, `In`, and other condition operators
+4. Verify AND/OR logic operators for multi-condition rules
+5. Confirm priority ordering and `StopOnMatch` behavior across multiple rules
+6. Validate metadata field matching and disabled rule skipping
+
+---
+
 ## Key Types
 
 ```csharp
@@ -64,132 +77,47 @@ public enum RuleActionType
 }
 ```
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Evaluate — SingleEqualsRule MatchesByMessageType
+> 💻 Run the lab tests to see each Rule Engine concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-await _store.AddOrUpdateAsync(new BusinessRule
-{
-    Name = "RouteOrders",
-    Priority = 1,
-    Conditions = [new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "order.created" }],
-    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "orders-topic" },
-});
-
-var envelope = IntegrationEnvelope<string>.Create("data", "OrderService", "order.created");
-var result = await _engine.EvaluateAsync(envelope);
-
-Assert.That(result.HasMatch, Is.True);
-Assert.That(result.MatchedRules, Has.Count.EqualTo(1));
-Assert.That(result.Actions[0].TargetTopic, Is.EqualTo("orders-topic"));
-```
-
-### 2. Evaluate — NoMatchingRule ReturnsNoMatch
-
-```csharp
-await _store.AddOrUpdateAsync(new BusinessRule
-{
-    Name = "RouteOrders",
-    Priority = 1,
-    Conditions = [new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "order.created" }],
-    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "orders-topic" },
-});
-
-var envelope = IntegrationEnvelope<string>.Create("data", "PaymentService", "payment.received");
-var result = await _engine.EvaluateAsync(envelope);
-
-Assert.That(result.HasMatch, Is.False);
-Assert.That(result.MatchedRules, Is.Empty);
-Assert.That(result.Actions, Is.Empty);
-```
-
-### 3. Evaluate — ContainsOperator MatchesSubstring
-
-```csharp
-await _store.AddOrUpdateAsync(new BusinessRule
-{
-    Name = "AllOrders",
-    Priority = 1,
-    Conditions = [new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Contains, Value = "order" }],
-    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "all-orders" },
-});
-
-var envelope = IntegrationEnvelope<string>.Create("data", "Service", "order.shipped");
-var result = await _engine.EvaluateAsync(envelope);
-
-Assert.That(result.HasMatch, Is.True);
-Assert.That(result.Actions[0].TargetTopic, Is.EqualTo("all-orders"));
-```
-
-### 4. Evaluate — AndLogic AllConditionsMustMatch
-
-```csharp
-await _store.AddOrUpdateAsync(new BusinessRule
-{
-    Name = "HighPriorityOrders",
-    Priority = 1,
-    LogicOperator = RuleLogicOperator.And,
-    Conditions =
-    [
-        new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "order.created" },
-        new RuleCondition { FieldName = "Source", Operator = RuleConditionOperator.Equals, Value = "PremiumService" },
-    ],
-    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "premium-orders" },
-});
-
-// Only MessageType matches, Source doesn't → no match.
-var envelope1 = IntegrationEnvelope<string>.Create("data", "BasicService", "order.created");
-var result1 = await _engine.EvaluateAsync(envelope1);
-Assert.That(result1.HasMatch, Is.False);
-
-// Both match → match.
-var envelope2 = IntegrationEnvelope<string>.Create("data", "PremiumService", "order.created");
-var result2 = await _engine.EvaluateAsync(envelope2);
-Assert.That(result2.HasMatch, Is.True);
-```
-
-### 5. Evaluate — OrLogic AnyConditionMatches
-
-```csharp
-await _store.AddOrUpdateAsync(new BusinessRule
-{
-    Name = "OrderOrPayment",
-    Priority = 1,
-    LogicOperator = RuleLogicOperator.Or,
-    Conditions =
-    [
-        new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "order.created" },
-        new RuleCondition { FieldName = "MessageType", Operator = RuleConditionOperator.Equals, Value = "payment.received" },
-    ],
-    Action = new RuleAction { ActionType = RuleActionType.Route, TargetTopic = "finance" },
-});
-
-var orderEnvelope = IntegrationEnvelope<string>.Create("data", "Service", "order.created");
-var orderResult = await _engine.EvaluateAsync(orderEnvelope);
-Assert.That(orderResult.HasMatch, Is.True);
-
-var paymentEnvelope = IntegrationEnvelope<string>.Create("data", "Service", "payment.received");
-var paymentResult = await _engine.EvaluateAsync(paymentEnvelope);
-Assert.That(paymentResult.HasMatch, Is.True);
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial30/Lab.cs`](../tests/TutorialLabs/Tutorial30/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Evaluate_MatchingRule_ReturnsMatch` | Matching rule returns match with action |
+| 2 | `Evaluate_NoMatch_ReturnsEmpty` | No matching rule returns empty result |
+| 3 | `Evaluate_ContainsOperator_MatchesSubstring` | Contains operator matches substring |
+| 4 | `Evaluate_MetadataCondition_MatchesMetadataField` | Metadata field condition matching |
+| 5 | `Evaluate_DisabledRule_IsSkipped` | Disabled rules are skipped |
+| 6 | `Evaluate_PriorityOrder_HigherPriorityWins` | Higher priority rule wins with StopOnMatch |
+| 7 | `Evaluate_OrLogic_MatchesAnyCondition` | OR logic matches any condition |
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial30.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial30.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial30/Exam.cs`](../tests/TutorialLabs/Tutorial30/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_MultiRuleEvaluation_CollectsAllMatches` | 🟢 Starter | MultiRuleEvaluation — CollectsAllMatches |
+| 2 | `Intermediate_RejectAction_NoRouting` | 🟡 Intermediate | RejectAction — NoRouting |
+| 3 | `Advanced_InOperator_MatchesCommaList` | 🔴 Advanced | InOperator — MatchesCommaList |
+
+> 💻 [`tests/TutorialLabs/Tutorial30/Exam.cs`](../tests/TutorialLabs/Tutorial30/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial30.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial30.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial30.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 29 — Throttle & Rate Limiting](29-throttle-rate-limiting.md)** | **Next: [Tutorial 31 — Event Sourcing →](31-event-sourcing.md)**

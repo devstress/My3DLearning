@@ -1,10 +1,19 @@
 // ============================================================================
-// Tutorial 17 – Normalizer (Lab)
+// Tutorial 17 – Normalizer (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Normalizer.
-// Real Integrations: MessageNormalizer detecting JSON/XML/CSV and converting
-// to canonical JSON. Publish normalized results via NatsBrokerEndpoint
-// (real NATS JetStream via Aspire).
+// PURPOSE: Run each test in order to see how the Normalizer pattern
+//          auto-detects JSON, XML, and CSV payloads and converts them
+//          to canonical JSON.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Normalize_Json_PassesThroughUnchanged           — JSON payload passes through without transformation
+//   2. Normalize_Xml_ConvertsToJson                    — XML payload converts to canonical JSON
+//   3. Normalize_Csv_ConvertsToJsonArray               — CSV payload converts to JSON array
+//   4. Normalize_StrictContentType_ThrowsForUnknown    — strict mode throws for unknown content types
+//   5. Normalize_NonStrict_DetectsJsonByPayload        — non-strict mode detects format by payload inspection
+//   6. Normalize_E2E_PublishNormalizedToNatsEndpoint    — end-to-end normalize and publish via real NATS
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

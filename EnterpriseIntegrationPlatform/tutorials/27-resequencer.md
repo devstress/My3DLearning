@@ -2,6 +2,19 @@
 
 Reorder out-of-sequence messages back into their original sequence.
 
+---
+
+## Learning Objectives
+
+1. Understand the Resequencer pattern and how it buffers out-of-order messages
+2. Use `MessageResequencer` to accept sequenced messages and release them in order
+3. Verify that a complete in-order sequence releases all messages on the final accept
+4. Confirm that out-of-order arrivals are buffered and released in correct sequence order
+5. Validate duplicate sequence numbers are ignored and `ActiveSequenceCount` is tracked
+6. Use `ReleaseOnTimeout` to flush incomplete sequences and verify buffered messages are returned in order
+
+---
+
 ## Key Types
 
 ```csharp
@@ -23,104 +36,47 @@ public sealed class ResequencerOptions
 }
 ```
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Accept — CompleteSequenceInOrder ReleasesAllMessages
+> 💻 Run the lab tests to see each Resequencer concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var resequencer = CreateResequencer();
-var correlationId = Guid.NewGuid();
-
-var r1 = resequencer.Accept(MakeSequenced(correlationId, 0, 3));
-var r2 = resequencer.Accept(MakeSequenced(correlationId, 1, 3));
-var r3 = resequencer.Accept(MakeSequenced(correlationId, 2, 3));
-
-// Only the last accept should release all 3
-Assert.That(r1, Is.Empty);
-Assert.That(r2, Is.Empty);
-Assert.That(r3, Has.Count.EqualTo(3));
-Assert.That(r3[0].Payload, Is.EqualTo("msg-0"));
-Assert.That(r3[1].Payload, Is.EqualTo("msg-1"));
-Assert.That(r3[2].Payload, Is.EqualTo("msg-2"));
-```
-
-### 2. Accept — OutOfOrder ReleasesInCorrectOrder
-
-```csharp
-var resequencer = CreateResequencer();
-var correlationId = Guid.NewGuid();
-
-var r1 = resequencer.Accept(MakeSequenced(correlationId, 2, 3));
-var r2 = resequencer.Accept(MakeSequenced(correlationId, 0, 3));
-var r3 = resequencer.Accept(MakeSequenced(correlationId, 1, 3));
-
-Assert.That(r1, Is.Empty);
-Assert.That(r2, Is.Empty);
-Assert.That(r3, Has.Count.EqualTo(3));
-Assert.That(r3[0].Payload, Is.EqualTo("msg-0"));
-Assert.That(r3[1].Payload, Is.EqualTo("msg-1"));
-Assert.That(r3[2].Payload, Is.EqualTo("msg-2"));
-```
-
-### 3. Accept — IncompleteSequence BuffersAndReturnsEmpty
-
-```csharp
-var resequencer = CreateResequencer();
-var correlationId = Guid.NewGuid();
-
-var result = resequencer.Accept(MakeSequenced(correlationId, 1, 3));
-
-Assert.That(result, Is.Empty);
-Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(1));
-```
-
-### 4. Accept — DuplicateSequenceNumber IsIgnored
-
-```csharp
-var resequencer = CreateResequencer();
-var correlationId = Guid.NewGuid();
-
-resequencer.Accept(MakeSequenced(correlationId, 0, 2));
-var dup = resequencer.Accept(MakeSequenced(correlationId, 0, 2));
-
-Assert.That(dup, Is.Empty);
-// Still waiting for seq 1
-Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(1));
-```
-
-### 5. ReleaseOnTimeout — IncompleteSequence ReturnsBufferedInOrder
-
-```csharp
-var resequencer = CreateResequencer();
-var correlationId = Guid.NewGuid();
-
-resequencer.Accept(MakeSequenced(correlationId, 2, 5));
-resequencer.Accept(MakeSequenced(correlationId, 0, 5));
-
-var released = resequencer.ReleaseOnTimeout<string>(correlationId);
-
-Assert.That(released, Has.Count.EqualTo(2));
-Assert.That(released[0].Payload, Is.EqualTo("msg-0"));
-Assert.That(released[1].Payload, Is.EqualTo("msg-2"));
-Assert.That(resequencer.ActiveSequenceCount, Is.EqualTo(0));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial27/Lab.cs`](../tests/TutorialLabs/Tutorial27/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Accept_InOrder_ReleasesAllWhenComplete` | Complete in-order sequence releases all messages |
+| 2 | `Accept_OutOfOrder_ReleasesInCorrectSequence` | Out-of-order arrivals are buffered and released in order |
+| 3 | `Accept_DuplicateSequenceNumber_IsIgnored` | Duplicate sequence numbers are silently ignored |
+| 4 | `Accept_MissingSequenceInfo_ThrowsArgumentException` | Missing sequence metadata throws ArgumentException |
+| 5 | `ReleaseOnTimeout_IncompleteSequence_ReleasesBuffered` | Timeout releases buffered messages in sequence order |
+| 6 | `ReleaseOnTimeout_UnknownCorrelation_ReturnsEmpty` | Unknown correlation ID returns empty list |
+| 7 | `ActiveSequenceCount_TracksBufferedSequences` | ActiveSequenceCount tracks number of open sequences |
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial27.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial27.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial27/Exam.cs`](../tests/TutorialLabs/Tutorial27/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_LargeOutOfOrderBatch_ReleasedInSequence` | 🟢 Starter | LargeOutOfOrderBatch — ReleasedInSequence |
+| 2 | `Intermediate_InterleavedSequences_EachReleasedIndependently` | 🟡 Intermediate | InterleavedSequences — EachReleasedIndependently |
+| 3 | `Advanced_TimeoutPartialRelease_ThenCompleteNewSequence` | 🔴 Advanced | TimeoutPartialRelease — ThenCompleteNewSequence |
+
+> 💻 [`tests/TutorialLabs/Tutorial27/Exam.cs`](../tests/TutorialLabs/Tutorial27/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial27.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial27.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial27.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 26 — Message Replay](26-message-replay.md)** | **Next: [Tutorial 28 — Competing Consumers →](28-competing-consumers.md)**

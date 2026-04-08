@@ -2,6 +2,17 @@
 
 Write messages to local or network file system paths with naming conventions.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Write data files with accompanying metadata sidecar files
+2. Expand filename patterns using envelope properties (MessageType, MessageId)
+3. Create directories on demand when the connector option is enabled
+4. Handle file-exists conflicts based on overwrite settings
+5. Read file content and list matching files from the file system
+6. Wire an envelope through a `MockEndpoint` into the file connector end-to-end
+
 ## Key Types
 
 ```csharp
@@ -34,111 +45,50 @@ public sealed class FileConnectorOptions
 }
 ```
 
-## Exercises
+---
 
-### 1. FileConnectorOptions — Defaults
+## Lab — Guided Practice
 
-```csharp
-var opts = new FileConnectorOptions();
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-Assert.That(opts.RootDirectory, Is.EqualTo(string.Empty));
-Assert.That(opts.Encoding, Is.EqualTo("utf-8"));
-Assert.That(opts.CreateDirectoryIfNotExists, Is.True);
-Assert.That(opts.OverwriteExisting, Is.False);
-Assert.That(opts.FilenamePattern, Is.EqualTo("{MessageId}-{MessageType}.json"));
-```
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Write_CreatesDataFile_AndMetadataSidecar` | Write creates data + metadata sidecar |
+| 2 | `Write_ExpandsFilenamePattern_FromEnvelope` | Filename pattern expanded from envelope |
+| 3 | `Write_CreatesDirectory_WhenOptionEnabled` | Directory auto-created when enabled |
+| 4 | `Write_Throws_WhenFileExists_AndOverwriteDisabled` | Throws on existing file when overwrite disabled |
+| 5 | `Read_ReturnsFileContent` | Read returns file content |
+| 6 | `ListFiles_ReturnsMatchingPaths` | List files returns matching paths |
+| 7 | `E2E_MockEndpoint_FeedsEnvelope_ThroughFileConnector` | End-to-end envelope → file connector |
 
-### 2. FileConnectorOptions — CustomValues
-
-```csharp
-var opts = new FileConnectorOptions
-{
-    RootDirectory = "/data/exports",
-    Encoding = "ascii",
-    CreateDirectoryIfNotExists = false,
-    OverwriteExisting = true,
-    FilenamePattern = "{CorrelationId}.xml",
-};
-
-Assert.That(opts.RootDirectory, Is.EqualTo("/data/exports"));
-Assert.That(opts.Encoding, Is.EqualTo("ascii"));
-Assert.That(opts.CreateDirectoryIfNotExists, Is.False);
-Assert.That(opts.OverwriteExisting, Is.True);
-Assert.That(opts.FilenamePattern, Is.EqualTo("{CorrelationId}.xml"));
-```
-
-### 3. IFileSystem — InterfaceShape HasExpectedMembers
-
-```csharp
-var type = typeof(IFileSystem);
-
-Assert.That(type.GetMethod("WriteAllBytesAsync"), Is.Not.Null);
-Assert.That(type.GetMethod("ReadAllBytesAsync"), Is.Not.Null);
-Assert.That(type.GetMethod("GetFiles"), Is.Not.Null);
-Assert.That(type.GetMethod("FileExists"), Is.Not.Null);
-Assert.That(type.GetMethod("CreateDirectory"), Is.Not.Null);
-```
-
-### 4. FileConnector — Write DelegatesToFileSystem
-
-```csharp
-var fs = Substitute.For<IFileSystem>();
-
-var opts = Options.Create(new FileConnectorOptions
-{
-    RootDirectory = "/output",
-    CreateDirectoryIfNotExists = true,
-});
-
-var connector = new FileConnector(fs, opts, NullLogger<FileConnector>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create("payload", "Svc", "order.placed");
-
-await connector.WriteAsync(
-    envelope,
-    s => System.Text.Encoding.UTF8.GetBytes(s),
-    CancellationToken.None);
-
-// Verify directory creation was called
-fs.Received(1).CreateDirectory(Arg.Any<string>());
-
-// Verify file write was called (data + metadata sidecar)
-await fs.Received(2).WriteAllBytesAsync(
-    Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>());
-```
-
-### 5. FileConnector — Read DelegatesToFileSystem
-
-```csharp
-var fs = Substitute.For<IFileSystem>();
-var expected = System.Text.Encoding.UTF8.GetBytes("file-content");
-fs.ReadAllBytesAsync("/output/test.json", Arg.Any<CancellationToken>())
-    .Returns(expected);
-
-var connector = new FileConnector(
-    fs,
-    Options.Create(new FileConnectorOptions { RootDirectory = "/output" }),
-    NullLogger<FileConnector>.Instance);
-
-var result = await connector.ReadAsync("/output/test.json", CancellationToken.None);
-
-Assert.That(result, Is.EqualTo(expected));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial37/Lab.cs`](../tests/TutorialLabs/Tutorial37/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial37/Lab.cs`](../tests/TutorialLabs/Tutorial37/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial37.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial37.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial37/Exam.cs`](../tests/TutorialLabs/Tutorial37/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_WriteAndReadRoundtrip_ThroughMockEndpoint` | 🟢 Starter | Write-and-read round-trip through MockEndpoint |
+| 2 | `Challenge2_CustomFilenamePattern_ContainsMessageTypeAndId` | 🟡 Intermediate | Custom filename pattern with MessageType and Id |
+| 3 | `Challenge3_SubdirectoryListing_CombinesRootAndSub` | 🔴 Advanced | Subdirectory listing combines root and sub |
+
+> 💻 [`tests/TutorialLabs/Tutorial37/Exam.cs`](../tests/TutorialLabs/Tutorial37/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial37.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial37.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial37.ExamAnswers"
 ```
 
 ---

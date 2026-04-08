@@ -1,11 +1,23 @@
 // ============================================================================
-// Tutorial 02 – Temporal.io Workflow Orchestration (Lab)
+// Tutorial 02 – Temporal.io Workflow Orchestration (Lab · Guided Practice)
 // ============================================================================
-// EIP Patterns: Process Manager, Saga, Scatter-Gather
-// End-to-End: Temporal workflow dispatch, saga compensation with rollback,
-// fan-out/split via parallel activities, and scalability through task queues
-// and retry policies. Uses MockTemporalWorkflowDispatcher for unit-level
-// validation; real Temporal containers run via Aspire in integration tests.
+// PURPOSE: Run each test in order to see how Temporal workflow dispatch, saga
+//          compensation, fan-out, and scalability settings work. Read the code
+//          and comments to understand each concept before moving to the Exam.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Workflow dispatch — envelope fields map to Temporal input contract
+//   2. Workflow ID — deterministic "integration-{messageId}" prevents duplicates
+//   3. Saga success — persist → validate → ack, no compensation needed
+//   4. Saga failure — workflow fails, compensation triggered via nack path
+//   5. Custom compensation — OnDispatch simulates LIFO rollback of completed steps
+//   6. Fan-out — split batch into parallel independent workflow executions
+//   7. TemporalOptions — task queue, namespace, server address defaults
+//   8. PipelineOptions — ack/nack subjects and workflow timeout configuration
+//   9. Aspire DI — wire PipelineOrchestrator with mock dispatcher via host
+//  10. Correlation/Causation — IDs propagated from envelope into workflow input
+//
+// INFRASTRUCTURE: MockTemporalWorkflowDispatcher / AspireIntegrationTestHost
 // ============================================================================
 
 using System.Text.Json;

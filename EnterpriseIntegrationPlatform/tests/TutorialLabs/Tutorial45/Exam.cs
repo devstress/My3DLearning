@@ -1,11 +1,19 @@
 // ============================================================================
-// Tutorial 45 – Performance Profiling (Exam)
+// Tutorial 45 – Performance Profiling (Exam · Fill in the Blanks)
 // ============================================================================
-// EIP Pattern: Profiling
-// E2E: Multi-snapshot analysis, delta metric tracking, and full profiling
-//      session lifecycle — all published through NatsBrokerEndpoint
-//      (real NATS JetStream via Aspire).
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — multiple snapshots_ time range query_ publish analysis
+//   🟡 Intermediate  — snapshot delta metrics_ cpu usage tracking
+//   🔴 Advanced      — profiling session lifecycle_ publish all snapshots
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
+
 using EnterpriseIntegrationPlatform.Contracts;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -13,20 +21,20 @@ using NUnit.Framework;
 using Performance.Profiling;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial45;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_MultipleSnapshots_TimeRangeQuery_PublishAnalysis()
+    public async Task Starter_MultipleSnapshots_TimeRangeQuery_PublishAnalysis()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t45-exam-range");
         var topic = AspireFixture.UniqueTopic("t45-exam-analysis-results");
 
-        var profiler = new ContinuousProfiler(
-            NullLogger<ContinuousProfiler>.Instance,
-            Options.Create(new ProfilingOptions()));
+        // TODO: Create a ContinuousProfiler with appropriate configuration
+        dynamic profiler = null!;
 
         var before = DateTimeOffset.UtcNow.AddSeconds(-1);
 
@@ -48,24 +56,22 @@ public sealed class Exam
 
         foreach (var snap in snapshots)
         {
-            var envelope = IntegrationEnvelope<string>.Create(
-                $"{snap.Label}|threads:{snap.Cpu.ThreadCount}|ws:{snap.Memory.WorkingSetBytes}",
-                "profiler", "snapshot.analysis");
-            await nats.PublishAsync(envelope, topic, default);
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic envelope = null!;
+            // TODO: await nats.PublishAsync(...)
         }
 
         nats.AssertReceivedOnTopic(topic, 3);
     }
 
     [Test]
-    public async Task Challenge2_SnapshotDeltaMetrics_CpuUsageTracking()
+    public async Task Intermediate_SnapshotDeltaMetrics_CpuUsageTracking()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t45-exam-delta");
         var topic = AspireFixture.UniqueTopic("t45-exam-delta-results");
 
-        var profiler = new ContinuousProfiler(
-            NullLogger<ContinuousProfiler>.Instance,
-            Options.Create(new ProfilingOptions()));
+        // TODO: Create a ContinuousProfiler with appropriate configuration
+        dynamic profiler = null!;
 
         // First snapshot has no CPU delta (no baseline)
         var first = profiler.CaptureSnapshot("first");
@@ -76,23 +82,20 @@ public sealed class Exam
         Assert.That(second.Cpu.TotalProcessorTime, Is.GreaterThanOrEqualTo(first.Cpu.TotalProcessorTime));
         Assert.That(second.Memory.TotalAllocatedBytes, Is.GreaterThanOrEqualTo(first.Memory.TotalAllocatedBytes));
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            $"cpu-delta-available:{second.Cpu.CpuUsagePercent is not null}|" +
-            $"alloc-delta-available:{second.Memory.AllocationRateBytesPerSecond is not null}",
-            "profiler", "delta.metrics");
-        await nats.PublishAsync(envelope, topic, default);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: await nats.PublishAsync(...)
         nats.AssertReceivedOnTopic(topic, 1);
     }
 
     [Test]
-    public async Task Challenge3_ProfilingSessionLifecycle_PublishAllSnapshots()
+    public async Task Advanced_ProfilingSessionLifecycle_PublishAllSnapshots()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t45-exam-session");
         var topic = AspireFixture.UniqueTopic("t45-exam-session-stream");
 
-        var profiler = new ContinuousProfiler(
-            NullLogger<ContinuousProfiler>.Instance,
-            Options.Create(new ProfilingOptions { MaxRetainedSnapshots = 5 }));
+        // TODO: Create a ContinuousProfiler with appropriate configuration
+        dynamic profiler = null!;
 
         // Simulate a profiling session: capture, query, verify
         Assert.That(profiler.SnapshotCount, Is.EqualTo(0));
@@ -113,10 +116,9 @@ public sealed class Exam
 
         foreach (var snap in allSnapshots)
         {
-            var envelope = IntegrationEnvelope<string>.Create(
-                $"{snap.Label}|gc-gen2:{snap.Gc.Gen2Collections}",
-                "profiler", "session.snapshot");
-            await nats.PublishAsync(envelope, topic, default);
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic envelope = null!;
+            // TODO: await nats.PublishAsync(...)
         }
 
         nats.AssertReceivedOnTopic(topic, 5);
@@ -126,3 +128,4 @@ public sealed class Exam
         Assert.That(all[4].Payload, Does.StartWith("cooldown|"));
     }
 }
+#endif

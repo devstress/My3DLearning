@@ -1,11 +1,22 @@
 // ============================================================================
-// Tutorial 08 – Activities Pipeline (Lab)
+// Tutorial 08 – Activities Pipeline (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Pipes and Filters
-// End-to-End: DefaultMessageValidationService for schema validation,
-// IntegrationPipelineInput/Result record construction, multi-stage pipeline
-// (Persist→Validate→Publish) with MockEndpoint and InvalidMessageChannel
-// for DLQ routing on validation failure.
+// PURPOSE: Run each test in order to see how validation, pipeline input/result
+//          records, and multi-stage pipeline patterns work through
+//          DefaultMessageValidationService and MockEndpoint.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Validation — valid JSON payload passes
+//   2. Validation — empty payload rejected with reason
+//   3. Validation — non-JSON payload rejected with reason
+//   4. Pipeline input — record construction with all fields
+//   5. Pipeline result — success and failure record semantics
+//   6. Two-stage pipeline — Validate → Publish end-to-end
+//   7. Validation failure — routes to Invalid Message Channel (DLQ)
+//   8. Three-stage pipeline — Persist → Validate → Publish
+//   9. Four-stage pipeline — Persist → Validate → Log → Publish with audit
+//
+// INFRASTRUCTURE: MockEndpoint / MockPersistenceActivityService / MockMessageLoggingService
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Activities;

@@ -4,6 +4,17 @@ Broadcast a request to multiple recipients in parallel and collect their respons
 
 ---
 
+## Learning Objectives
+
+1. Understand the Scatter-Gather pattern and how it fans out requests to multiple recipients
+2. Use `ScatterGatherer<TRequest, TResponse>` to broadcast a `ScatterRequest` and collect `GatherResponse` objects
+3. Verify that scatter publishes to every recipient topic and gathers responses by `CorrelationId`
+4. Confirm that partial responses are returned when the timeout expires before all recipients reply
+5. Validate edge cases: empty recipients return immediately, exceeding `MaxRecipients` throws
+6. Submit responses with `SubmitResponseAsync` and observe completion before the timeout window
+
+---
+
 ## Key Types
 
 ```csharp
@@ -39,132 +50,46 @@ public sealed record ScatterGatherResult<TResponse>(
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### Exercise 1: Empty recipients returns immediately
+> 💻 Run the lab tests to see each Scatter-Gather concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var options = Options.Create(new ScatterGatherOptions { TimeoutMs = 5000 });
-
-var sg = new ScatterGatherer<string, string>(
-    producer, options,
-    NullLogger<ScatterGatherer<string, string>>.Instance);
-
-var request = new ScatterRequest<string>(
-    Guid.NewGuid(), "ping", new List<string>());
-
-var result = await sg.ScatterGatherAsync(request);
-
-Assert.That(result.Responses, Is.Empty);
-Assert.That(result.TimedOut, Is.False);
-Assert.That(result.Duration, Is.LessThanOrEqualTo(TimeSpan.FromSeconds(1)));
-```
-
-### Exercise 2: Exceeding max recipients throws
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var options = Options.Create(new ScatterGatherOptions
-{
-    MaxRecipients = 2,
-    TimeoutMs = 5000,
-});
-
-var sg = new ScatterGatherer<string, string>(
-    producer, options,
-    NullLogger<ScatterGatherer<string, string>>.Instance);
-
-var request = new ScatterRequest<string>(
-    Guid.NewGuid(), "payload",
-    new List<string> { "t1", "t2", "t3" });
-
-Assert.ThrowsAsync<ArgumentException>(() => sg.ScatterGatherAsync(request));
-```
-
-### Exercise 3: Scatter publishes to each recipient topic
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var options = Options.Create(new ScatterGatherOptions { TimeoutMs = 500 });
-
-var sg = new ScatterGatherer<string, string>(
-    producer, options,
-    NullLogger<ScatterGatherer<string, string>>.Instance);
-
-var recipients = new List<string> { "svc-a", "svc-b" };
-var request = new ScatterRequest<string>(
-    Guid.NewGuid(), "hello", recipients);
-
-await sg.ScatterGatherAsync(request);
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    "svc-a",
-    Arg.Any<CancellationToken>());
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    "svc-b",
-    Arg.Any<CancellationToken>());
-```
-
-### Exercise 4: Full scatter-gather completes before timeout
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var options = Options.Create(new ScatterGatherOptions { TimeoutMs = 10_000 });
-
-var sg = new ScatterGatherer<string, string>(
-    producer, options,
-    NullLogger<ScatterGatherer<string, string>>.Instance);
-
-var correlationId = Guid.NewGuid();
-var request = new ScatterRequest<string>(
-    correlationId, "query", new List<string> { "svc-a" });
-
-var scatterTask = sg.ScatterGatherAsync(request);
-
-await Task.Delay(100);
-var submitted = await sg.SubmitResponseAsync(
-    correlationId,
-    new GatherResponse<string>("svc-a", "answer", DateTimeOffset.UtcNow, true, null));
-
-var result = await scatterTask;
-
-Assert.That(submitted, Is.True);
-Assert.That(result.Responses.Count, Is.EqualTo(1));
-Assert.That(result.Responses[0].Payload, Is.EqualTo("answer"));
-Assert.That(result.TimedOut, Is.False);
-```
-
-### Exercise 5: Default option values
-
-```csharp
-var opts = new ScatterGatherOptions();
-
-Assert.That(opts.TimeoutMs, Is.EqualTo(30_000));
-Assert.That(opts.MaxRecipients, Is.EqualTo(50));
-```
-
----
-
-## Lab
-
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial22/Lab.cs`](../tests/TutorialLabs/Tutorial22/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Scatter_PublishesToAllRecipients` | Scatter publishes to every recipient topic and gathers all responses |
+| 2 | `Scatter_EmptyRecipients_ReturnsImmediately` | Empty recipient list returns immediately with no responses |
+| 3 | `Gather_TimesOut_ReturnsPartialResponses` | Timeout returns partial responses when not all recipients reply |
+| 4 | `Gather_PreservesCorrelationId` | Result preserves the original CorrelationId |
+| 5 | `SubmitResponse_UnknownCorrelation_ReturnsFalse` | Submitting a response for an unknown CorrelationId returns false |
+| 6 | `Scatter_ExceedsMaxRecipients_Throws` | Exceeding MaxRecipients throws ArgumentException |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial22.Lab"
 ```
 
-## Exam
+---
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial22/Exam.cs`](../tests/TutorialLabs/Tutorial22/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_MixedResponses_SuccessAndFailure` | 🟢 Starter | MixedResponses — SuccessAndFailure |
+| 2 | `Intermediate_Duration_IsTracked` | 🟡 Intermediate | Duration — IsTracked |
+| 3 | `Advanced_ConcurrentOperations_IsolateByCorrelation` | 🔴 Advanced | ConcurrentOperations — IsolateByCorrelation |
+
+> 💻 [`tests/TutorialLabs/Tutorial22/Exam.cs`](../tests/TutorialLabs/Tutorial22/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial22.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial22.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial22.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 21 — Aggregator](21-aggregator.md)** | **Next: [Tutorial 23 — Request-Reply →](23-request-reply.md)**

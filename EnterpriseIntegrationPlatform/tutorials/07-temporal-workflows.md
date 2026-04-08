@@ -2,7 +2,16 @@
 
 Durable workflow orchestration with `IntegrationPipelineWorkflow`, `AtomicPipelineWorkflow`, and saga compensation.
 
----
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Configure `TemporalOptions` for server address, namespace, and task queue
+2. Discover workflow types in the Temporal assembly via reflection
+3. Dispatch integration messages through `PipelineOrchestrator` to Temporal workflows
+4. Generate deterministic workflow IDs from message identifiers for idempotent dispatch
+5. Serialize payload and metadata to JSON for Temporal workflow input
+6. Handle dispatch failures gracefully without losing messages
 
 ## Key Types
 
@@ -63,117 +72,52 @@ public interface IMessageLoggingService
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Verify workflow types exist in the Temporal assembly
+> **Purpose:** Run each test in order to see how Temporal workflow configuration,
+> orchestrator dispatch, and failure handling work through MockTemporalWorkflowDispatcher.
+> Read the code and comments to understand each concept before moving to the Exam.
 
-```csharp
-var assembly = typeof(TemporalOptions).Assembly;
-
-var pipeline = assembly.GetTypes()
-    .FirstOrDefault(t => t.Name == "IntegrationPipelineWorkflow");
-Assert.That(pipeline, Is.Not.Null);
-Assert.That(pipeline!.IsClass, Is.True);
-
-var atomic = assembly.GetTypes()
-    .FirstOrDefault(t => t.Name == "AtomicPipelineWorkflow");
-Assert.That(atomic, Is.Not.Null);
-
-var saga = assembly.GetTypes()
-    .FirstOrDefault(t => t.Name == "SagaCompensationWorkflow");
-Assert.That(saga, Is.Not.Null);
-```
-
-### 2. TemporalOptions defaults and overrides
-
-```csharp
-var options = new TemporalOptions();
-
-Assert.That(options.ServerAddress, Is.EqualTo("localhost:15233"));
-Assert.That(options.Namespace, Is.EqualTo("default"));
-Assert.That(options.TaskQueue, Is.EqualTo("integration-workflows"));
-Assert.That(TemporalOptions.SectionName, Is.EqualTo("Temporal"));
-
-options = new TemporalOptions
-{
-    ServerAddress = "temporal.prod.internal:7233",
-    Namespace = "production",
-    TaskQueue = "prod-integration",
-};
-
-Assert.That(options.ServerAddress, Is.EqualTo("temporal.prod.internal:7233"));
-Assert.That(options.Namespace, Is.EqualTo("production"));
-Assert.That(options.TaskQueue, Is.EqualTo("prod-integration"));
-```
-
-### 3. Verify activity classes expose expected methods
-
-```csharp
-var assembly = typeof(TemporalOptions).Assembly;
-
-var integrationActivities = assembly.GetTypes()
-    .FirstOrDefault(t => t.Name == "IntegrationActivities");
-Assert.That(integrationActivities, Is.Not.Null);
-Assert.That(integrationActivities!.GetMethod("ValidateMessageAsync"), Is.Not.Null);
-Assert.That(integrationActivities.GetMethod("LogProcessingStageAsync"), Is.Not.Null);
-
-var pipelineActivities = assembly.GetTypes()
-    .FirstOrDefault(t => t.Name == "PipelineActivities");
-Assert.That(pipelineActivities, Is.Not.Null);
-
-var methodNames = pipelineActivities!
-    .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-    .Select(m => m.Name).ToList();
-
-Assert.That(methodNames, Does.Contain("PersistMessageAsync"));
-Assert.That(methodNames, Does.Contain("UpdateDeliveryStatusAsync"));
-Assert.That(methodNames, Does.Contain("PublishAckAsync"));
-Assert.That(methodNames, Does.Contain("PublishNackAsync"));
-Assert.That(methodNames, Does.Contain("LogStageAsync"));
-```
-
-### 4. Mock workflow activity chain: Validate → Log
-
-```csharp
-var validationService = Substitute.For<IMessageValidationService>();
-var loggingService = Substitute.For<IMessageLoggingService>();
-
-var messageId = Guid.NewGuid();
-const string messageType = "order.created";
-const string payloadJson = "{\"orderId\": \"ORD-001\"}";
-
-validationService.ValidateAsync(messageType, payloadJson)
-    .Returns(MessageValidationResult.Success);
-loggingService.LogAsync(messageId, messageType, Arg.Any<string>())
-    .Returns(Task.CompletedTask);
-
-var validationResult = await validationService.ValidateAsync(messageType, payloadJson);
-Assert.That(validationResult.IsValid, Is.True);
-
-await loggingService.LogAsync(messageId, messageType, "Validated");
-
-await validationService.Received(1).ValidateAsync(messageType, payloadJson);
-await loggingService.Received(1).LogAsync(messageId, messageType, "Validated");
-```
-
----
-
-## Lab
+| # | Test | Concept |
+|---|------|---------|
+| 1 | `TemporalOptions_Defaults_TaskQueueAndNamespace` | TemporalOptions defaults and section name |
+| 2 | `WorkflowTypes_AllFourExistInAssembly` | Workflow type discovery via reflection |
+| 3 | `PipelineOptions_Defaults_AckNackSubjects` | PipelineOptions Ack/Nack subject defaults |
+| 4 | `PipelineOrchestrator_DispatchesCorrectInput` | Orchestrator converts envelope to pipeline input |
+| 5 | `PipelineOrchestrator_WorkflowId_DerivedFromMessageId` | Deterministic workflow ID from MessageId |
+| 6 | `PipelineOrchestrator_SerializesPayloadAndMetadata` | Payload and metadata serialized to JSON |
+| 7 | `PipelineOrchestrator_MapsPriorityAsInt` | MessagePriority enum mapped to integer |
+| 8 | `PipelineOrchestrator_DispatchFailure_HandledGracefully` | Failure result handled without throwing |
+| 9 | `PipelineOrchestrator_MultipleDispatches_CountTracked` | Multiple dispatches tracked for assertions |
 
 > 💻 [`tests/TutorialLabs/Tutorial07/Lab.cs`](../tests/TutorialLabs/Tutorial07/Lab.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial07.Lab"
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial07.Lab"
 ```
 
-## Exam
+---
+
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_AspireHost_OrchestratorDispatchesViaDI` | 🟢 Starter | AspireHost — OrchestratorDispatchesViaDI |
+| 2 | `Intermediate_WorkflowFailure_LogsWarning` | 🟡 Intermediate | WorkflowFailure — LogsWarning |
+| 3 | `Advanced_CorrelationAndCausation_PropagatedToInput` | 🔴 Advanced | CorrelationAndCausation — PropagatedToInput |
 
 > 💻 [`tests/TutorialLabs/Tutorial07/Exam.cs`](../tests/TutorialLabs/Tutorial07/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial07.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial07.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial07.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 06 — Messaging Channels](06-messaging-channels.md)** | **Next: [Tutorial 08 — Activities and the Pipeline →](08-activities-pipeline.md)**

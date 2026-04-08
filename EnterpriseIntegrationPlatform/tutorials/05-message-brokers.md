@@ -2,6 +2,17 @@
 
 Configure the three broker implementations (NATS JetStream, Kafka, Pulsar) via `BrokerOptions` and publish messages through the broker abstraction.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Configure `BrokerOptions` for each supported broker protocol (NATS, Kafka, Pulsar, Postgres)
+2. Publish messages through `IMessageBrokerProducer` — the protocol-agnostic abstraction
+3. Route messages to multiple topics and verify per-topic delivery
+4. Register event-driven consumers with push-based message handlers
+5. Use polling consumers to retrieve batches of messages with max-message limits
+6. Apply selective consumers with predicate-based priority filtering
+
 ## Key Types
 
 ```csharp
@@ -28,123 +39,52 @@ public interface IMessageBrokerProducer
 }
 ```
 
-## Exercises
+---
 
-### 1. Configure BrokerOptions for each broker
+## Lab — Guided Practice
 
-```csharp
-var nats = new BrokerOptions
-{
-    BrokerType = BrokerType.NatsJetStream,
-    ConnectionString = "nats://localhost:15222",
-    TransactionTimeoutSeconds = 30,
-};
-Assert.That(nats.BrokerType, Is.EqualTo(BrokerType.NatsJetStream));
-Assert.That(nats.ConnectionString, Is.EqualTo("nats://localhost:15222"));
+> **Purpose:** Run each test in order to see how broker configuration, protocol-agnostic
+> publishing, and consumer patterns work through real NATS JetStream via Aspire.
 
-var kafka = new BrokerOptions
-{
-    BrokerType = BrokerType.Kafka,
-    ConnectionString = "localhost:9092",
-    TransactionTimeoutSeconds = 60,
-};
-Assert.That(kafka.BrokerType, Is.EqualTo(BrokerType.Kafka));
-Assert.That(kafka.TransactionTimeoutSeconds, Is.EqualTo(60));
+| # | Test | Concept |
+|---|------|---------|
+| 1 | `BrokerOptions_Defaults_NatsJetStreamWithSectionName` | Default broker options and section name |
+| 2 | `BrokerType_AllProtocols_Enumerated` | All four broker protocols enumerated |
+| 3 | `Publish_NatsConfig_MessageDeliveredViaAbstraction` | Protocol-agnostic publish through real NATS |
+| 4 | `Publish_MultipleTopics_PerTopicDeliveryVerified` | Multi-topic routing with per-topic verification |
+| 5 | `EventDrivenConsumer_HandlerTriggeredOnMessageArrival` | Push-based event-driven consumer handler |
+| 6 | `PollingConsumer_BatchRetrieval_MaxMessagesRespected` | Pull-based polling with max-message limit |
+| 7 | `SelectiveConsumer_PredicateFilters_OnlyMatchingDelivered` | Priority-based predicate filtering |
+| 8 | `SubscribeConsumer_MultipleHandlers_AllInvoked` | Multiple independent subscription handlers |
 
-var pulsar = new BrokerOptions
-{
-    BrokerType = BrokerType.Pulsar,
-    ConnectionString = "pulsar://localhost:6650",
-    TransactionTimeoutSeconds = 45,
-};
-Assert.That(pulsar.BrokerType, Is.EqualTo(BrokerType.Pulsar));
-```
-
-### 2. Publish through a mocked NATS producer
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "nats-message", "NatsService", "nats.event");
-
-await producer.PublishAsync(envelope, "nats-events");
-
-await producer.Received(1).PublishAsync(
-    Arg.Is<IntegrationEnvelope<string>>(e => e.Payload == "nats-message"),
-    Arg.Is("nats-events"),
-    Arg.Any<CancellationToken>());
-```
-
-### 3. Publish through a mocked Kafka producer
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "kafka-message", "KafkaService", "kafka.event");
-
-await producer.PublishAsync(envelope, "kafka-events");
-
-await producer.Received(1).PublishAsync(
-    Arg.Is<IntegrationEnvelope<string>>(e => e.Payload == "kafka-message"),
-    Arg.Is("kafka-events"),
-    Arg.Any<CancellationToken>());
-```
-
-### 4. Publish to multiple topics and verify each
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var orderEnvelope = IntegrationEnvelope<string>.Create(
-    "new-order", "OrderService", "order.created");
-var paymentEnvelope = IntegrationEnvelope<string>.Create(
-    "payment-received", "PaymentService", "payment.received");
-var shippingEnvelope = IntegrationEnvelope<string>.Create(
-    "shipment-dispatched", "ShippingService", "shipment.dispatched");
-
-await producer.PublishAsync(orderEnvelope, "orders-topic");
-await producer.PublishAsync(paymentEnvelope, "payments-topic");
-await producer.PublishAsync(shippingEnvelope, "shipping-topic");
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Is("orders-topic"),
-    Arg.Any<CancellationToken>());
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Is("payments-topic"),
-    Arg.Any<CancellationToken>());
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Is("shipping-topic"),
-    Arg.Any<CancellationToken>());
-
-await producer.Received(3).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Any<string>(),
-    Arg.Any<CancellationToken>());
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial05/Lab.cs`](../tests/TutorialLabs/Tutorial05/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial05/Lab.cs`](../tests/TutorialLabs/Tutorial05/Lab.cs)
 
 ```bash
 dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial05.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial05/Exam.cs`](../tests/TutorialLabs/Tutorial05/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_MultiBrokerFanOut_AllEndpointsReceive` | 🟢 Starter | MultiBrokerFanOut — AllEndpointsReceive |
+| 2 | `Intermediate_SelectiveConsumer_PriorityGate` | 🟡 Intermediate | SelectiveConsumer — PriorityGate |
+| 3 | `Advanced_DIHost_BrokerOptionsConfigured` | 🔴 Advanced | DIHost — BrokerOptionsConfigured |
+
+> 💻 [`tests/TutorialLabs/Tutorial05/Exam.cs`](../tests/TutorialLabs/Tutorial05/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial05.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial05.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial05.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 04 — Integration Envelope](04-integration-envelope.md)** | **Next: [Tutorial 06 — Messaging Channels →](06-messaging-channels.md)**

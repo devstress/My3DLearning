@@ -1,10 +1,18 @@
 // ============================================================================
-// Tutorial 12 – Recipient List (Lab)
+// Tutorial 12 – Recipient List (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Recipient List
-// Real Integrations: Wire real RecipientListRouter with NatsBrokerEndpoint
-// (real NATS JetStream via Aspire), configure fan-out rules, send messages,
-// verify delivery to multiple destinations through real broker.
+// PURPOSE: Run each test in order to see how the Recipient List pattern
+//          fans out messages to multiple destinations via real NATS.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Basic fan-out — single rule sends to three destinations
+//   2. No match — unmatched envelope produces empty result
+//   3. Multi-rule combination — two matching rules merge destination lists
+//   4. Deduplication — overlapping destinations across rules are deduplicated
+//   5. Metadata recipients — destinations resolved from envelope metadata key
+//   6. Regex operator — pattern-based matching on message type
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -163,7 +171,7 @@ public sealed class Lab
 
     // ── 3. Advanced Recipient Sources (Real NATS) ────────────────────
 
-    [Test]
+    [Test, Retry(2)] // NATS JetStream may timeout transiently in CI when creating 3 streams
     public async Task Route_MetadataRecipients_AddsDestinations()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t12-meta");

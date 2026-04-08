@@ -2,7 +2,15 @@
 
 Point-to-Point, Publish-Subscribe, Datatype, Invalid Message, and Messaging Bridge channel patterns.
 
----
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Send messages through a Point-to-Point channel and verify single-consumer delivery
+2. Publish events via Publish-Subscribe channels with fan-out to multiple subscriber groups
+3. Route messages to type-specific topics using the Datatype Channel pattern
+4. Redirect malformed or expired messages to an Invalid Message Channel
+5. Register consumer handlers and verify handler invocation on message arrival
 
 ## Key Types
 
@@ -85,141 +93,52 @@ public interface IMessagingBridge : IAsyncDisposable
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Point-to-Point: single consumer receives the message
+> **Purpose:** Run each test in order to see how messaging channel patterns work
+> through real NATS JetStream via Aspire. Read the code and comments to understand
+> each concept before moving to the Exam.
 
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var envelope = IntegrationEnvelope<string>.Create(
-    payload: "order-123",
-    source: "OrderService",
-    messageType: "order.created") with
-{
-    Intent = MessageIntent.Command,
-};
-
-await producer.PublishAsync(envelope, "orders.point-to-point");
-
-await producer.Received(1).PublishAsync(
-    Arg.Is<IntegrationEnvelope<string>>(e => e.Payload == "order-123"),
-    Arg.Is("orders.point-to-point"),
-    Arg.Any<CancellationToken>());
-```
-
-### 2. Publish-Subscribe: every consumer group gets a copy
-
-```csharp
-var consumer = Substitute.For<IMessageBrokerConsumer>();
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "event-data", "EventService", "event.published") with
-{
-    Intent = MessageIntent.Event,
-};
-
-var groups = new[] { "billing-group", "analytics-group", "notifications-group" };
-
-foreach (var group in groups)
-{
-    await consumer.SubscribeAsync<string>(
-        "events.pubsub", group, _ => Task.CompletedTask);
-}
-
-await producer.PublishAsync(envelope, "events.pubsub");
-
-await consumer.Received(3).SubscribeAsync<string>(
-    Arg.Is("events.pubsub"),
-    Arg.Any<string>(),
-    Arg.Any<Func<IntegrationEnvelope<string>, Task>>(),
-    Arg.Any<CancellationToken>());
-
-foreach (var group in groups)
-{
-    await consumer.Received(1).SubscribeAsync<string>(
-        Arg.Is("events.pubsub"),
-        Arg.Is(group),
-        Arg.Any<Func<IntegrationEnvelope<string>, Task>>(),
-        Arg.Any<CancellationToken>());
-}
-```
-
-### 3. Datatype Channel: each message type routes to its own topic
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var orderEnvelope = IntegrationEnvelope<string>.Create(
-    "new-order", "OrderService", "order.created");
-var paymentEnvelope = IntegrationEnvelope<string>.Create(
-    "payment-received", "PaymentService", "payment.completed");
-var inventoryEnvelope = IntegrationEnvelope<string>.Create(
-    "stock-updated", "InventoryService", "inventory.adjusted");
-
-await producer.PublishAsync(orderEnvelope, "datatype.order.created");
-await producer.PublishAsync(paymentEnvelope, "datatype.payment.completed");
-await producer.PublishAsync(inventoryEnvelope, "datatype.inventory.adjusted");
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Is("datatype.order.created"),
-    Arg.Any<CancellationToken>());
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Is("datatype.payment.completed"),
-    Arg.Any<CancellationToken>());
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<string>>(),
-    Arg.Is("datatype.inventory.adjusted"),
-    Arg.Any<CancellationToken>());
-```
-
-### 4. Invalid Message Channel: expired envelopes
-
-```csharp
-var expired = IntegrationEnvelope<string>.Create(
-    "stale-data", "LegacySystem", "legacy.update") with
-{
-    ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-5),
-};
-
-Assert.That(expired.IsExpired, Is.True);
-
-var valid = IntegrationEnvelope<string>.Create(
-    "fresh-data", "ModernSystem", "modern.update") with
-{
-    ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
-};
-
-Assert.That(valid.IsExpired, Is.False);
-
-var noExpiry = IntegrationEnvelope<string>.Create(
-    "persistent-data", "CoreService", "core.event");
-
-Assert.That(noExpiry.ExpiresAt, Is.Null);
-Assert.That(noExpiry.IsExpired, Is.False);
-```
-
----
-
-## Lab
+| # | Test | Concept |
+|---|------|---------|
+| 1 | `PointToPoint_Send_DeliversToQueueChannel` | Point-to-Point send through real NATS |
+| 2 | `PointToPoint_Receive_HandlerTriggeredOnSend` | ReceiveAsync registers a consumer handler |
+| 3 | `PointToPoint_MultipleSends_AllDelivered` | Multiple messages accumulate in order |
+| 4 | `PubSub_Publish_DeliversToChannel` | Publish-Subscribe through real NATS |
+| 5 | `PubSub_Subscribe_MultipleSubscribersGetFanOut` | Fan-out to multiple subscribers |
+| 6 | `DatatypeChannel_RoutesMessageByType` | Datatype Channel routes by MessageType |
+| 7 | `DatatypeChannel_ResolveChannel_ComputesTopicName` | ResolveChannel computes topic name |
+| 8 | `InvalidMessageChannel_RouteInvalid_PublishesToInvalidTopic` | Invalid Message Channel routes malformed messages |
+| 9 | `InvalidMessageChannel_RouteRawInvalid_CapturesRawData` | RouteRawInvalidAsync handles raw data |
 
 > 💻 [`tests/TutorialLabs/Tutorial06/Lab.cs`](../tests/TutorialLabs/Tutorial06/Lab.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial06.Lab"
+dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial06.Lab"
 ```
 
-## Exam
+---
+
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_Bridge_PointToPointRelay` | 🟢 Starter | Bridge — PointToPointRelay |
+| 2 | `Intermediate_PubSubFanOut_ThreeSubscribersReceive` | 🟡 Intermediate | PubSubFanOut — ThreeSubscribersReceive |
+| 3 | `Advanced_DatatypeChannel_MultipleTypesRoutedCorrectly` | 🔴 Advanced | DatatypeChannel — MultipleTypesRoutedCorrectly |
 
 > 💻 [`tests/TutorialLabs/Tutorial06/Exam.cs`](../tests/TutorialLabs/Tutorial06/Exam.cs)
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial06.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial06.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial06.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 05 — Message Brokers](05-message-brokers.md)** | **Next: [Tutorial 07 — Temporal Workflows →](07-temporal-workflows.md)**

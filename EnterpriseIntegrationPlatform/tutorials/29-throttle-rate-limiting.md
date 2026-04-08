@@ -2,6 +2,18 @@
 
 Control message throughput with token-bucket rate limiting and throttling.
 
+---
+
+## Learning Objectives
+
+1. Understand the Throttle pattern and token-bucket rate limiting for message throughput
+2. Use `TokenBucketThrottle` to acquire tokens and control per-second message rates
+3. Verify that burst capacity limits are enforced and tokens decrement on acquisition
+4. Configure reject-on-backpressure mode to immediately reject when tokens are exhausted
+5. Inspect `ThrottleMetrics` to track acquired, rejected, and wait-time statistics
+
+---
+
 ## Key Types
 
 ```csharp
@@ -49,117 +61,46 @@ public sealed record ThrottlePartitionKey
 }
 ```
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. AcquireAsync — WithAvailableTokens ReturnsPermitted
+> 💻 Run the lab tests to see each Throttle concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var options = Options.Create(new ThrottleOptions
-{
-    MaxMessagesPerSecond = 100,
-    BurstCapacity = 10,
-    MaxWaitTime = TimeSpan.FromSeconds(5),
-});
-
-using var throttle = new TokenBucketThrottle(options, NullLogger<TokenBucketThrottle>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create("data", "TestService", "test.event");
-
-var result = await throttle.AcquireAsync(envelope);
-
-Assert.That(result.Permitted, Is.True);
-Assert.That(result.RejectionReason, Is.Null);
-```
-
-### 2. AcquireAsync — ConsumesToken DecreasesAvailableCount
-
-```csharp
-var options = Options.Create(new ThrottleOptions
-{
-    MaxMessagesPerSecond = 100,
-    BurstCapacity = 5,
-});
-
-using var throttle = new TokenBucketThrottle(options, NullLogger<TokenBucketThrottle>.Instance);
-
-var before = throttle.AvailableTokens;
-
-var envelope = IntegrationEnvelope<string>.Create("data", "TestService", "test.event");
-await throttle.AcquireAsync(envelope);
-
-Assert.That(throttle.AvailableTokens, Is.LessThan(before));
-```
-
-### 3. AcquireAsync — NoTokensWithRejectOnBackpressure RejectsImmediately
-
-```csharp
-var options = Options.Create(new ThrottleOptions
-{
-    MaxMessagesPerSecond = 1,
-    BurstCapacity = 1,
-    RejectOnBackpressure = true,
-});
-
-using var throttle = new TokenBucketThrottle(options, NullLogger<TokenBucketThrottle>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create("data", "TestService", "test.event");
-
-// Consume the only token.
-await throttle.AcquireAsync(envelope);
-
-// Next acquire should be rejected (no tokens, reject mode).
-var result = await throttle.AcquireAsync(envelope);
-
-Assert.That(result.Permitted, Is.False);
-Assert.That(result.RejectionReason, Is.Not.Null.And.Not.Empty);
-```
-
-### 4. ThrottleOptions — Defaults AreReasonable
-
-```csharp
-var opts = new ThrottleOptions();
-
-Assert.That(opts.MaxMessagesPerSecond, Is.EqualTo(100));
-Assert.That(opts.BurstCapacity, Is.EqualTo(200));
-Assert.That(opts.MaxWaitTime, Is.EqualTo(TimeSpan.FromSeconds(30)));
-Assert.That(opts.RejectOnBackpressure, Is.False);
-```
-
-### 5. ThrottleResult — ContainsExpectedFields
-
-```csharp
-var options = Options.Create(new ThrottleOptions
-{
-    MaxMessagesPerSecond = 100,
-    BurstCapacity = 10,
-});
-
-using var throttle = new TokenBucketThrottle(options, NullLogger<TokenBucketThrottle>.Instance);
-
-var envelope = IntegrationEnvelope<string>.Create("data", "TestService", "test.event");
-var result = await throttle.AcquireAsync(envelope);
-
-Assert.That(result.Permitted, Is.True);
-Assert.That(result.WaitTime, Is.GreaterThanOrEqualTo(TimeSpan.Zero));
-Assert.That(result.RemainingTokens, Is.GreaterThanOrEqualTo(0));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial29/Lab.cs`](../tests/TutorialLabs/Tutorial29/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Acquire_WithTokens_IsPermitted` | Available tokens permit acquisition |
+| 2 | `Acquire_ExhaustsTokens_StillPermittedUntilEmpty` | Tokens exhaust sequentially until empty |
+| 3 | `Acquire_RejectOnBackpressure_RejectsWhenEmpty` | Reject mode rejects when tokens exhausted |
+| 4 | `AvailableTokens_DecrementsOnAcquire` | Token count decrements on each acquire |
+| 5 | `GetMetrics_ReflectsAcquireAndReject` | Metrics track acquires and rejects |
+| 6 | `GetMetrics_RefillRate_MatchesConfig` | Refill rate matches configuration |
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial29.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial29.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial29/Exam.cs`](../tests/TutorialLabs/Tutorial29/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_BurstExhaustion_PermittedThenRejected` | 🟢 Starter | BurstExhaustion — PermittedThenRejected |
+| 2 | `Intermediate_MetricAccumulation_TracksAllOperations` | 🟡 Intermediate | MetricAccumulation — TracksAllOperations |
+| 3 | `Advanced_SingleToken_AlternatePermitReject` | 🔴 Advanced | SingleToken — AlternatePermitReject |
+
+> 💻 [`tests/TutorialLabs/Tutorial29/Exam.cs`](../tests/TutorialLabs/Tutorial29/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial29.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial29.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial29.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 28 — Competing Consumers](28-competing-consumers.md)** | **Next: [Tutorial 30 — Rule Engine →](30-rule-engine.md)**

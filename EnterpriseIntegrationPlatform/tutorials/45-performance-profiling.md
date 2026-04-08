@@ -2,6 +2,16 @@
 
 Profile CPU, memory, and GC performance to identify bottlenecks under load.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Capture performance snapshots and publish metrics to a broker endpoint
+2. Track snapshot counts and retrieve the latest snapshot by label
+3. Query snapshots by time range with filtered results
+4. Attach labels and metadata to profiling snapshots
+5. Enforce max-retention eviction of oldest snapshots
+
 ## Key Types
 
 ```csharp
@@ -50,122 +60,49 @@ public sealed class GcMonitor : IGcMonitor
 }
 ```
 
-## Exercises
+---
 
-### 1. ContinuousProfiler — CaptureSnapshot WithLabel
+## Lab — Guided Practice
 
-```csharp
-var profiler = new ContinuousProfiler(
-    NullLogger<ContinuousProfiler>.Instance,
-    Options.Create(new ProfilingOptions()));
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-var snapshot = profiler.CaptureSnapshot("baseline");
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `CaptureSnapshot_PublishMetricsToNatsBrokerEndpoint` | Capture and publish performance snapshot |
+| 2 | `SnapshotCount_Increments_PublishCount` | Snapshot count increments |
+| 3 | `GetLatestSnapshot_PublishLabel` | Get latest snapshot by label |
+| 4 | `GetSnapshotsByTimeRange_PublishFiltered` | Query snapshots by time range |
+| 5 | `LabelledSnapshots_PublishWithMetadata` | Labelled snapshots with metadata |
+| 6 | `MaxRetention_EvictsOldest_PublishCurrent` | Max retention evicts oldest snapshot |
 
-Assert.That(snapshot, Is.Not.Null);
-Assert.That(snapshot.Label, Is.EqualTo("baseline"));
-Assert.That(snapshot.SnapshotId, Is.Not.Null.And.Not.Empty);
-Assert.That(snapshot.Cpu, Is.Not.Null);
-Assert.That(snapshot.Memory, Is.Not.Null);
-Assert.That(snapshot.Gc, Is.Not.Null);
-```
-
-### 2. ContinuousProfiler — SnapshotCount Increments
-
-```csharp
-var profiler = new ContinuousProfiler(
-    NullLogger<ContinuousProfiler>.Instance,
-    Options.Create(new ProfilingOptions()));
-
-Assert.That(profiler.SnapshotCount, Is.EqualTo(0));
-
-profiler.CaptureSnapshot();
-Assert.That(profiler.SnapshotCount, Is.EqualTo(1));
-
-profiler.CaptureSnapshot();
-profiler.CaptureSnapshot();
-Assert.That(profiler.SnapshotCount, Is.EqualTo(3));
-```
-
-### 3. ContinuousProfiler — GetLatestSnapshot ReturnsLastCaptured
-
-```csharp
-var profiler = new ContinuousProfiler(
-    NullLogger<ContinuousProfiler>.Instance,
-    Options.Create(new ProfilingOptions()));
-
-Assert.That(profiler.GetLatestSnapshot(), Is.Null);
-
-profiler.CaptureSnapshot("first");
-profiler.CaptureSnapshot("second");
-var latest = profiler.CaptureSnapshot("third");
-
-var retrieved = profiler.GetLatestSnapshot();
-Assert.That(retrieved, Is.Not.Null);
-Assert.That(retrieved!.SnapshotId, Is.EqualTo(latest.SnapshotId));
-Assert.That(retrieved.Label, Is.EqualTo("third"));
-```
-
-### 4. AllocationHotspotDetector — RegisterAndGetOperationStats
-
-```csharp
-var detector = new AllocationHotspotDetector(
-    NullLogger<AllocationHotspotDetector>.Instance,
-    Options.Create(new ProfilingOptions()));
-
-detector.RegisterOperation("ProcessOrder", TimeSpan.FromMilliseconds(100), 1024);
-detector.RegisterOperation("ProcessOrder", TimeSpan.FromMilliseconds(200), 2048);
-
-var stats = detector.GetOperationStats("ProcessOrder");
-
-Assert.That(stats, Is.Not.Null);
-Assert.That(stats!.OperationName, Is.EqualTo("ProcessOrder"));
-Assert.That(stats.InvocationCount, Is.EqualTo(2));
-Assert.That(stats.AverageDuration, Is.EqualTo(TimeSpan.FromMilliseconds(150)));
-Assert.That(stats.MaxDuration, Is.EqualTo(TimeSpan.FromMilliseconds(200)));
-Assert.That(stats.MinDuration, Is.EqualTo(TimeSpan.FromMilliseconds(100)));
-Assert.That(stats.TotalAllocatedBytes, Is.EqualTo(3072));
-```
-
-### 5. InMemoryBenchmarkRegistry — RegisterAndGetBaseline
-
-```csharp
-var registry = new InMemoryBenchmarkRegistry(
-    NullLogger<InMemoryBenchmarkRegistry>.Instance);
-
-var baseline = new BenchmarkBaseline
-{
-    BenchmarkName = "SerializeOrder",
-    MeanDuration = TimeSpan.FromMilliseconds(5),
-    MeanAllocatedBytes = 4096,
-    Iterations = 1000,
-    RecordedAt = DateTimeOffset.UtcNow,
-};
-
-registry.RegisterBaseline(baseline);
-
-var retrieved = registry.GetBaseline("SerializeOrder");
-Assert.That(retrieved, Is.Not.Null);
-Assert.That(retrieved!.BenchmarkName, Is.EqualTo("SerializeOrder"));
-Assert.That(retrieved.MeanDuration, Is.EqualTo(TimeSpan.FromMilliseconds(5)));
-Assert.That(retrieved.MeanAllocatedBytes, Is.EqualTo(4096));
-Assert.That(retrieved.Iterations, Is.EqualTo(1000));
-Assert.That(retrieved.RegressionThresholdPercent, Is.EqualTo(20.0));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial45/Lab.cs`](../tests/TutorialLabs/Tutorial45/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial45/Lab.cs`](../tests/TutorialLabs/Tutorial45/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial45.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial45.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial45/Exam.cs`](../tests/TutorialLabs/Tutorial45/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_MultipleSnapshots_TimeRangeQuery_PublishAnalysis` | 🟢 Starter | Multiple snapshots with time-range query and analysis |
+| 2 | `Challenge2_SnapshotDeltaMetrics_CpuUsageTracking` | 🟡 Intermediate | Snapshot delta metrics — CPU usage tracking |
+| 3 | `Challenge3_ProfilingSessionLifecycle_PublishAllSnapshots` | 🔴 Advanced | Profiling session lifecycle — publish all snapshots |
+
+> 💻 [`tests/TutorialLabs/Tutorial45/Exam.cs`](../tests/TutorialLabs/Tutorial45/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial45.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial45.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial45.ExamAnswers"
 ```
 
 ---

@@ -1,9 +1,19 @@
 // ============================================================================
-// Tutorial 22 – Scatter-Gather (Lab)
+// Tutorial 22 – Scatter-Gather (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Scatter-Gather.
-// Real Integrations: ScatterGatherer with NatsBrokerEndpoint
-// (real NATS JetStream via Aspire) as producer.
+// PURPOSE: Run each test in order to see how the Scatter-Gather pattern
+//          broadcasts a request to multiple recipients and collects their
+//          responses within a timeout window.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Scatter_PublishesToAllRecipients            — scatter publishes to every recipient and gathers responses
+//   2. Scatter_EmptyRecipients_ReturnsImmediately  — empty recipient list returns immediately
+//   3. Gather_TimesOut_ReturnsPartialResponses     — timeout returns partial responses
+//   4. Gather_PreservesCorrelationId               — result preserves the original CorrelationId
+//   5. SubmitResponse_UnknownCorrelation_ReturnsFalse — unknown CorrelationId returns false
+//   6. Scatter_ExceedsMaxRecipients_Throws         — exceeding MaxRecipients throws ArgumentException
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

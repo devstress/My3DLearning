@@ -1,11 +1,19 @@
 // ============================================================================
-// Tutorial 44 – Disaster Recovery (Exam)
+// Tutorial 44 – Disaster Recovery (Exam · Fill in the Blanks)
 // ============================================================================
-// EIP Pattern: Failover / Failback
-// E2E: Full failover/failback lifecycle, multi-region topology with
-//      failover chain, and failover audit trail — all via NatsBrokerEndpoint
-//      (real NATS JetStream via Aspire).
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter       — full failover failback lifecycle_ with nats broker endpoint
+//   🟡 Intermediate  — multi region topology_ failover chain
+//   🔴 Advanced      — failover result details_ publish audit trail
 // ============================================================================
+#pragma warning disable CS0219  // Variable assigned but never used
+#pragma warning disable CS8602  // Dereference of possibly null reference
+#pragma warning disable CS8604  // Possible null reference argument
+
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.DisasterRecovery;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -13,20 +21,20 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
+#if EXAM_STUDENT
 namespace TutorialLabs.Tutorial44;
 
 [TestFixture]
 public sealed class Exam
 {
     [Test]
-    public async Task Challenge1_FullFailoverFailbackLifecycle_WithNatsBrokerEndpoint()
+    public async Task Starter_FullFailoverFailbackLifecycle_WithNatsBrokerEndpoint()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t44-exam-lifecycle");
         var topic = AspireFixture.UniqueTopic("t44-exam-dr-audit");
 
-        var mgr = new InMemoryFailoverManager(
-            NullLogger<InMemoryFailoverManager>.Instance,
-            Options.Create(new DisasterRecoveryOptions()));
+        // TODO: Create a InMemoryFailoverManager with appropriate configuration
+        dynamic mgr = null!;
 
         await mgr.RegisterRegionAsync(new RegionInfo
         {
@@ -40,45 +48,49 @@ public sealed class Exam
         });
 
         // Initial state
-        var initial = await mgr.GetPrimaryAsync();
+        // TODO: var initial = await mgr.GetPrimaryAsync(...)
+        dynamic initial = null!;
         Assert.That(initial!.RegionId, Is.EqualTo("primary-region"));
 
         // Failover
-        var failover = await mgr.FailoverAsync("standby-region");
+        // TODO: var failover = await mgr.FailoverAsync(...)
+        dynamic failover = null!;
         Assert.That(failover.Success, Is.True);
         Assert.That(failover.PromotedRegionId, Is.EqualTo("standby-region"));
         Assert.That(failover.DemotedRegionId, Is.EqualTo("primary-region"));
 
-        var afterFailover = await mgr.GetPrimaryAsync();
+        // TODO: var afterFailover = await mgr.GetPrimaryAsync(...)
+        dynamic afterFailover = null!;
         Assert.That(afterFailover!.RegionId, Is.EqualTo("standby-region"));
 
-        var envelope1 = IntegrationEnvelope<string>.Create(
-            $"failover:{failover.PromotedRegionId}", "dr-manager", "failover.event");
-        await nats.PublishAsync(envelope1, topic, default);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope1 = null!;
+        // TODO: await nats.PublishAsync(...)
 
         // Failback
-        var failback = await mgr.FailbackAsync("primary-region");
+        // TODO: var failback = await mgr.FailbackAsync(...)
+        dynamic failback = null!;
         Assert.That(failback.Success, Is.True);
 
-        var afterFailback = await mgr.GetPrimaryAsync();
+        // TODO: var afterFailback = await mgr.GetPrimaryAsync(...)
+        dynamic afterFailback = null!;
         Assert.That(afterFailback!.RegionId, Is.EqualTo("primary-region"));
 
-        var envelope2 = IntegrationEnvelope<string>.Create(
-            $"failback:{failback.PromotedRegionId}", "dr-manager", "failback.event");
-        await nats.PublishAsync(envelope2, topic, default);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope2 = null!;
+        // TODO: await nats.PublishAsync(...)
 
         nats.AssertReceivedOnTopic(topic, 2);
     }
 
     [Test]
-    public async Task Challenge2_MultiRegionTopology_FailoverChain()
+    public async Task Intermediate_MultiRegionTopology_FailoverChain()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t44-exam-chain");
         var topic = AspireFixture.UniqueTopic("t44-exam-chain-events");
 
-        var mgr = new InMemoryFailoverManager(
-            NullLogger<InMemoryFailoverManager>.Instance,
-            Options.Create(new DisasterRecoveryOptions()));
+        // TODO: Create a InMemoryFailoverManager with appropriate configuration
+        dynamic mgr = null!;
 
         await mgr.RegisterRegionAsync(new RegionInfo
         {
@@ -97,22 +109,23 @@ public sealed class Exam
         });
 
         // First failover: us-east-1 → eu-west-1
-        var r1 = await mgr.FailoverAsync("eu-west-1");
+        // TODO: var r1 = await mgr.FailoverAsync(...)
+        dynamic r1 = null!;
         Assert.That(r1.Success, Is.True);
         Assert.That((await mgr.GetPrimaryAsync())!.RegionId, Is.EqualTo("eu-west-1"));
 
         // Second failover: eu-west-1 → ap-south-1
-        var r2 = await mgr.FailoverAsync("ap-south-1");
+        // TODO: var r2 = await mgr.FailoverAsync(...)
+        dynamic r2 = null!;
         Assert.That(r2.Success, Is.True);
         Assert.That((await mgr.GetPrimaryAsync())!.RegionId, Is.EqualTo("ap-south-1"));
 
         var results = new[] { r1, r2 };
         foreach (var result in results)
         {
-            var envelope = IntegrationEnvelope<string>.Create(
-                $"{result.DemotedRegionId}→{result.PromotedRegionId}",
-                "dr-manager", "failover.chain");
-            await nats.PublishAsync(envelope, topic, default);
+            // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+            dynamic envelope = null!;
+            // TODO: await nats.PublishAsync(...)
         }
 
         nats.AssertReceivedOnTopic(topic, 2);
@@ -123,14 +136,13 @@ public sealed class Exam
     }
 
     [Test]
-    public async Task Challenge3_FailoverResultDetails_PublishAuditTrail()
+    public async Task Advanced_FailoverResultDetails_PublishAuditTrail()
     {
         await using var nats = AspireFixture.CreateNatsEndpoint("t44-exam-audit");
         var topic = AspireFixture.UniqueTopic("t44-exam-audit-trail");
 
-        var mgr = new InMemoryFailoverManager(
-            NullLogger<InMemoryFailoverManager>.Instance,
-            Options.Create(new DisasterRecoveryOptions()));
+        // TODO: Create a InMemoryFailoverManager with appropriate configuration
+        dynamic mgr = null!;
 
         await mgr.RegisterRegionAsync(new RegionInfo
         {
@@ -143,7 +155,8 @@ public sealed class Exam
             State = FailoverState.Standby,
         });
 
-        var result = await mgr.FailoverAsync("region-b");
+        // TODO: var result = await mgr.FailoverAsync(...)
+        dynamic result = null!;
 
         Assert.That(result.Success, Is.True);
         Assert.That(result.PromotedRegionId, Is.EqualTo("region-b"));
@@ -152,15 +165,16 @@ public sealed class Exam
         Assert.That(result.CompletedAt, Is.GreaterThan(DateTimeOffset.MinValue));
         Assert.That(result.ErrorMessage, Is.Null);
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            $"success:{result.PromotedRegionId}|demoted:{result.DemotedRegionId}|duration:{result.Duration.TotalMilliseconds}ms",
-            "dr-manager", "failover.audit");
-        await nats.PublishAsync(envelope, topic, default);
+        // TODO: Create an IntegrationEnvelope with appropriate payload, source, and message type
+        dynamic envelope = null!;
+        // TODO: await nats.PublishAsync(...)
         nats.AssertReceivedOnTopic(topic, 1);
 
         // Verify regions after failover
-        var regions = await mgr.GetAllRegionsAsync();
+        // TODO: var regions = await mgr.GetAllRegionsAsync(...)
+        dynamic regions = null!;
         Assert.That(regions.Single(r => r.RegionId == "region-b").IsPrimary, Is.True);
         Assert.That(regions.Single(r => r.RegionId == "region-a").State, Is.EqualTo(FailoverState.Standby));
     }
 }
+#endif

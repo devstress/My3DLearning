@@ -1,9 +1,23 @@
 // ============================================================================
-// Tutorial 04 – Integration Envelope (Lab)
+// Tutorial 04 – Integration Envelope (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Envelope Wrapper, Fault Message
-// Real Integrations: Channel tests use real NATS JetStream via Aspire.
-// Record immutability and FaultEnvelope tests are pure data-structure tests.
+// PURPOSE: Run each test in order to see how record immutability, fault
+//          envelopes, message history, and every envelope field work
+//          end-to-end through real NATS JetStream. Read the code and
+//          comments to understand each concept before moving to the Exam.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Record `with` — immutable copy with overridden fields
+//   2. FaultEnvelope factory — preserves correlation from failed message
+//   3. FaultEnvelope exception — captures error type, message, stack trace
+//   4. MessageHistoryEntry — processing step audit trail
+//   5. ExpiresAt — expiration survives channel delivery
+//   6. ReplyTo — Return Address pattern through channel
+//   7. Split sequence — SequenceNumber + TotalCount through channel
+//   8. Metadata headers — well-known MessageHeaders constants through NATS
+//   9. All fields — complex payload with every field end-to-end
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire) / MockEndpoint
 // ============================================================================
 
 using NUnit.Framework;

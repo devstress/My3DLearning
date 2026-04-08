@@ -2,6 +2,17 @@
 
 Deep dive into every `IntegrationEnvelope<T>` property: identity, expiration, metadata headers, sequence numbers, and immutable record semantics.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Use C# record `with` expressions to create modified envelopes without mutating the original
+2. Create `FaultEnvelope` records from failed messages for dead-letter routing and replay
+3. Track processing steps using `MessageHistoryEntry` for full audit trails
+4. Verify that `ExpiresAt`, `ReplyTo`, and split-sequence fields survive channel delivery
+5. Attach and read well-known `MessageHeaders` constants through real NATS
+6. Construct a complex payload envelope with every field populated end-to-end
+
 ## Key Types
 
 ```csharp
@@ -43,142 +54,52 @@ public static class MessageHeaders
 }
 ```
 
-## Exercises
+---
 
-### 1. Set all properties on a complex payload envelope
+## Lab — Guided Practice
 
-```csharp
-public sealed record ShipmentPayload(string ShipmentId, string Carrier, decimal WeightKg, string[] Items);
+> **Purpose:** Run each test in order to see how record immutability, fault envelopes,
+> message history, and every envelope field work end-to-end through real NATS JetStream.
 
-var items = new[] { "SKU-001", "SKU-002" };
-var shipment = new ShipmentPayload("SHIP-1", "FedEx", 12.5m, items);
-var correlationId = Guid.NewGuid();
+| # | Test | Concept |
+|---|------|---------|
+| 1 | `Envelope_WithExpression_CreatesNewInstanceOriginalUnchanged` | Record `with` — immutable copy with overrides |
+| 2 | `FaultEnvelope_CreateFromFailedMessage_PreservesCorrelation` | FaultEnvelope factory preserves identity |
+| 3 | `FaultEnvelope_WithException_CapturesErrorDetails` | Exception type and message captured |
+| 4 | `MessageHistoryEntry_RecordsProcessingSteps` | Message History audit trail pattern |
+| 5 | `Envelope_ExpiresAt_SurvivedChannelDelivery` | ExpiresAt preserved through real NATS |
+| 6 | `Envelope_ReplyTo_RequestReplyPatternThroughChannel` | ReplyTo (Return Address) through channel |
+| 7 | `Envelope_SplitSequence_ThroughChannel` | SequenceNumber + TotalCount through channel |
+| 8 | `Envelope_MetadataHeaders_WellKnownConstants` | MessageHeaders constants through real NATS |
+| 9 | `Envelope_AllFields_ComplexPayloadThroughChannel` | Every field on a complex payload end-to-end |
 
-var envelope = IntegrationEnvelope<ShipmentPayload>.Create(
-    payload: shipment,
-    source: "WarehouseService",
-    messageType: "shipment.dispatched",
-    correlationId: correlationId) with
-{
-    SchemaVersion = "2.0",
-    Priority = MessagePriority.High,
-    Intent = MessageIntent.Event,
-    ReplyTo = "shipment-replies",
-    ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
-    SequenceNumber = 0,
-    TotalCount = 3,
-};
-
-Assert.That(envelope.Payload.ShipmentId, Is.EqualTo("SHIP-1"));
-Assert.That(envelope.Payload.Carrier, Is.EqualTo("FedEx"));
-Assert.That(envelope.Payload.WeightKg, Is.EqualTo(12.5m));
-Assert.That(envelope.Payload.Items, Has.Length.EqualTo(2));
-Assert.That(envelope.CorrelationId, Is.EqualTo(correlationId));
-Assert.That(envelope.SchemaVersion, Is.EqualTo("2.0"));
-Assert.That(envelope.Priority, Is.EqualTo(MessagePriority.High));
-Assert.That(envelope.Intent, Is.EqualTo(MessageIntent.Event));
-Assert.That(envelope.ReplyTo, Is.EqualTo("shipment-replies"));
-Assert.That(envelope.ExpiresAt, Is.Not.Null);
-Assert.That(envelope.SequenceNumber, Is.EqualTo(0));
-Assert.That(envelope.TotalCount, Is.EqualTo(3));
-```
-
-### 2. Verify unique MessageId generation and independent CorrelationIds
-
-```csharp
-var ids = Enumerable.Range(0, 100)
-    .Select(_ => IntegrationEnvelope<string>.Create("payload", "source", "type").MessageId)
-    .ToList();
-
-Assert.That(ids.Distinct().Count(), Is.EqualTo(100),
-    "Each envelope must have a globally unique MessageId");
-
-var env1 = IntegrationEnvelope<string>.Create("a", "src", "type");
-var env2 = IntegrationEnvelope<string>.Create("b", "src", "type");
-Assert.That(env1.CorrelationId, Is.Not.EqualTo(env2.CorrelationId));
-```
-
-### 3. Test IsExpired with past, future, and null ExpiresAt
-
-```csharp
-var expired = IntegrationEnvelope<string>.Create("stale", "source", "type") with
-{
-    ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-5),
-};
-Assert.That(expired.IsExpired, Is.True);
-
-var fresh = IntegrationEnvelope<string>.Create("fresh", "source", "type") with
-{
-    ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
-};
-Assert.That(fresh.IsExpired, Is.False);
-
-var immortal = IntegrationEnvelope<string>.Create("immortal", "source", "type");
-Assert.That(immortal.ExpiresAt, Is.Null);
-Assert.That(immortal.IsExpired, Is.False);
-```
-
-### 4. Add and read metadata headers
-
-```csharp
-var envelope = IntegrationEnvelope<string>.Create("payload", "source", "type") with
-{
-    Metadata = new Dictionary<string, string>
-    {
-        [MessageHeaders.ContentType] = "application/json",
-        [MessageHeaders.TraceId] = "abc-123-trace",
-        [MessageHeaders.SourceTopic] = "orders-topic",
-    },
-};
-
-Assert.That(envelope.Metadata[MessageHeaders.ContentType], Is.EqualTo("application/json"));
-Assert.That(envelope.Metadata[MessageHeaders.TraceId], Is.EqualTo("abc-123-trace"));
-Assert.That(envelope.Metadata[MessageHeaders.SourceTopic], Is.EqualTo("orders-topic"));
-Assert.That(envelope.Metadata, Has.Count.EqualTo(3));
-```
-
-### 5. Model a Splitter output with sequence numbers
-
-```csharp
-var correlationId = Guid.NewGuid();
-var parts = Enumerable.Range(0, 3)
-    .Select(i => IntegrationEnvelope<string>.Create(
-        payload: $"Part-{i}",
-        source: "Splitter",
-        messageType: "order.part",
-        correlationId: correlationId) with
-    {
-        SequenceNumber = i,
-        TotalCount = 3,
-    })
-    .ToList();
-
-Assert.That(parts, Has.Count.EqualTo(3));
-
-for (var i = 0; i < 3; i++)
-{
-    Assert.That(parts[i].SequenceNumber, Is.EqualTo(i));
-    Assert.That(parts[i].TotalCount, Is.EqualTo(3));
-    Assert.That(parts[i].CorrelationId, Is.EqualTo(correlationId));
-}
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial04/Lab.cs`](../tests/TutorialLabs/Tutorial04/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial04/Lab.cs`](../tests/TutorialLabs/Tutorial04/Lab.cs)
 
 ```bash
 dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial04.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial04/Exam.cs`](../tests/TutorialLabs/Tutorial04/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Intermediate_CausationChain_ThreeHopsThroughChannel` | 🟡 Intermediate | CausationChain — ThreeHopsThroughChannel |
+| 2 | `Advanced_SplitSequence_AllPartsWithMetadataPreserved` | 🔴 Advanced | SplitSequence — AllPartsWithMetadataPreserved |
+
+> 💻 [`tests/TutorialLabs/Tutorial04/Exam.cs`](../tests/TutorialLabs/Tutorial04/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial04.Exam"
-```
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial04.Exam" --filter "FullyQualifiedName!~ExamAnswers"
 
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial04.ExamAnswers"
+```
 ---
 
 **Previous: [← Tutorial 03 — Your First Message](03-first-message.md)** | **Next: [Tutorial 05 — Message Brokers →](05-message-brokers.md)**

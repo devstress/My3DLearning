@@ -1,9 +1,19 @@
 // ============================================================================
-// Tutorial 24 – Retry Framework (Lab)
+// Tutorial 24 – Retry Framework (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Retry / Guaranteed Delivery.
-// Real Integrations: ExponentialBackoffRetryPolicy with no-delay override,
-// then publish success via NatsBrokerEndpoint (real NATS JetStream via Aspire).
+// PURPOSE: Run each test in order to see how exponential backoff retry logic
+//          wraps operations, tracks attempts, and surfaces exceptions on
+//          exhaustion.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Execute_SucceedsFirstAttempt_ReturnsResult       — success on first attempt returns result
+//   2. Execute_FailsThenSucceeds_RetriesCorrectly       — transient failures are retried until success
+//   3. Execute_AllAttemptsFail_ReturnsFailure            — exhaustion returns IsSucceeded = false
+//   4. Execute_VoidOverload_ReturnsRetryResultBool       — void overload returns RetryResult<bool>
+//   5. Execute_RetryThenPublish_EndToEnd                 — retry + publish end-to-end via real NATS
+//   6. Execute_MaxAttemptsOne_NoRetry                    — MaxAttempts = 1 means no retry
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

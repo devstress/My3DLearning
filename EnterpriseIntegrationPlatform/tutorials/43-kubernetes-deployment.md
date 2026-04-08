@@ -2,98 +2,78 @@
 
 Deploy the platform to Kubernetes with Helm charts and Kustomize overlays.
 
-## Exercises
+## Learning Objectives
 
-### 1. TemporalOptions — PropertiesAssignable
+After completing this tutorial you will be able to:
+
+1. Resolve environment-specific configuration overrides
+2. Fall back to default values when no environment override exists
+3. Resolve multiple keys at once and publish results
+4. Build a dev → staging → prod configuration cascade
+5. Resolve configuration from environment variables
+
+---
+
+## Key Types
 
 ```csharp
-var opts = new TemporalOptions
+// src/Configuration/IConfigurationStore.cs — configuration key-value storage
+public interface IConfigurationStore
 {
-    ServerAddress = "temporal.prod:7233",
-    Namespace = "production",
-    TaskQueue = "order-workflows",
-};
+    Task<string?> GetAsync(string key, string? environment = null, CancellationToken ct = default);
+    Task SetAsync(string key, string value, string? environment = null, CancellationToken ct = default);
+}
 
-Assert.That(opts.ServerAddress, Is.EqualTo("temporal.prod:7233"));
-Assert.That(opts.Namespace, Is.EqualTo("production"));
-Assert.That(opts.TaskQueue, Is.EqualTo("order-workflows"));
-```
-
-### 2. PipelineOptions — PropertiesAssignable
-
-```csharp
-var opts = new PipelineOptions
+// src/Configuration/IFeatureFlagService.cs — feature flag evaluation
+public interface IFeatureFlagService
 {
-    AckSubject = "pipeline.ack",
-    NackSubject = "pipeline.nack",
-    InboundSubject = "pipeline.inbound",
-    NatsUrl = "nats://nats-server:4222",
-    ConsumerGroup = "my-group",
-};
-
-Assert.That(opts.AckSubject, Is.EqualTo("pipeline.ack"));
-Assert.That(opts.NackSubject, Is.EqualTo("pipeline.nack"));
-Assert.That(opts.InboundSubject, Is.EqualTo("pipeline.inbound"));
-Assert.That(opts.NatsUrl, Is.EqualTo("nats://nats-server:4222"));
-Assert.That(opts.ConsumerGroup, Is.EqualTo("my-group"));
+    Task<bool> IsEnabledAsync(string flagName, string? tenantId = null, CancellationToken ct = default);
+}
 ```
 
-### 3. JwtOptions — Defaults ValidateLifetimeAndClockSkew
+---
 
-```csharp
-var opts = new JwtOptions();
+## Lab — Guided Practice
 
-Assert.That(opts.ValidateLifetime, Is.True);
-Assert.That(opts.ClockSkew, Is.EqualTo(TimeSpan.FromMinutes(5)));
-Assert.That(opts.Issuer, Is.EqualTo(string.Empty));
-Assert.That(opts.Audience, Is.EqualTo(string.Empty));
-Assert.That(opts.SigningKey, Is.EqualTo(string.Empty));
-```
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-### 4. DisasterRecoveryOptions — Defaults
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `EnvironmentOverride_ResolvesSpecificEnvironment` | Resolve environment-specific override |
+| 2 | `EnvironmentOverride_FallsBackToDefault` | Fall back to default value |
+| 3 | `EnvironmentOverride_ReturnsNull_WhenNotFound` | Returns null when key not found |
+| 4 | `EnvironmentOverride_ResolveMany_PublishResults` | Resolve many keys and publish results |
+| 5 | `ConfigCascade_DevStagingProd_PublishResolved` | Dev → staging → prod cascade |
+| 6 | `EnvironmentVariable_ResolveFromEnvVar` | Resolve from environment variable |
 
-```csharp
-var opts = new DisasterRecoveryOptions();
-
-Assert.That(opts.MaxDrillHistorySize, Is.EqualTo(100));
-Assert.That(opts.MaxReplicationLag, Is.EqualTo(TimeSpan.FromSeconds(30)));
-Assert.That(opts.HealthCheckInterval, Is.EqualTo(TimeSpan.FromSeconds(10)));
-Assert.That(opts.OfflineThreshold, Is.EqualTo(3));
-Assert.That(opts.PerItemReplicationTime, Is.EqualTo(TimeSpan.FromMilliseconds(1)));
-```
-
-### 5. OptionsCreate — TemporalOptions WorksCorrectly
-
-```csharp
-var temporal = new TemporalOptions
-{
-    ServerAddress = "localhost:7233",
-    Namespace = "test-ns",
-    TaskQueue = "test-queue",
-};
-
-var wrapped = Options.Create(temporal);
-
-Assert.That(wrapped, Is.Not.Null);
-Assert.That(wrapped.Value.ServerAddress, Is.EqualTo("localhost:7233"));
-Assert.That(wrapped.Value.Namespace, Is.EqualTo("test-ns"));
-Assert.That(wrapped.Value.TaskQueue, Is.EqualTo("test-queue"));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial43/Lab.cs`](../tests/TutorialLabs/Tutorial43/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial43/Lab.cs`](../tests/TutorialLabs/Tutorial43/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial43.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial43.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial43/Exam.cs`](../tests/TutorialLabs/Tutorial43/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_FullConfigCascade_WithNatsBrokerEndpoint` | 🟢 Starter | Full config cascade with NatsBrokerEndpoint |
+| 2 | `Challenge2_MultiKeyResolution_AcrossEnvironments` | 🟡 Intermediate | Multi-key resolution across environments |
+| 3 | `Challenge3_DeploymentConfigScenario_PublishAllResolved` | 🔴 Advanced | Deployment config scenario — publish all resolved |
+
+> 💻 [`tests/TutorialLabs/Tutorial43/Exam.cs`](../tests/TutorialLabs/Tutorial43/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial43.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial43.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial43.ExamAnswers"
 ```
 
 ---
