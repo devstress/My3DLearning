@@ -78,13 +78,19 @@ The simplest approach to atomicity is to make every operation safe to retry. If 
 
 **Platform implementation:** The `IntegrationEnvelope` carries a unique `MessageId` and `CorrelationId` on every message. The `Storage.Cassandra` module stores deduplication keys so that the same message processed twice produces no duplicate side effects (EIP: Idempotent Receiver). The `Processing.Retry` module provides configurable retry policies with exponential backoff and jitter. Together, these ensure that any transient failure — network timeout, broker restart, service crash — can be retried automatically without corrupting state.
 
-**B) Transactional Outbox Pattern: CDC + Event Publishing**
+**B) Transactional Outbox Pattern: CDC + Kafka or Polling Outbox**
 
-> *Idea: Make the database write and the "event to publish" atomic inside the database, then publish later.*
+> *Idea: Make the DB write and the "event to publish" atomic inside the DB, then publish later.*
 
-When a service needs to update its own state *and* publish an event, doing both atomically is impossible with separate database and broker transactions. The Transactional Outbox pattern solves this by writing the event to an outbox table in the *same* database transaction as the state change, then publishing the event asynchronously.
+When a service needs to update its own state *and* publish an event, doing both atomically is impossible with separate database and broker transactions. The Transactional Outbox pattern solves this by writing the event to an outbox table in the *same* database transaction as the state change, then publishing the event asynchronously. Change Data Capture (CDC) or polling then reads the outbox and forwards events to the message broker.
 
-**Platform implementation:** The `Ingestion.Postgres` broker implements a variant of this pattern natively. The `eip_messages` table stores messages with `pg_notify` triggers that alert consumers of new messages. The `PostgresTransactionalClient` wraps produce-and-consume operations in database transactions, ensuring that message publication and business state changes are atomic within PostgreSQL. The `SKIP LOCKED` consumer pattern provides exactly-once delivery semantics without head-of-line blocking. This makes PostgreSQL a viable zero-infrastructure-overhead broker for teams that already run Postgres.
+**Platform implementation — broker-agnostic `ITransactionalClient`:** The platform defines a broker-agnostic `ITransactionalClient` interface (EIP: Transactional Client, Chapter 10) that provides atomic publish semantics across *all four brokers*:
+
+- **PostgreSQL (`PostgresTransactionalClient`):** True ACID atomicity. Messages are written to the `eip_messages` outbox table inside the same `NpgsqlTransaction` as any business state change. On commit, `pg_notify` triggers alert consumers of new messages, and a fan-out trigger creates `eip_subscriptions` rows for all durable subscribers. The `SKIP LOCKED` consumer pattern provides competing-consumer delivery without head-of-line blocking. This is the purest implementation of the Transactional Outbox pattern — the database *is* the broker.
+- **Kafka (`BrokerTransactionalClient` with native transactions):** Kafka's built-in `init/begin/commit/abort` transaction protocol provides exactly-once publish semantics. Multiple messages published within a transaction scope are committed atomically to Kafka or rolled back entirely.
+- **NATS JetStream and Pulsar (`BrokerTransactionalClient` with publish-then-confirm):** For brokers without native transaction support, the `BrokerTransactionalClient` tracks every published message within the transaction scope. On success, the transaction commits normally. On failure or timeout, it publishes compensating tombstone messages to DLQ topics for each already-published message, providing at-least-once semantics with compensation-based rollback.
+
+**CDC and Event Publishing:** The platform's `EventSourcing` module complements the outbox pattern by providing an append-only `IEventStore` with optimistic concurrency, forward/backward stream reads, and a `EventProjectionEngine` that rebuilds read-model state from event streams with configurable snapshot intervals. This event store + projection model is the CDC side of the pattern: business events are appended atomically to the event store, and projections (consumers) rebuild state by replaying the event stream — the same principle as CDC log tailing, implemented in-process.
 
 **C) Message-Oriented Middleware: Queues, Retries, DLQ, Routing, Transformations**
 
@@ -109,11 +115,11 @@ No single approach is sufficient for enterprise-grade integration:
 | Approach | Alone Is Not Enough Because... | Combined With Others Provides... |
 |---|---|---|
 | **A) Retry + Idempotency** | Retrying a 7-step process from scratch is wasteful and may cause side effects in external systems | Fine-grained idempotency at the message level, complementing Temporal's step-level durability |
-| **B) Transactional Outbox** | Only solves the "write + publish" atomicity within a single database; does not address multi-service orchestration | Atomic event publication in the PostgreSQL broker, ensuring no message is lost between database and broker |
+| **B) Transactional Outbox** | Only solves the "write + publish" atomicity within a single database; does not address multi-service orchestration | Atomic event publication across all four brokers via `ITransactionalClient` — true ACID in PostgreSQL, native transactions in Kafka, publish-then-confirm with compensation in NATS/Pulsar. CDC via `EventSourcing` projections ensures no event is lost between write and publish. |
 | **C) Message Middleware** | Provides delivery guarantees but has no concept of multi-step process state; a 7-step saga requires manual correlation | Reliable message delivery, DLQ, routing, and transformation as infrastructure — offloading these from workflow code |
 | **D) Durable Execution** | Requires reliable message delivery to *start* workflows; Temporal alone does not replace a message broker | Step-level durability, saga compensation, and process resumption that the messaging layer cannot provide |
 
-The platform architecture layers these approaches: messages enter through **brokers (C)** with guaranteed delivery, trigger **durable workflows (D)** that coordinate multi-step processing, with **retry + idempotency (A)** at every level, and **transactional outbox (B)** available when the broker is PostgreSQL. This defense-in-depth strategy means that no single failure mode — network partition, broker restart, service crash, or datacenter outage — can leave the system in an inconsistent state.
+The platform architecture layers these approaches: messages enter through **brokers (C)** with guaranteed delivery, trigger **durable workflows (D)** that coordinate multi-step processing, with **retry + idempotency (A)** at every level, and **transactional outbox (B)** providing atomic publish semantics across all brokers — true ACID in PostgreSQL, native transactions in Kafka, and publish-then-confirm with compensation in NATS/Pulsar. This defense-in-depth strategy means that no single failure mode — network partition, broker restart, service crash, or datacenter outage — can leave the system in an inconsistent state.
 
 ### The Eleven Architectural Pillars
 
@@ -348,11 +354,11 @@ EnterpriseIntegrationPlatform/
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Atomicity strategy | Defense-in-depth: all four approaches | Retry + idempotency (A) at message level, transactional outbox (B) in PostgreSQL broker, message middleware (C) for delivery/DLQ/routing, durable execution (D) via Temporal for step-level process durability |
+| Atomicity strategy | Defense-in-depth: all four approaches | Retry + idempotency (A) at message level, transactional outbox (B) via `ITransactionalClient` across all four brokers (ACID in Postgres, native txn in Kafka, publish-then-confirm in NATS/Pulsar) + CDC via EventSourcing projections, message middleware (C) for delivery/DLQ/routing, durable execution (D) via Temporal for step-level process durability |
 | AI strategy | Self-hosted RAG (RagFlow + Ollama) + AI-driven development | AI is a core pillar: context retrieval, code generation, natural-language observability. All data on-premises; developers use their preferred AI provider |
 | Workflow engine | Temporal over Durable Functions | Portable, polyglot (Go, Java, Python, TypeScript, .NET, PHP), mature saga/compensation support; durable execution makes the process itself fault-tolerant |
 | Orchestration | .NET Aspire | Single-command orchestration of all services, brokers, AI runtime, and infrastructure; service discovery; health monitoring |
-| Broker strategy | Kafka + NATS/Pulsar/PostgreSQL | Kafka for streaming; NATS/Pulsar for task delivery without head-of-line blocking; PostgreSQL for transactional outbox pattern with zero additional infrastructure |
+| Broker strategy | Kafka + NATS/Pulsar/PostgreSQL | Kafka for streaming + native transactions; NATS/Pulsar for task delivery without head-of-line blocking; PostgreSQL for ACID transactional outbox with zero additional infrastructure. All brokers support `ITransactionalClient` for atomic publish semantics. |
 | Observability store | Grafana Loki + OpenTelemetry | LogQL queries, lightweight, vendor-neutral; AI-powered natural-language queries via OpenClaw |
 
 See [`docs/adr/`](docs/adr/) for full Architecture Decision Records.
