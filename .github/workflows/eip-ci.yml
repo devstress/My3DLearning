@@ -122,8 +122,25 @@ jobs:
       - name: Build solution
         run: dotnet build --no-restore --configuration Release
 
+      - name: Get Playwright version
+        id: pw-version
+        run: |
+          PW_VERSION=$(grep 'Microsoft.Playwright' Directory.Packages.props | grep -oP 'Version="\K[^"]+')
+          echo "version=$PW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
       - name: Install Playwright browsers
-        run: pwsh tests/PlaywrightTests/bin/Release/net10.0/playwright.ps1 install --with-deps
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pwsh tests/PlaywrightTests/bin/Release/net10.0/playwright.ps1 install
+
+      - name: Install Playwright OS dependencies
+        run: pwsh tests/PlaywrightTests/bin/Release/net10.0/playwright.ps1 install-deps
 
       - name: Run Playwright E2E tests
         env:
