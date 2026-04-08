@@ -101,11 +101,6 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 ### Chunk 300 — ✅ Done — see `rules/completion-log.md`
 
 ### Chunk 301 — ✅ Done — see `rules/completion-log.md`
-|---|---|
-| **Goal** | Harden `Ingestion.Nats` from demo-grade to production-grade. |
-| **Changes** | (a) Add `NatsOptions` class (IOptions pattern) with `Url`, `MaxReconnectRetries`, `ReconnectWaitMs`, `StreamCreateRetries`. (b) Implement `IAsyncDisposable` on both Producer and Consumer with real resource cleanup. (c) Add `NatsHealthCheck : IHealthCheck` that verifies JetStream API responsiveness. (d) Update `NatsServiceExtensions` to use `IOptions<NatsOptions>`, register health check, validate configuration. (e) Add OpenTelemetry `ActivitySource` tracing on publish/consume. (f) Fix infinite-loop risk in `EnsureStreamAsync` — throw after max retries exhausted. |
-| **Tests** | New unit tests in `tests/UnitTests/`: `NatsOptionsTests.cs` (validation, defaults), `NatsHealthCheckTests.cs` (healthy/unhealthy scenarios), `NatsServiceExtensionsTests.cs` (registration, health check, config validation). Minimum 12 new tests. |
-| **Acceptance** | `dotnet build` 0 warnings. All existing + new tests pass. NATS provider LOC increases from ~237 to ~400+. |
 
 ### Chunk 302 — Kafka provider hardening
 
@@ -167,7 +162,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Next Chunk
 
-**Chunk 301** — NATS JetStream provider hardening.
+**Chunk 302** — Kafka provider hardening.
 
 ---
 
