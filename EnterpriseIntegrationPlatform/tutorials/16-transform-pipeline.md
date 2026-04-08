@@ -83,19 +83,23 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial16.Lab"
 
 ---
 
-## Exam — Assessment Challenges
+## Exam — Fill in the Blanks
 
-> 🎯 Prove you can apply the Transform Pipeline pattern in realistic, end-to-end scenarios.
-> Each challenge combines multiple concepts and uses a business-like domain.
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
 
-| # | Challenge | Difficulty |
-|---|-----------|------------|
-| 1 | `Starter_RegexReplace_MasksPhoneNumbers` | 🟢 Starter |
-| 2 | `Intermediate_JsonPathFilter_RetainsOnlySpecifiedPaths` | 🟡 Intermediate |
-| 3 | `Advanced_MultiStep_TransformAndPublish` | 🔴 Advanced |
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Starter_RegexReplace_MasksPhoneNumbers` | 🟢 Starter | Create a `RegexReplaceStep` and wire it into a `TransformPipeline` |
+| 2 | `Intermediate_JsonPathFilter_RetainsOnlySpecifiedPaths` | 🟡 Intermediate | Create a `JsonPathFilterStep` with keep-paths and build the pipeline |
+| 3 | `Advanced_MultiStep_TransformAndPublish` | 🔴 Advanced | Assemble a 3-step pipeline, execute it, create an envelope, and publish |
 
 ```bash
-dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial16.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial16.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial16.ExamAnswers"
 ```
 
 ---

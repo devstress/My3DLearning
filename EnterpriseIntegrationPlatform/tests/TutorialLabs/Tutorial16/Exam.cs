@@ -1,21 +1,14 @@
 // ============================================================================
-// Tutorial 16 – Transform Pipeline (Exam · Assessment Challenges)
+// Tutorial 16 – Transform Pipeline (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply the Transform Pipeline pattern in realistic,
-//          end-to-end scenarios that combine multiple concepts.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
 //   🟢 Starter      — Regex replace step masks phone numbers in a pipeline
 //   🟡 Intermediate — JsonPathFilter step retains only specified JSON paths
 //   🔴 Advanced     — Multi-step pipeline transforms and publishes via MockEndpoint
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -43,11 +36,13 @@ public sealed class Exam
     [Test]
     public async Task Starter_RegexReplace_MasksPhoneNumbers()
     {
-        var step = new RegexReplaceStep(@"\d{3}-\d{4}", "***-****");
         var options = Options.Create(new TransformOptions { Enabled = true });
+
+        // TODO: Create a RegexReplaceStep matching phone patterns (\d{3}-\d{4})
+        //       replacing with "***-****", then build a TransformPipeline with it.
         var pipeline = new TransformPipeline(
-            new ITransformStep[] { step }, options,
-            NullLogger<TransformPipeline>.Instance);
+            new ITransformStep[] { /* TODO: your RegexReplaceStep here */ },
+            options, NullLogger<TransformPipeline>.Instance);
 
         var result = await pipeline.ExecuteAsync(
             "Call 555-1234 or 555-5678", "text/plain");
@@ -70,11 +65,13 @@ public sealed class Exam
     [Test]
     public async Task Intermediate_JsonPathFilter_RetainsOnlySpecifiedPaths()
     {
-        var step = new JsonPathFilterStep(new[] { "order.id", "customer.name" });
         var options = Options.Create(new TransformOptions { Enabled = true });
+
+        // TODO: Create a JsonPathFilterStep that keeps only "order.id" and "customer.name",
+        //       then build a TransformPipeline with it.
         var pipeline = new TransformPipeline(
-            new ITransformStep[] { step }, options,
-            NullLogger<TransformPipeline>.Instance);
+            new ITransformStep[] { /* TODO: your JsonPathFilterStep here */ },
+            options, NullLogger<TransformPipeline>.Instance);
 
         var payload = """{"order":{"id":"ORD-1","total":99.99},"customer":{"name":"Alice","email":"a@b.com"},"internal":"secret"}""";
         var result = await pipeline.ExecuteAsync(payload, "application/json");
@@ -102,23 +99,29 @@ public sealed class Exam
     {
         await using var output = new MockEndpoint("exam-transform");
 
-        var steps = new ITransformStep[]
-        {
-            new RegexReplaceStep(@"\bfoo\b", "bar"),
-            new UpperCaseStep(),
-            new PrefixStep("[PROCESSED] "),
-        };
         var options = Options.Create(new TransformOptions { Enabled = true });
+
+        // TODO: Create an array of 3 ITransformStep instances:
+        //   1. RegexReplaceStep that replaces whole-word "foo" (\bfoo\b) with "bar"
+        //   2. UpperCaseStep
+        //   3. PrefixStep with prefix "[PROCESSED] "
+        //   Then build a TransformPipeline with them.
         var pipeline = new TransformPipeline(
-            steps, options, NullLogger<TransformPipeline>.Instance);
+            new ITransformStep[]
+            {
+                /* TODO: your 3 steps here */
+            },
+            options, NullLogger<TransformPipeline>.Instance);
 
         var result = await pipeline.ExecuteAsync("the foo is here", "text/plain");
 
         Assert.That(result.Payload, Is.EqualTo("[PROCESSED] THE BAR IS HERE"));
         Assert.That(result.StepsApplied, Is.EqualTo(3));
 
-        var envelope = IntegrationEnvelope<string>.Create(
-            result.Payload, "TransformSvc", "transform.done");
+        // TODO: Create an IntegrationEnvelope<string>.Create() with the result.Payload,
+        //       source "TransformSvc", message type "transform.done".
+        //       Then call output.PublishAsync(envelope, "processed-topic", CancellationToken.None)
+        IntegrationEnvelope<string> envelope = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
         await output.PublishAsync(envelope, "processed-topic", CancellationToken.None);
 
         output.AssertReceivedOnTopic("processed-topic", 1);
