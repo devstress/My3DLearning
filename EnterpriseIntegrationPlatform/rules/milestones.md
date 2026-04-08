@@ -106,13 +106,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Chunk 303 — ✅ Done — see `rules/completion-log.md`
 
-### Chunk 304 — Ingestion.Postgres unit tests
-
-| Status | `not-started` |
-|---|---|
-| **Goal** | `Ingestion.Postgres` has 611 LOC of production code but **zero unit tests** in `tests/UnitTests/`. Add comprehensive unit test coverage. |
-| **Tests** | New files in `tests/UnitTests/`: `PostgresBrokerProducerTests.cs` (publish serialization, null guards, topic validation), `PostgresBrokerConsumerTests.cs` (deserialization, handler invocation, predicate filtering, dispose), `PostgresTransactionalClientTests.cs` (commit/rollback semantics, timeout, compensation), `PostgresConnectionFactoryTests.cs` (connection string validation, options binding), `PostgresBrokerOptionsTests.cs` (defaults, validation), `PostgresServiceExtensionsTests.cs` (DI registration, health check). Minimum 25 new tests. |
-| **Acceptance** | `dotnet build` 0 warnings. All new tests pass. Postgres provider has ≥25 unit tests covering all 6 source files. |
+### Chunk 304 — ✅ Done — see `rules/completion-log.md`
 
 ### Chunk 305 — Security project unit tests
 
@@ -148,7 +142,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Next Chunk
 
-**Chunk 304** — Ingestion.Postgres unit tests.
+**Chunk 305** — Security project unit tests.
 
 ---
 

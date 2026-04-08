@@ -56,5 +56,6 @@
     <ProjectReference Include="..\..\src\Ingestion.Kafka\Ingestion.Kafka.csproj" />
     <ProjectReference Include="..\..\src\Ingestion.Pulsar\Ingestion.Pulsar.csproj" />
     <ProjectReference Include="..\..\src\Ingestion.Nats\Ingestion.Nats.csproj" />
+    <ProjectReference Include="..\..\src\Ingestion.Postgres\Ingestion.Postgres.csproj" />
   </ItemGroup>
 </Project>

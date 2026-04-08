@@ -4,6 +4,24 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 304 — Ingestion.Postgres unit tests
+
+- **Date**: 2026-04-08
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Add first-ever unit tests for Ingestion.Postgres module (previously 0 tests).
+- **Files created**:
+  - `tests/UnitTests/PostgresBrokerOptionsTests.cs` — 7 tests
+  - `tests/UnitTests/PostgresBrokerProducerTests.cs` — 5 tests
+  - `tests/UnitTests/PostgresBrokerConsumerTests.cs` — 5 tests
+  - `tests/UnitTests/PostgresTransactionalClientTests.cs` — 3 tests
+  - `tests/UnitTests/PostgresConnectionFactoryTests.cs` — 4 tests
+  - `tests/UnitTests/PostgresServiceExtensionsTests.cs` — 6 tests
+- **Files modified**:
+  - `tests/UnitTests/UnitTests.csproj` — Added Ingestion.Postgres project reference
+- **Test counts after**:
+  - UnitTests: 1653 (was 1623, +30 new tests)
+
 ## Chunk 303 — Pulsar provider hardening
 
 - **Date**: 2026-04-08
