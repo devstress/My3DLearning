@@ -192,7 +192,7 @@ This platform is designed for organizations that:
 
 - **Code-first platform.** All integrations are implemented in code. The platform core uses C#, with polyglot extension support via Temporal.io SDKs. This platform does not provide low-code or visual design tooling. Organizations requiring drag-and-drop integration design should evaluate Logic Apps, MuleSoft Anypoint, or Boomi.
 - **Limited connector catalog.** The platform includes four connector types: HTTP, SFTP, Email, and File. Organizations requiring broad connectivity to heterogeneous systems (databases, SaaS APIs, mainframes) should evaluate Apache Camel (300+ connectors) or MuleSoft (1,000+ connectors).
-- **Production maturity.** The platform is well-architected and covered by 2,000+ automated tests across unit, integration, contract, workflow, browser, and load test suites. However, it has not been validated at scale in high-throughput production environments. BizTalk Server, Apache Camel, and MuleSoft have established production track records measured in billions of messages.
+- **Production maturity.** The platform is well-architected and covered by 2,000+ automated tests across unit, integration, contract, workflow, browser, and load test suites. However, it is still early date and need a lot of validations to improve.
 - **Not a universal Camel replacement.** For Java/JVM organizations whose primary requirement is connecting to diverse systems with minimal custom code, Apache Camel remains the more appropriate choice. However, Temporal.io's polyglot SDKs enable JVM teams to participate in workflows without migrating away from Java.
 
 ---
