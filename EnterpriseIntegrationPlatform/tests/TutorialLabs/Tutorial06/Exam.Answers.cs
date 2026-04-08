@@ -1,14 +1,8 @@
 // ============================================================================
-// Tutorial 06 – Messaging Channels (Exam · Fill in the Blanks)
+// Tutorial 06 – Messaging Channels (Exam Answers · DO NOT PEEK)
 // ============================================================================
-// INSTRUCTIONS: Each test has TODO comments where you must write the missing
-//   code. Run the tests — they will FAIL until you fill in the blanks.
-//   Check your work against Exam.Answers.cs after attempting each challenge.
-//
-// DIFFICULTY TIERS:
-//   🟢 Starter      — Bridge messages between two Point-to-Point channels
-//   🟡 Intermediate — Pub-Sub fan-out delivers to all three subscriber groups
-//   🔴 Advanced     — Datatype Channel routes multiple message types to correct topics
+// These are the complete, passing answers for the Exam.
+// Try to solve each challenge yourself before looking here.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -21,7 +15,7 @@ using TutorialLabs.Infrastructure;
 namespace TutorialLabs.Tutorial06;
 
 [TestFixture]
-public sealed class Exam
+public sealed class ExamAnswers
 {
     // ── 🟢 STARTER — Point-to-Point Bridge Relay ──────────────────────────
     //
@@ -44,18 +38,12 @@ public sealed class Exam
         var outbound = new PointToPointChannel(
             target, target, NullLogger<PointToPointChannel>.Instance);
 
-        // TODO: Wire ReceiveAsync on inbound channel — when a message arrives on "inbound-q"
-        //   in group "bridge-group", forward it to outbound channel on topic "outbound-q"
         await inbound.ReceiveAsync<string>("inbound-q", "bridge-group",
-            async msg =>
-            {
-                // TODO: forward the message to outbound channel
-                await Task.CompletedTask; // ← replace with outbound.SendAsync(...)
-            },
+            async msg => await outbound.SendAsync(msg, "outbound-q", CancellationToken.None),
             CancellationToken.None);
 
-        // TODO: Create an IntegrationEnvelope<string> with payload "bridged-payload", source "SourceSystem", type "source.event"
-        IntegrationEnvelope<string> envelope = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
+        var envelope = IntegrationEnvelope<string>.Create(
+            "bridged-payload", "SourceSystem", "source.event");
         await source.SendAsync(envelope);
 
         target.AssertReceivedCount(1);
@@ -81,17 +69,15 @@ public sealed class Exam
             endpoint, endpoint, NullLogger<PublishSubscribeChannel>.Instance);
 
         var results = new List<string>();
-        // TODO: Subscribe three groups ("email", "sms", "push") to "notifications" topic.
-        //   Each handler should add its group name to the results list and return Task.CompletedTask.
         await channel.SubscribeAsync<string>("notifications", "email",
-            msg => { /* TODO: results.Add("email"); */ return Task.CompletedTask; }, CancellationToken.None);
+            msg => { results.Add("email"); return Task.CompletedTask; }, CancellationToken.None);
         await channel.SubscribeAsync<string>("notifications", "sms",
-            msg => { /* TODO: results.Add("sms"); */ return Task.CompletedTask; }, CancellationToken.None);
+            msg => { results.Add("sms"); return Task.CompletedTask; }, CancellationToken.None);
         await channel.SubscribeAsync<string>("notifications", "push",
-            msg => { /* TODO: results.Add("push"); */ return Task.CompletedTask; }, CancellationToken.None);
+            msg => { results.Add("push"); return Task.CompletedTask; }, CancellationToken.None);
 
-        // TODO: Create an IntegrationEnvelope<string> with payload "broadcast", source "NotificationService", type "notification.sent"
-        IntegrationEnvelope<string> envelope = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
+        var envelope = IntegrationEnvelope<string>.Create(
+            "broadcast", "NotificationService", "notification.sent");
         await endpoint.SendAsync(envelope);
 
         Assert.That(results, Has.Count.EqualTo(3));
@@ -114,15 +100,14 @@ public sealed class Exam
     public async Task Advanced_DatatypeChannel_MultipleTypesRoutedCorrectly()
     {
         await using var endpoint = new MockEndpoint("datatype");
-        // TODO: Create DatatypeChannelOptions with TopicPrefix = "dt" and Separator = "."
-        var options = Options.Create(new DatatypeChannelOptions()); // ← replace with { TopicPrefix = "dt", Separator = "." }
-        // TODO: Create a DatatypeChannel using endpoint, options, and NullLogger
-        DatatypeChannel channel = null!; // ← replace with new DatatypeChannel(...)
+        var options = Options.Create(new DatatypeChannelOptions
+            { TopicPrefix = "dt", Separator = "." });
+        var channel = new DatatypeChannel(
+            endpoint, options, NullLogger<DatatypeChannel>.Instance);
 
-        // TODO: Create three envelopes for order.created ("o1"), payment.received ("p1"), inventory.updated ("i1")
-        IntegrationEnvelope<string> orderEnv = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
-        IntegrationEnvelope<string> paymentEnv = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
-        IntegrationEnvelope<string> inventoryEnv = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
+        var orderEnv = IntegrationEnvelope<string>.Create("o1", "svc", "order.created");
+        var paymentEnv = IntegrationEnvelope<string>.Create("p1", "svc", "payment.received");
+        var inventoryEnv = IntegrationEnvelope<string>.Create("i1", "svc", "inventory.updated");
 
         await channel.PublishAsync(orderEnv, CancellationToken.None);
         await channel.PublishAsync(paymentEnv, CancellationToken.None);

@@ -1,14 +1,8 @@
 // ============================================================================
-// Tutorial 05 – Message Brokers (Exam · Fill in the Blanks)
+// Tutorial 05 – Message Brokers (Exam Answers · DO NOT PEEK)
 // ============================================================================
-// INSTRUCTIONS: Each test has TODO comments where you must write the missing
-//   code. Run the tests — they will FAIL until you fill in the blanks.
-//   Check your work against Exam.Answers.cs after attempting each challenge.
-//
-// DIFFICULTY TIERS:
-//   🟢 Starter      — Fan out one event to NATS + Kafka + Pulsar simultaneously
-//   🟡 Intermediate — Priority-based triage with selective consumer predicate
-//   🔴 Advanced     — AspireIntegrationTestHost DI pipeline with BrokerOptions
+// These are the complete, passing answers for the Exam.
+// Try to solve each challenge yourself before looking here.
 // ============================================================================
 
 using NUnit.Framework;
@@ -19,7 +13,7 @@ using EnterpriseIntegrationPlatform.Ingestion;
 namespace TutorialLabs.Tutorial05;
 
 [TestFixture]
-public sealed class Exam
+public sealed class ExamAnswers
 {
     // ── 🟢 STARTER — Multi-Broker Fan-Out ──────────────────────────────
     //
@@ -42,13 +36,17 @@ public sealed class Exam
         var kafka = new MockEndpoint("kafka");
         var pulsar = new MockEndpoint("pulsar");
 
-        // TODO: Create an IntegrationEnvelope<string> with payload "critical-event", source "AlertService", type "alert.raised", Priority = Critical, Intent = Event
-        IntegrationEnvelope<string> envelope = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
+        var envelope = IntegrationEnvelope<string>.Create(
+            "critical-event", "AlertService", "alert.raised") with
+        {
+            Priority = MessagePriority.Critical,
+            Intent = MessageIntent.Event,
+        };
 
-        // TODO: Fan out — publish the envelope to all three broker endpoints on topic "alerts"
-        await Task.CompletedTask; // ← replace with nats.PublishAsync(...)
-        // await kafka.PublishAsync(...)
-        // await pulsar.PublishAsync(...)
+        // Fan out to all three broker endpoints
+        await nats.PublishAsync(envelope, "alerts");
+        await kafka.PublishAsync(envelope, "alerts");
+        await pulsar.PublishAsync(envelope, "alerts");
 
         nats.AssertReceivedCount(1);
         kafka.AssertReceivedCount(1);
@@ -84,27 +82,24 @@ public sealed class Exam
         var output = new MockEndpoint("triage");
         var triaged = new List<string>();
 
-        // TODO: Subscribe to "orders" topic with group "triage-group".
-        //   Predicate: only accept High or Critical priority.
-        //   Handler: add "{msg.Priority}:{msg.Payload}" to triaged list.
         await output.SubscribeAsync<string>("orders", "triage-group",
-            env => false, // ← replace predicate: env.Priority == MessagePriority.High || ...
+            env => env.Priority == MessagePriority.High
+                || env.Priority == MessagePriority.Critical,
             msg =>
             {
-                // TODO: Add the triaged message string to the triaged list
+                triaged.Add($"{msg.Priority}:{msg.Payload}");
                 return Task.CompletedTask;
             });
 
-        // TODO: Send four messages at different priority levels (Low, Normal, High, Critical)
-        //   Each with source "svc", type "order", and an appropriate payload string
+        // Send messages at all priority levels
         await output.SendAsync(IntegrationEnvelope<string>.Create(
             "low-order", "svc", "order") with { Priority = MessagePriority.Low });
         await output.SendAsync(IntegrationEnvelope<string>.Create(
             "normal-order", "svc", "order") with { Priority = MessagePriority.Normal });
-        // TODO: Send High priority order
-        // await output.SendAsync(...)
-        // TODO: Send Critical priority order
-        // await output.SendAsync(...)
+        await output.SendAsync(IntegrationEnvelope<string>.Create(
+            "high-order", "svc", "order") with { Priority = MessagePriority.High });
+        await output.SendAsync(IntegrationEnvelope<string>.Create(
+            "critical-order", "svc", "order") with { Priority = MessagePriority.Critical });
 
         // Only High and Critical pass the gate
         Assert.That(triaged, Has.Count.EqualTo(2));
@@ -134,19 +129,23 @@ public sealed class Exam
         // BrokerOptions configured for the test scenario.
         var builder = AspireIntegrationTestHost.CreateBuilder();
         var output = builder.AddMockEndpoint("output");
-        // TODO: Wire the MockEndpoint as the producer
-        // builder.UseProducer(...)
-
-        // TODO: Configure BrokerOptions — set BrokerType to NatsJetStream,
-        //   ConnectionString to "nats://localhost:15222", TransactionTimeoutSeconds to 60
-        // builder.Configure<BrokerOptions>(opts => { ... });
-
+        builder.UseProducer(output);
+        builder.Configure<BrokerOptions>(opts =>
+        {
+            opts.BrokerType = BrokerType.NatsJetStream;
+            opts.ConnectionString = "nats://localhost:15222";
+            opts.TransactionTimeoutSeconds = 60;
+        });
         await using var host = builder.Build();
 
         // Resolve the producer from DI — it's the MockEndpoint
         var producer = host.GetService<IMessageBrokerProducer>();
-        // TODO: Create an IntegrationEnvelope<string> with payload "di-message", source "DIService", type "di.event", Intent = Event, Priority = High
-        IntegrationEnvelope<string> envelope = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
+        var envelope = IntegrationEnvelope<string>.Create(
+            "di-message", "DIService", "di.event") with
+        {
+            Intent = MessageIntent.Event,
+            Priority = MessagePriority.High,
+        };
 
         await producer.PublishAsync(envelope, "di-topic");
 

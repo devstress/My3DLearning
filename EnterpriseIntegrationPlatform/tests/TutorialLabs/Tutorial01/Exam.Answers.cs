@@ -1,14 +1,8 @@
 // ============================================================================
-// Tutorial 01 – Introduction (Exam · Fill in the Blanks)
+// Tutorial 01 – Introduction (Exam Answers · DO NOT PEEK)
 // ============================================================================
-// INSTRUCTIONS: Each test has TODO comments where you must write the missing
-//   code. Run the tests — they will FAIL until you fill in the blanks.
-//   Check your work against Exam.Answers.cs after attempting each challenge.
-//
-// DIFFICULTY TIERS:
-//   🟢 Starter      — Apply ONE concept (channel hop with causation)
-//   🟡 Intermediate — Combine concepts (fan-out pipeline with enrichment)
-//   🔴 Advanced     — Design decision (record immutability across channels)
+// These are the complete, passing answers for the Exam.
+// Try to solve each challenge yourself before looking here.
 // ============================================================================
 
 using NUnit.Framework;
@@ -20,7 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace TutorialLabs.Tutorial01;
 
 [TestFixture]
-public sealed class Exam
+public sealed class ExamAnswers
 {
     private NatsBrokerEndpoint _broker = null!;
     private string _natsUrl = null!;
@@ -43,16 +37,6 @@ public sealed class Exam
     }
 
     // ── 🟢 STARTER — Single Channel Hop with Causation ──────────────────
-    //
-    // SCENARIO: An e-commerce WebStore submits a high-priority order command.
-    // An order processor receives it via a P2P queue, processes it, and emits
-    // an "order.processed" event via PubSub. The event must carry the correct
-    // causation chain (CorrelationId + CausationId) so downstream services
-    // can trace the order back to its origin.
-    //
-    // WHAT YOU PROVE: You can wire a P2P→PubSub pipeline and maintain
-    // message lineage across the hop.
-    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
     public async Task Starter_CommandToEvent_SingleChannelHop()
@@ -70,20 +54,27 @@ public sealed class Exam
 
         // Domain command: e-commerce order
         var order = new OrderPayload("ORD-777", "Server Rack", 1, 4999.99m);
-
-        // TODO: Create an IntegrationEnvelope<OrderPayload> with payload=order, source="WebStore", type="order.place"
-        //       Set Intent=Command, Priority=High using `with` expression.
-        IntegrationEnvelope<OrderPayload> command = null!; // ← replace with IntegrationEnvelope<OrderPayload>.Create(...) with { ... }
+        var command = IntegrationEnvelope<OrderPayload>.Create(
+            order, "WebStore", "order.place") with
+        {
+            Intent = MessageIntent.Command,
+            Priority = MessagePriority.High,
+        };
 
         // Pipeline: P2P command in → handler transforms → PubSub event out
         await commandChannel.ReceiveAsync<OrderPayload>(commandTopic, "order-processor",
             async msg =>
             {
-                // TODO: Create an IntegrationEnvelope<string> event with payload $"Processed:{msg.Payload.OrderId}",
-                //       source "OrderProcessor", type "order.processed",
-                //       correlationId=msg.CorrelationId, causationId=msg.MessageId, Intent=Event.
-                //       Then publish it to eventChannel on eventTopic.
-                await Task.CompletedTask;
+                var orderEvent = IntegrationEnvelope<string>.Create(
+                    $"Processed:{msg.Payload.OrderId}",
+                    "OrderProcessor",
+                    "order.processed",
+                    correlationId: msg.CorrelationId,
+                    causationId: msg.MessageId) with
+                {
+                    Intent = MessageIntent.Event,
+                };
+                await eventChannel.PublishAsync(orderEvent, eventTopic, CancellationToken.None);
             }, CancellationToken.None);
 
         await Task.Delay(500);
@@ -105,18 +96,6 @@ public sealed class Exam
     }
 
     // ── 🟡 INTERMEDIATE — Fan-Out Pipeline with Enrichment ──────────────
-    //
-    // SCENARIO: A billing service publishes an "invoice.paid" event. Two
-    // independent downstream systems must react:
-    //   1. Audit Writer — adds an audit-timestamp and sends to an audit queue
-    //   2. Notification Sender — forwards the event to a notifications queue
-    //
-    // This tests PubSub fan-out → two P2P downstream channels — a common
-    // enterprise pattern (event broadcasting with per-subscriber processing).
-    //
-    // WHAT YOU PROVE: You can wire fan-out to multiple downstream channels,
-    // each with independent processing logic and metadata enrichment.
-    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
     public async Task Intermediate_FanOutPipeline_MultipleDownstreamChannels()
@@ -140,25 +119,28 @@ public sealed class Exam
         await eventChannel.SubscribeAsync<string>(businessTopic, "audit-writer",
             async msg =>
             {
-                // TODO: Create an enriched copy of msg using `with` that adds
-                //       Metadata with key "audit-timestamp" = DateTimeOffset.UtcNow.ToString("O"),
-                //       then send it to auditChannel on auditTopic.
-                await Task.CompletedTask;
+                var auditMsg = msg with
+                {
+                    Metadata = new Dictionary<string, string> { ["audit-timestamp"] = DateTimeOffset.UtcNow.ToString("O") },
+                };
+                await auditChannel.SendAsync(auditMsg, auditTopic, CancellationToken.None);
             }, CancellationToken.None);
 
         // Subscriber 2: Notification sender — forwards to notification queue
         await eventChannel.SubscribeAsync<string>(businessTopic, "notification-sender",
             async msg =>
             {
-                // TODO: Forward msg to notifyChannel on notifyTopic.
-                await Task.CompletedTask;
+                await notifyChannel.SendAsync(msg, notifyTopic, CancellationToken.None);
             }, CancellationToken.None);
 
         await Task.Delay(500);
 
-        // TODO: Create an IntegrationEnvelope<string> with payload "InvoicePaid:INV-300",
-        //       source "BillingService", type "invoice.paid", Intent=Event.
-        IntegrationEnvelope<string> evt = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { ... }
+        // Business event: invoice paid
+        var evt = IntegrationEnvelope<string>.Create(
+            "InvoicePaid:INV-300", "BillingService", "invoice.paid") with
+        {
+            Intent = MessageIntent.Event,
+        };
         await eventChannel.PublishAsync(evt, businessTopic, CancellationToken.None);
 
         await auditBroker.WaitForMessagesOnTopicAsync(auditTopic, 1, TimeSpan.FromSeconds(10));
@@ -179,21 +161,6 @@ public sealed class Exam
     }
 
     // ── 🔴 ADVANCED — Record Immutability Across Channels ───────────────
-    //
-    // SCENARIO: An IoT gateway sends a sensor temperature reading. A
-    // monitoring service detects the reading exceeds a threshold and creates
-    // an enriched "alert" version using the `with` operator. Both the
-    // original reading and the enriched alert must flow through separate
-    // channels without mutating each other.
-    //
-    // This tests C# record immutability — `with` creates a new record,
-    // leaving the original untouched. Both share the same MessageId because
-    // `with` copies all fields (including identity). In production you would
-    // give the alert a new MessageId; here we verify the `with` behavior.
-    //
-    // WHAT YOU PROVE: You understand record immutability and can send
-    // original + enriched messages to separate channels without data leaks.
-    // ─────────────────────────────────────────────────────────────────────
 
     [Test]
     public async Task Advanced_ImmutableEnrichment_OriginalAndEnriched_SeparateChannels()
@@ -204,13 +171,20 @@ public sealed class Exam
         var rawTopic = $"raw-readings-{Guid.NewGuid():N}";
         var alertTopic = $"alerts-{Guid.NewGuid():N}";
 
-        // TODO: Create the original sensor reading envelope with payload "sensor-reading:42.5",
-        //       source "IoTGateway", type "sensor.temperature".
-        IntegrationEnvelope<string> original = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
+        // Original sensor reading
+        var original = IntegrationEnvelope<string>.Create(
+            "sensor-reading:42.5", "IoTGateway", "sensor.temperature");
 
-        // TODO: Create an enriched alert from original using `with` expression:
-        //       Priority=Critical, Metadata with "threshold-exceeded"="true" and "alert-level"="critical".
-        IntegrationEnvelope<string> enriched = null!; // ← replace with original with { ... }
+        // Enriched alert — created via `with` (original is NOT mutated)
+        var enriched = original with
+        {
+            Priority = MessagePriority.Critical,
+            Metadata = new Dictionary<string, string>
+            {
+                ["threshold-exceeded"] = "true",
+                ["alert-level"] = "critical",
+            },
+        };
 
         // Send original → raw readings channel, enriched → alerts channel
         await channel.SendAsync(original, rawTopic, CancellationToken.None);

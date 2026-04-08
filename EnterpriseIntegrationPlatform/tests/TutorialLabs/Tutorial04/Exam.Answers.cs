@@ -1,14 +1,8 @@
 // ============================================================================
-// Tutorial 04 – Integration Envelope (Exam · Fill in the Blanks)
+// Tutorial 04 – Integration Envelope (Exam Answers · DO NOT PEEK)
 // ============================================================================
-// INSTRUCTIONS: Each test has TODO comments where you must write the missing
-//   code. Run the tests — they will FAIL until you fill in the blanks.
-//   Check your work against Exam.Answers.cs after attempting each challenge.
-//
-// DIFFICULTY TIERS:
-//   🟢 Starter      — FaultEnvelope lifecycle with retry exhaustion
-//   🟡 Intermediate — Multi-hop causation chain through PointToPointChannel
-//   🔴 Advanced     — Split-sequence reassembly with full metadata verification
+// These are the complete, passing answers for the Exam.
+// Try to solve each challenge yourself before looking here.
 // ============================================================================
 
 using NUnit.Framework;
@@ -19,10 +13,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace TutorialLabs.Tutorial04;
 
-#pragma warning disable CS0219 // Variable is assigned but its value is never used — intentional for fill-in-the-blank TODOs
-
 [TestFixture]
-public sealed class Exam
+public sealed class ExamAnswers
 {
     // ── 🟢 STARTER — FaultEnvelope Lifecycle with Retry Exhaustion ─────
     //
@@ -41,14 +33,17 @@ public sealed class Exam
         // Simulate retry exhaustion: message fails 3 times, then generates
         // a FaultEnvelope capturing the final exception and all retry attempts.
         // Verify every field is correctly populated for dead-letter routing.
-        // TODO: Create an IntegrationEnvelope<string> with payload "{\"orderId\":\"ORD-999\"}", source "IngestService", type "order.created", Priority = High, Intent = Command
-        IntegrationEnvelope<string> original = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
+        var original = IntegrationEnvelope<string>.Create(
+            "{\"orderId\":\"ORD-999\"}", "IngestService", "order.created") with
+        {
+            Priority = MessagePriority.High,
+            Intent = MessageIntent.Command,
+        };
 
-        // TODO: Create a TimeoutException with message "Database connection timeout after 30s"
-        TimeoutException exception = null!; // ← replace with new TimeoutException(...)
-
-        // TODO: Create a FaultEnvelope from 'original', faulted by "PersistenceService", reason "Retry exhaustion after 3 attempts", retryCount 3, passing the exception
-        FaultEnvelope fault = null!; // ← replace with FaultEnvelope.Create(...)
+        var exception = new TimeoutException("Database connection timeout after 30s");
+        var fault = FaultEnvelope.Create(
+            original, "PersistenceService",
+            "Retry exhaustion after 3 attempts", 3, exception);
 
         // Identity preserved from original
         Assert.That(fault.OriginalMessageId, Is.EqualTo(original.MessageId));
@@ -66,8 +61,8 @@ public sealed class Exam
         Assert.That(fault.ErrorDetails, Does.Contain("Database connection timeout"));
 
         // Each FaultEnvelope gets its own unique FaultId
-        // TODO: Create a second FaultEnvelope from 'original', faulted by "PersistenceService", reason "Second failure", retryCount 4
-        FaultEnvelope fault2 = null!; // ← replace with FaultEnvelope.Create(...)
+        var fault2 = FaultEnvelope.Create(
+            original, "PersistenceService", "Second failure", 4);
         Assert.That(fault2.FaultId, Is.Not.EqualTo(fault.FaultId));
     }
 
@@ -95,18 +90,31 @@ public sealed class Exam
             output, output, NullLogger<PointToPointChannel>.Instance);
 
         // Hop 1: Command originates the business transaction
-        // TODO: Create an IntegrationEnvelope<string> with payload "PlaceOrder", source "WebApp", type "order.place", Intent = Command
-        IntegrationEnvelope<string> command = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
+        var command = IntegrationEnvelope<string>.Create(
+            "PlaceOrder", "WebApp", "order.place") with
+        {
+            Intent = MessageIntent.Command,
+        };
         await channel.SendAsync(command, "commands", CancellationToken.None);
 
         // Hop 2: Event reports the command was processed
-        // TODO: Create an IntegrationEnvelope<string> with payload "OrderPlaced", source "OrderService", type "order.placed", correlationId from command, causationId from command.MessageId, Intent = Event
-        IntegrationEnvelope<string> evt = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
+        var evt = IntegrationEnvelope<string>.Create(
+            "OrderPlaced", "OrderService", "order.placed",
+            correlationId: command.CorrelationId,
+            causationId: command.MessageId) with
+        {
+            Intent = MessageIntent.Event,
+        };
         await channel.SendAsync(evt, "events", CancellationToken.None);
 
         // Hop 3: Document generated as a side effect
-        // TODO: Create an IntegrationEnvelope<string> with payload "InvoiceGenerated", source "BillingService", type "invoice.generated", correlationId from command, causationId from evt.MessageId, Intent = Document
-        IntegrationEnvelope<string> doc = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
+        var doc = IntegrationEnvelope<string>.Create(
+            "InvoiceGenerated", "BillingService", "invoice.generated",
+            correlationId: command.CorrelationId,
+            causationId: evt.MessageId) with
+        {
+            Intent = MessageIntent.Document,
+        };
         await channel.SendAsync(doc, "documents", CancellationToken.None);
 
         output.AssertReceivedCount(3);
@@ -162,14 +170,20 @@ public sealed class Exam
 
         for (var i = 0; i < total; i++)
         {
-            // TODO: Create an IntegrationEnvelope<string> with payload $"chunk-{i}", source "Splitter",
-            //   type "data.chunk", correlationId from correlationId variable, and set:
-            //   SequenceNumber = i, TotalCount = total, Priority = High,
-            //   Metadata with MessageHeaders.SequenceNumber and MessageHeaders.TotalCount
-            IntegrationEnvelope<string> part = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
-
-            // TODO: Send the part through the channel on topic "chunks"
-            await Task.CompletedTask; // ← replace with channel.SendAsync(...)
+            var part = IntegrationEnvelope<string>.Create(
+                $"chunk-{i}", "Splitter", "data.chunk",
+                correlationId: correlationId) with
+            {
+                SequenceNumber = i,
+                TotalCount = total,
+                Priority = MessagePriority.High,
+                Metadata = new Dictionary<string, string>
+                {
+                    [MessageHeaders.SequenceNumber] = i.ToString(),
+                    [MessageHeaders.TotalCount] = total.ToString(),
+                },
+            };
+            await channel.SendAsync(part, "chunks", CancellationToken.None);
         }
 
         output.AssertReceivedCount(total);

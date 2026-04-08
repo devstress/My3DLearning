@@ -1,14 +1,8 @@
 // ============================================================================
-// Tutorial 09 – Content-Based Router (Exam · Fill in the Blanks)
+// Tutorial 09 – Content-Based Router (Exam Answers · DO NOT PEEK)
 // ============================================================================
-// INSTRUCTIONS: Each test has TODO comments where you must write the missing
-//   code. Run the tests — they will FAIL until you fill in the blanks.
-//   Check your work against Exam.Answers.cs after attempting each challenge.
-//
-// DIFFICULTY TIERS:
-//   🟢 Starter      — Multi-rule regional routing with fallback to global
-//   🟡 Intermediate — Route by JSON payload fields using JsonElement
-//   🔴 Advanced     — Batch routing with per-topic count verification
+// These are the complete, passing answers for the Exam.
+// Try to solve each challenge yourself before looking here.
 // ============================================================================
 
 using System.Text.Json;
@@ -22,7 +16,7 @@ using TutorialLabs.Infrastructure;
 namespace TutorialLabs.Tutorial09;
 
 [TestFixture]
-public sealed class Exam
+public sealed class ExamAnswers
 {
     // ── 🟢 STARTER — Regional Order Routing ───────────────────────────────
     //
@@ -37,20 +31,28 @@ public sealed class Exam
     public async Task Starter_RegionalRouting_MatchesAndFallsBack()
     {
         await using var output = new MockEndpoint("regional");
-        // TODO: Create RouterOptions with two RoutingRules:
-        //   Rule 1: Priority=1, Name="US-East", FieldName="Metadata.region", Operator=Equals, Value="us-east", TargetTopic="fulfilment.us-east"
-        //   Rule 2: Priority=2, Name="EU-West", FieldName="Metadata.region", Operator=Equals, Value="eu-west", TargetTopic="fulfilment.eu-west"
-        //   DefaultTopic = "fulfilment.global"
-        var options = Options.Create(new RouterOptions()); // ← replace with full RouterOptions configuration
-        // TODO: Create a ContentBasedRouter with output, options, and NullLogger
-        ContentBasedRouter router = null!; // ← replace with new ContentBasedRouter(...)
+        var options = Options.Create(new RouterOptions
+        {
+            Rules =
+            [
+                new RoutingRule { Priority = 1, Name = "US-East",
+                    FieldName = "Metadata.region", Operator = RoutingOperator.Equals,
+                    Value = "us-east", TargetTopic = "fulfilment.us-east" },
+                new RoutingRule { Priority = 2, Name = "EU-West",
+                    FieldName = "Metadata.region", Operator = RoutingOperator.Equals,
+                    Value = "eu-west", TargetTopic = "fulfilment.eu-west" },
+            ],
+            DefaultTopic = "fulfilment.global",
+        });
+        var router = new ContentBasedRouter(
+            output, options, NullLogger<ContentBasedRouter>.Instance);
 
-        // TODO: Create usOrder — IntegrationEnvelope<string> "o1"/"svc"/"order.created" with Metadata region = "us-east"
-        IntegrationEnvelope<string> usOrder = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { Metadata = ... }
-        // TODO: Create euOrder — IntegrationEnvelope<string> "o2"/"svc"/"order.created" with Metadata region = "eu-west"
-        IntegrationEnvelope<string> euOrder = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { Metadata = ... }
-        // TODO: Create unknownOrder — IntegrationEnvelope<string> "o3"/"svc"/"order.created" with Metadata region = "af-south"
-        IntegrationEnvelope<string> unknownOrder = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { Metadata = ... }
+        var usOrder = IntegrationEnvelope<string>.Create("o1", "svc", "order.created") with
+            { Metadata = new Dictionary<string, string> { ["region"] = "us-east" } };
+        var euOrder = IntegrationEnvelope<string>.Create("o2", "svc", "order.created") with
+            { Metadata = new Dictionary<string, string> { ["region"] = "eu-west" } };
+        var unknownOrder = IntegrationEnvelope<string>.Create("o3", "svc", "order.created") with
+            { Metadata = new Dictionary<string, string> { ["region"] = "af-south" } };
 
         Assert.That((await router.RouteAsync(usOrder)).TargetTopic, Is.EqualTo("fulfilment.us-east"));
         Assert.That((await router.RouteAsync(euOrder)).TargetTopic, Is.EqualTo("fulfilment.eu-west"));
@@ -75,18 +77,22 @@ public sealed class Exam
     public async Task Intermediate_PayloadRouting_JsonElementField()
     {
         await using var output = new MockEndpoint("payload");
-        // TODO: Create RouterOptions with two RoutingRules:
-        //   Rule 1: Priority=1, Name="Urgent", FieldName="Payload.status", Operator=Equals, Value="urgent", TargetTopic="urgent-processing"
-        //   Rule 2: Priority=2, Name="Normal", FieldName="Payload.status", Operator=Equals, Value="normal", TargetTopic="normal-processing"
-        //   DefaultTopic = "default-processing"
-        var options = Options.Create(new RouterOptions()); // ← replace with full RouterOptions configuration
-        // TODO: Create a ContentBasedRouter with output, options, and NullLogger
-        ContentBasedRouter router = null!; // ← replace with new ContentBasedRouter(...)
+        var options = Options.Create(new RouterOptions
+        {
+            Rules =
+            [
+                new RoutingRule { Priority = 1, Name = "Urgent",
+                    FieldName = "Payload.status", Operator = RoutingOperator.Equals,
+                    Value = "urgent", TargetTopic = "urgent-processing" },
+                new RoutingRule { Priority = 2, Name = "Normal",
+                    FieldName = "Payload.status", Operator = RoutingOperator.Equals,
+                    Value = "normal", TargetTopic = "normal-processing" },
+            ],
+            DefaultTopic = "default-processing",
+        });
+        var router = new ContentBasedRouter(
+            output, options, NullLogger<ContentBasedRouter>.Instance);
 
-        // TODO: Deserialize each JSON string to JsonElement and route via router.RouteAsync
-        //   urgentJson: {"status":"urgent","amount":5000}
-        //   normalJson: {"status":"normal","amount":50}
-        //   unknownJson: {"status":"backorder","amount":10}
         var urgentJson = JsonSerializer.Deserialize<JsonElement>(
             "{\"status\":\"urgent\",\"amount\":5000}");
         var normalJson = JsonSerializer.Deserialize<JsonElement>(
@@ -94,11 +100,9 @@ public sealed class Exam
         var unknownJson = JsonSerializer.Deserialize<JsonElement>(
             "{\"status\":\"backorder\",\"amount\":10}");
 
-        // TODO: Route each JSON envelope and capture the routing decision
-        RoutingDecision d1 = null!; // ← replace with await router.RouteAsync(IntegrationEnvelope<JsonElement>.Create(urgentJson, "svc", "order"))
-        RoutingDecision d2 = null!; // ← replace with await router.RouteAsync(IntegrationEnvelope<JsonElement>.Create(normalJson, "svc", "order"))
-        RoutingDecision d3 = null!; // ← replace with await router.RouteAsync(IntegrationEnvelope<JsonElement>.Create(unknownJson, "svc", "order"))
-        _ = router; // suppress unused-variable warning — remove after filling in RouteAsync calls above
+        var d1 = await router.RouteAsync(IntegrationEnvelope<JsonElement>.Create(urgentJson, "svc", "order"));
+        var d2 = await router.RouteAsync(IntegrationEnvelope<JsonElement>.Create(normalJson, "svc", "order"));
+        var d3 = await router.RouteAsync(IntegrationEnvelope<JsonElement>.Create(unknownJson, "svc", "order"));
 
         Assert.That(d1.TargetTopic, Is.EqualTo("urgent-processing"));
         Assert.That(d2.TargetTopic, Is.EqualTo("normal-processing"));
@@ -123,18 +127,26 @@ public sealed class Exam
     public async Task Advanced_BatchRouting_MultipleMessagesVerifyTopics()
     {
         await using var output = new MockEndpoint("batch");
-        // TODO: Create RouterOptions with two RoutingRules:
-        //   Rule 1: Priority=1, FieldName="MessageType", Operator=StartsWith, Value="order", TargetTopic="orders"
-        //   Rule 2: Priority=2, FieldName="MessageType", Operator=StartsWith, Value="payment", TargetTopic="payments"
-        //   DefaultTopic = "other"
-        var options = Options.Create(new RouterOptions()); // ← replace with full RouterOptions configuration
-        // TODO: Create a ContentBasedRouter with output, options, and NullLogger
-        ContentBasedRouter router = null!; // ← replace with new ContentBasedRouter(...)
+        var options = Options.Create(new RouterOptions
+        {
+            Rules =
+            [
+                new RoutingRule { Priority = 1,
+                    FieldName = "MessageType", Operator = RoutingOperator.StartsWith,
+                    Value = "order", TargetTopic = "orders" },
+                new RoutingRule { Priority = 2,
+                    FieldName = "MessageType", Operator = RoutingOperator.StartsWith,
+                    Value = "payment", TargetTopic = "payments" },
+            ],
+            DefaultTopic = "other",
+        });
+        var router = new ContentBasedRouter(
+            output, options, NullLogger<ContentBasedRouter>.Instance);
 
-        // TODO: Route four messages through the router:
-        //   "d1"/"svc"/"order.created", "d2"/"svc"/"order.shipped",
-        //   "d3"/"svc"/"payment.received", "d4"/"svc"/"inventory.updated"
-        _ = router; // suppress unused-variable warning — remove after filling in RouteAsync calls above
+        await router.RouteAsync(IntegrationEnvelope<string>.Create("d1", "svc", "order.created"));
+        await router.RouteAsync(IntegrationEnvelope<string>.Create("d2", "svc", "order.shipped"));
+        await router.RouteAsync(IntegrationEnvelope<string>.Create("d3", "svc", "payment.received"));
+        await router.RouteAsync(IntegrationEnvelope<string>.Create("d4", "svc", "inventory.updated"));
 
         output.AssertReceivedCount(4);
         output.AssertReceivedOnTopic("orders", 2);

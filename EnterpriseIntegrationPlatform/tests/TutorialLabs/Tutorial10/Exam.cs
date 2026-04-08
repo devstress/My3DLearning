@@ -1,22 +1,14 @@
 // ============================================================================
-// Tutorial 10 – Message Filter (Exam · Assessment Challenges)
+// Tutorial 10 – Message Filter (Exam · Fill in the Blanks)
 // ============================================================================
-// PURPOSE: Prove you can apply message filter patterns in realistic scenarios —
-//          spam filtering, priority-based triage, and multi-condition metadata
-//          filtering.
+// INSTRUCTIONS: Each test has TODO comments where you must write the missing
+//   code. Run the tests — they will FAIL until you fill in the blanks.
+//   Check your work against Exam.Answers.cs after attempting each challenge.
 //
 // DIFFICULTY TIERS:
 //   🟢 Starter      — Filter trusted partners using In operator, quarantine others
 //   🟡 Intermediate — Priority-based triage — only High/Critical pass through
 //   🔴 Advanced     — Multi-condition AND filter on tenant and environment metadata
-//
-// HOW THIS DIFFERS FROM THE LAB:
-//   • Lab tests each concept in isolation — Exam combines them
-//   • Lab uses simple payloads — Exam uses realistic business domains
-//   • Lab verifies one assertion — Exam verifies end-to-end flows
-//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
-//
-// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -45,28 +37,17 @@ public sealed class Exam
     public async Task Starter_SpamFilter_AcceptsTrustedRejectsOthers()
     {
         await using var output = new MockEndpoint("spam");
-        var options = Options.Create(new MessageFilterOptions
-        {
-            Conditions =
-            [
-                new RuleCondition
-                {
-                    FieldName = "Source",
-                    Operator = RuleConditionOperator.In,
-                    Value = "TrustedPartnerA,TrustedPartnerB",
-                },
-            ],
-            Logic = RuleLogicOperator.And,
-            OutputTopic = "legitimate",
-            DiscardTopic = "quarantine",
-        });
-        var filter = new MessageFilter(
-            output, options, NullLogger<MessageFilter>.Instance);
+        // TODO: Configure MessageFilterOptions with:
+        //   Condition: FieldName="Source", Operator=In, Value="TrustedPartnerA,TrustedPartnerB"
+        //   Logic=And, OutputTopic="legitimate", DiscardTopic="quarantine"
+        var options = Options.Create(new MessageFilterOptions { OutputTopic = "" }); // ← replace with full configuration
+        // TODO: Create a MessageFilter with output, options, and NullLogger
+        MessageFilter filter = null!; // ← replace with new MessageFilter(...)
 
-        var trusted = IntegrationEnvelope<string>.Create(
-            "data", "TrustedPartnerA", "partner.update");
-        var spam = IntegrationEnvelope<string>.Create(
-            "spam", "MaliciousBot", "spam.broadcast");
+        // TODO: Create trusted envelope — payload "data", source "TrustedPartnerA", type "partner.update"
+        IntegrationEnvelope<string> trusted = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
+        // TODO: Create spam envelope — payload "spam", source "MaliciousBot", type "spam.broadcast"
+        IntegrationEnvelope<string> spam = null!; // ← replace with IntegrationEnvelope<string>.Create(...)
 
         Assert.That((await filter.FilterAsync(trusted)).Passed, Is.True);
         Assert.That((await filter.FilterAsync(spam)).Passed, Is.False);
@@ -88,32 +69,25 @@ public sealed class Exam
     public async Task Intermediate_PriorityFilter_OnlyHighCriticalPass()
     {
         await using var output = new MockEndpoint("priority");
-        var options = Options.Create(new MessageFilterOptions
-        {
-            Conditions =
-            [
-                new RuleCondition
-                {
-                    FieldName = "Priority",
-                    Operator = RuleConditionOperator.In,
-                    Value = "High,Critical",
-                },
-            ],
-            Logic = RuleLogicOperator.And,
-            OutputTopic = "priority-processing",
-            DiscardTopic = "low-archive",
-        });
-        var filter = new MessageFilter(
-            output, options, NullLogger<MessageFilter>.Instance);
+        // TODO: Configure MessageFilterOptions with:
+        //   Condition: FieldName="Priority", Operator=In, Value="High,Critical"
+        //   Logic=And, OutputTopic="priority-processing", DiscardTopic="low-archive"
+        var options = Options.Create(new MessageFilterOptions { OutputTopic = "" }); // ← replace with full configuration
+        // TODO: Create a MessageFilter with output, options, and NullLogger
+        MessageFilter filter = null!; // ← replace with new MessageFilter(...)
 
-        var high = IntegrationEnvelope<string>.Create("d", "svc", "ev") with
-            { Priority = MessagePriority.High };
-        var critical = IntegrationEnvelope<string>.Create("d", "svc", "ev") with
-            { Priority = MessagePriority.Critical };
-        var normal = IntegrationEnvelope<string>.Create("d", "svc", "ev") with
-            { Priority = MessagePriority.Normal };
-        var low = IntegrationEnvelope<string>.Create("d", "svc", "ev") with
-            { Priority = MessagePriority.Low };
+        // TODO: Create an IntegrationEnvelope<string> with payload "d", source "svc", type "ev"
+        //       with Priority = MessagePriority.High
+        IntegrationEnvelope<string> high = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { Priority = ... }
+        // TODO: Create an IntegrationEnvelope<string> with payload "d", source "svc", type "ev"
+        //       with Priority = MessagePriority.Critical
+        IntegrationEnvelope<string> critical = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { Priority = ... }
+        // TODO: Create an IntegrationEnvelope<string> with payload "d", source "svc", type "ev"
+        //       with Priority = MessagePriority.Normal
+        IntegrationEnvelope<string> normal = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { Priority = ... }
+        // TODO: Create an IntegrationEnvelope<string> with payload "d", source "svc", type "ev"
+        //       with Priority = MessagePriority.Low
+        IntegrationEnvelope<string> low = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { Priority = ... }
 
         Assert.That((await filter.FilterAsync(high)).Passed, Is.True);
         Assert.That((await filter.FilterAsync(critical)).Passed, Is.True);
@@ -137,45 +111,20 @@ public sealed class Exam
     public async Task Advanced_MetadataFilter_AndLogic_BothConditionsRequired()
     {
         await using var output = new MockEndpoint("metadata");
-        var options = Options.Create(new MessageFilterOptions
-        {
-            Conditions =
-            [
-                new RuleCondition
-                {
-                    FieldName = "Metadata.tenant",
-                    Operator = RuleConditionOperator.Equals,
-                    Value = "acme-corp",
-                },
-                new RuleCondition
-                {
-                    FieldName = "Metadata.environment",
-                    Operator = RuleConditionOperator.Equals,
-                    Value = "production",
-                },
-            ],
-            Logic = RuleLogicOperator.And,
-            OutputTopic = "production-acme",
-            DiscardTopic = "non-prod-discard",
-        });
-        var filter = new MessageFilter(
-            output, options, NullLogger<MessageFilter>.Instance);
+        // TODO: Configure MessageFilterOptions with two conditions (AND logic):
+        //   Condition 1: FieldName="Metadata.tenant", Operator=Equals, Value="acme-corp"
+        //   Condition 2: FieldName="Metadata.environment", Operator=Equals, Value="production"
+        //   Logic=And, OutputTopic="production-acme", DiscardTopic="non-prod-discard"
+        var options = Options.Create(new MessageFilterOptions { OutputTopic = "" }); // ← replace with full configuration
+        // TODO: Create a MessageFilter with output, options, and NullLogger
+        MessageFilter filter = null!; // ← replace with new MessageFilter(...)
 
-        var valid = IntegrationEnvelope<string>.Create("d", "svc", "ev") with
-        {
-            Metadata = new Dictionary<string, string>
-                { ["tenant"] = "acme-corp", ["environment"] = "production" },
-        };
-        var wrongTenant = IntegrationEnvelope<string>.Create("d", "svc", "ev") with
-        {
-            Metadata = new Dictionary<string, string>
-                { ["tenant"] = "other-corp", ["environment"] = "production" },
-        };
-        var wrongEnv = IntegrationEnvelope<string>.Create("d", "svc", "ev") with
-        {
-            Metadata = new Dictionary<string, string>
-                { ["tenant"] = "acme-corp", ["environment"] = "staging" },
-        };
+        // TODO: Create valid envelope — "d"/"svc"/"ev" with Metadata tenant="acme-corp", environment="production"
+        IntegrationEnvelope<string> valid = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { Metadata = ... }
+        // TODO: Create wrongTenant envelope — "d"/"svc"/"ev" with Metadata tenant="other-corp", environment="production"
+        IntegrationEnvelope<string> wrongTenant = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { Metadata = ... }
+        // TODO: Create wrongEnv envelope — "d"/"svc"/"ev" with Metadata tenant="acme-corp", environment="staging"
+        IntegrationEnvelope<string> wrongEnv = null!; // ← replace with IntegrationEnvelope<string>.Create(...) with { Metadata = ... }
 
         Assert.That((await filter.FilterAsync(valid)).Passed, Is.True);
         Assert.That((await filter.FilterAsync(wrongTenant)).Passed, Is.False);

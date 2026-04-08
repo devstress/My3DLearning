@@ -1,14 +1,8 @@
 // ============================================================================
-// Tutorial 07 – Temporal Workflows (Exam · Fill in the Blanks)
+// Tutorial 07 – Temporal Workflows (Exam Answers · DO NOT PEEK)
 // ============================================================================
-// INSTRUCTIONS: Each test has TODO comments where you must write the missing
-//   code. Run the tests — they will FAIL until you fill in the blanks.
-//   Check your work against Exam.Answers.cs after attempting each challenge.
-//
-// DIFFICULTY TIERS:
-//   🟢 Starter      — Wire PipelineOrchestrator via DI and dispatch through Aspire host
-//   🟡 Intermediate — Handle workflow failure result gracefully
-//   🔴 Advanced     — Correlation and causation IDs propagated through dispatch
+// These are the complete, passing answers for the Exam.
+// Try to solve each challenge yourself before looking here.
 // ============================================================================
 
 using System.Text.Json;
@@ -25,7 +19,7 @@ using TutorialLabs.Infrastructure;
 namespace TutorialLabs.Tutorial07;
 
 [TestFixture]
-public sealed class Exam
+public sealed class ExamAnswers
 {
     // ── 🟢 STARTER — DI-Wired Orchestrator Dispatch ───────────────────────
     //
@@ -44,16 +38,15 @@ public sealed class Exam
         await using var host = AspireIntegrationTestHost.CreateBuilder()
             .ConfigureServices(svc =>
             {
-                // TODO: Register the dispatcher as ITemporalWorkflowDispatcher singleton
-                // TODO: Configure PipelineOptions with AckSubject = "ack.di" and NackSubject = "nack.di"
-                // TODO: Register PipelineOrchestrator as a singleton
+                svc.AddSingleton<ITemporalWorkflowDispatcher>(dispatcher);
+                svc.Configure<PipelineOptions>(o => { o.AckSubject = "ack.di"; o.NackSubject = "nack.di"; });
+                svc.AddSingleton<PipelineOrchestrator>();
             })
             .Build();
 
         var orchestrator = host.GetService<PipelineOrchestrator>();
         var json = JsonSerializer.Deserialize<JsonElement>("{\"test\":true}");
-        // TODO: Create an IntegrationEnvelope<JsonElement> with payload json, source "DIService", type "di.test"
-        IntegrationEnvelope<JsonElement> envelope = null!; // ← replace with IntegrationEnvelope<JsonElement>.Create(...)
+        var envelope = IntegrationEnvelope<JsonElement>.Create(json, "DIService", "di.test");
 
         await orchestrator.ProcessAsync(envelope);
 
@@ -75,16 +68,14 @@ public sealed class Exam
     [Test]
     public async Task Intermediate_WorkflowFailure_LogsWarning()
     {
-        // TODO: Create a MockTemporalWorkflowDispatcher that returns failure with "Validation failed"
-        MockTemporalWorkflowDispatcher dispatcher = null!; // ← replace with new MockTemporalWorkflowDispatcher().ReturnsFailure(...)
+        var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsFailure("Validation failed");
 
-        // TODO: Create PipelineOptions via Options.Create
-        // TODO: Create a PipelineOrchestrator with dispatcher, options, and NullLogger
-        PipelineOrchestrator orchestrator = null!; // ← replace with new PipelineOrchestrator(dispatcher, Options.Create(new PipelineOptions()), NullLogger<PipelineOrchestrator>.Instance)
+        var options = Options.Create(new PipelineOptions());
+        var orchestrator = new PipelineOrchestrator(
+            dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
 
         var json = JsonSerializer.Deserialize<JsonElement>("{\"bad\":true}");
-        // TODO: Create an IntegrationEnvelope<JsonElement> with payload json, source "svc", type "bad.type"
-        IntegrationEnvelope<JsonElement> envelope = null!; // ← replace with IntegrationEnvelope<JsonElement>.Create(...)
+        var envelope = IntegrationEnvelope<JsonElement>.Create(json, "svc", "bad.type");
 
         await orchestrator.ProcessAsync(envelope);
 
@@ -107,14 +98,14 @@ public sealed class Exam
         var dispatcher = new MockTemporalWorkflowDispatcher().ReturnsSuccess();
 
         var options = Options.Create(new PipelineOptions());
-        // TODO: Create a PipelineOrchestrator with dispatcher, options, and NullLogger
-        PipelineOrchestrator orchestrator = null!; // ← replace with new PipelineOrchestrator(...)
+        var orchestrator = new PipelineOrchestrator(
+            dispatcher, options, NullLogger<PipelineOrchestrator>.Instance);
 
         var correlationId = Guid.NewGuid();
         var causationId = Guid.NewGuid();
         var json = JsonSerializer.Deserialize<JsonElement>("{}");
-        // TODO: Create an IntegrationEnvelope<JsonElement> with json, "svc", "type", correlationId, causationId
-        IntegrationEnvelope<JsonElement> envelope = null!; // ← replace with IntegrationEnvelope<JsonElement>.Create(...)
+        var envelope = IntegrationEnvelope<JsonElement>.Create(
+            json, "svc", "type", correlationId, causationId);
 
         await orchestrator.ProcessAsync(envelope);
 
