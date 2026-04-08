@@ -39,6 +39,12 @@ public sealed class AspireFixture
     /// <summary>PostgreSQL connection string from the running Aspire TestAppHost.</summary>
     public static string? PostgresConnectionString { get; private set; }
 
+    /// <summary>Kafka bootstrap servers from the running Aspire TestAppHost.</summary>
+    public static string? KafkaBootstrapServers { get; private set; }
+
+    /// <summary>Pulsar service URL from the running Aspire TestAppHost.</summary>
+    public static string? PulsarServiceUrl { get; private set; }
+
     [OneTimeSetUp]
     public async Task GlobalSetUp()
     {
@@ -52,6 +58,8 @@ public sealed class AspireFixture
             SftpEndpoint = await SharedTestAppHost.GetSftpEndpointAsync();
             SmtpEndpoint = await SharedTestAppHost.GetSmtpEndpointAsync();
             PostgresConnectionString = await SharedTestAppHost.GetPostgresConnectionStringAsync();
+            KafkaBootstrapServers = await SharedTestAppHost.GetKafkaBootstrapServersAsync();
+            PulsarServiceUrl = await SharedTestAppHost.GetPulsarServiceUrlAsync();
         }
     }
 
@@ -81,6 +89,28 @@ public sealed class AspireFixture
         if (!IsAvailable || PostgresConnectionString is null)
             Assert.Ignore("Docker not available — skipping real Postgres broker test");
         return new PostgresBrokerEndpoint(name, PostgresConnectionString);
+    }
+
+    /// <summary>
+    /// Creates a KafkaBrokerEndpoint connected to the real Apache Kafka.
+    /// Throws Ignore if Docker is not available.
+    /// </summary>
+    public static KafkaBrokerEndpoint CreateKafkaEndpoint(string name)
+    {
+        if (!IsAvailable || KafkaBootstrapServers is null)
+            Assert.Ignore("Docker not available — skipping real Kafka broker test");
+        return new KafkaBrokerEndpoint(name, KafkaBootstrapServers);
+    }
+
+    /// <summary>
+    /// Creates a PulsarBrokerEndpoint connected to the real Apache Pulsar.
+    /// Throws Ignore if Docker is not available.
+    /// </summary>
+    public static PulsarBrokerEndpoint CreatePulsarEndpoint(string name)
+    {
+        if (!IsAvailable || PulsarServiceUrl is null)
+            Assert.Ignore("Docker not available — skipping real Pulsar broker test");
+        return new PulsarBrokerEndpoint(name, PulsarServiceUrl);
     }
 
     /// <summary>
