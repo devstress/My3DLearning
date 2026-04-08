@@ -88,15 +88,11 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Chunks
 
-All chunks (200–251) completed. Exam.cs fill-in-blank and Exam.Answers.cs created for all 50 tutorials. Chunk 251 (final validation) remains as a future polish item.
-
-| Chunk | Tutorials | Status |
-|-------|-----------|--------|
-| 251 | Final validation: build all, run all tests, verify Exam.cs files don't compile (blanks), Exam.Answers.cs pass | `not-started` |
+✅ All chunks (200–251) complete — see `rules/completion-log.md` for full history.
 
 ### Next Chunk
 
-**Chunk 251** — Final validation
+All phases and chunks complete. No remaining work.
 
 ---
 
