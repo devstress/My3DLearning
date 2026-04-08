@@ -1,9 +1,18 @@
 // ============================================================================
-// Tutorial 26 – Message Replay (Lab)
+// Tutorial 26 – Message Replay (Lab · Guided Practice)
 // ============================================================================
-// EIP Pattern: Message Store / Replay.
-// Real Integrations: MessageReplayer with InMemoryMessageReplayStore +
-// NatsBrokerEndpoint (real NATS JetStream via Aspire) as producer.
+// PURPOSE: Run each test in order to see how the Message Store / Replay
+//          pattern replays stored messages with filtering and deduplication.
+//
+// CONCEPTS DEMONSTRATED (one per test):
+//   1. Replay_SingleMessage_PublishesToTargetTopic        — single message replayed to target topic
+//   2. Replay_MultipleMessages_ReplaysAll                — multiple stored messages all replayed
+//   3. Replay_FilterByMessageType_OnlyMatchingReplayed   — MessageType filter replays matching only
+//   4. Replay_EmptyStore_ReturnsZeroReplayed             — empty store returns zero counts
+//   5. Replay_SkipAlreadyReplayed_SkipsTaggedMessages    — SkipAlreadyReplayed skips tagged messages
+//   6. Replay_ResultTimestamps_ArePopulated              — StartedAt / CompletedAt populated
+//
+// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

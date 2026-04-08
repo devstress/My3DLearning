@@ -2,6 +2,19 @@
 
 Replay previously processed messages from the replay store with filtering and deduplication.
 
+---
+
+## Learning Objectives
+
+1. Understand the Message Store / Replay pattern and when to replay messages
+2. Use `MessageReplayer` with `InMemoryMessageReplayStore` to replay stored messages to a target topic
+3. Verify that replay counts (`ReplayedCount`, `SkippedCount`, `FailedCount`) are accurate
+4. Confirm filtering by `MessageType` and `CorrelationId` replays only matching messages
+5. Validate the `SkipAlreadyReplayed` option skips messages tagged with a `ReplayId` header
+6. Verify configuration guard: an empty `SourceTopic` throws `InvalidOperationException`
+
+---
+
 ## Key Types
 
 ```csharp
@@ -44,164 +57,39 @@ public record ReplayResult
 }
 ```
 
-## Exercises
+## Lab — Guided Practice
 
-### 1. Replay — AllMessagesReplayed CountsAreCorrect
+> 💻 Run the lab tests to see each Message Replay concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var store = new InMemoryMessageReplayStore();
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var options = Options.Create(new ReplayOptions
-{
-    SourceTopic = "orders",
-    TargetTopic = "orders-replay",
-    MaxMessages = 100,
-});
-
-var replayer = new MessageReplayer(
-    store, producer, options, NullLogger<MessageReplayer>.Instance);
-
-var env1 = IntegrationEnvelope<string>.Create("p1", "Svc", "order.created");
-var env2 = IntegrationEnvelope<string>.Create("p2", "Svc", "order.created");
-await store.StoreForReplayAsync(env1, "orders", CancellationToken.None);
-await store.StoreForReplayAsync(env2, "orders", CancellationToken.None);
-
-var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
-
-Assert.That(result.ReplayedCount, Is.EqualTo(2));
-Assert.That(result.SkippedCount, Is.EqualTo(0));
-Assert.That(result.FailedCount, Is.EqualTo(0));
-```
-
-### 2. Replay — PublishesToConfiguredTargetTopic
-
-```csharp
-var store = new InMemoryMessageReplayStore();
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var options = Options.Create(new ReplayOptions
-{
-    SourceTopic = "events",
-    TargetTopic = "events-replay",
-    MaxMessages = 10,
-});
-
-var replayer = new MessageReplayer(
-    store, producer, options, NullLogger<MessageReplayer>.Instance);
-
-var env = IntegrationEnvelope<string>.Create("data", "Svc", "event.fired");
-await store.StoreForReplayAsync(env, "events", CancellationToken.None);
-
-await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<object>>(),
-    "events-replay",
-    Arg.Any<CancellationToken>());
-```
-
-### 3. Replay — FilterByMessageType OnlyMatchingMessagesReplayed
-
-```csharp
-var store = new InMemoryMessageReplayStore();
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var options = Options.Create(new ReplayOptions
-{
-    SourceTopic = "topic",
-    TargetTopic = "topic-replay",
-    MaxMessages = 100,
-});
-
-var replayer = new MessageReplayer(
-    store, producer, options, NullLogger<MessageReplayer>.Instance);
-
-var match = IntegrationEnvelope<string>.Create("m", "Svc", "order.created");
-var noMatch = IntegrationEnvelope<string>.Create("n", "Svc", "invoice.created");
-await store.StoreForReplayAsync(match, "topic", CancellationToken.None);
-await store.StoreForReplayAsync(noMatch, "topic", CancellationToken.None);
-
-var filter = new ReplayFilter { MessageType = "order.created" };
-var result = await replayer.ReplayAsync(filter, CancellationToken.None);
-
-Assert.That(result.ReplayedCount, Is.EqualTo(1));
-```
-
-### 4. Replay — SkipAlreadyReplayed SkipsMessagesWithReplayIdHeader
-
-```csharp
-var store = new InMemoryMessageReplayStore();
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var options = Options.Create(new ReplayOptions
-{
-    SourceTopic = "src",
-    TargetTopic = "tgt",
-    MaxMessages = 100,
-    SkipAlreadyReplayed = true,
-});
-
-var replayer = new MessageReplayer(
-    store, producer, options, NullLogger<MessageReplayer>.Instance);
-
-var alreadyReplayed = new IntegrationEnvelope<string>
-{
-    MessageId = Guid.NewGuid(),
-    CorrelationId = Guid.NewGuid(),
-    Timestamp = DateTimeOffset.UtcNow,
-    Source = "Svc",
-    MessageType = "type",
-    Payload = "data",
-    Metadata = new Dictionary<string, string>
-    {
-        [MessageHeaders.ReplayId] = Guid.NewGuid().ToString(),
-    },
-};
-var fresh = IntegrationEnvelope<string>.Create("fresh", "Svc", "type");
-
-await store.StoreForReplayAsync(alreadyReplayed, "src", CancellationToken.None);
-await store.StoreForReplayAsync(fresh, "src", CancellationToken.None);
-
-var result = await replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None);
-
-Assert.That(result.ReplayedCount, Is.EqualTo(1));
-Assert.That(result.SkippedCount, Is.EqualTo(1));
-```
-
-### 5. Replay — EmptySourceTopic ThrowsInvalidOperationException
-
-```csharp
-var store = new InMemoryMessageReplayStore();
-var producer = Substitute.For<IMessageBrokerProducer>();
-
-var options = Options.Create(new ReplayOptions
-{
-    SourceTopic = "",
-    TargetTopic = "tgt",
-});
-
-var replayer = new MessageReplayer(
-    store, producer, options, NullLogger<MessageReplayer>.Instance);
-
-Assert.ThrowsAsync<InvalidOperationException>(
-    () => replayer.ReplayAsync(new ReplayFilter(), CancellationToken.None));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial26/Lab.cs`](../tests/TutorialLabs/Tutorial26/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Replay_SingleMessage_PublishesToTargetTopic` | Single message replayed to target topic |
+| 2 | `Replay_MultipleMessages_ReplaysAll` | Multiple stored messages are all replayed |
+| 3 | `Replay_FilterByMessageType_OnlyMatchingReplayed` | MessageType filter replays only matching messages |
+| 4 | `Replay_EmptyStore_ReturnsZeroReplayed` | Empty store returns zero replayed and zero skipped |
+| 5 | `Replay_SkipAlreadyReplayed_SkipsTaggedMessages` | SkipAlreadyReplayed skips messages with ReplayId header |
+| 6 | `Replay_ResultTimestamps_ArePopulated` | StartedAt and CompletedAt timestamps are populated |
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial26.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial26.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial26/Exam.cs`](../tests/TutorialLabs/Tutorial26/Exam.cs)
+## Exam — Assessment Challenges
+
+> 🎯 Prove you can apply the Message Replay pattern in realistic, end-to-end scenarios.
+> Each challenge combines multiple concepts and uses a business-like domain.
+
+| # | Challenge | Difficulty |
+|---|-----------|------------|
+| 1 | `Starter_FilterByCorrelationId_OnlyMatchingReplayed` | 🟢 Starter |
+| 2 | `Intermediate_MaxMessages_CapsReplayCount` | 🟡 Intermediate |
+| 3 | `Advanced_MissingSourceTopic_ThrowsInvalidOperation` | 🔴 Advanced |
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial26.Exam"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial26.Exam"
 ```
 
 ---

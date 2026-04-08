@@ -1,8 +1,21 @@
 // ============================================================================
-// Tutorial 27 – Resequencer (Exam)
+// Tutorial 27 – Resequencer (Exam · Assessment Challenges)
 // ============================================================================
-// E2E challenges: large out-of-order batch, interleaved sequences, timeout
-// partial release.
+// PURPOSE: Prove you can apply the Resequencer pattern in realistic,
+//          end-to-end scenarios that combine multiple concepts.
+//
+// DIFFICULTY TIERS:
+//   🟢 Starter      — Large out-of-order batch released in correct sequence
+//   🟡 Intermediate — Interleaved sequences each release independently
+//   🔴 Advanced     — Timeout partial release then complete a new sequence
+//
+// HOW THIS DIFFERS FROM THE LAB:
+//   • Lab tests each concept in isolation — Exam combines them
+//   • Lab uses simple payloads — Exam uses realistic business domains
+//   • Lab verifies one assertion — Exam verifies end-to-end flows
+//   • Lab is "read and run" — Exam is "given a scenario, prove it works"
+//
+// INFRASTRUCTURE: MockEndpoint
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -17,8 +30,18 @@ namespace TutorialLabs.Tutorial27;
 [TestFixture]
 public sealed class Exam
 {
+    // ── 🟢 STARTER — Large out-of-order batch ──────────────────────────
+    //
+    // SCENARIO: Ten messages arrive in reverse order. The resequencer must
+    //           buffer them all and release them in correct sequence when
+    //           the final message completes the set.
+    //
+    // WHAT YOU PROVE: The resequencer handles a large batch and releases
+    //                 all messages in ascending sequence number order.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge1_LargeOutOfOrderBatch_ReleasedInSequence()
+    public async Task Starter_LargeOutOfOrderBatch_ReleasedInSequence()
     {
         await using var output = new MockEndpoint("reseq-batch");
         var resequencer = new MessageResequencer(
@@ -47,8 +70,18 @@ public sealed class Exam
         output.AssertReceivedOnTopic("ordered", total);
     }
 
+    // ── 🟡 INTERMEDIATE — Interleaved sequences ───────────────────────
+    //
+    // SCENARIO: Messages from two independent sequences (corrA and corrB)
+    //           arrive interleaved. Each sequence must be tracked and
+    //           released independently when complete.
+    //
+    // WHAT YOU PROVE: The resequencer maintains separate buffers per
+    //                 CorrelationId and releases each sequence correctly.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge2_InterleavedSequences_EachReleasedIndependently()
+    public async Task Intermediate_InterleavedSequences_EachReleasedIndependently()
     {
         await using var output = new MockEndpoint("reseq-interleave");
         var resequencer = new MessageResequencer(
@@ -74,8 +107,19 @@ public sealed class Exam
         output.AssertReceivedOnTopic("interleaved", 4);
     }
 
+    // ── 🔴 ADVANCED — Timeout partial release then new sequence ────────
+    //
+    // SCENARIO: An incomplete sequence is force-released via timeout. Then
+    //           a new, separate sequence arrives and completes normally.
+    //           The resequencer must handle both flows cleanly.
+    //
+    // WHAT YOU PROVE: Timeout correctly flushes partial state, and the
+    //                 resequencer can accept and complete new sequences
+    //                 afterwards with ActiveSequenceCount returning to 0.
+    // ─────────────────────────────────────────────────────────────────────
+
     [Test]
-    public async Task Challenge3_TimeoutPartialRelease_ThenCompleteNewSequence()
+    public async Task Advanced_TimeoutPartialRelease_ThenCompleteNewSequence()
     {
         await using var output = new MockEndpoint("reseq-timeout");
         var resequencer = new MessageResequencer(

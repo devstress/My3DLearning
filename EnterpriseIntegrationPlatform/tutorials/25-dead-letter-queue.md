@@ -4,6 +4,17 @@ Capture unprocessable messages with full diagnostic context so they can be inspe
 
 ---
 
+## Learning Objectives
+
+1. Understand the Dead Letter Channel pattern and when messages are routed to a DLQ
+2. Use `DeadLetterPublisher<T>` to publish failed messages with diagnostic context
+3. Verify that published dead-letter envelopes preserve the original envelope and correlation ID
+4. Confirm that `DeadLetterReason`, error message, and attempt count are recorded correctly
+5. Validate that the `FailedAt` timestamp is set at publish time
+6. Verify configuration guard: an empty `DeadLetterTopic` throws `InvalidOperationException`
+
+---
+
 ## Key Types
 
 ```csharp
@@ -50,151 +61,37 @@ public sealed class MessageExpirationChecker<T> : IMessageExpirationChecker<T>
 
 ---
 
-## Exercises
+## Lab — Guided Practice
 
-### Exercise 1: Publish routes to configured dead-letter topic
+> 💻 Run the lab tests to see each Dead Letter Queue concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var options = Options.Create(new DeadLetterOptions
-{
-    DeadLetterTopic = "dlq-topic",
-});
-
-var publisher = new DeadLetterPublisher<string>(producer, options);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "bad-payload", "OrderSvc", "order.created");
-
-await publisher.PublishAsync(
-    envelope,
-    DeadLetterReason.MaxRetriesExceeded,
-    "Failed after 3 retries",
-    attemptCount: 3,
-    CancellationToken.None);
-
-await producer.Received(1).PublishAsync(
-    Arg.Any<IntegrationEnvelope<DeadLetterEnvelope<string>>>(),
-    "dlq-topic",
-    Arg.Any<CancellationToken>());
-```
-
-### Exercise 2: Empty topic throws InvalidOperationException
-
-```csharp
-var producer = Substitute.For<IMessageBrokerProducer>();
-var options = Options.Create(new DeadLetterOptions
-{
-    DeadLetterTopic = "",
-});
-
-var publisher = new DeadLetterPublisher<string>(producer, options);
-var envelope = IntegrationEnvelope<string>.Create(
-    "data", "Svc", "type");
-
-Assert.ThrowsAsync<InvalidOperationException>(() =>
-    publisher.PublishAsync(
-        envelope,
-        DeadLetterReason.PoisonMessage,
-        "error",
-        1,
-        CancellationToken.None));
-```
-
-### Exercise 3: DeadLetterEnvelope record construction
-
-```csharp
-var original = IntegrationEnvelope<string>.Create(
-    "payload", "Svc", "type");
-
-var dlEnvelope = new DeadLetterEnvelope<string>
-{
-    OriginalEnvelope = original,
-    Reason = DeadLetterReason.ValidationFailed,
-    ErrorMessage = "Schema mismatch",
-    FailedAt = DateTimeOffset.UtcNow,
-    AttemptCount = 2,
-};
-
-Assert.That(dlEnvelope.OriginalEnvelope.Payload, Is.EqualTo("payload"));
-Assert.That(dlEnvelope.Reason, Is.EqualTo(DeadLetterReason.ValidationFailed));
-Assert.That(dlEnvelope.ErrorMessage, Is.EqualTo("Schema mismatch"));
-Assert.That(dlEnvelope.AttemptCount, Is.EqualTo(2));
-```
-
-### Exercise 4: Publisher preserves CorrelationId on wrapper
-
-```csharp
-IntegrationEnvelope<DeadLetterEnvelope<string>>? captured = null;
-var producer = Substitute.For<IMessageBrokerProducer>();
-producer
-    .PublishAsync(
-        Arg.Do<IntegrationEnvelope<DeadLetterEnvelope<string>>>(e => captured = e),
-        Arg.Any<string>(),
-        Arg.Any<CancellationToken>())
-    .Returns(Task.CompletedTask);
-
-var options = Options.Create(new DeadLetterOptions
-{
-    DeadLetterTopic = "dlq",
-});
-
-var publisher = new DeadLetterPublisher<string>(producer, options);
-
-var originalCorrelationId = Guid.NewGuid();
-var envelope = IntegrationEnvelope<string>.Create(
-    "data", "Svc", "type", correlationId: originalCorrelationId);
-
-await publisher.PublishAsync(
-    envelope, DeadLetterReason.MessageExpired, "expired", 0, CancellationToken.None);
-
-Assert.That(captured, Is.Not.Null);
-Assert.That(captured!.CorrelationId, Is.EqualTo(originalCorrelationId));
-```
-
-### Exercise 5: Publisher uses custom source when configured
-
-```csharp
-IntegrationEnvelope<DeadLetterEnvelope<string>>? captured = null;
-var producer = Substitute.For<IMessageBrokerProducer>();
-producer
-    .PublishAsync(
-        Arg.Do<IntegrationEnvelope<DeadLetterEnvelope<string>>>(e => captured = e),
-        Arg.Any<string>(),
-        Arg.Any<CancellationToken>())
-    .Returns(Task.CompletedTask);
-
-var options = Options.Create(new DeadLetterOptions
-{
-    DeadLetterTopic = "dlq",
-    Source = "DLQ-Publisher",
-});
-
-var publisher = new DeadLetterPublisher<string>(producer, options);
-
-var envelope = IntegrationEnvelope<string>.Create(
-    "data", "OriginalSvc", "type");
-
-await publisher.PublishAsync(
-    envelope, DeadLetterReason.UnroutableMessage, "no route", 1, CancellationToken.None);
-
-Assert.That(captured, Is.Not.Null);
-Assert.That(captured!.Source, Is.EqualTo("DLQ-Publisher"));
-```
-
----
-
-## Lab
-
-> 💻 **Runnable lab:** [`tests/TutorialLabs/Tutorial25/Lab.cs`](../tests/TutorialLabs/Tutorial25/Lab.cs)
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Publish_MaxRetriesExceeded_SendsToDeadLetterTopic` | Message routed to configured DLQ topic |
+| 2 | `Publish_PreservesOriginalEnvelope` | Original envelope payload and MessageId are preserved |
+| 3 | `Publish_SetsCorrectReason` | DeadLetterReason and error message are recorded |
+| 4 | `Publish_TracksAttemptCount` | Attempt count is captured in the dead-letter envelope |
+| 5 | `Publish_SetsFailedAtTimestamp` | FailedAt timestamp is set at publish time |
+| 6 | `Publish_PreservesCorrelationId` | CorrelationId is preserved on the wrapper envelope |
+| 7 | `Publish_AllReasonValues_AreSupported` | All DeadLetterReason enum values are accepted |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial25.Lab"
 ```
 
-## Exam
+---
 
-> 💻 **Coding exam:** [`tests/TutorialLabs/Tutorial25/Exam.cs`](../tests/TutorialLabs/Tutorial25/Exam.cs)
+## Exam — Assessment Challenges
+
+> 🎯 Prove you can apply the Dead Letter Queue pattern in realistic, end-to-end scenarios.
+> Each challenge combines multiple concepts and uses a business-like domain.
+
+| # | Challenge | Difficulty |
+|---|-----------|------------|
+| 1 | `Starter_MultipleFailures_AllReachDlq` | 🟢 Starter |
+| 2 | `Intermediate_OriginalEnvelope_MetadataPreserved` | 🟡 Intermediate |
+| 3 | `Advanced_MissingDeadLetterTopic_Throws` | 🔴 Advanced |
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial25.Exam"
