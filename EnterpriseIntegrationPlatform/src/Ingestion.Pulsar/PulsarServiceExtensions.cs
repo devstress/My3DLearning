@@ -2,6 +2,7 @@ using DotPulsar;
 using DotPulsar.Abstractions;
 using EnterpriseIntegrationPlatform.Ingestion;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace EnterpriseIntegrationPlatform.Ingestion.Pulsar;
 
@@ -25,13 +26,20 @@ public static class PulsarServiceExtensions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceUrl);
 
-        services.AddSingleton<IPulsarClient>(_ =>
-            PulsarClient.Builder()
-                .ServiceUrl(new Uri(serviceUrl))
-                .Build());
+        services.Configure<PulsarOptions>(opts => opts.ServiceUrl = serviceUrl);
+
+        services.AddSingleton<IPulsarClient>(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<PulsarOptions>>().Value;
+            opts.Validate();
+            return PulsarClient.Builder()
+                .ServiceUrl(new Uri(opts.ServiceUrl))
+                .Build();
+        });
 
         services.AddSingleton<IMessageBrokerProducer, PulsarProducer>();
         services.AddSingleton<IMessageBrokerConsumer, PulsarConsumer>();
+        services.AddSingleton<PulsarHealthCheck>();
 
         return services;
     }

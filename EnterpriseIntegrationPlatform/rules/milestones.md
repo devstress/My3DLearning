@@ -104,14 +104,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Chunk 302 — ✅ Done — see `rules/completion-log.md`
 
-### Chunk 303 — Pulsar provider hardening
-
-| Status | `not-started` |
-|---|---|
-| **Goal** | Harden `Ingestion.Pulsar` from demo-grade to production-grade. Fix critical producer-per-message anti-pattern. |
-| **Changes** | (a) Add `PulsarOptions` class (IOptions pattern) with `ServiceUrl`, `OperationTimeoutMs`, `ConnectionTimeoutMs`, `KeepAliveIntervalMs`. (b) **Fix PulsarProducer**: cache producer instances per topic using `ConcurrentDictionary<string, IProducer<byte[]>>` — stop creating a new producer per `PublishAsync` call. (c) Implement `IAsyncDisposable` on Producer (dispose cached producers) and Consumer (dispose consumer). (d) Add `PulsarHealthCheck : IHealthCheck`. (e) Update `PulsarServiceExtensions` to use `IOptions<PulsarOptions>`, register health check, validate URL. (f) Add OpenTelemetry `ActivitySource` tracing. |
-| **Tests** | New/expanded unit tests: `PulsarOptionsTests.cs`, `PulsarHealthCheckTests.cs`, update existing `PulsarServiceExtensionsTests.cs`, new `PulsarProducerCachingTests.cs` (verify producer reuse per topic). Minimum 12 new tests. |
-| **Acceptance** | `dotnet build` 0 warnings. All existing + new tests pass. Pulsar producer-per-message bug eliminated. Pulsar provider LOC increases from ~189 to ~400+. |
+### Chunk 303 — ✅ Done — see `rules/completion-log.md`
 
 ### Chunk 304 — Ingestion.Postgres unit tests
 
@@ -155,7 +148,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Next Chunk
 
-**Chunk 303** — Pulsar provider hardening.
+**Chunk 304** — Ingestion.Postgres unit tests.
 
 ---
 

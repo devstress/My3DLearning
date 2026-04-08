@@ -4,6 +4,29 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 303 — Pulsar provider hardening
+
+- **Date**: 2026-04-08
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Harden Pulsar provider with IOptions pattern, health check, ActivitySource tracing, proper IAsyncDisposable, ObjectDisposedException guards. **Critical fix: eliminated producer-per-message anti-pattern** by caching producers per topic in ConcurrentDictionary.
+- **Files created**:
+  - `src/Ingestion.Pulsar/PulsarOptions.cs` — IOptions config with ServiceUrl, OperationTimeoutMs, KeepAliveIntervalMs + URL scheme validation (pulsar:// or pulsar+ssl://)
+  - `src/Ingestion.Pulsar/PulsarHealthCheck.cs` — IHealthCheck verifying Pulsar client via NewProducer() builder
+  - `tests/UnitTests/PulsarOptionsTests.cs` — 16 tests: defaults, section name, URL validation, timeout validation
+  - `tests/UnitTests/PulsarHealthCheckTests.cs` — 4 tests: constructor validation, healthy/unhealthy paths
+  - `tests/UnitTests/PulsarProducerCachingTests.cs` — 7 tests: cache lifecycle, dispose, ObjectDisposedException, argument validation
+- **Files modified**:
+  - `src/Ingestion.Pulsar/PulsarProducer.cs` — **Replaced producer-per-message with ConcurrentDictionary<string, IProducer> cache**. Added IAsyncDisposable (disposes all cached producers), ActivitySource tracing, ObjectDisposedException guard, CachedProducerCount diagnostic property
+  - `src/Ingestion.Pulsar/PulsarConsumer.cs` — Added ActivitySource tracing, linked CancellationTokenSource for DisposeAsync, ObjectDisposedException guard
+  - `src/Ingestion.Pulsar/PulsarServiceExtensions.cs` — IOptions<PulsarOptions>, PulsarHealthCheck registration, URL validation
+  - `src/Ingestion.Pulsar/Ingestion.Pulsar.csproj` — Added HealthChecks.Abstractions + Options package refs
+  - `tests/UnitTests/PulsarProducerTests.cs` — Updated dispose tests for real IAsyncDisposable behavior
+  - `tests/UnitTests/PulsarConsumerTests.cs` — Added 3 tests: dispose safety, double-dispose, ObjectDisposedException after dispose
+  - `tests/UnitTests/PulsarServiceExtensionsTests.cs` — Added 3 tests: IOptions<PulsarOptions>, PulsarHealthCheck, whitespace URL validation
+- **Test counts after**:
+  - UnitTests: 1623 (was 1591, +32 new tests)
+
 ## Chunk 302 — Kafka provider hardening
 
 - **Date**: 2026-04-08
