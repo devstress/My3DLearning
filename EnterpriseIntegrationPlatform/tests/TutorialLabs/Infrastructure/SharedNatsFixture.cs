@@ -145,6 +145,94 @@ public static class SharedTestAppHost
         }
     }
 
+    /// <summary>Gets the Kafka bootstrap servers string from the running TestAppHost.</summary>
+    /// <remarks>
+    /// Waits for the Kafka broker to become responsive before returning.
+    /// Returns <c>null</c> when Docker/Kafka is unavailable so tests can skip.
+    /// </remarks>
+    public static async Task<string?> GetKafkaBootstrapServersAsync()
+    {
+        var app = await GetAppAsync();
+        if (app is null) return null;
+
+        try
+        {
+            var endpoint = app.GetEndpoint("kafka", "kafka-tcp");
+            var bootstrapServers = $"{endpoint.Host}:{endpoint.Port}";
+
+            // Verify Kafka actually accepts connections (container may still be starting)
+            const int maxAttempts = 30;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    var config = new Confluent.Kafka.AdminClientConfig
+                    {
+                        BootstrapServers = bootstrapServers,
+                        SocketTimeoutMs = 3_000,
+                    };
+                    using var admin = new Confluent.Kafka.AdminClientBuilder(config).Build();
+                    admin.GetMetadata(TimeSpan.FromSeconds(3));
+                    return bootstrapServers; // Connection succeeded
+                }
+                catch (Exception) when (attempt < maxAttempts)
+                {
+                    await Task.Delay(2_000); // Wait 2s between retries
+                }
+            }
+
+            return null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Gets the Pulsar service URL from the running TestAppHost.</summary>
+    /// <remarks>
+    /// Waits for the Pulsar broker to become responsive before returning.
+    /// Returns <c>null</c> when Docker/Pulsar is unavailable so tests can skip.
+    /// </remarks>
+    public static async Task<string?> GetPulsarServiceUrlAsync()
+    {
+        var app = await GetAppAsync();
+        if (app is null) return null;
+
+        try
+        {
+            var endpoint = app.GetEndpoint("pulsar", "pulsar-tcp");
+            var serviceUrl = $"pulsar://{endpoint.Host}:{endpoint.Port}";
+
+            // Verify Pulsar actually accepts connections via admin API
+            var adminEndpoint = app.GetEndpoint("pulsar", "pulsar-admin");
+            var adminUrl = $"http://{adminEndpoint.Host}:{adminEndpoint.Port}";
+
+            const int maxAttempts = 60; // Pulsar standalone takes longer to start
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    var response = await httpClient.GetAsync($"{adminUrl}/admin/v2/brokers/health");
+                    if (response.IsSuccessStatusCode)
+                        return serviceUrl;
+                }
+                catch (Exception) when (attempt < maxAttempts)
+                {
+                    // Container still starting
+                }
+                await Task.Delay(2_000);
+            }
+
+            return null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Stops the test host.</summary>
     public static async Task DisposeAsync()
     {

@@ -52,15 +52,42 @@ public sealed class NatsJetStreamProducer : IMessageBrokerProducer
     private async Task EnsureStreamAsync(string topic, CancellationToken ct)
     {
         var streamName = topic.Replace(".", "-");
-        try
+
+        // Retry transient JetStream API timeouts (e.g. during container startup
+        // or under heavy concurrent stream creation load in CI).
+        const int maxRetries = 3;
+        for (var attempt = 1; ; attempt++)
         {
-            await _js.GetStreamAsync(streamName, cancellationToken: ct);
-        }
-        catch (NatsJSApiException ex) when (ex.Error.Code == 404)
-        {
-            await _js.CreateStreamAsync(
-                new StreamConfig(streamName, [topic]),
-                ct);
+            try
+            {
+                await _js.GetStreamAsync(streamName, cancellationToken: ct);
+                return; // Stream exists
+            }
+            catch (NatsJSApiException ex) when (ex.Error.Code == 404)
+            {
+                // Stream does not exist — create it (may also need retry)
+                try
+                {
+                    await _js.CreateStreamAsync(
+                        new StreamConfig(streamName, [topic]),
+                        ct);
+                    return;
+                }
+                catch (NatsJSApiNoResponseException) when (attempt < maxRetries)
+                {
+                    _logger.LogWarning(
+                        "JetStream create-stream timeout (attempt {Attempt}/{Max}), retrying…",
+                        attempt, maxRetries);
+                    await Task.Delay(1_000 * attempt, ct);
+                }
+            }
+            catch (NatsJSApiNoResponseException) when (attempt < maxRetries)
+            {
+                _logger.LogWarning(
+                    "JetStream get-stream timeout (attempt {Attempt}/{Max}), retrying…",
+                    attempt, maxRetries);
+                await Task.Delay(1_000 * attempt, ct);
+            }
         }
     }
 }

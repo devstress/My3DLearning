@@ -3,20 +3,25 @@
 // ============================================================================
 // PURPOSE: Run each test in order to see how broker configuration,
 //          protocol-agnostic publishing, and consumer patterns work through
-//          real NATS JetStream via Aspire. Read the code and comments to
+//          all four brokers via Aspire. Read the code and comments to
 //          understand each concept before moving to the Exam.
 //
 // CONCEPTS DEMONSTRATED (one per test):
-//   1. BrokerOptions defaults — NatsJetStream, 30s timeout, section name
-//   2. BrokerType enum — all four supported protocols
-//   3. Protocol-agnostic publish — message delivered via abstraction
-//   4. Multi-topic routing — per-topic delivery verification
-//   5. Event-driven consumer — push-based handler triggered on arrival
-//   6. Polling consumer — batch retrieval with max-message limit
-//   7. Selective consumer — predicate-based priority filtering
-//   8. Multiple handlers — independent subscription handlers all invoked
+//   1.  BrokerOptions defaults — NatsJetStream, 30s timeout, section name
+//   2.  BrokerType enum — all four supported protocols
+//   3.  Protocol-agnostic publish (NATS) — message delivered via abstraction
+//   4.  Multi-topic routing (NATS) — per-topic delivery verification
+//   5.  Event-driven consumer (NATS) — push-based handler triggered on arrival
+//   6.  Polling consumer (NATS) — batch retrieval with max-message limit
+//   7.  Selective consumer (NATS) — predicate-based priority filtering
+//   8.  Multiple handlers (NATS) — independent subscription handlers all invoked
+//   9.  Kafka E2E publish — real Apache Kafka round-trip via Aspire
+//   10. Pulsar E2E publish — real Apache Pulsar round-trip via Aspire
+//   11. Postgres E2E publish — real PostgreSQL broker round-trip via Aspire
+//   12. All four brokers — same IMessageBrokerProducer, interchangeable delivery
 //
-// INFRASTRUCTURE: NatsBrokerEndpoint (real NATS JetStream via Aspire)
+// INFRASTRUCTURE: NatsBrokerEndpoint, KafkaBrokerEndpoint,
+//   PulsarBrokerEndpoint, PostgresBrokerEndpoint (all via Aspire TestAppHost)
 // ============================================================================
 
 using NUnit.Framework;
@@ -219,5 +224,113 @@ public sealed class Lab
 
         // At least one handler should receive the message
         Assert.That(handler1Results.Count + handler2Results.Count, Is.GreaterThanOrEqualTo(1));
+    }
+
+    // ── 4. Kafka E2E — Real Apache Kafka via Aspire ─────────────────────
+
+    [Test]
+    public async Task Publish_Kafka_RealBrokerDelivery()
+    {
+        // The same IMessageBrokerProducer abstraction works with Kafka.
+        // KafkaBrokerEndpoint wraps a real Confluent.Kafka producer backed
+        // by the Aspire-managed Bitnami Kafka container (KRaft mode).
+        await using var kafka = AspireFixture.CreateKafkaEndpoint("t05-kafka");
+        var topic = AspireFixture.UniqueTopic("t05-kafka-pub");
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "kafka-message", "KafkaService", "kafka.event");
+        await kafka.PublishAsync(envelope, topic);
+
+        kafka.AssertReceivedCount(1);
+        Assert.That(kafka.GetReceived<string>().Payload, Is.EqualTo("kafka-message"));
+    }
+
+    // ── 5. Pulsar E2E — Real Apache Pulsar via Aspire ───────────────────
+
+    [Test]
+    public async Task Publish_Pulsar_RealBrokerDelivery()
+    {
+        // Apache Pulsar uses Key_Shared subscriptions for per-recipient
+        // ordering at scale. PulsarBrokerEndpoint wraps DotPulsar against
+        // the Aspire-managed Pulsar standalone container.
+        await using var pulsar = AspireFixture.CreatePulsarEndpoint("t05-pulsar");
+        var topic = AspireFixture.UniqueTopic("t05-pulsar-pub");
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "pulsar-message", "PulsarService", "pulsar.event");
+        await pulsar.PublishAsync(envelope, topic);
+
+        pulsar.AssertReceivedCount(1);
+        Assert.That(pulsar.GetReceived<string>().Payload, Is.EqualTo("pulsar-message"));
+    }
+
+    // ── 6. Postgres E2E — Real PostgreSQL via Aspire ────────────────────
+
+    [Test]
+    public async Task Publish_Postgres_RealBrokerDelivery()
+    {
+        // PostgreSQL acts as a message broker using eip_messages table +
+        // pg_notify for push delivery. No additional broker infrastructure
+        // needed — just Postgres. PostgresBrokerEndpoint wraps the real
+        // PostgresBrokerProducer against the Aspire-managed Postgres 17
+        // container.
+        await using var pg = AspireFixture.CreatePostgresEndpoint("t05-postgres");
+        var topic = AspireFixture.UniqueTopic("t05-pg-pub");
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "postgres-message", "PostgresService", "postgres.event");
+        await pg.PublishAsync(envelope, topic);
+
+        pg.AssertReceivedCount(1);
+        Assert.That(pg.GetReceived<string>().Payload, Is.EqualTo("postgres-message"));
+    }
+
+    // ── 7. All Four Brokers — Interchangeable Delivery ──────────────────
+
+    [Test]
+    public async Task AllFourBrokers_SameAbstraction_InterchangeableDelivery()
+    {
+        // THE fundamental EIP design principle: all message brokers are
+        // interchangeable. A single IntegrationEnvelope published through
+        // IMessageBrokerProducer delivers identically across NATS, Kafka,
+        // Pulsar, and Postgres. Zero code changes when swapping brokers.
+        await using var nats = AspireFixture.CreateNatsEndpoint("t05-all-nats");
+        await using var kafka = AspireFixture.CreateKafkaEndpoint("t05-all-kafka");
+        await using var pulsar = AspireFixture.CreatePulsarEndpoint("t05-all-pulsar");
+        await using var pg = AspireFixture.CreatePostgresEndpoint("t05-all-pg");
+
+        // All four endpoints implement IMessageBrokerProducer
+        IMessageBrokerProducer[] brokers = [nats, kafka, pulsar, pg];
+
+        var envelope = IntegrationEnvelope<string>.Create(
+            "interchangeable", "CrossBrokerProof", "broker.test") with
+        {
+            Priority = MessagePriority.High,
+            Intent = MessageIntent.Event,
+        };
+
+        // Publish the same message to all four brokers
+        foreach (var broker in brokers)
+        {
+            var topic = AspireFixture.UniqueTopic("t05-all");
+            await broker.PublishAsync(envelope, topic);
+        }
+
+        // Each broker received exactly one message with identical payload
+        nats.AssertReceivedCount(1);
+        kafka.AssertReceivedCount(1);
+        pulsar.AssertReceivedCount(1);
+        pg.AssertReceivedCount(1);
+
+        // Same payload, same identity — the abstraction is real
+        Assert.That(nats.GetReceived<string>().Payload, Is.EqualTo("interchangeable"));
+        Assert.That(kafka.GetReceived<string>().Payload, Is.EqualTo("interchangeable"));
+        Assert.That(pulsar.GetReceived<string>().Payload, Is.EqualTo("interchangeable"));
+        Assert.That(pg.GetReceived<string>().Payload, Is.EqualTo("interchangeable"));
+
+        Assert.That(nats.GetReceived<string>().MessageId, Is.EqualTo(envelope.MessageId));
+        Assert.That(kafka.GetReceived<string>().MessageId, Is.EqualTo(envelope.MessageId));
+        Assert.That(pulsar.GetReceived<string>().MessageId, Is.EqualTo(envelope.MessageId));
+        Assert.That(pg.GetReceived<string>().MessageId, Is.EqualTo(envelope.MessageId));
     }
 }
