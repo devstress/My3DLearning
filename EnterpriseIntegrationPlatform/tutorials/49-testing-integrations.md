@@ -2,86 +2,59 @@
 
 Write unit, contract, integration, and load tests for integration pipelines.
 
-## Exercises
+## Learning Objectives
 
-### 1. IntegrationEnvelope — Create SetsAllMandatoryFields
+After completing this tutorial you will be able to:
 
-```csharp
-var envelope = IntegrationEnvelope<string>.Create(
-    "payload", "OrderService", "order.created");
+1. Capture published messages with `NatsBrokerEndpoint` for test verification
+2. Track messages across multiple topics in a single test
+3. Create `IntegrationEnvelope<T>` instances and verify all identity fields
+4. Build causation chains and inspect `FaultEnvelope` details
+5. Advance a `RoutingSlip` step-by-step through its itinerary
 
-Assert.That(envelope.MessageId, Is.Not.EqualTo(Guid.Empty));
-Assert.That(envelope.CorrelationId, Is.Not.EqualTo(Guid.Empty));
-Assert.That(envelope.Source, Is.EqualTo("OrderService"));
-Assert.That(envelope.MessageType, Is.EqualTo("order.created"));
-Assert.That(envelope.Payload, Is.EqualTo("payload"));
-Assert.That(envelope.SchemaVersion, Is.EqualTo("1.0"));
-```
+---
 
-### 2. IntegrationEnvelope — CausationId TracksDerivedMessages
+## Lab — Guided Practice
 
-```csharp
-var parent = IntegrationEnvelope<string>.Create(
-    "parent-data", "ParentService", "parent.event");
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-var child = IntegrationEnvelope<string>.Create(
-    "child-data", "ChildService", "child.event",
-    correlationId: parent.CorrelationId,
-    causationId: parent.MessageId);
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `NatsBrokerEndpoint_CapturesPublishedMessages` | MockEndpoint captures published messages |
+| 2 | `NatsBrokerEndpoint_TracksMultipleTopics` | Track messages across multiple topics |
+| 3 | `IntegrationEnvelope_Create_SetsAllFields` | Envelope factory sets all identity fields |
+| 4 | `CausationId_TracksDerivedMessages` | CausationId tracks derived messages |
+| 5 | `FaultEnvelope_CapturesOriginalDetails` | FaultEnvelope captures original details |
+| 6 | `RoutingSlip_Advance_MovesToNextStep` | RoutingSlip advance moves to next step |
 
-Assert.That(child.CorrelationId, Is.EqualTo(parent.CorrelationId));
-Assert.That(child.CausationId, Is.EqualTo(parent.MessageId));
-```
-
-### 3. FaultEnvelope — Create CapturesOriginalMessageDetails
-
-```csharp
-var original = IntegrationEnvelope<string>.Create(
-    "data", "OrderService", "order.created");
-
-var fault = FaultEnvelope.Create(
-    original, "ValidationStep", "Invalid schema", 3);
-
-Assert.That(fault.OriginalMessageId, Is.EqualTo(original.MessageId));
-Assert.That(fault.CorrelationId, Is.EqualTo(original.CorrelationId));
-Assert.That(fault.FaultedBy, Is.EqualTo("ValidationStep"));
-Assert.That(fault.FaultReason, Is.EqualTo("Invalid schema"));
-Assert.That(fault.RetryCount, Is.EqualTo(3));
-```
-
-### 4. MessagePriority — EnumValues
-
-```csharp
-Assert.That(Enum.GetValues<MessagePriority>(), Has.Length.GreaterThanOrEqualTo(4));
-Assert.That((int)MessagePriority.Low, Is.EqualTo(0));
-Assert.That((int)MessagePriority.Normal, Is.EqualTo(1));
-Assert.That((int)MessagePriority.High, Is.EqualTo(2));
-Assert.That((int)MessagePriority.Critical, Is.EqualTo(3));
-```
-
-### 5. MessageIntent — EnumValues
-
-```csharp
-Assert.That(Enum.GetValues<MessageIntent>(), Has.Length.GreaterThanOrEqualTo(3));
-Assert.That((int)MessageIntent.Command, Is.EqualTo(0));
-Assert.That((int)MessageIntent.Document, Is.EqualTo(1));
-Assert.That((int)MessageIntent.Event, Is.EqualTo(2));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial49/Lab.cs`](../tests/TutorialLabs/Tutorial49/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial49/Lab.cs`](../tests/TutorialLabs/Tutorial49/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial49.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial49.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial49/Exam.cs`](../tests/TutorialLabs/Tutorial49/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_CausationChain_ThreeGenerationsPublished` | 🟢 Starter | Three-generation causation chain published |
+| 2 | `Challenge2_FaultEnvelope_WithException` | 🟡 Intermediate | FaultEnvelope created from exception |
+| 3 | `Challenge3_RoutingSlipLifecycle_PublishesEachStep` | 🔴 Advanced | Routing slip lifecycle — publish each step |
+
+> 💻 [`tests/TutorialLabs/Tutorial49/Exam.cs`](../tests/TutorialLabs/Tutorial49/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial49.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial49.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial49.ExamAnswers"
 ```
 
 ---

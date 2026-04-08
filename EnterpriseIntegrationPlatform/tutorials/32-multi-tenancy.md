@@ -2,6 +2,16 @@
 
 Isolate message processing per tenant with tenant resolution and context propagation.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Resolve a `TenantContext` from envelope metadata using `ITenantResolver`
+2. Handle missing or null tenant identifiers and receive the `Anonymous` sentinel
+3. Enforce cross-tenant isolation with `ITenantIsolationGuard`
+4. Detect tenant mismatches that throw `TenantIsolationException` with diagnostic properties
+5. Propagate tenant identity through integration message metadata
+
 ## Key Types
 
 ```csharp
@@ -47,90 +57,49 @@ public sealed class TenantIsolationException : Exception
 }
 ```
 
-## Exercises
+---
 
-### 1. Resolve — FromMetadata WithTenantIdKey
+## Lab — Guided Practice
 
-```csharp
-var metadata = new Dictionary<string, string>
-{
-    [TenantResolver.TenantMetadataKey] = "tenant-abc",
-};
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-var context = _resolver.Resolve(metadata);
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `ResolveFromMetadata_ReturnsTenantContext` | Resolve tenant from metadata dictionary |
+| 2 | `ResolveFromMetadata_MissingKey_ReturnsAnonymous` | Missing key returns Anonymous sentinel |
+| 3 | `ResolveFromString_ReturnsTenantContext` | Resolve tenant from explicit string |
+| 4 | `ResolveFromString_NullOrWhitespace_ReturnsAnonymous` | Null/whitespace string returns Anonymous |
+| 5 | `IsolationGuard_MatchingTenant_DoesNotThrow` | Guard passes when tenant matches |
+| 6 | `IsolationGuard_MismatchedTenant_ThrowsAndPublishesAlert` | Guard throws on mismatch and publishes alert |
 
-Assert.That(context.TenantId, Is.EqualTo("tenant-abc"));
-Assert.That(context.IsResolved, Is.True);
-```
-
-### 2. Resolve — MissingTenantId ReturnsAnonymous
-
-```csharp
-var metadata = new Dictionary<string, string>();
-
-var context = _resolver.Resolve(metadata);
-
-Assert.That(context.IsResolved, Is.False);
-Assert.That(context, Is.SameAs(TenantContext.Anonymous));
-```
-
-### 3. Resolve — String WithExplicitTenantId
-
-```csharp
-var context = _resolver.Resolve("my-tenant");
-
-Assert.That(context.TenantId, Is.EqualTo("my-tenant"));
-Assert.That(context.IsResolved, Is.True);
-```
-
-### 4. IsolationGuard — Enforce PassesWhenTenantMatches
-
-```csharp
-var guard = new TenantIsolationGuard(_resolver);
-var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
-{
-    Metadata = new Dictionary<string, string>
-    {
-        [TenantResolver.TenantMetadataKey] = "tenant-x",
-    },
-};
-
-Assert.DoesNotThrow(() => guard.Enforce(envelope, "tenant-x"));
-```
-
-### 5. IsolationGuard — Enforce ThrowsOnMismatch
-
-```csharp
-var guard = new TenantIsolationGuard(_resolver);
-var envelope = IntegrationEnvelope<string>.Create("data", "Svc", "event") with
-{
-    Metadata = new Dictionary<string, string>
-    {
-        [TenantResolver.TenantMetadataKey] = "tenant-a",
-    },
-};
-
-var ex = Assert.Throws<TenantIsolationException>(
-    () => guard.Enforce(envelope, "tenant-b"));
-
-Assert.That(ex!.ActualTenantId, Is.EqualTo("tenant-a"));
-Assert.That(ex.ExpectedTenantId, Is.EqualTo("tenant-b"));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial32/Lab.cs`](../tests/TutorialLabs/Tutorial32/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial32/Lab.cs`](../tests/TutorialLabs/Tutorial32/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial32.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial32.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial32/Exam.cs`](../tests/TutorialLabs/Tutorial32/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_MultiTenantRouting_IsolatesPerTenant` | 🟢 Starter | Multi-tenant routing with per-tenant isolation |
+| 2 | `Challenge2_CrossTenantAccess_Rejected` | 🟡 Intermediate | Cross-tenant access rejection |
+| 3 | `Challenge3_AnonymousTenant_GuardRejects` | 🔴 Advanced | Anonymous tenant guard rejection logic |
+
+> 💻 [`tests/TutorialLabs/Tutorial32/Exam.cs`](../tests/TutorialLabs/Tutorial32/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial32.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial32.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial32.ExamAnswers"
 ```
 
 ---

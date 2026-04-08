@@ -2,6 +2,16 @@
 
 Query platform knowledge using Retrieval-Augmented Generation with Ollama embeddings.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Generate text completions with `OllamaClient.GenerateAsync`
+2. Run a RAG chat flow through `RagFlowClient.ChatAsync`
+3. Understand default settings for `OllamaSettings` and `RagFlowOptions`
+4. Inspect the `RagFlowChatResponse` record shape
+5. Wire an AI-enriched pipeline end-to-end through a `MockEndpoint`
+
 ## Key Types
 
 ```csharp
@@ -78,98 +88,49 @@ public sealed class RagFlowOptions
 }
 ```
 
-## Exercises
+---
 
-### 1. IOllamaService — InterfaceShape HasExpectedMethods
+## Lab — Guided Practice
 
-```csharp
-var type = typeof(IOllamaService);
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-Assert.That(type.GetMethod("GenerateAsync"), Is.Not.Null);
-Assert.That(type.GetMethod("AnalyseAsync"), Is.Not.Null);
-Assert.That(type.GetMethod("IsHealthyAsync"), Is.Not.Null);
-```
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Ollama_GenerateAsync_ReturnsExpected` | Generate text with Ollama |
+| 2 | `RagFlow_ChatAsync_ReturnsChatResponse` | RAG chat flow returns response |
+| 3 | `OllamaSettings_Defaults` | OllamaSettings default values |
+| 4 | `RagFlowOptions_Defaults` | RagFlowOptions default values |
+| 5 | `RagFlowChatResponse_RecordShape` | RagFlowChatResponse record shape |
+| 6 | `E2E_MockEndpoint_AiEnrichedPipeline` | End-to-end AI-enriched pipeline |
 
-### 2. IRagFlowService — InterfaceShape HasExpectedMethods
-
-```csharp
-var type = typeof(IRagFlowService);
-
-Assert.That(type.GetMethod("RetrieveAsync"), Is.Not.Null);
-Assert.That(type.GetMethod("ChatAsync"), Is.Not.Null);
-Assert.That(type.GetMethod("ListDatasetsAsync"), Is.Not.Null);
-Assert.That(type.GetMethod("IsHealthyAsync"), Is.Not.Null);
-```
-
-### 3. Mock — IOllamaService GenerateAsync ReturnsExpected
-
-```csharp
-var ollama = Substitute.For<IOllamaService>();
-ollama.GenerateAsync(
-        "What is EIP?",
-        Arg.Any<string>(),
-        Arg.Any<CancellationToken>())
-    .Returns("Enterprise Integration Patterns");
-
-var result = await ollama.GenerateAsync("What is EIP?");
-
-Assert.That(result, Is.EqualTo("Enterprise Integration Patterns"));
-```
-
-### 4. Mock — IRagFlowService ChatAsync ReturnsChatResponse
-
-```csharp
-var ragFlow = Substitute.For<IRagFlowService>();
-var expectedResponse = new RagFlowChatResponse(
-    Answer: "The answer is 42",
-    ConversationId: "conv-123",
-    References: new List<RagFlowReference>
-    {
-        new("Relevant passage", "doc.pdf", 0.95),
-    });
-
-ragFlow.ChatAsync("What is the answer?", null, Arg.Any<CancellationToken>())
-    .Returns(expectedResponse);
-
-var result = await ragFlow.ChatAsync("What is the answer?");
-
-Assert.That(result.Answer, Is.EqualTo("The answer is 42"));
-Assert.That(result.ConversationId, Is.EqualTo("conv-123"));
-Assert.That(result.References, Has.Count.EqualTo(1));
-```
-
-### 5. RagFlowChatResponse — RecordShape
-
-```csharp
-var refs = new List<RagFlowReference>
-{
-    new("passage 1", "file1.pdf", 0.9),
-    new("passage 2", "file2.pdf", 0.8),
-};
-
-var response = new RagFlowChatResponse("Answer text", "conv-1", refs);
-
-Assert.That(response.Answer, Is.EqualTo("Answer text"));
-Assert.That(response.ConversationId, Is.EqualTo("conv-1"));
-Assert.That(response.References, Has.Count.EqualTo(2));
-Assert.That(response.References[0].DocumentName, Is.EqualTo("file1.pdf"));
-Assert.That(response.References[1].Score, Is.EqualTo(0.8));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial40/Lab.cs`](../tests/TutorialLabs/Tutorial40/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial40/Lab.cs`](../tests/TutorialLabs/Tutorial40/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial40.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial40.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial40/Exam.cs`](../tests/TutorialLabs/Tutorial40/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_FullRagChatFlow_ThroughMockEndpoint` | 🟢 Starter | Full RAG chat flow through MockEndpoint |
+| 2 | `Challenge2_OllamaAnalysis_WithSystemPrompt` | 🟡 Intermediate | Ollama analysis with system prompt |
+| 3 | `Challenge3_RagFlowDatasetListing_AndHealthCheck` | 🔴 Advanced | RAG Flow dataset listing and health check |
+
+> 💻 [`tests/TutorialLabs/Tutorial40/Exam.cs`](../tests/TutorialLabs/Tutorial40/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial40.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial40.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial40.ExamAnswers"
 ```
 
 ---

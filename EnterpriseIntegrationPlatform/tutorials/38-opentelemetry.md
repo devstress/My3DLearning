@@ -2,6 +2,16 @@
 
 Instrument message processing with OpenTelemetry traces, metrics, and spans.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Record and retrieve lifecycle events by correlation ID and business key
+2. Query the latest event for a correlation and order stages chronologically
+3. Retrieve events by `MessageId` for per-message history
+4. Inject trace context into envelopes with `CorrelationPropagator`
+5. Publish lifecycle events end-to-end through a `MockEndpoint`
+
 ## Key Types
 
 ```csharp
@@ -118,159 +128,50 @@ public static class CorrelationPropagator
 }
 ```
 
-## Exercises
+---
 
-### 1. MessageEvent — RecordShape AllPropertiesAccessible
+## Lab — Guided Practice
 
-```csharp
-var evt = new MessageEvent
-{
-    EventId = Guid.NewGuid(),
-    MessageId = Guid.NewGuid(),
-    CorrelationId = Guid.NewGuid(),
-    MessageType = "order.placed",
-    Source = "OrderSvc",
-    Stage = "Ingestion",
-    Status = DeliveryStatus.Pending,
-    RecordedAt = DateTimeOffset.UtcNow,
-    Details = "Received at gateway",
-    BusinessKey = "ORD-123",
-    TraceId = "abc123",
-    SpanId = "def456",
-};
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-Assert.That(evt.EventId, Is.Not.EqualTo(Guid.Empty));
-Assert.That(evt.MessageId, Is.Not.EqualTo(Guid.Empty));
-Assert.That(evt.CorrelationId, Is.Not.EqualTo(Guid.Empty));
-Assert.That(evt.MessageType, Is.EqualTo("order.placed"));
-Assert.That(evt.Source, Is.EqualTo("OrderSvc"));
-Assert.That(evt.Stage, Is.EqualTo("Ingestion"));
-Assert.That(evt.Status, Is.EqualTo(DeliveryStatus.Pending));
-Assert.That(evt.Details, Is.EqualTo("Received at gateway"));
-Assert.That(evt.BusinessKey, Is.EqualTo("ORD-123"));
-Assert.That(evt.TraceId, Is.EqualTo("abc123"));
-Assert.That(evt.SpanId, Is.EqualTo("def456"));
-```
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `RecordAndRetrieve_ByCorrelationId` | Record and retrieve by CorrelationId |
+| 2 | `RecordAndRetrieve_ByBusinessKey` | Record and retrieve by business key |
+| 3 | `GetLatestByCorrelationId_ReturnsNewestEvent` | Get latest event for a correlation |
+| 4 | `GetByMessageId_ReturnsMatchingEvents` | Get events by MessageId |
+| 5 | `CorrelationPropagator_InjectTraceContext_ReturnsEnvelope` | Inject trace context into envelope |
+| 6 | `MultipleStages_OrderedByRecordedAt` | Multiple stages ordered chronologically |
+| 7 | `E2E_MockEndpoint_RecordEventsAsEnvelopesFlow` | End-to-end lifecycle event recording |
 
-### 2. InMemoryMessageStateStore — RecordAndRetrieveByCorrelationId
-
-```csharp
-var store = new InMemoryMessageStateStore();
-var correlationId = Guid.NewGuid();
-
-var evt = new MessageEvent
-{
-    EventId = Guid.NewGuid(),
-    MessageId = Guid.NewGuid(),
-    CorrelationId = correlationId,
-    MessageType = "order.placed",
-    Source = "OrderSvc",
-    Stage = "Routing",
-    Status = DeliveryStatus.InFlight,
-    RecordedAt = DateTimeOffset.UtcNow,
-};
-
-await store.RecordAsync(evt);
-
-var results = await store.GetByCorrelationIdAsync(correlationId);
-
-Assert.That(results, Has.Count.EqualTo(1));
-Assert.That(results[0].CorrelationId, Is.EqualTo(correlationId));
-```
-
-### 3. InMemoryMessageStateStore — RecordAndRetrieveByBusinessKey
-
-```csharp
-var store = new InMemoryMessageStateStore();
-
-var evt = new MessageEvent
-{
-    EventId = Guid.NewGuid(),
-    MessageId = Guid.NewGuid(),
-    CorrelationId = Guid.NewGuid(),
-    MessageType = "invoice.paid",
-    Source = "BillingSvc",
-    Stage = "Processing",
-    Status = DeliveryStatus.Delivered,
-    RecordedAt = DateTimeOffset.UtcNow,
-    BusinessKey = "INV-2024-001",
-};
-
-await store.RecordAsync(evt);
-
-var results = await store.GetByBusinessKeyAsync("INV-2024-001");
-
-Assert.That(results, Has.Count.EqualTo(1));
-Assert.That(results[0].BusinessKey, Is.EqualTo("INV-2024-001"));
-```
-
-### 4. InspectionResult — RecordShape
-
-```csharp
-var result = new InspectionResult
-{
-    Query = "ORD-123",
-    Found = true,
-    Summary = "Message delivered successfully",
-    Events = new List<MessageEvent>(),
-    LatestStage = "Delivery",
-    LatestStatus = DeliveryStatus.Delivered,
-};
-
-Assert.That(result.Query, Is.EqualTo("ORD-123"));
-Assert.That(result.Found, Is.True);
-Assert.That(result.Summary, Is.EqualTo("Message delivered successfully"));
-Assert.That(result.Events, Is.Not.Null);
-Assert.That(result.LatestStage, Is.EqualTo("Delivery"));
-Assert.That(result.LatestStatus, Is.EqualTo(DeliveryStatus.Delivered));
-```
-
-### 5. MessageStateSnapshot — RecordShape
-
-```csharp
-var snapshot = new MessageStateSnapshot
-{
-    MessageId = Guid.NewGuid(),
-    CorrelationId = Guid.NewGuid(),
-    CausationId = Guid.NewGuid(),
-    MessageType = "order.shipped",
-    Source = "ShippingSvc",
-    Priority = MessagePriority.High,
-    Timestamp = DateTimeOffset.UtcNow,
-    CurrentStage = "Delivery",
-    DeliveryStatus = DeliveryStatus.Delivered,
-    TraceId = "trace-abc",
-    SpanId = "span-xyz",
-    RetryCount = 0,
-};
-
-Assert.That(snapshot.MessageId, Is.Not.EqualTo(Guid.Empty));
-Assert.That(snapshot.CorrelationId, Is.Not.EqualTo(Guid.Empty));
-Assert.That(snapshot.CausationId, Is.Not.Null);
-Assert.That(snapshot.MessageType, Is.EqualTo("order.shipped"));
-Assert.That(snapshot.Source, Is.EqualTo("ShippingSvc"));
-Assert.That(snapshot.Priority, Is.EqualTo(MessagePriority.High));
-Assert.That(snapshot.CurrentStage, Is.EqualTo("Delivery"));
-Assert.That(snapshot.DeliveryStatus, Is.EqualTo(DeliveryStatus.Delivered));
-Assert.That(snapshot.TraceId, Is.EqualTo("trace-abc"));
-Assert.That(snapshot.SpanId, Is.EqualTo("span-xyz"));
-Assert.That(snapshot.RetryCount, Is.EqualTo(0));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial38/Lab.cs`](../tests/TutorialLabs/Tutorial38/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial38/Lab.cs`](../tests/TutorialLabs/Tutorial38/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial38.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial38.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial38/Exam.cs`](../tests/TutorialLabs/Tutorial38/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_FullLifecycleTracking_ThroughMockEndpoint` | 🟢 Starter | Full lifecycle tracking through MockEndpoint |
+| 2 | `Challenge2_WhereIsInspection_WithMockedServices` | 🟡 Intermediate | Where-is inspection with mocked services |
+| 3 | `Challenge3_CreateSnapshot_FromEnvelope` | 🔴 Advanced | Create snapshot from envelope |
+
+> 💻 [`tests/TutorialLabs/Tutorial38/Exam.cs`](../tests/TutorialLabs/Tutorial38/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial38.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial38.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial38.ExamAnswers"
 ```
 
 ---

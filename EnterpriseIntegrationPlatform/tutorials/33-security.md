@@ -2,6 +2,16 @@
 
 Sanitize input, encrypt payloads, and validate messages against security threats.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Sanitise message payloads by stripping script tags and SQL injection patterns
+2. Evaluate whether a string payload is clean using `InputSanitizer.IsClean`
+3. Enforce maximum payload size with `PayloadSizeGuard`
+4. Wire a sanitise → guard → publish pipeline through a `MockEndpoint`
+5. Understand how input validation fits into an integration security model
+
 ## Key Types
 
 ```csharp
@@ -44,77 +54,49 @@ public sealed class JwtOptions
 }
 ```
 
-## Exercises
+---
 
-### 1. InputSanitizer — Sanitize RemovesScriptTags
+## Lab — Guided Practice
 
-```csharp
-var input = "Hello <script>alert('xss')</script> World";
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-var result = _sanitizer.Sanitize(input);
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Sanitizer_RemovesScriptTags` | Strip `<script>` tags from payloads |
+| 2 | `Sanitizer_RemovesSqlInjection` | Strip SQL injection patterns |
+| 3 | `IsClean_DetectsDangerousInput` | Detect dangerous input strings |
+| 4 | `PayloadSizeGuard_AllowsUnderLimit` | Payload under size limit passes |
+| 5 | `PayloadSizeGuard_RejectsOverLimit` | Payload over size limit is rejected |
+| 6 | `SanitizedMessage_PublishedToMockEndpoint` | End-to-end sanitise and publish |
 
-Assert.That(result, Does.Not.Contain("<script>"));
-Assert.That(result, Does.Not.Contain("alert"));
-Assert.That(result, Does.Contain("Hello"));
-Assert.That(result, Does.Contain("World"));
-```
-
-### 2. InputSanitizer — IsClean ReturnsFalseForXss
-
-```csharp
-var dirty = "<script>alert('xss')</script>";
-
-Assert.That(_sanitizer.IsClean(dirty), Is.False);
-```
-
-### 3. InputSanitizer — IsClean ReturnsTrueForClean
-
-```csharp
-var clean = "Hello, this is perfectly safe text.";
-
-Assert.That(_sanitizer.IsClean(clean), Is.True);
-```
-
-### 4. PayloadSizeGuard — Enforce PassesForSmallPayload
-
-```csharp
-var guard = new PayloadSizeGuard(
-    Options.Create(new PayloadSizeOptions { MaxPayloadBytes = 1024 }));
-
-var smallPayload = new string('x', 100);
-
-Assert.DoesNotThrow(() => guard.Enforce(smallPayload));
-```
-
-### 5. PayloadSizeGuard — Enforce ThrowsPayloadTooLargeException
-
-```csharp
-var guard = new PayloadSizeGuard(
-    Options.Create(new PayloadSizeOptions { MaxPayloadBytes = 50 }));
-
-var oversized = new string('x', 200);
-
-var ex = Assert.Throws<PayloadTooLargeException>(
-    () => guard.Enforce(oversized));
-
-Assert.That(ex!.MaxBytes, Is.EqualTo(50));
-Assert.That(ex.ActualBytes, Is.GreaterThan(50));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial33/Lab.cs`](../tests/TutorialLabs/Tutorial33/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial33/Lab.cs`](../tests/TutorialLabs/Tutorial33/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial33.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial33.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial33/Exam.cs`](../tests/TutorialLabs/Tutorial33/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_FullSanitizePipeline_PublishesCleanMessages` | 🟢 Starter | Full sanitise pipeline that publishes clean messages |
+| 2 | `Challenge2_ByteArrayPayloadGuard` | 🟡 Intermediate | Byte-array payload size guard |
+| 3 | `Challenge3_CombinedSanitizerAndGuard_E2E` | 🔴 Advanced | Combined sanitiser + guard end-to-end |
+
+> 💻 [`tests/TutorialLabs/Tutorial33/Exam.cs`](../tests/TutorialLabs/Tutorial33/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial33.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial33.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial33.ExamAnswers"
 ```
 
 ---

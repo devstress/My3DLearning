@@ -2,6 +2,16 @@
 
 Compensate partial failures in distributed workflows using saga rollback activities.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Execute single-step and multi-step saga compensations
+2. Detect compensation failures and publish Nack notifications
+3. Inspect `IntegrationPipelineResult` failure reasons
+4. Verify that saga workflow and activity types exist in the assembly
+5. Understand the Temporal-based saga compensation pattern
+
 ## Key Types
 
 ```csharp
@@ -83,78 +93,49 @@ public sealed class SagaCompensationActivities
 }
 ```
 
-## Exercises
+---
 
-### 1. CompensateAsync — ReturnsTrue
+## Lab — Guided Practice
 
-```csharp
-var svc = new DefaultCompensationActivityService(
-    NullLogger<DefaultCompensationActivityService>.Instance);
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-var result = await svc.CompensateAsync(Guid.NewGuid(), "validate");
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `CompensateAsync_SingleStep_ReturnsTrue` | Single-step compensation returns true |
+| 2 | `CompensateAsync_MultipleSteps_AllReturnTrue` | Multi-step compensation all succeed |
+| 3 | `MockCompensation_FailureDetected_NackPublished` | Failure detected — Nack published |
+| 4 | `IntegrationPipelineResult_FailureHasReason` | Pipeline result failure has reason |
+| 5 | `SagaCompensationWorkflow_ClassExists` | Saga workflow class exists in assembly |
+| 6 | `SagaCompensationActivities_ClassExists` | Saga activities class exists in assembly |
 
-Assert.That(result, Is.True);
-```
-
-### 2. ICompensationActivityService — InterfaceShape
-
-```csharp
-var type = typeof(ICompensationActivityService);
-
-Assert.That(type.IsInterface, Is.True);
-Assert.That(type.GetMethod("CompensateAsync"), Is.Not.Null);
-```
-
-### 3. SagaCompensationActivities — ClassExists
-
-```csharp
-var assembly = typeof(EnterpriseIntegrationPlatform.Workflow.Temporal.TemporalOptions).Assembly;
-var type = assembly.GetTypes()
-    .FirstOrDefault(t => t.Name == "SagaCompensationActivities");
-
-Assert.That(type, Is.Not.Null);
-```
-
-### 4. SagaCompensationWorkflow — ClassExists
-
-```csharp
-var assembly = typeof(EnterpriseIntegrationPlatform.Workflow.Temporal.TemporalOptions).Assembly;
-var type = assembly.GetTypes()
-    .FirstOrDefault(t => t.Name == "SagaCompensationWorkflow");
-
-Assert.That(type, Is.Not.Null);
-```
-
-### 5. CompensateAsync — MultipleSteps AllReturnTrue
-
-```csharp
-var svc = new DefaultCompensationActivityService(
-    NullLogger<DefaultCompensationActivityService>.Instance);
-
-var corrId = Guid.NewGuid();
-var r1 = await svc.CompensateAsync(corrId, "persist");
-var r2 = await svc.CompensateAsync(corrId, "notify");
-var r3 = await svc.CompensateAsync(corrId, "route");
-
-Assert.That(r1, Is.True);
-Assert.That(r2, Is.True);
-Assert.That(r3, Is.True);
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial47/Lab.cs`](../tests/TutorialLabs/Tutorial47/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial47/Lab.cs`](../tests/TutorialLabs/Tutorial47/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial47.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial47.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial47/Exam.cs`](../tests/TutorialLabs/Tutorial47/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_MultiStepCompensation_AllNotified` | 🟢 Starter | Multi-step compensation — all steps notified |
+| 2 | `Challenge2_PartialFailure_FailureNotificationPublished` | 🟡 Intermediate | Partial failure notification published |
+| 3 | `Challenge3_SagaWorkflowTypes_ExistInAssembly` | 🔴 Advanced | Saga workflow types exist in assembly |
+
+> 💻 [`tests/TutorialLabs/Tutorial47/Exam.cs`](../tests/TutorialLabs/Tutorial47/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial47.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial47.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial47.ExamAnswers"
 ```
 
 ---

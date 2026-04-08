@@ -2,6 +2,15 @@
 
 Implement notification use cases with Ack/Nack, feature flags, and priority routing.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Validate messages and publish Ack on success or Nack on failure
+2. Inspect `MessageValidationResult` success and failure properties
+3. Log notification activity without errors
+4. Wire a full notification flow: validate → log → publish
+
 ## Key Types
 
 ```csharp
@@ -21,71 +30,49 @@ public sealed class XmlNotificationMapper : INotificationMapper
 }
 ```
 
-## Exercises
+---
 
-### 1. ValidateAsync — ValidMessage ReturnsSuccess
+## Lab — Guided Practice
 
-```csharp
-var svc = new DefaultMessageValidationService();
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-var result = await svc.ValidateAsync("order.created", "{\"id\": 1}");
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `Validate_Success_PublishesAck` | Successful validation publishes Ack |
+| 2 | `Validate_Failure_PublishesNack` | Failed validation publishes Nack |
+| 3 | `LogAsync_CompletesWithoutError` | Log activity completes without error |
+| 4 | `MessageValidationResult_Success_HasExpectedValues` | Validation result success properties |
+| 5 | `MessageValidationResult_Failure_HasReasonAndInvalid` | Validation result failure reason |
+| 6 | `FullNotificationFlow_ValidateLogPublish` | Full notification flow end-to-end |
 
-Assert.That(result.IsValid, Is.True);
-Assert.That(result.Reason, Is.Null);
-```
-
-### 2. MessageValidationResult — Success HasExpectedValues
-
-```csharp
-var result = MessageValidationResult.Success;
-
-Assert.That(result.IsValid, Is.True);
-Assert.That(result.Reason, Is.Null);
-```
-
-### 3. MessageValidationResult — Failure HasReasonAndInvalid
-
-```csharp
-var result = MessageValidationResult.Failure("Schema mismatch");
-
-Assert.That(result.IsValid, Is.False);
-Assert.That(result.Reason, Is.EqualTo("Schema mismatch"));
-```
-
-### 4. LogAsync — Completes WithoutError
-
-```csharp
-var svc = new DefaultMessageLoggingService(
-    NullLogger<DefaultMessageLoggingService>.Instance);
-
-Assert.DoesNotThrowAsync(() =>
-    svc.LogAsync(Guid.NewGuid(), "order.created", "Validated"));
-```
-
-### 5. INotificationActivityService — InterfaceShape
-
-```csharp
-var type = typeof(INotificationActivityService);
-
-Assert.That(type.IsInterface, Is.True);
-Assert.That(type.GetMethod("PublishAckAsync"), Is.Not.Null);
-Assert.That(type.GetMethod("PublishNackAsync"), Is.Not.Null);
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial48/Lab.cs`](../tests/TutorialLabs/Tutorial48/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial48/Lab.cs`](../tests/TutorialLabs/Tutorial48/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial48.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial48.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial48/Exam.cs`](../tests/TutorialLabs/Tutorial48/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_ConditionalAckNack_CorrectTopics` | 🟢 Starter | Conditional Ack/Nack to correct topics |
+| 2 | `Challenge2_BatchNotification_MultipleMessages` | 🟡 Intermediate | Batch notification with multiple messages |
+| 3 | `Challenge3_PersistenceActivity_SaveAndUpdate` | 🔴 Advanced | Persistence activity save and update |
+
+> 💻 [`tests/TutorialLabs/Tutorial48/Exam.cs`](../tests/TutorialLabs/Tutorial48/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial48.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial48.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial48.ExamAnswers"
 ```
 
 ---

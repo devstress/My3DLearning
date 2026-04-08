@@ -2,6 +2,16 @@
 
 Handle disaster recovery with failover regions, backup/restore, and replication.
 
+## Learning Objectives
+
+After completing this tutorial you will be able to:
+
+1. Register multi-region topology and publish it to a broker endpoint
+2. Perform failover to promote a target region to primary
+3. Handle failover errors for unknown or same-region targets
+4. Fail back to restore the original primary region
+5. Update health-check timestamps and query all region states
+
 ## Key Types
 
 ```csharp
@@ -29,140 +39,50 @@ public interface IDrDrillRunner
 }
 ```
 
-## Exercises
+---
 
-### 1. FailoverResult — RecordShape
+## Lab — Guided Practice
 
-```csharp
-var now = DateTimeOffset.UtcNow;
-var result = new FailoverResult
-{
-    Success = true,
-    PromotedRegionId = "us-west-2",
-    DemotedRegionId = "us-east-1",
-    Duration = TimeSpan.FromMilliseconds(150),
-    CompletedAt = now,
-};
+> 💻 Run the lab tests to see each concept demonstrated in isolation.
+> Each test targets a single behaviour so you can study one idea at a time.
 
-Assert.That(result.Success, Is.True);
-Assert.That(result.PromotedRegionId, Is.EqualTo("us-west-2"));
-Assert.That(result.DemotedRegionId, Is.EqualTo("us-east-1"));
-Assert.That(result.Duration, Is.EqualTo(TimeSpan.FromMilliseconds(150)));
-Assert.That(result.CompletedAt, Is.EqualTo(now));
-Assert.That(result.ErrorMessage, Is.Null);
-```
+| # | Test Name | Concept |
+|---|-----------|---------|
+| 1 | `RegisterRegions_PublishTopologyToNatsBrokerEndpoint` | Register regions and publish topology |
+| 2 | `Failover_PromotesTarget_PublishResult` | Failover promotes target region |
+| 3 | `FailoverToUnknownRegion_PublishError` | Failover to unknown region publishes error |
+| 4 | `FailoverToSameRegion_PublishError` | Failover to same region publishes error |
+| 5 | `FailbackRestoresOriginalPrimary_PublishResult` | Failback restores original primary |
+| 6 | `UpdateHealthCheck_PublishTimestampChange` | Health-check timestamp update |
+| 7 | `GetAllRegions_PublishRegionStates` | Get all region states |
 
-### 2. ReplicationStatus — RecordShape
-
-```csharp
-var now = DateTimeOffset.UtcNow;
-var status = new ReplicationStatus
-{
-    SourceRegionId = "us-east-1",
-    TargetRegionId = "eu-west-1",
-    Lag = TimeSpan.FromSeconds(5),
-    PendingItems = 42,
-    IsHealthy = true,
-    CapturedAt = now,
-    LastReplicatedSequence = 1000,
-};
-
-Assert.That(status.SourceRegionId, Is.EqualTo("us-east-1"));
-Assert.That(status.TargetRegionId, Is.EqualTo("eu-west-1"));
-Assert.That(status.Lag, Is.EqualTo(TimeSpan.FromSeconds(5)));
-Assert.That(status.PendingItems, Is.EqualTo(42));
-Assert.That(status.IsHealthy, Is.True);
-Assert.That(status.LastReplicatedSequence, Is.EqualTo(1000));
-```
-
-### 3. DrDrillType — EnumValues
-
-```csharp
-var values = Enum.GetValues<DrDrillType>();
-
-Assert.That(values, Does.Contain(DrDrillType.RegionFailure));
-Assert.That(values, Does.Contain(DrDrillType.NetworkPartition));
-Assert.That(values, Does.Contain(DrDrillType.StorageFailure));
-Assert.That(values, Does.Contain(DrDrillType.BrokerFailure));
-Assert.That(values, Does.Contain(DrDrillType.PlannedFailover));
-Assert.That(values, Has.Length.EqualTo(5));
-```
-
-### 4. InMemoryFailoverManager — RegisterAndGetRegions
-
-```csharp
-var manager = new InMemoryFailoverManager(
-    NullLogger<InMemoryFailoverManager>.Instance,
-    Options.Create(new DisasterRecoveryOptions()));
-
-await manager.RegisterRegionAsync(new RegionInfo
-{
-    RegionId = "us-east-1",
-    DisplayName = "US East",
-    State = FailoverState.Primary,
-});
-
-await manager.RegisterRegionAsync(new RegionInfo
-{
-    RegionId = "eu-west-1",
-    DisplayName = "EU West",
-    State = FailoverState.Standby,
-});
-
-var regions = await manager.GetAllRegionsAsync();
-Assert.That(regions, Has.Count.EqualTo(2));
-
-var primary = await manager.GetPrimaryAsync();
-Assert.That(primary, Is.Not.Null);
-Assert.That(primary!.RegionId, Is.EqualTo("us-east-1"));
-Assert.That(primary.IsPrimary, Is.True);
-```
-
-### 5. InMemoryFailoverManager — Failover PromotesTargetRegion
-
-```csharp
-var manager = new InMemoryFailoverManager(
-    NullLogger<InMemoryFailoverManager>.Instance,
-    Options.Create(new DisasterRecoveryOptions()));
-
-await manager.RegisterRegionAsync(new RegionInfo
-{
-    RegionId = "us-east-1",
-    DisplayName = "US East",
-    State = FailoverState.Primary,
-});
-
-await manager.RegisterRegionAsync(new RegionInfo
-{
-    RegionId = "us-west-2",
-    DisplayName = "US West",
-    State = FailoverState.Standby,
-});
-
-var result = await manager.FailoverAsync("us-west-2");
-
-Assert.That(result.Success, Is.True);
-Assert.That(result.PromotedRegionId, Is.EqualTo("us-west-2"));
-Assert.That(result.DemotedRegionId, Is.EqualTo("us-east-1"));
-
-var newPrimary = await manager.GetPrimaryAsync();
-Assert.That(newPrimary!.RegionId, Is.EqualTo("us-west-2"));
-```
-
-## Lab
-
-Run the full lab: [`tests/TutorialLabs/Tutorial44/Lab.cs`](../tests/TutorialLabs/Tutorial44/Lab.cs)
+> 💻 [`tests/TutorialLabs/Tutorial44/Lab.cs`](../tests/TutorialLabs/Tutorial44/Lab.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial44.Lab"
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial44.Lab"
 ```
 
-## Exam
+---
 
-Coding challenges: [`tests/TutorialLabs/Tutorial44/Exam.cs`](../tests/TutorialLabs/Tutorial44/Exam.cs)
+## Exam — Fill in the Blanks
+
+> 🎯 Open `Exam.cs` and fill in the `// TODO:` blanks. Tests will **fail** until you write the missing code.
+> After attempting each challenge, check your work against `Exam.Answers.cs`.
+
+| # | Challenge | Difficulty | What You Fill In |
+|---|-----------|------------|------------------|
+| 1 | `Challenge1_FullFailoverFailbackLifecycle_WithNatsBrokerEndpoint` | 🟢 Starter | Full failover → failback lifecycle with broker |
+| 2 | `Challenge2_MultiRegionTopology_FailoverChain` | 🟡 Intermediate | Multi-region topology failover chain |
+| 3 | `Challenge3_FailoverResultDetails_PublishAuditTrail` | 🔴 Advanced | Failover result details — publish audit trail |
+
+> 💻 [`tests/TutorialLabs/Tutorial44/Exam.cs`](../tests/TutorialLabs/Tutorial44/Exam.cs)
 
 ```bash
-dotnet test tests/TutorialLabs/TutorialLabs.csproj --filter "FullyQualifiedName~Tutorial44.Exam"
+# Run exam (will fail until you fill in the blanks):
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial44.Exam" --filter "FullyQualifiedName!~ExamAnswers"
+
+# Run answer key to verify expected behaviour:
+dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial44.ExamAnswers"
 ```
 
 ---
