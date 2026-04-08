@@ -84,6 +84,8 @@ public sealed class NorthguardConsumer : IMessageBrokerConsumer
                 var data = await response.Content.ReadAsByteArrayAsync(cancellationToken);
                 if (data.Length == 0)
                 {
+                    // No messages available; avoid tight-loop by waiting briefly
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
                     continue;
                 }
 
@@ -105,11 +107,18 @@ public sealed class NorthguardConsumer : IMessageBrokerConsumer
                     System.Text.Encoding.UTF8,
                     "application/json");
 
-                await ackClient.PostAsync(
+                var ackResponse = await ackClient.PostAsync(
                     $"/v1/topics/{Uri.EscapeDataString(topic)}/ack" +
                     $"?group={Uri.EscapeDataString(consumerGroup)}",
                     ackContent,
                     cancellationToken);
+
+                if (!ackResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning(
+                        "Northguard ACK returned {StatusCode} for message {MessageId} on topic {Topic}",
+                        ackResponse.StatusCode, envelope.MessageId, topic);
+                }
 
                 _logger.LogDebug(
                     "Processed message {MessageId} from Northguard topic {Topic}",

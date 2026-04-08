@@ -40,7 +40,7 @@ var postgres = builder.AddContainer("postgres", "postgres", "17")
 
 // ── Apache Kafka (via Bitnami image) — high-throughput event streaming ───────
 // Uses KRaft mode (no ZooKeeper) for minimal resource footprint in tests.
-var kafka = builder.AddContainer("kafka", "bitnami/kafka", "latest")
+var kafka = builder.AddContainer("kafka", "bitnami/kafka", "3.9.0")
     .WithEnvironment("KAFKA_CFG_NODE_ID", "0")
     .WithEnvironment("KAFKA_CFG_PROCESS_ROLES", "controller,broker")
     .WithEnvironment("KAFKA_CFG_CONTROLLER_QUORUM_VOTERS", "0@localhost:9093")
