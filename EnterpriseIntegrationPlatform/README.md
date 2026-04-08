@@ -64,6 +64,77 @@ However, the book's implementation context predates modern infrastructure:
 
 This platform addresses that gap. Every pattern from every chapter — Messaging Channels, Message Construction, Message Routing, Message Transformation, Messaging Endpoints, and System Management — is mapped to a platform component, implemented in C#, and covered by automated tests. See [`docs/eip-mapping.md`](docs/eip-mapping.md) for the complete pattern-to-implementation mapping.
 
+### Protecting Atomicity in Distributed Systems
+
+In any distributed system, a single business operation often spans multiple services, databases, and message brokers. The core challenge is atomicity: ensuring that a multi-step process either completes entirely or fails cleanly, without leaving the system in a partial, inconsistent state. The industry has converged on four principal approaches to this problem. This platform deliberately combines all four, layering them to provide defense-in-depth reliability.
+
+#### The Four Approaches
+
+**A) Durable Initiation: Retry from Starting Points + Deduplication (Idempotency)**
+
+> *Idea: If work can be retried safely, failures are survivable.*
+
+The simplest approach to atomicity is to make every operation safe to retry. If a step fails, restart it from the beginning. The key requirement is idempotency — repeating an operation must produce the same result as executing it once.
+
+**Platform implementation:** The `IntegrationEnvelope` carries a unique `MessageId` and `CorrelationId` on every message. The `Storage.Cassandra` module stores deduplication keys so that the same message processed twice produces no duplicate side effects (EIP: Idempotent Receiver). The `Processing.Retry` module provides configurable retry policies with exponential backoff and jitter. Together, these ensure that any transient failure — network timeout, broker restart, service crash — can be retried automatically without corrupting state.
+
+**B) Transactional Outbox Pattern: CDC + Event Publishing**
+
+> *Idea: Make the database write and the "event to publish" atomic inside the database, then publish later.*
+
+When a service needs to update its own state *and* publish an event, doing both atomically is impossible with separate database and broker transactions. The Transactional Outbox pattern solves this by writing the event to an outbox table in the *same* database transaction as the state change, then publishing the event asynchronously.
+
+**Platform implementation:** The `Ingestion.Postgres` broker implements a variant of this pattern natively. The `eip_messages` table stores messages with `pg_notify` triggers that alert consumers of new messages. The `PostgresTransactionalClient` wraps produce-and-consume operations in database transactions, ensuring that message publication and business state changes are atomic within PostgreSQL. The `SKIP LOCKED` consumer pattern provides exactly-once delivery semantics without head-of-line blocking. This makes PostgreSQL a viable zero-infrastructure-overhead broker for teams that already run Postgres.
+
+**C) Message-Oriented Middleware: Queues, Retries, DLQ, Routing, Transformations**
+
+> *Idea: Move reliability to the messaging layer — queues, retries, Dead Letter Channels, routing, transformations.*
+
+Rather than building reliability into every service, delegate it to a purpose-built messaging layer. Message brokers provide guaranteed delivery, retry queues, Dead Letter Channels for poison messages, content-based routing, and message transformation — all as infrastructure concerns rather than application code.
+
+**Platform implementation:** This is the platform's primary integration model, implementing the complete [Enterprise Integration Patterns](https://www.enterpriseintegrationpatterns.com/) catalog. Four interchangeable brokers (NATS JetStream, Kafka, Pulsar, PostgreSQL) provide guaranteed delivery. `Processing.DeadLetter` routes permanently failed messages to DLQ topics for investigation. `Processing.Routing` provides Content-Based Router, Recipient List, Dynamic Router, and Routing Slip patterns. `Processing.Transform` handles JSON↔XML conversion, JSONPath extraction, and regex transformations. `Processing.Splitter` and `Processing.Aggregator` decompose and reassemble complex messages. The entire EIP catalog — 65+ patterns across six chapters — is implemented, tested, and broker-agnostic.
+
+**D) Durable Execution Workflows: Temporal.io**
+
+> *Idea: Make the process itself durable. Each step is recorded so you can resume exactly where you left off.*
+
+The most comprehensive approach to atomicity is durable execution. Instead of relying on retries or messaging infrastructure alone, the workflow engine records every step's input and output. If a process crashes after step 3 of 7, it resumes at step 4 with the exact state it had before the crash — no re-execution of completed steps, no lost progress, no partial state.
+
+**Platform implementation:** [Temporal.io](https://temporal.io/) orchestrates every message's processing lifecycle. When a broker consumer picks up an `IntegrationEnvelope`, it initiates a Temporal workflow that coordinates validation → transformation → routing → delivery as durable activities. Each activity's result is persisted by Temporal's event history. Workflows survive process restarts, infrastructure failures, and even datacenter outages. Saga compensation enables automatic rollback of completed steps when a later step fails permanently. Temporal's polyglot SDKs (Go, Java, Python, TypeScript, .NET, PHP) mean that individual activities can be implemented in the language best suited to each task.
+
+#### Why This Platform Combines All Four
+
+No single approach is sufficient for enterprise-grade integration:
+
+| Approach | Alone Is Not Enough Because... | Combined With Others Provides... |
+|---|---|---|
+| **A) Retry + Idempotency** | Retrying a 7-step process from scratch is wasteful and may cause side effects in external systems | Fine-grained idempotency at the message level, complementing Temporal's step-level durability |
+| **B) Transactional Outbox** | Only solves the "write + publish" atomicity within a single database; does not address multi-service orchestration | Atomic event publication in the PostgreSQL broker, ensuring no message is lost between database and broker |
+| **C) Message Middleware** | Provides delivery guarantees but has no concept of multi-step process state; a 7-step saga requires manual correlation | Reliable message delivery, DLQ, routing, and transformation as infrastructure — offloading these from workflow code |
+| **D) Durable Execution** | Requires reliable message delivery to *start* workflows; Temporal alone does not replace a message broker | Step-level durability, saga compensation, and process resumption that the messaging layer cannot provide |
+
+The platform architecture layers these approaches: messages enter through **brokers (C)** with guaranteed delivery, trigger **durable workflows (D)** that coordinate multi-step processing, with **retry + idempotency (A)** at every level, and **transactional outbox (B)** available when the broker is PostgreSQL. This defense-in-depth strategy means that no single failure mode — network partition, broker restart, service crash, or datacenter outage — can leave the system in an inconsistent state.
+
+### The Eleven Architectural Pillars
+
+The platform is built on eleven foundational pillars. Each pillar is implemented as one or more dedicated projects in the `src/` directory, covered by automated tests, and designed to operate independently while composing into a cohesive whole.
+
+| # | Pillar | Platform Components | Purpose |
+|---|---|---|---|
+| 1 | **Message Brokers** | `Ingestion`, `Ingestion.Kafka`, `Ingestion.Nats`, `Ingestion.Pulsar`, `Ingestion.Postgres` | Interchangeable message broker layer. Broker selection is a deployment-time configuration choice. NATS JetStream (default), Kafka (streaming), Pulsar (large-scale Key_Shared), PostgreSQL (zero-infrastructure option). |
+| 2 | **Durable Workflow Orchestration** | `Workflow.Temporal`, `Activities` | Temporal.io-based durable execution. Every message's lifecycle is a workflow: validation → transformation → routing → delivery. Saga compensation, signals, queries, and polyglot SDK support. |
+| 3 | **Enterprise Integration Patterns** | `Processing.Routing`, `Processing.Splitter`, `Processing.Aggregator`, `Processing.ScatterGather`, `Processing.Resequencer`, `Processing.Translator`, `Processing.Transform`, `Processing.Dispatcher`, `Processing.RequestReply`, `Processing.DeadLetter`, `Processing.Retry`, `Processing.Replay`, `Processing.Throttle`, `Processing.CompetingConsumers` | Complete implementation of the Hohpe/Woolf EIP catalog: Content-Based Router, Splitter, Aggregator, Scatter-Gather, Resequencer, Dead Letter Channel, Competing Consumers, and 50+ additional patterns across all six book chapters. |
+| 4 | **AI-Driven Development** | `AI.Ollama`, `AI.RagFlow`, `AI.RagKnowledge`, `OpenClaw.Web` | Self-hosted RAG (RagFlow + Ollama) for developer context retrieval. Natural-language observability queries ("where is my message?"). AI-driven code generation workflow. All data on-premises. |
+| 5 | **.NET Aspire Orchestration** | `AppHost`, `ServiceDefaults` | Single-command orchestration of all services, brokers, Temporal, AI runtime, and infrastructure. Service discovery, health monitoring, and the Aspire dashboard for unified visibility. |
+| 6 | **Security** | `Security`, `Security.Secrets` | Input sanitization and payload guards prevent injection attacks. Secret management integrates Azure Key Vault and HashiCorp Vault with automatic rotation. Encryption at rest and in transit. |
+| 7 | **Multi-Tenancy** | `MultiTenancy`, `MultiTenancy.Onboarding` | Tenant resolution, data isolation, and quota enforcement. Self-service tenant provisioning with per-tenant broker topics, storage partitions, and configuration. |
+| 8 | **Observability** | `Observability`, `ServiceDefaults` | OpenTelemetry distributed tracing, Prometheus metrics, and structured logging across every layer. Grafana Loki for log aggregation. AI-powered natural-language queries via OpenClaw. |
+| 9 | **Event Sourcing** | `EventSourcing` | Event store with append-only persistence, snapshot optimization, and projection engine. Enables full audit trails, temporal queries, and state reconstruction from event history. |
+| 10 | **Disaster Recovery** | `DisasterRecovery` | Failover orchestration, cross-region replication, RPO/RTO configuration, and automated DR drill execution. Ensures business continuity during infrastructure failures. |
+| 11 | **Connectors** | `Connector.Http`, `Connector.Sftp`, `Connector.Email`, `Connector.File`, `Connectors` | Protocol-specific adapters for delivering messages to external systems. Unified connector registry with authentication, retry, and delivery confirmation. Extensible plugin model. |
+
+These eleven pillars are not aspirational — each is implemented, tested, and operational. The platform's 2,000+ automated tests (unit, integration, contract, workflow, browser, and load) verify that every pillar functions correctly in isolation and in composition.
+
 ### AI-Driven Architecture
 
 AI is a core architectural pillar of this platform, embedded across the development lifecycle rather than limited to a single feature:
@@ -277,10 +348,11 @@ EnterpriseIntegrationPlatform/
 
 | Decision | Choice | Rationale |
 |---|---|---|
+| Atomicity strategy | Defense-in-depth: all four approaches | Retry + idempotency (A) at message level, transactional outbox (B) in PostgreSQL broker, message middleware (C) for delivery/DLQ/routing, durable execution (D) via Temporal for step-level process durability |
 | AI strategy | Self-hosted RAG (RagFlow + Ollama) + AI-driven development | AI is a core pillar: context retrieval, code generation, natural-language observability. All data on-premises; developers use their preferred AI provider |
-| Workflow engine | Temporal over Durable Functions | Portable, polyglot (Go, Java, Python, TypeScript, .NET, PHP), mature saga/compensation support |
+| Workflow engine | Temporal over Durable Functions | Portable, polyglot (Go, Java, Python, TypeScript, .NET, PHP), mature saga/compensation support; durable execution makes the process itself fault-tolerant |
 | Orchestration | .NET Aspire | Single-command orchestration of all services, brokers, AI runtime, and infrastructure; service discovery; health monitoring |
-| Broker strategy | Kafka + NATS/Pulsar/PostgreSQL | Kafka for streaming; NATS/Pulsar for task delivery without head-of-line blocking; PostgreSQL for teams that already run Postgres and want to avoid a dedicated broker |
+| Broker strategy | Kafka + NATS/Pulsar/PostgreSQL | Kafka for streaming; NATS/Pulsar for task delivery without head-of-line blocking; PostgreSQL for transactional outbox pattern with zero additional infrastructure |
 | Observability store | Grafana Loki + OpenTelemetry | LogQL queries, lightweight, vendor-neutral; AI-powered natural-language queries via OpenClaw |
 
 See [`docs/adr/`](docs/adr/) for full Architecture Decision Records.
