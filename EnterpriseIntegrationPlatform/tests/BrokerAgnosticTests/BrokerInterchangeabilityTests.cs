@@ -210,11 +210,12 @@ public sealed class BrokerInterchangeabilityTests
     {
         // The BrokerType enum enumerates all interchangeable broker implementations.
         var values = Enum.GetValues<BrokerType>();
-        Assert.That(values, Has.Length.EqualTo(4));
+        Assert.That(values, Has.Length.EqualTo(5));
         Assert.That(values, Does.Contain(BrokerType.NatsJetStream));
         Assert.That(values, Does.Contain(BrokerType.Kafka));
         Assert.That(values, Does.Contain(BrokerType.Pulsar));
         Assert.That(values, Does.Contain(BrokerType.Postgres));
+        Assert.That(values, Does.Contain(BrokerType.Northguard));
     }
 
     // ── 5. Bridge Between Two Brokers ───────────────────────────────────

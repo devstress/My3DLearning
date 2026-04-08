@@ -147,4 +147,48 @@ public class IngestionServiceExtensionsTests
         Assert.Throws<ArgumentNullException>(() =>
             services.AddIngestion(null!));
     }
+
+    [Test]
+    public void AddBrokerOptions_BindsNorthguardType()
+    {
+        // Arrange
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Broker:BrokerType"] = "Northguard",
+                ["Broker:ConnectionString"] = "https://northguard.example.com",
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddBrokerOptions(config);
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<BrokerOptions>>().Value;
+
+        // Assert
+        Assert.That(options.BrokerType, Is.EqualTo(BrokerType.Northguard));
+        Assert.That(options.ConnectionString, Is.EqualTo("https://northguard.example.com"));
+    }
+
+    [Test]
+    public void AddIngestion_Northguard_RegistersProducerAndConsumer()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        services.AddIngestion(options =>
+        {
+            options.BrokerType = BrokerType.Northguard;
+            options.ConnectionString = "https://northguard.example.com";
+        });
+
+        var provider = services.BuildServiceProvider();
+        var opts = provider.GetRequiredService<IOptions<BrokerOptions>>().Value;
+
+        Assert.That(opts.BrokerType, Is.EqualTo(BrokerType.Northguard));
+        Assert.That(services.Any(sd => sd.ServiceType == typeof(IMessageBrokerProducer)), Is.True);
+        Assert.That(services.Any(sd => sd.ServiceType == typeof(IMessageBrokerConsumer)), Is.True);
+    }
 }

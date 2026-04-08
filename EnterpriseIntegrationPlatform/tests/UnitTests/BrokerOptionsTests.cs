@@ -65,4 +65,14 @@ public class BrokerOptionsTests
         // Assert
         Assert.That(options.ConnectionString, Is.EqualTo("nats://localhost:4222"));
     }
+
+    [Test]
+    public void BrokerType_CanBeSetToNorthguard()
+    {
+        // Arrange & Act
+        var options = new BrokerOptions { BrokerType = BrokerType.Northguard };
+
+        // Assert
+        Assert.That(options.BrokerType, Is.EqualTo(BrokerType.Northguard));
+    }
 }

@@ -30,6 +30,10 @@ public static class IngestionServiceExtensions
                 "Ingestion.Postgres",
                 "EnterpriseIntegrationPlatform.Ingestion.Postgres.PostgresServiceExtensions",
                 "AddPostgresBroker"),
+            [BrokerType.Northguard] = (
+                "Ingestion.Northguard",
+                "EnterpriseIntegrationPlatform.Ingestion.Northguard.NorthguardServiceExtensions",
+                "AddNorthguardBroker"),
         };
 
     /// <summary>
@@ -59,7 +63,8 @@ public static class IngestionServiceExtensions
     /// <remarks>
     /// <para>
     /// The consuming project must reference the appropriate broker package
-    /// (<c>Ingestion.Nats</c>, <c>Ingestion.Kafka</c>, or <c>Ingestion.Pulsar</c>)
+    /// (<c>Ingestion.Nats</c>, <c>Ingestion.Kafka</c>, <c>Ingestion.Pulsar</c>,
+    /// <c>Ingestion.Postgres</c>, or <c>Ingestion.Northguard</c>)
     /// for the selected <see cref="BrokerType"/>.
     /// </para>
     /// </remarks>

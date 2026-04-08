@@ -36,4 +36,16 @@ public enum BrokerType
     /// Provides native ACID transactions via NpgsqlTransaction.
     /// </summary>
     Postgres = 3,
+
+    /// <summary>
+    /// Northguard — LinkedIn's next-generation log storage engine that replaces
+    /// Kafka for ultra-high-scale workloads (32 trillion records/day, 17 PB+).
+    /// Uses fine-grained log striping (segments and ranges) instead of monolithic
+    /// partitions, with a Raft-backed sharded metadata layer for decentralised
+    /// coordination. Automatic load balancing eliminates stop-the-world rebalances.
+    /// Best suited for massive-scale event streaming where Kafka's centralised
+    /// controller and partition-based replication become operational bottlenecks.
+    /// Accessed via the Xinfra virtualised pub/sub gateway.
+    /// </summary>
+    Northguard = 4,
 }

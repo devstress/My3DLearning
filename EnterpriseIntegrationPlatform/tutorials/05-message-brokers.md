@@ -2,11 +2,14 @@
 
 Configure the three broker implementations (NATS JetStream, Kafka, Pulsar) via `BrokerOptions` and publish messages through the broker abstraction.
 
+> **New:** Northguard (LinkedIn's Kafka replacement) is now available as a fifth broker.
+> See [Northguard Scenarios](#northguard--when-to-use-it) below for guidance on when to choose it.
+
 ## Learning Objectives
 
 After completing this tutorial you will be able to:
 
-1. Configure `BrokerOptions` for each supported broker protocol (NATS, Kafka, Pulsar, Postgres)
+1. Configure `BrokerOptions` for each supported broker protocol (NATS, Kafka, Pulsar, Postgres, Northguard)
 2. Publish messages through `IMessageBrokerProducer` — the protocol-agnostic abstraction
 3. Route messages to multiple topics and verify per-topic delivery
 4. Register event-driven consumers with push-based message handlers
@@ -22,6 +25,8 @@ public enum BrokerType
     NatsJetStream = 0,  // Default — lightweight, no HOL blocking
     Kafka = 1,          // Event streaming, audit logs, fan-out
     Pulsar = 2,         // Key_Shared — per-recipient ordering at scale
+    Postgres = 3,       // SQL-based — no extra broker, ≤ 5 k TPS
+    Northguard = 4,     // LinkedIn's Kafka successor — ultra-high-scale log striping
 }
 
 // src/Ingestion/BrokerOptions.cs
@@ -85,6 +90,63 @@ dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial05.Exam" --filter 
 # Run answer key to verify expected behaviour:
 dotnet test --filter "FullyQualifiedName~TutorialLabs.Tutorial05.ExamAnswers"
 ```
+---
+
+## Northguard — When to Use It
+
+Northguard is LinkedIn's next-generation log storage engine, built to replace Apache Kafka at extreme scale. It is accessed through the **Xinfra** virtualised pub/sub layer, which provides a unified client API across both Kafka and Northguard clusters.
+
+### Key Architecture Differences from Kafka
+
+| Concern | Kafka | Northguard |
+|---------|-------|------------|
+| **Data unit** | Partitions (monolithic) | Segments + ranges (fine-grained log striping) |
+| **Metadata** | Single centralised controller | Raft-backed sharded vnodes |
+| **Rebalancing** | Stop-the-world partition reassignment | Automatic, incremental range splits/merges |
+| **Scaling** | Manual partition count tuning | Self-balancing as load changes |
+| **Replication** | Partition-level ISR | Configurable per-segment storage policies |
+
+### Scenarios Where You Need Northguard
+
+1. **Ultra-high-throughput event streaming (> 1 M events/sec per topic)** — Kafka's centralised controller becomes a metadata bottleneck at extreme topic/partition counts. Northguard's sharded metadata layer eliminates this.
+
+2. **Massive multi-tenant platforms (hundreds of thousands of topics)** — Kafka clusters struggle when topic counts exceed ~50k. Northguard's fine-grained segmentation handles 100k+ topics without operational overhead.
+
+3. **Frequent scaling / elastic workloads** — Adding or removing Kafka brokers triggers expensive partition reassignment. Northguard's range-based storage rebalances incrementally and automatically.
+
+4. **Long-retention, high-volume audit and compliance logs** — When storing petabytes of data with strict durability guarantees, Northguard's flexible storage policies provide better control than Kafka's uniform replication factor.
+
+5. **Cross-cluster topic federation and migration** — Via Xinfra, you can migrate topics from Kafka to Northguard (or vice versa) without application code changes — dual writes, epoch-based ordering, and seamless cutover.
+
+6. **Reducing operational toil at scale** — If your team spends significant effort on Kafka cluster management (rebalancing, broker recovery, partition skew remediation), Northguard's self-managing architecture drastically reduces ops burden.
+
+### When to Stick with Kafka
+
+- **Mature ecosystem integration** — Kafka Connect, Kafka Streams, ksqlDB, and the vast ecosystem of tooling is battle-tested. Northguard's ecosystem is nascent.
+- **Moderate scale (< 50k topics, < 100 brokers)** — Kafka handles this well and the operational model is well understood.
+- **Public/OSS requirement** — Northguard is currently internal to LinkedIn. Use Kafka (or other OSS brokers) for general deployments.
+
+### Configuration
+
+```csharp
+// appsettings.json
+{
+  "Broker": {
+    "BrokerType": "Northguard",
+    "ConnectionString": "https://northguard.example.com"
+  }
+}
+
+// Program.cs
+builder.Services.AddIngestion(options =>
+{
+    options.BrokerType = BrokerType.Northguard;
+    options.ConnectionString = "https://northguard.example.com";
+});
+```
+
+> **Note:** Northguard is currently an internal LinkedIn system. This integration is provided as a forward-looking implementation for organisations running inside LinkedIn's infrastructure or preparing for Northguard's future public availability.
+
 ---
 
 **Previous: [← Tutorial 04 — Integration Envelope](04-integration-envelope.md)** | **Next: [Tutorial 06 — Messaging Channels →](06-messaging-channels.md)**
