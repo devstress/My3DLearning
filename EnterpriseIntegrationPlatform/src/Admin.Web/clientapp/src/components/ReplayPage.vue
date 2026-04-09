@@ -87,7 +87,7 @@ export default {
       if (!this.replayResult?.startedAt || !this.replayResult?.completedAt) return '—'
       const start = new Date(this.replayResult.startedAt)
       const end = new Date(this.replayResult.completedAt)
-      const ms = end - start
+      const ms = Math.max(0, end - start)
       return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(2)}s`
     },
   },
