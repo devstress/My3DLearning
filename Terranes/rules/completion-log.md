@@ -814,3 +814,14 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - `src/style.css` — Migrated `.top-row` background from `#f7f7f7` to `var(--bs-body-bg)` and border from `#d6d5d5` to `var(--bs-border-color)`. Added `[data-bs-theme="dark"] .sidebar` darker gradient. Added `.theme-toggle-btn` styles.
 
 **Tests:** 106 Vitest tests (98 + 8 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+### Chunk 055 — Enhanced Home Landing Page (2026-04-09)
+
+**Goal:** Transform HomeView into a polished landing page with hero section, how-it-works flow, testimonial carousel, and footer.
+
+**Files modified:**
+- `src/views/HomeView.vue` — Complete rewrite: Added hero section with animated gradient background (CSS keyframes, prefers-reduced-motion safe). Added "How It Works" 4-step visual flow with icons and numbered steps. Added testimonial carousel with 3 static testimonials, prev/next navigation, and counter. Added footer with 3-column layout (Platform, Services, About). Existing 6 feature cards preserved in "Platform Features" section. All sections mobile-optimised with col-12/col-6/col-md-* responsive classes.
+- `src/__tests__/HomeView.spec.ts` — Updated from 6 to 10 tests: added hero section, how-it-works 4-step flow, testimonial carousel with navigation, footer with links. Existing tests adapted for new card count.
+- `src/__tests__/ResponsiveLayout.spec.ts` — Updated card count assertion to ≥6 (accounts for how-it-works steps).
+
+**Tests:** 110 Vitest tests (106 + 4 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
