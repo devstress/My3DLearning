@@ -3,7 +3,9 @@ import { ref } from 'vue';
 import { RouterLink, RouterView, useRouter } from 'vue-router';
 import ToastContainer from './components/ToastContainer.vue';
 import BreadcrumbBar from './components/BreadcrumbBar.vue';
+import SearchBar from './components/SearchBar.vue';
 import { useTheme } from './composables/useTheme';
+import { useAuth } from './composables/useAuth';
 
 const sidebarOpen = ref(false);
 function toggleSidebar() {
@@ -11,6 +13,8 @@ function toggleSidebar() {
 }
 
 const { isDark, toggleTheme } = useTheme();
+const { currentUser, isAuthenticated, logout, restoreSession } = useAuth();
+restoreSession();
 
 const router = useRouter();
 router.afterEach((to) => {
@@ -82,8 +86,16 @@ router.afterEach((to) => {
     </div>
 
     <main id="main-content">
-      <div class="top-row px-4">
-        <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+      <div class="top-row px-4 d-flex justify-content-between align-items-center">
+        <SearchBar />
+        <div class="d-flex align-items-center gap-3">
+          <template v-if="isAuthenticated">
+            <span class="text-white">{{ currentUser?.displayName }}</span>
+            <button class="btn btn-sm btn-outline-light" @click="logout">Logout</button>
+          </template>
+          <RouterLink v-else to="/login" class="text-white">Login</RouterLink>
+          <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        </div>
       </div>
       <article class="content px-4">
         <BreadcrumbBar />

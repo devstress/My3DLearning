@@ -46,6 +46,24 @@ const router = createRouter({
       meta: { title: 'Dashboard | Terranes', breadcrumb: 'Dashboard' },
     },
     {
+      path: '/search',
+      name: 'search',
+      component: () => import('../views/SearchView.vue'),
+      meta: { title: 'Search | Terranes', breadcrumb: 'Search' },
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/LoginView.vue'),
+      meta: { title: 'Login | Terranes', breadcrumb: 'Login' },
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('../views/RegisterView.vue'),
+      meta: { title: 'Register | Terranes', breadcrumb: 'Register' },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/NotFoundView.vue'),

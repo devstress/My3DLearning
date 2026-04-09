@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { api } from '../api/client';
-import type { BuyerJourney, HomeModel, LandBlock } from '../types';
+import type { BuyerJourney, HomeModel, LandBlock, AggregatedQuote } from '../types';
 import StatusBadge from '../components/StatusBadge.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import ActionButton from '../components/ActionButton.vue';
@@ -9,6 +9,7 @@ import StepIndicator from '../components/StepIndicator.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ConfettiEffect from '../components/ConfettiEffect.vue';
 import JourneyTimeline from '../components/JourneyTimeline.vue';
+import QuoteSummary from '../components/QuoteSummary.vue';
 import { useToast } from '../composables/useToast';
 
 const { showSuccess, showError, showInfo } = useToast();
@@ -23,6 +24,8 @@ const errorMessage = ref<string | null>(null);
 const actionLoading = ref(false);
 const showConfirmDialog = ref(false);
 const showConfetti = ref(false);
+const journeyQuotes = ref<AggregatedQuote | null>(null);
+const quoteLoading = ref(false);
 
 const journeyStages = [
   'Browsing', 'DesignSelected', 'PlacedOnLand',
@@ -35,6 +38,14 @@ async function loadStageData() {
     availableModels.value = await api.getHomeModels();
   } else if (currentJourney.value?.currentStage === 'DesignSelected') {
     availableLand.value = await api.getLandBlocks();
+  } else if (currentJourney.value?.currentStage === 'QuoteReceived') {
+    quoteLoading.value = true;
+    try {
+      const quotes = await api.getJourneyQuotes(currentJourney.value.id);
+      journeyQuotes.value = quotes.length > 0 ? quotes[0] : null;
+    } finally {
+      quoteLoading.value = false;
+    }
   }
 }
 
@@ -283,6 +294,7 @@ onMounted(async () => {
             <div class="card-body">
               <h5>✅ Quote Received!</h5>
               <p>Your indicative quote is ready. You can proceed to partner referral.</p>
+              <QuoteSummary :quote="journeyQuotes" :loading="quoteLoading" />
               <ActionButton :loading="actionLoading" variant="success" loading-text="Completing..." @click="promptCompleteJourney">🎉 Complete Journey</ActionButton>
             </div>
           </div>

@@ -84,3 +84,36 @@ export interface Notification {
   isRead: boolean;
   createdUtc: string;
 }
+
+export interface SearchResult {
+  entityType: string;
+  entityId: string;
+  title: string;
+  summary: string;
+  relevanceScore: number;
+}
+
+export interface AggregatedQuote {
+  id: string;
+  journeyId: string;
+  totalAmountAud: number;
+  lineItems: QuoteLineItem[];
+  generatedUtc: string;
+}
+
+export interface QuoteLineItem {
+  id: string;
+  quoteRequestId: string;
+  category: string;
+  description: string;
+  amountAud: number;
+}
+
+export interface PlatformUser {
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
+  isActive: boolean;
+  createdUtc: string;
+}

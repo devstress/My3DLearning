@@ -7,6 +7,9 @@ import type {
   VillageLot,
   BuyerJourney,
   Notification,
+  SearchResult,
+  AggregatedQuote,
+  PlatformUser,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
@@ -101,5 +104,40 @@ export const api = {
       if (!r.ok) throw new Error(`API error: ${r.status}`);
       return r.json() as Promise<{ status: string; timestamp: string }>;
     });
+  },
+
+  // Search
+  search(query: string, maxResults?: number) {
+    const qs = buildQuery({ query, maxResults });
+    return fetchJson<SearchResult[]>(`/search${qs}`);
+  },
+  searchByType(entityType: string, query: string, maxResults?: number) {
+    const qs = buildQuery({ query, maxResults });
+    return fetchJson<SearchResult[]>(`/search/${entityType}${qs}`);
+  },
+
+  // Aggregated Quotes
+  aggregateQuote(journeyId: string) {
+    const qs = buildQuery({ journeyId });
+    return fetchJson<AggregatedQuote>(`/aggregated-quotes${qs}`, { method: 'POST' });
+  },
+  getJourneyQuotes(journeyId: string) {
+    return fetchJson<AggregatedQuote[]>(`/aggregated-quotes/journey/${journeyId}`);
+  },
+
+  // Auth
+  login(email: string, password: string) {
+    const qs = buildQuery({ email, password });
+    return fetchJson<PlatformUser>(`/auth/login${qs}`, { method: 'POST' });
+  },
+  register(user: { email: string; displayName: string }, password: string) {
+    const qs = buildQuery({ password });
+    return fetchJson<PlatformUser>(`/auth/register${qs}`, {
+      method: 'POST',
+      body: JSON.stringify(user),
+    });
+  },
+  getUser(userId: string) {
+    return fetchJson<PlatformUser>(`/auth/users/${userId}`);
   },
 };
