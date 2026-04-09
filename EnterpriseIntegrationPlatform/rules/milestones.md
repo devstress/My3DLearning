@@ -90,10 +90,161 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ✅ All chunks (200–251) complete — see `rules/completion-log.md` for full history.
 
+---
+
+## Phase 30 — Quality Hardening (Audit-Driven)
+
+> **Origin:** Independent audit of the EIP codebase identified concrete weak spots.
+> Every chunk in this phase addresses a verified gap with production-quality code
+> and new unit tests. No scaffolding, no placeholders, no conceptual work.
+
+### Chunk 300 — ✅ Done — see `rules/completion-log.md`
+
+### Chunk 301 — ✅ Done — see `rules/completion-log.md`
+
+### Chunk 302 — ✅ Done — see `rules/completion-log.md`
+
+### Chunk 303 — ✅ Done — see `rules/completion-log.md`
+
+### Chunk 304 — ✅ Done — see `rules/completion-log.md`
+
+### Chunk 305 — ✅ Done — see `rules/completion-log.md`
+
+### Chunk 306 — ✅ Done — see `rules/completion-log.md`
+
+### Chunk 307 — ✅ Done — see `rules/completion-log.md`
+
+### Chunk 308 — ✅ Done — see `rules/completion-log.md`
+
 ### Next Chunk
 
-All phases and chunks complete. No remaining work.
+✅ Phase 30 complete — see `rules/completion-log.md` for full history.
+
+Chunks 300–308 done. All 4 broker providers hardened with IOptions, health checks, IAsyncDisposable, ActivitySource tracing. Pulsar producer-per-message anti-pattern fixed. Security, Postgres, NATS all have comprehensive unit tests. 50 src projects, 9 test projects, 2,341 tests (1,691 UnitTests + 57 ContractTests + 29 WorkflowTests + 38 BrokerAgnosticTests + 526 TutorialLabs).
 
 ---
 
-For detailed completion history, files created, and notes see `rules/completion-log.md`.
+## Phase 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+
+> **Origin:** The platform has a robust backend (50 src projects, 4 brokers, full EIP patterns,
+> observability instrumentation, control bus, test message generator, audit logging) but the
+> Admin.Web UI only exposes 7 basic pages. This phase adds BizTalk-inspired message monitoring,
+> flow visualization, subscription management, control bus UI, and real-time metrics — bringing
+> the admin experience to production-grade.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 310 | **Message Flow Timeline** — see `rules/completion-log.md` | `done` |
+| 311 | **Subscription Viewer** — see `rules/completion-log.md` | `done` |
+| 312 | **In-Flight Message Monitor** — see `rules/completion-log.md` | `done` |
+| 313 | **Control Bus UI** — see `rules/completion-log.md` | `done` |
+| 314 | **Audit Log Viewer** — see `rules/completion-log.md` | `done` |
+| 315 | **Test Message Generator UI** — see `rules/completion-log.md` | `done` |
+| 316 | **Enhanced Dashboard with Metrics** — see `rules/completion-log.md` | `done` |
+| 317 | **Configuration & Feature Flags UI** — see `rules/completion-log.md` | `done` |
+| 318 | **Tenant Management UI** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 31 complete — 9 chunks (310–318). Admin UI expanded from 7 pages to 16 pages.
+77 Vitest tests (was 19). 13 test files. Full .NET build succeeds.
+
+---
+
+### Next Chunk
+
+Phase 31 is complete. No remaining chunks.
+
+---
+
+## Phase 32 — Admin UI UX Polish & Remaining Backend Features
+
+> **Origin:** Phase 31 built 16 Admin UI pages, but several BizTalk-inspired backend features
+> (Message Replay, Connector Health, Event Store) lacked UI. Additionally, some pages displayed
+> raw JSON instead of proper UI components (Profiling, Rate Limiting). This phase adds the missing
+> pages, enhances existing ones, and adds UX polish: dark/light theme, toast notifications,
+> collapsible sidebar with section groupings.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 320 | **Message Replay UI** — see `rules/completion-log.md` | `done` |
+| 321 | **Connector Health Monitor** — see `rules/completion-log.md` | `done` |
+| 322 | **Enhanced Profiling Page** — see `rules/completion-log.md` | `done` |
+| 323 | **Enhanced RateLimit Page** — see `rules/completion-log.md` | `done` |
+| 324 | **Event Store Browser** — see `rules/completion-log.md` | `done` |
+| 325 | **Dark Mode Toggle + Theme Persistence** — see `rules/completion-log.md` | `done` |
+| 326 | **Toast Notification System** — see `rules/completion-log.md` | `done` |
+| 327 | **Responsive Collapsible Sidebar** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 32 complete — 8 chunks (320–327). Admin UI expanded from 16 pages to 19 pages.
+100 Vitest tests (was 77). 16 test files (was 13). 3 new pages (Replay, Connectors, Event Store).
+2 pages enhanced (Profiling, RateLimit). Dark/light theme toggle. Toast notifications.
+Collapsible sidebar with section groupings. Full .NET build succeeds.
+
+---
+
+### Next Chunk
+
+Phase 32 is complete. No remaining chunks.
+
+---
+
+## Phase 33 — Gateway & Connector Adapter Test Hardening
+
+> **Origin:** Audit revealed that `HttpMessagingGateway` (the core Messaging Gateway EIP pattern)
+> had **zero unit tests**, and all 4 connector adapter classes (`HttpConnectorAdapter`,
+> `SftpConnectorAdapter`, `EmailConnectorAdapter`, `FileConnectorAdapter`) lacked dedicated
+> unit tests. `GatewayOptions`, `GatewayResponse`, and `RouteDefinition` were also untested.
+> This phase closes these critical test gaps.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 330 | **HttpMessagingGateway Tests** — see `rules/completion-log.md` | `done` |
+| 331 | **Gateway Options/Response/RouteDefinition Tests** — see `rules/completion-log.md` | `done` |
+| 332 | **HttpConnectorAdapter + EmailConnectorAdapter Tests** — see `rules/completion-log.md` | `done` |
+| 333 | **SftpConnectorAdapter + FileConnectorAdapter Tests** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 33 complete — 4 chunks (330–333). 73 new unit tests. UnitTests total: 1764 (was 1691).
+HttpMessagingGateway now has 15 tests covering SendAsync/SendAndReceiveAsync success, failure,
+timeout, correlation ID forwarding, custom headers, and argument validation. All 4 connector
+adapters have dedicated tests for SendAsync, TestConnectionAsync, constructor validation.
+GatewayOptions/GatewayResponse/RouteDefinition configuration defaults fully tested.
+
+---
+
+### Next Chunk
+
+Phase 33 is complete. No remaining chunks.
+
+---
+
+## Phase 34 — DI Registration (ServiceExtensions) Test Hardening
+
+> **Origin:** Audit revealed 35 `*ServiceExtensions.cs` files (DI registration methods critical
+> for production wiring) had **zero dedicated unit tests**. Only 8 of 42 ServiceExtensions files
+> had tests. This phase adds comprehensive DI registration tests verifying that every
+> `Add*` extension method correctly registers its expected services in the DI container.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 340 | **Processing Pattern DI Tests Part 1** — see `rules/completion-log.md` | `done` |
+| 341 | **Processing Pattern DI Tests Part 2** — see `rules/completion-log.md` | `done` |
+| 342 | **Infrastructure DI Tests** — see `rules/completion-log.md` | `done` |
+| 343 | **Connector & Platform DI Tests** — see `rules/completion-log.md` | `done` |
+| 344 | **AI & Remaining DI Tests** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 34 complete — 5 chunks (340–344). 79 new unit tests covering 35 ServiceExtensions files.
+UnitTests total: 1843 (was 1764). All 42 ServiceExtensions files now have dedicated DI tests.
+Tests verify every `Add*` method registers the correct service types in the container.
+
+---
+
+### Next Chunk
+
+Phase 34 is complete. No remaining chunks.

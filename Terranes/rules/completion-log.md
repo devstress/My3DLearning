@@ -763,3 +763,65 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - `rules/milestones.md` — Added Chunk 063 (done)
 
 **Tests:** 29 Playwright E2E tests × 6 browser projects = 174 cross-browser runs. 83 Vitest component tests. 446 NUnit tests. All passing.
+
+### Chunk 052 — Responsive Layout Overhaul (2026-04-09)
+
+**Goal:** Migrate sidebar breakpoint from 641px to Bootstrap md (768px). Add collapsible sidebar with slide animation. Make all card grids stack to 1-column on mobile. Add responsive scrolling for journey stages. Respect prefers-reduced-motion.
+
+**Files modified:**
+- `src/style.css` — Migrated all breakpoints from 641px/640.98px to 768px/767.98px. Replaced `display: none/block` sidebar toggle with `max-height: 0 → 100vh` slide transition. Added `prefers-reduced-motion` media query for sidebar animation.
+- `src/views/HomeView.vue` — Added `col-12` to all 6 feature card columns for mobile stacking.
+- `src/views/VillagesView.vue` — Added `col-12` to village card columns.
+- `src/views/HomeModelsView.vue` — Added `col-12` to model card columns.
+- `src/views/MarketplaceView.vue` — Added `col-12` to listing card columns.
+- `src/views/DashboardView.vue` — Added `col-6` to stat cards, `col-12` to journey/notification cards and recent models.
+- `src/views/JourneyView.vue` — Added `col-12` to design cards. Replaced row/col stage indicators with flex-nowrap scrollable container for mobile.
+- `src/components/SkeletonCard.vue` — Added `col-12` for mobile stacking.
+
+**Files created:**
+- `src/__tests__/ResponsiveLayout.spec.ts` — 5 tests: breakpoint migration verification, sidebar slide animation CSS, prefers-reduced-motion, HomeView col-12 stacking, SkeletonCard col-12 stacking.
+
+**Tests:** 88 Vitest tests (83 + 5 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+### Chunk 053 — Accessibility & Keyboard Navigation (2026-04-09)
+
+**Goal:** Add comprehensive accessibility support: ARIA attributes, keyboard navigation, focus trapping, skip-to-content link, and screen-reader-friendly toast announcements.
+
+**Files modified:**
+- `src/components/DetailModal.vue` — Added `role="dialog"`, `aria-modal="true"`, `aria-label`, close button `aria-label="Close modal"`. Added Escape-to-close keydown handler. Added Tab focus trap cycling between first/last focusable elements. Added backdrop click-to-close. Auto-focuses modal on open.
+- `src/App.vue` — Added skip-to-content link (`<a href="#main-content" class="skip-to-content">`). Added `id="main-content"` on `<main>`. Added `aria-label="Main navigation"` on sidebar nav. Added `aria-label="Toggle navigation"` on navbar toggler.
+- `src/style.css` — Added `.skip-to-content` styles: positioned off-screen, shown on focus.
+- `src/views/VillagesView.vue` — Added `aria-label="View village details"` on button.
+- `src/views/HomeModelsView.vue` — Added `aria-label="View model details"` on button.
+- `src/views/MarketplaceView.vue` — Added `aria-label="View listing details"` on button.
+- `src/views/LandBlocksView.vue` — Added `aria-label="Test-fit design on block"` on button.
+
+**Files created:**
+- `src/__tests__/Accessibility.spec.ts` — 10 tests: dialog role/aria-modal, close button aria-label, Escape-to-close, backdrop click-to-close, skip-to-content link, main#main-content, nav aria-label, toggler aria-label, skip-to-content CSS, toast aria-live verification.
+
+**Tests:** 98 Vitest tests (88 + 10 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+### Chunk 054 — Dark Mode Support (2026-04-09)
+
+**Goal:** Add dark mode support with system-preference detection, manual toggle, localStorage persistence, and sidebar gradient adaptation.
+
+**Files created:**
+- `src/composables/useTheme.ts` — `useTheme()` composable: singleton pattern with `theme` ref, `toggleTheme()`, `setTheme()`. Detects `prefers-color-scheme: dark`. Sets `data-bs-theme` on `<html>`. Persists to `localStorage('terranes-theme')`. Listens for system preference changes when no user override.
+- `src/__tests__/composables/useTheme.spec.ts` — 8 tests: default light theme, data-bs-theme attribute, toggle switching, localStorage persistence, read stored preference, explicit setTheme, dark-mode CSS verification (2 tests).
+
+**Files modified:**
+- `src/App.vue` — Imported and initialised `useTheme()`. Added theme toggle button in sidebar with 🌙/☀️ emoji and "Dark Mode"/"Light Mode" label.
+- `src/style.css` — Migrated `.top-row` background from `#f7f7f7` to `var(--bs-body-bg)` and border from `#d6d5d5` to `var(--bs-border-color)`. Added `[data-bs-theme="dark"] .sidebar` darker gradient. Added `.theme-toggle-btn` styles.
+
+**Tests:** 106 Vitest tests (98 + 8 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+### Chunk 055 — Enhanced Home Landing Page (2026-04-09)
+
+**Goal:** Transform HomeView into a polished landing page with hero section, how-it-works flow, testimonial carousel, and footer.
+
+**Files modified:**
+- `src/views/HomeView.vue` — Complete rewrite: Added hero section with animated gradient background (CSS keyframes, prefers-reduced-motion safe). Added "How It Works" 4-step visual flow with icons and numbered steps. Added testimonial carousel with 3 static testimonials, prev/next navigation, and counter. Added footer with 3-column layout (Platform, Services, About). Existing 6 feature cards preserved in "Platform Features" section. All sections mobile-optimised with col-12/col-6/col-md-* responsive classes.
+- `src/__tests__/HomeView.spec.ts` — Updated from 6 to 10 tests: added hero section, how-it-works 4-step flow, testimonial carousel with navigation, footer with links. Existing tests adapted for new card count.
+- `src/__tests__/ResponsiveLayout.spec.ts` — Updated card count assertion to ≥6 (accounts for how-it-works steps).
+
+**Tests:** 110 Vitest tests (106 + 4 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.

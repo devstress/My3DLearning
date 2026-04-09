@@ -57,7 +57,7 @@ watch([searchName, selectedLayout], search);
       No villages found. Create one to get started!
     </div>
     <div v-else class="row g-4">
-      <div class="col-md-4" v-for="village in villages" :key="village.id">
+      <div class="col-12 col-md-4" v-for="village in villages" :key="village.id">
         <div class="card h-100 shadow-sm">
           <div class="card-body">
             <h5 class="card-title">{{ village.name }}</h5>
@@ -71,7 +71,7 @@ watch([searchName, selectedLayout], search);
             </small>
           </div>
           <div class="card-footer">
-            <button class="btn btn-sm btn-outline-primary" @click="viewVillage(village)">View Details</button>
+            <button class="btn btn-sm btn-outline-primary" aria-label="View village details" @click="viewVillage(village)">View Details</button>
           </div>
         </div>
       </div>

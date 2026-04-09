@@ -201,11 +201,12 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div class="row text-center">
+          <div class="d-flex flex-nowrap overflow-auto text-center">
             <div
               v-for="stage in journeyStages"
               :key="stage"
-              class="col"
+              class="flex-shrink-0 px-2"
+              style="min-width: 6rem;"
               :class="{
                 'text-success': journeyStages.indexOf(currentJourney.currentStage) >= journeyStages.indexOf(stage),
                 'text-muted': journeyStages.indexOf(currentJourney.currentStage) < journeyStages.indexOf(stage),
@@ -225,7 +226,7 @@ onMounted(async () => {
           <h5>Step 1: Select a Home Design</h5>
           <p>Choose a home design from our gallery.</p>
           <div v-if="availableModels" class="row g-3">
-            <div class="col-md-4" v-for="model in availableModels.slice(0, 6)" :key="model.id">
+            <div class="col-12 col-md-4" v-for="model in availableModels.slice(0, 6)" :key="model.id">
               <div class="card h-100">
                 <div class="card-body">
                   <h6>{{ model.name }}</h6>

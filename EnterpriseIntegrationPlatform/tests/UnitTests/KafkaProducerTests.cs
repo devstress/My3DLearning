@@ -134,17 +134,59 @@ public class KafkaProducerTests
     }
 
     // ------------------------------------------------------------------ //
-    // Dispose
+    // Dispose — flushes and disposes
     // ------------------------------------------------------------------ //
 
     [Test]
-    public void Dispose_DisposesUnderlyingProducer()
+    public void Dispose_FlushesAndDisposesUnderlyingProducer()
     {
         var inner = Substitute.For<IProducer<string, byte[]>>();
         var producer = new KafkaProducer(inner, NullLogger<KafkaProducer>.Instance);
 
         producer.Dispose();
 
+        inner.Received(1).Flush(Arg.Any<TimeSpan>());
         inner.Received(1).Dispose();
+    }
+
+    [Test]
+    public void Dispose_CalledTwice_OnlyDisposesOnce()
+    {
+        var inner = Substitute.For<IProducer<string, byte[]>>();
+        var producer = new KafkaProducer(inner, NullLogger<KafkaProducer>.Instance);
+
+        producer.Dispose();
+        producer.Dispose();
+
+        inner.Received(1).Dispose();
+    }
+
+    [Test]
+    public async Task DisposeAsync_FlushesAndDisposesUnderlyingProducer()
+    {
+        var inner = Substitute.For<IProducer<string, byte[]>>();
+        var producer = new KafkaProducer(inner, NullLogger<KafkaProducer>.Instance);
+
+        await producer.DisposeAsync();
+
+        inner.Received(1).Flush(Arg.Any<TimeSpan>());
+        inner.Received(1).Dispose();
+    }
+
+    // ------------------------------------------------------------------ //
+    // ObjectDisposedException after dispose
+    // ------------------------------------------------------------------ //
+
+    [Test]
+    public void PublishAsync_AfterDispose_ThrowsObjectDisposedException()
+    {
+        var inner = Substitute.For<IProducer<string, byte[]>>();
+        var producer = new KafkaProducer(inner, NullLogger<KafkaProducer>.Instance);
+        producer.Dispose();
+
+        var envelope = IntegrationEnvelope<string>.Create("payload", "src", "type");
+        Assert.That(
+            async () => await producer.PublishAsync(envelope, "topic"),
+            Throws.InstanceOf<ObjectDisposedException>());
     }
 }

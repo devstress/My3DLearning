@@ -45,6 +45,8 @@
     <!-- Temporal workflow orchestration -->
     <PackageVersion Include="Temporalio" Version="1.11.1" />
     <PackageVersion Include="Temporalio.Extensions.Hosting" Version="1.11.1" />
+    <!-- Options -->
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.5" />
     <!-- Health Checks -->
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="10.0.5" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.5" />

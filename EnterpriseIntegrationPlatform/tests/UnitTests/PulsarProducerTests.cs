@@ -71,18 +71,29 @@ public class PulsarProducerTests
     }
 
     // ------------------------------------------------------------------ //
-    // DisposeAsync
+    // DisposeAsync — cleans up cached producers
     // ------------------------------------------------------------------ //
 
     [Test]
-    public async Task DisposeAsync_ReturnsCompletedValueTask()
+    public async Task DisposeAsync_CanBeCalledSafely()
     {
         var client = Substitute.For<IPulsarClient>();
         var sut = new PulsarProducer(client, NullLogger<PulsarProducer>.Instance);
 
-        var task = sut.DisposeAsync();
+        await sut.DisposeAsync();
 
-        Assert.That(task.IsCompleted, Is.True);
-        await task;
+        Assert.Pass();
+    }
+
+    [Test]
+    public async Task DisposeAsync_CalledTwice_DoesNotThrow()
+    {
+        var client = Substitute.For<IPulsarClient>();
+        var sut = new PulsarProducer(client, NullLogger<PulsarProducer>.Instance);
+
+        await sut.DisposeAsync();
+        await sut.DisposeAsync();
+
+        Assert.Pass();
     }
 }

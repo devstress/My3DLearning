@@ -94,17 +94,40 @@ public class KafkaConsumerTests
     }
 
     // ------------------------------------------------------------------ //
-    // DisposeAsync
+    // DisposeAsync — cancels and cleans up
     // ------------------------------------------------------------------ //
 
     [Test]
-    public async Task DisposeAsync_ReturnsCompletedValueTask()
+    public async Task DisposeAsync_CanBeCalledSafely()
     {
         var sut = new KafkaConsumer(DefaultConfig, NullLogger<KafkaConsumer>.Instance);
 
-        var task = sut.DisposeAsync();
+        await sut.DisposeAsync();
 
-        Assert.That(task.IsCompleted, Is.True);
-        await task;
+        // Verify no exception thrown
+        Assert.Pass();
+    }
+
+    [Test]
+    public async Task DisposeAsync_CalledTwice_DoesNotThrow()
+    {
+        var sut = new KafkaConsumer(DefaultConfig, NullLogger<KafkaConsumer>.Instance);
+
+        await sut.DisposeAsync();
+        await sut.DisposeAsync();
+
+        Assert.Pass();
+    }
+
+    [Test]
+    public async Task SubscribeAsync_AfterDispose_ThrowsObjectDisposedException()
+    {
+        var sut = new KafkaConsumer(DefaultConfig, NullLogger<KafkaConsumer>.Instance);
+        await sut.DisposeAsync();
+
+        Assert.That(
+            async () => await sut.SubscribeAsync<string>(
+                "topic", "group", _ => Task.CompletedTask),
+            Throws.InstanceOf<ObjectDisposedException>());
     }
 }

@@ -64,7 +64,7 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
       No listings found matching your criteria.
     </div>
     <div v-else class="row g-4">
-      <div class="col-md-6" v-for="listing in listings" :key="listing.id">
+      <div class="col-12 col-md-6" v-for="listing in listings" :key="listing.id">
         <div class="card h-100 shadow-sm">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
@@ -81,7 +81,7 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
             </div>
           </div>
           <div class="card-footer">
-            <button class="btn btn-sm btn-outline-primary" @click="viewListing(listing)">View Details</button>
+            <button class="btn btn-sm btn-outline-primary" aria-label="View listing details" @click="viewListing(listing)">View Details</button>
           </div>
         </div>
       </div>

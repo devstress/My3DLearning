@@ -12,6 +12,7 @@ using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Ingestion.Nats;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
@@ -48,7 +49,8 @@ public sealed class NatsBrokerEndpoint : IMessageBrokerProducer, IMessageBrokerC
         _js = new NatsJSContext(_connection);
         _producer = new NatsJetStreamProducer(
             _connection,
-            NullLogger<NatsJetStreamProducer>.Instance);
+            NullLogger<NatsJetStreamProducer>.Instance,
+            Options.Create(new NatsOptions()));
     }
 
     public string Name => _name;

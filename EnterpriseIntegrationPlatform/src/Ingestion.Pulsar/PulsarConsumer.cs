@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using DotPulsar;
 using DotPulsar.Abstractions;
 using DotPulsar.Extensions;
@@ -16,8 +17,12 @@ namespace EnterpriseIntegrationPlatform.Ingestion.Pulsar;
 /// </summary>
 public sealed class PulsarConsumer : IMessageBrokerConsumer
 {
+    internal static readonly ActivitySource ActivitySource = new("EIP.Ingestion.Pulsar.Consumer");
+
     private readonly IPulsarClient _client;
     private readonly ILogger<PulsarConsumer> _logger;
+    private readonly CancellationTokenSource _disposeCts = new();
+    private bool _disposed;
 
     /// <summary>Initialises a new <see cref="PulsarConsumer"/>.</summary>
     public PulsarConsumer(IPulsarClient client, ILogger<PulsarConsumer> logger)
@@ -35,9 +40,12 @@ public sealed class PulsarConsumer : IMessageBrokerConsumer
         Func<IntegrationEnvelope<T>, Task> handler,
         CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(topic);
         ArgumentException.ThrowIfNullOrWhiteSpace(consumerGroup);
         ArgumentNullException.ThrowIfNull(handler);
+
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
 
         var consumer = _client.NewConsumer()
             .SubscriptionName(consumerGroup)
@@ -51,8 +59,12 @@ public sealed class PulsarConsumer : IMessageBrokerConsumer
 
         await using (consumer.ConfigureAwait(false))
         {
-            await foreach (var msg in consumer.Messages(cancellationToken))
+            await foreach (var msg in consumer.Messages(linked.Token))
             {
+                using var activity = ActivitySource.StartActivity("Pulsar.Consume");
+                activity?.SetTag("messaging.system", "pulsar");
+                activity?.SetTag("messaging.destination", topic);
+
                 try
                 {
                     var bytes = msg.Data.IsSingleSegment
@@ -63,12 +75,14 @@ public sealed class PulsarConsumer : IMessageBrokerConsumer
                     {
                         _logger.LogWarning(
                             "Failed to deserialise message on Pulsar topic {Topic}", topic);
-                        await consumer.Acknowledge(msg, cancellationToken);
+                        await consumer.Acknowledge(msg, linked.Token);
                         continue;
                     }
 
+                    activity?.SetTag("messaging.message_id", envelope.MessageId.ToString());
+
                     await handler(envelope);
-                    await consumer.Acknowledge(msg, cancellationToken);
+                    await consumer.Acknowledge(msg, linked.Token);
 
                     _logger.LogDebug(
                         "Processed message {MessageId} from Pulsar topic {Topic}",
@@ -79,12 +93,19 @@ public sealed class PulsarConsumer : IMessageBrokerConsumer
                     _logger.LogError(ex,
                         "Error processing message from Pulsar topic {Topic}", topic);
                     await consumer.RedeliverUnacknowledgedMessages(
-                        [msg.MessageId], cancellationToken);
+                        [msg.MessageId], linked.Token);
                 }
             }
         }
     }
 
     /// <inheritdoc />
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await _disposeCts.CancelAsync();
+        _disposeCts.Dispose();
+    }
 }

@@ -1,6 +1,7 @@
 using EnterpriseIntegrationPlatform.Ingestion;
 using EnterpriseIntegrationPlatform.Ingestion.Pulsar;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NUnit.Framework;
 
 namespace EnterpriseIntegrationPlatform.Tests.Unit;
@@ -42,6 +43,35 @@ public class PulsarServiceExtensionsTests
         Assert.That(consumer, Is.InstanceOf<PulsarConsumer>());
     }
 
+    [Test]
+    public async Task AddPulsarBroker_RegistersPulsarOptions()
+    {
+        var services = new ServiceCollection();
+
+        services.AddLogging();
+        services.AddPulsarBroker("pulsar://broker.prod:6650");
+
+        await using var provider = services.BuildServiceProvider();
+        var opts = provider.GetService<IOptions<PulsarOptions>>();
+
+        Assert.That(opts, Is.Not.Null);
+        Assert.That(opts!.Value.ServiceUrl, Is.EqualTo("pulsar://broker.prod:6650"));
+    }
+
+    [Test]
+    public async Task AddPulsarBroker_RegistersPulsarHealthCheck()
+    {
+        var services = new ServiceCollection();
+
+        services.AddLogging();
+        services.AddPulsarBroker("pulsar://localhost:6650");
+
+        await using var provider = services.BuildServiceProvider();
+        var healthCheck = provider.GetService<PulsarHealthCheck>();
+
+        Assert.That(healthCheck, Is.Not.Null);
+    }
+
     // ------------------------------------------------------------------ //
     // Argument validation
     // ------------------------------------------------------------------ //
@@ -63,6 +93,16 @@ public class PulsarServiceExtensionsTests
 
         Assert.That(
             () => services.AddPulsarBroker(""),
+            Throws.InstanceOf<ArgumentException>());
+    }
+
+    [Test]
+    public void AddPulsarBroker_WhitespaceServiceUrl_Throws()
+    {
+        var services = new ServiceCollection();
+
+        Assert.That(
+            () => services.AddPulsarBroker("   "),
             Throws.InstanceOf<ArgumentException>());
     }
 }

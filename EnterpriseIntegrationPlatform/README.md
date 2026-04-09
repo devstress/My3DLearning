@@ -139,7 +139,7 @@ The platform is built on eleven foundational pillars. Each pillar is implemented
 | 10 | **Disaster Recovery** | `DisasterRecovery` | Failover orchestration, cross-region replication, RPO/RTO configuration, and automated DR drill execution. Ensures business continuity during infrastructure failures. |
 | 11 | **Connectors** | `Connector.Http`, `Connector.Sftp`, `Connector.Email`, `Connector.File`, `Connectors` | Protocol-specific adapters for delivering messages to external systems. Unified connector registry with authentication, retry, and delivery confirmation. Extensible plugin model. |
 
-These eleven pillars are not aspirational — each is implemented, tested, and operational. The platform's 2,000+ automated tests (unit, integration, contract, workflow, browser, and load) verify that every pillar functions correctly in isolation and in composition.
+These eleven pillars are not aspirational — each is implemented, tested, and operational. The platform's 2,341 automated tests (unit, integration, contract, workflow, browser, and load) verify that every pillar functions correctly in isolation and in composition.
 
 ### AI-Driven Architecture
 
@@ -149,7 +149,7 @@ AI is a core architectural pillar of this platform, embedded across the developm
 
 2. **AI-Powered Observability (OpenClaw):** The OpenClaw web UI accepts natural-language queries — "where is my message?", "show me failed orders from tenant X" — and translates them into structured queries against the OpenTelemetry observability layer (backed by Grafana Loki). This transforms operations from manual log-trawling into an AI-assisted investigation workflow, reducing mean time to resolution for support teams.
 
-3. **AI-Driven Code Generation Workflow:** The platform's architecture rules, coding standards, and EIP pattern mappings are structured specifically for AI consumption. AI agents (GitHub Copilot, Claude Code, etc.) can generate compliant integration code, transformation activities, and workflow definitions by referencing the platform's RAG-indexed knowledge base. Generated code follows the same validation pipeline as manually written code: compilation, static analysis, 2,000+ automated tests, and human review.
+3. **AI-Driven Code Generation Workflow:** The platform's architecture rules, coding standards, and EIP pattern mappings are structured specifically for AI consumption. AI agents (GitHub Copilot, Claude Code, etc.) can generate compliant integration code, transformation activities, and workflow definitions by referencing the platform's RAG-indexed knowledge base. Generated code follows the same validation pipeline as manually written code: compilation, static analysis, 2,341 automated tests, and human review.
 
 4. **Intelligent Knowledge Management:** The `AI.RagKnowledge` module parses the platform's documentation and source code into queryable knowledge fragments. This enables both human developers and AI agents to discover pattern implementations, find code examples, and understand architectural decisions through natural-language queries rather than manual file navigation.
 
@@ -192,7 +192,7 @@ This platform is designed for organizations that:
 
 - **Code-first platform.** All integrations are implemented in code. The platform core uses C#, with polyglot extension support via Temporal.io SDKs. This platform does not provide low-code or visual design tooling. Organizations requiring drag-and-drop integration design should evaluate Logic Apps, MuleSoft Anypoint, or Boomi.
 - **Limited connector catalog.** The platform includes four connector types: HTTP, SFTP, Email, and File. Organizations requiring broad connectivity to heterogeneous systems (databases, SaaS APIs, mainframes) should evaluate Apache Camel (300+ connectors) or MuleSoft (1,000+ connectors).
-- **Production maturity.** The platform is well-architected and covered by 2,000+ automated tests across unit, integration, contract, workflow, browser, and load test suites. However, it is still early date and need a lot of validations to improve.
+- **Production maturity.** The platform is well-architected and covered by 2,341 automated tests across unit, integration, contract, workflow, browser, and load test suites. However, it is still early stage and needs additional validation to improve.
 - **Not a universal Camel replacement.** For Java/JVM organizations whose primary requirement is connecting to diverse systems with minimal custom code, Apache Camel remains the more appropriate choice. However, Temporal.io's polyglot SDKs enable JVM teams to participate in workflows without migrating away from Java.
 
 ---
@@ -337,14 +337,14 @@ EnterpriseIntegrationPlatform/
 │   ├── Admin.Api/                   # Administration REST API (EIP: Control Bus)
 │   └── Demo.Pipeline/               # End-to-end demo pipeline
 ├── tests/
-│   ├── UnitTests/                   # Fast, isolated unit tests (969 tests)
-│   ├── TutorialLabs/                # 50 tutorials with exercises, labs, and exams (522 tests)
+│   ├── UnitTests/                   # Fast, isolated unit tests (1,691 tests)
+│   ├── TutorialLabs/                # 50 tutorials with exercises, labs, and exams (526 tests)
 │   ├── BrokerAgnosticTests/         # Cross-broker EIP pattern verification (38 tests)
-│   ├── ContractTests/               # Contract verification tests (29 tests)
-│   ├── WorkflowTests/               # Temporal workflow tests (24 tests)
-│   ├── IntegrationTests/            # Testcontainers-based integration tests (17 tests)
+│   ├── ContractTests/               # Contract verification tests (57 tests)
+│   ├── WorkflowTests/               # Temporal workflow tests (29 tests)
+│   ├── IntegrationTests/            # Testcontainers-based integration tests (16 tests)
 │   ├── PlaywrightTests/             # End-to-end browser tests for Admin dashboard & OpenClaw UI (24 tests)
-│   └── LoadTests/                   # Performance and load tests (10 tests)
+│   └── LoadTests/                   # Performance and load tests (9 tests)
 ├── docs/                            # Architecture, ADRs, runbooks, and design docs
 ├── deploy/                          # Helm charts, Kustomize overlays, K8s manifests
 └── rules/                           # Development milestones, coding standards, architecture rules

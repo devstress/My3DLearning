@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Confluent.Kafka;
 using EnterpriseIntegrationPlatform.Contracts;
 using EnterpriseIntegrationPlatform.Ingestion;
@@ -10,10 +11,13 @@ namespace EnterpriseIntegrationPlatform.Ingestion.Kafka;
 /// Kafka is used for broadcast event streams, audit logs, fan-out analytics,
 /// and decoupled integration.
 /// </summary>
-public sealed class KafkaProducer : IMessageBrokerProducer, IDisposable
+public sealed class KafkaProducer : IMessageBrokerProducer, IAsyncDisposable, IDisposable
 {
+    internal static readonly ActivitySource ActivitySource = new("EIP.Ingestion.Kafka.Producer");
+
     private readonly IProducer<string, byte[]> _producer;
     private readonly ILogger<KafkaProducer> _logger;
+    private bool _disposed;
 
     /// <summary>Initialises a new <see cref="KafkaProducer"/>.</summary>
     public KafkaProducer(IProducer<string, byte[]> producer, ILogger<KafkaProducer> logger)
@@ -30,8 +34,14 @@ public sealed class KafkaProducer : IMessageBrokerProducer, IDisposable
         string topic,
         CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(envelope);
         ArgumentException.ThrowIfNullOrWhiteSpace(topic);
+
+        using var activity = ActivitySource.StartActivity("Kafka.Publish");
+        activity?.SetTag("messaging.system", "kafka");
+        activity?.SetTag("messaging.destination", topic);
+        activity?.SetTag("messaging.message_id", envelope.MessageId.ToString());
 
         var data = EnvelopeSerializer.Serialize(envelope);
         var message = new Message<string, byte[]>
@@ -48,5 +58,27 @@ public sealed class KafkaProducer : IMessageBrokerProducer, IDisposable
     }
 
     /// <inheritdoc />
-    public void Dispose() => _producer.Dispose();
+    public ValueTask DisposeAsync()
+    {
+        Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        try
+        {
+            _producer.Flush(TimeSpan.FromSeconds(10));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error flushing Kafka producer during disposal");
+        }
+
+        _producer.Dispose();
+    }
 }

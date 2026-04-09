@@ -4,6 +4,457 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 344 — AI & Remaining DI Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 34 — DI Registration (ServiceExtensions) Test Hardening
+- **Status**: done
+- **Goal**: DI registration tests for AI.Ollama, AI.RagFlow, AI.RagKnowledge, Security.Secrets, RuleEngine, Workflow.Temporal.
+- **Files created**:
+  - `tests/UnitTests/ServiceExtensions/AiAndRemainingDiTests.cs` — 12 tests: Ollama (IOllamaService), RagFlow (IRagFlowService), RagKnowledge (RagDocumentParser, RagKnowledgeIndex, RagQueryMatcher), Secrets (ISecretProvider, ISecretRotationService), RuleEngine (IRuleEngine, IRuleStore, AddRuleStore), Temporal (ITemporalWorkflowDispatcher)
+
+## Chunk 343 — Connector & Platform DI Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 34 — DI Registration (ServiceExtensions) Test Hardening
+- **Status**: done
+- **Goal**: DI registration tests for Connectors, Http/Email/Sftp/File connectors, MultiTenancy, TenantOnboarding.
+- **Files created**:
+  - `tests/UnitTests/ServiceExtensions/ConnectorPlatformDiTests.cs` — 16 tests: Connectors (IConnectorRegistry, IConnectorFactory, health check), HttpConnector (IHttpConnector, ITokenCache), EmailConnector (IEmailConnector, ISmtpClientWrapper), SftpConnector (ISftpConnector, ISftpConnectionPool), FileConnector (IFileConnector, IFileSystem), MultiTenancy (ITenantResolver, ITenantIsolationGuard), TenantOnboarding (ITenantOnboardingService, ITenantQuotaManager, IBrokerNamespaceProvisioner)
+
+## Chunk 342 — Infrastructure DI Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 34 — DI Registration (ServiceExtensions) Test Hardening
+- **Status**: done
+- **Goal**: DI registration tests for Channels, Configuration, EventSourcing, SystemManagement, DisasterRecovery, Observability, Profiling.
+- **Files created**:
+  - `tests/UnitTests/ServiceExtensions/InfrastructureDiTests.cs` — 27 tests: Channels (PointToPoint, PubSub, Datatype, InvalidMessage, Bridge), Configuration (IConfigurationStore, IFeatureFlagService, ChangeNotifier, EnvironmentOverride), EventSourcing (IEventStore, ISnapshotStore, EventProjectionEngine), SystemManagement (IControlBus, IMessageStore, ISmartProxy, ITestMessageGenerator), DR (IFailoverManager, IReplicationManager, IRecoveryPointValidator, IDrDrillRunner), Observability (IMessageStateStore, MessageLifecycleRecorder, ITraceAnalyzer), Profiling (IContinuousProfiler, IHotspotDetector, IGcMonitor, IBenchmarkRegistry)
+
+## Chunk 341 — Processing Pattern DI Tests Part 2
+
+- **Date**: 2026-04-09
+- **Phase**: 34 — DI Registration (ServiceExtensions) Test Hardening
+- **Status**: done
+- **Goal**: DI registration tests for Transform, Translator, Dispatcher, ScatterGather, RequestReply, CompetingConsumers, Throttle ServiceExtensions.
+- **Files created**:
+  - `tests/UnitTests/ServiceExtensions/ProcessingPatternDiTests2.cs` — 16 tests: Transform (pipeline, JsonToXml, XmlToJson, ContentEnricher, ContentFilter, Normalizer), Translator (JSON translator), Dispatcher (IMessageDispatcher, IServiceActivator), ScatterGather (IScatterGatherer), RequestReply (IRequestReplyCorrelator), CompetingConsumers (IConsumerLagMonitor, IBackpressureSignal, IConsumerScaler), Throttle (IMessageThrottle, IThrottleRegistry)
+
+## Chunk 340 — Processing Pattern DI Tests Part 1
+
+- **Date**: 2026-04-09
+- **Phase**: 34 — DI Registration (ServiceExtensions) Test Hardening
+- **Status**: done
+- **Goal**: DI registration tests for DeadLetter, Retry, Replay, Splitter, Aggregator ServiceExtensions.
+- **Files created**:
+  - `tests/UnitTests/ServiceExtensions/ProcessingPatternDiTests1.cs` — 8 tests: DeadLetter (IDeadLetterPublisher, IMessageExpirationChecker), Retry (IRetryPolicy), Replay (IMessageReplayStore, IMessageReplayer), Splitter (IMessageSplitter delegate, IMessageSplitter JSON), Aggregator (IMessageAggregator)
+
+## Chunk 333 — SftpConnectorAdapter + FileConnectorAdapter Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 33 — Gateway & Connector Adapter Test Hardening
+- **Status**: done
+- **Goal**: Dedicated unit tests for SftpConnectorAdapter (12 tests) and FileConnectorAdapter (10 tests) covering SendAsync success/failure, TestConnectionAsync (connect/disconnect/exception), constructor validation, argument guards.
+- **Files created**:
+  - `tests/UnitTests/SftpConnectorAdapterTests.cs` — 12 tests: Name, ConnectorType, SendAsync success/default-filename/exception, TestConnectionAsync connected/not-connected/throws, constructor null name/connector, SendAsync null envelope/options
+  - `tests/UnitTests/FileConnectorAdapterTests.cs` — 10 tests: Name, ConnectorType, SendAsync success/exception, TestConnectionAsync configured/no-root/throws, constructor null name/connector, SendAsync null envelope/options
+
+## Chunk 332 — HttpConnectorAdapter + EmailConnectorAdapter Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 33 — Gateway & Connector Adapter Test Hardening
+- **Status**: done
+- **Goal**: Dedicated unit tests for HttpConnectorAdapter (9 tests) and EmailConnectorAdapter (11 tests) covering SendAsync success/failure, TestConnectionAsync, constructor validation, argument guards.
+- **Files created**:
+  - `tests/UnitTests/HttpConnectorAdapterTests.cs` — 9 tests: Name, ConnectorType, SendAsync success/null-destination/exception, constructor null name/connector, SendAsync null envelope/options
+  - `tests/UnitTests/EmailConnectorAdapterTests.cs` — 11 tests: Name, ConnectorType, SendAsync success/with-subject/no-destination/exception, TestConnectionAsync connected/not-connected, constructor null name/connector, SendAsync null envelope
+
+## Chunk 331 — Gateway Options/Response/RouteDefinition Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 33 — Gateway & Connector Adapter Test Hardening
+- **Status**: done
+- **Goal**: Unit tests for GatewayOptions (7 tests — all defaults), GatewayResponse/GatewayResponse<T> (5 tests — success/failure/nullable), RouteDefinition (3 tests — defaults and properties).
+- **Files created**:
+  - `tests/UnitTests/Gateway/GatewayOptionsTests.cs` — 7 tests: SectionName, AdminApiBaseUrl, OpenClawBaseUrl, RateLimitPerMinute, GlobalRateLimitPerMinute, RequireHttps, AllowedOrigins defaults
+  - `tests/UnitTests/Gateway/GatewayResponseTests.cs` — 5 tests: success/failure, generic success/failure/nullable payload
+  - `tests/UnitTests/Gateway/RouteDefinitionTests.cs` — 3 tests: RequiresAuth default, RateLimitPolicy default, all properties settable
+
+## Chunk 330 — HttpMessagingGateway Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 33 — Gateway & Connector Adapter Test Hardening
+- **Status**: done
+- **Goal**: 15 unit tests for HttpMessagingGateway (the core Messaging Gateway EIP pattern). Tests cover SendAsync (success, JSON content, correlation ID header, custom headers, non-success status, HttpRequestException→502, Timeout→504, null destination, null payload) and SendAndReceiveAsync (success with payload deserialization, non-success status, HttpRequestException→502, Timeout→504, null destination, null request). Uses FakeHttpMessageHandler for HTTP interception without real network calls.
+- **Files created**:
+  - `tests/UnitTests/Gateway/HttpMessagingGatewayTests.cs` — 15 tests
+
+## Chunk 327 — UX: Responsive Collapsible Sidebar + Keyboard Nav
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: Collapsible sidebar with section groupings (Monitoring, Operations, Configuration, System). Icon-only mode when collapsed. Responsive layout for mobile.
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/App.vue` — Sidebar collapse toggle, section labels, `sidebarCollapsed` data property
+  - `src/Admin.Web/clientapp/src/style.css` — `.sidebar.collapsed`, `.sidebar-header`, `.sidebar-section`, `.sidebar-footer`, `.btn-collapse` styles
+  - `src/Admin.Web/clientapp/src/__tests__/App.test.js` — Added sidebar collapse test
+
+## Chunk 326 — UX: Toast Notification System
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: Toast notification container with auto-dismiss (4s), types (info/success/error/warning), slide-in animation.
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/App.vue` — Toast container template, `addToast`/`removeToast` methods, toast data array
+  - `src/Admin.Web/clientapp/src/style.css` — `.toast-container`, `.toast`, `.toast-info/success/error/warning`, `.toast-close`, `@keyframes toast-slide-in`
+
+## Chunk 325 — UX: Dark Mode Toggle + Theme Persistence
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: Light/dark theme toggle button in sidebar footer. Theme persisted in localStorage. CSS variables for both themes via `[data-theme]` attribute.
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/App.vue` — Theme toggle button, `isDark` data, `toggleTheme`/`applyTheme` methods, localStorage read on mount
+  - `src/Admin.Web/clientapp/src/style.css` — `[data-theme="dark"]` and `[data-theme="light"]` CSS variable definitions
+  - `src/Admin.Web/clientapp/src/__tests__/App.test.js` — Added theme toggle button test
+
+## Chunk 324 — Event Store Browser (BizTalk BAM)
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: New `EventStorePage.vue` for browsing event-sourced aggregate streams. Search by stream ID, event timeline with version markers, expandable event data/metadata. API endpoint: `GET /api/admin/eventstore/stream/{streamId}`.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/EventStorePage.vue` — Stream ID search, stat cards (events, version, first event), timeline with version-colored markers, expandable JSON data/metadata
+  - `src/Admin.Web/clientapp/src/__tests__/EventStorePage.test.js` — 6 tests: renders page, button text, event timeline, stat cards, empty state, error handling
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/eventstore/stream/{streamId}` endpoint using `IEventStore.ReadStreamAsync`
+  - `src/Admin.Api/Admin.Api.csproj` — Added EventSourcing project reference
+
+## Chunk 323 — Enhanced RateLimit Page
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: Replace raw JSON dump with proper UI: stat cards (permit limit, window, queue limit, rejection code), structured settings table, refresh button.
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/components/RateLimitPage.vue` — Stat cards, settings table with descriptions, refresh button, gateway API section
+
+## Chunk 322 — Enhanced Profiling Page
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: Replace raw JSON dumps with proper UI. Five sections: Performance Snapshot (stat cards + collapsible raw JSON), Hotspot Analysis (severity table), Operation Statistics (calls, avg, P95, max, errors), GC Diagnostics (gen0/1/2 collections, allocated MB, recommendations), Benchmark Baselines (regression % tracking).
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/components/ProfilingPage.vue` — 5 sections with proper tables/cards, hotspot detection, operation stats, GC recommendations, benchmark regression tracking
+
+## Chunk 321 — Connector Health Monitor
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: New `ConnectorsPage.vue` — BizTalk Adapter/Port Monitor equivalent. Lists registered connectors with type/status/health. Type filter dropdown. Stat cards (total, healthy, degraded, unhealthy). API endpoint: `GET /api/admin/connectors`.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/ConnectorsPage.vue` — Connector table with type filter, stat cards, health status badges
+  - `src/Admin.Web/clientapp/src/__tests__/ConnectorsPage.test.js` — 5 tests: renders page, empty state, renders rows, stat cards, type filter
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/connectors` endpoint using `IConnectorRegistry.GetDescriptors()`
+  - `src/Admin.Api/Admin.Api.csproj` — Added Connectors project reference
+
+## Chunk 320 — Message Replay UI
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: New `ReplayPage.vue` — BizTalk tracked message replay equivalent. Filter by correlation ID, message type, timestamps. Source/target topic fields. Replay result stat cards (replayed, skipped, failed, duration). Session history. API endpoint: `POST /api/admin/replay`.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/ReplayPage.vue` — Replay form with 6 filter fields, result stat cards, computed duration, session history table
+  - `src/Admin.Web/clientapp/src/__tests__/ReplayPage.test.js` — 6 tests: renders form, button text, result display, history tracking, error handling, duration computation
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `POST /api/admin/replay` endpoint using `IMessageReplayer.ReplayAsync()`, added `ReplayRequest` record
+  - `src/Admin.Web/clientapp/src/App.vue` — Added Replay, Connectors, Event Store nav links + page components + sidebar sections + dark mode + toast + collapse
+
+## Chunk 318 — Tenant Management UI
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `TenantsPage.vue` for tenant onboarding/deprovisioning, status lookup, and quota viewer. Wired to existing `/api/admin/tenants/*` API endpoints.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/TenantsPage.vue` — Onboard form (ID, name, tier, region), tenant status lookup, quota viewer, deprovision button
+  - `src/Admin.Web/clientapp/src/__tests__/TenantsPage.test.js` — 4 tests: renders page, button text, form toggle, validation
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/App.vue` — Added Tenants nav link + page component
+  - `src/Admin.Web/clientapp/src/__tests__/App.test.js` — Updated nav count, added Tenants nav test
+
+## Chunk 317 — Configuration & Feature Flags UI
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: Two new pages wired to existing API endpoints: `ConfigPage.vue` (CRUD config store with environment filtering) and `FeatureFlagsPage.vue` (CRUD feature flags with rollout % and tenant targeting).
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/ConfigPage.vue` — Config store CRUD with environment filter dropdown
+  - `src/Admin.Web/clientapp/src/components/FeatureFlagsPage.vue` — Feature flag CRUD with rollout %, tenant targeting
+  - `src/Admin.Web/clientapp/src/__tests__/ConfigPage.test.js` — 4 tests
+  - `src/Admin.Web/clientapp/src/__tests__/FeatureFlagsPage.test.js` — 4 tests
+
+## Chunk 316 — Enhanced Dashboard with Metrics API
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New API endpoint `GET /api/admin/metrics/summary` exposing OpenTelemetry instrument metadata (received, processed, failed, DLQ, in-flight, retries, processing duration). Dashboard can use this + Prometheus endpoint for live values.
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `/api/admin/metrics/summary` endpoint returning all 7 PlatformMeters instrument definitions + Prometheus endpoint info
+
+## Chunk 315 — Test Message Generator UI
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `TestMessagesPage.vue` + API endpoints for publishing synthetic test messages. Implements the BizTalk Test Message EIP pattern in the admin UI.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/TestMessagesPage.vue` — Topic input, custom JSON payload toggle, session history
+  - `src/Admin.Web/clientapp/src/__tests__/TestMessagesPage.test.js` — 6 tests: renders, button text, validation, API call, history tracking, custom payload toggle
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `POST /api/admin/test-messages` and `POST /api/admin/test-messages/custom` endpoints, `TestMessageRequest` + `CustomTestMessageRequest` records, SystemManagement DI registration
+  - `src/Admin.Api/Admin.Api.csproj` — Added SystemManagement project reference
+
+## Chunk 314 — Audit Log Viewer
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `AuditLogPage.vue` with paginated audit trail. Filter by action/API key. Load More pagination. Stat cards for entries shown and unique actions.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/AuditLogPage.vue` — Paginated audit log with action/API key filters, Load More, stat cards
+  - `src/Admin.Web/clientapp/src/__tests__/AuditLogPage.test.js` — 5 tests: renders, empty state, renders entries, Load More button, stat cards
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/audit` endpoint
+
+## Chunk 313 — Control Bus UI
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `ControlBusPage.vue` for sending control commands through the messaging infrastructure. Predefined command types (config.reload, throttle.update, route.enable/disable, endpoint.start/stop, cache.clear) plus custom command type. JSON payload editor. Command history.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/ControlBusPage.vue` — Command type selector, JSON payload editor, session command history
+  - `src/Admin.Web/clientapp/src/__tests__/ControlBusPage.test.js` — 6 tests: renders, button text, empty custom validation, sends command, history tracking, invalid JSON validation
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `POST /api/admin/controlbus/send` endpoint + `ControlBusSendRequest` record
+
+## Chunk 312 — In-Flight Message Monitor
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `InFlightPage.vue` — BizTalk Service Instances-inspired view. Real-time stat cards (total, pending, processing, retrying). Auto-refresh checkbox (5s interval). Breakdown table by message type.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/InFlightPage.vue` — Stat cards, auto-refresh, breakdown table with status badges, scoped CSS
+  - `src/Admin.Web/clientapp/src/__tests__/InFlightPage.test.js` — 5 tests: renders, idle state, total calculation, auto-refresh checkbox, timer cleanup
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/messages/inflight` endpoint
+
+## Chunk 311 — Subscription Viewer
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `SubscriptionsPage.vue` — BizTalk Subscription Viewer-inspired. Lists active subscriptions per broker with topic/consumer group/status. Broker type filter dropdown. Summary stat cards (total, active, brokers, topics).
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/SubscriptionsPage.vue` — Subscription table with broker filter, stat cards, computed uniqueBrokers/uniqueTopics
+  - `src/Admin.Web/clientapp/src/__tests__/SubscriptionsPage.test.js` — 5 tests: renders, broker filter, empty state, renders rows, stat cards
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/subscriptions` endpoint
+- **All Phase 31 chunks complete**:
+  - 16 pages total (was 7): Dashboard, Message Flow, Messages, In-Flight, Subscriptions, DLQ, Test Messages, Control Bus, Throttle, Rate Limiting, Config, Feature Flags, Tenants, Audit Log, DR Drills, Profiling
+  - 77 Vitest tests (was 19), 13 test files (was 4)
+  - 11 new API endpoints added to Admin.Api
+  - Full .NET build succeeds, all tests pass
+
+## Chunk 310 — Message Flow Timeline
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: BizTalk-inspired tracked activity viewer. New `MessageFlowPage.vue` with visual lifecycle timeline (Received → Processing → Delivered / Failed / DLQ). Query by correlation ID or business key. Timeline with status-colored markers, expandable event detail, AI trace analysis summary.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/MessageFlowPage.vue` — Timeline UI with search (correlation/business), status badges, expandable detail, AI summary card, scoped CSS
+  - `src/Admin.Web/clientapp/src/__tests__/MessageFlowPage.test.js` — 10 tests: renders, defaults, button text, GUID validation, correlation API, business key API, timeline events, expand/collapse, not-found, error handling
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/flow/correlation/{id}` and `GET /api/admin/flow/business/{key}` endpoints using `MessageStateInspector`
+
+## Chunk 308 — README accuracy pass
+
+- **Date**: 2026-04-09
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Full audit of README.md claims vs. reality. Fix all stale test counts.
+- **Files modified**:
+  - `README.md` — Updated 4 stale references: "2,239" → "2,341" automated tests (3 occurrences), "1,540" → "1,691" unit tests (1 occurrence). Verified all docs/ links resolve. 50 src projects, 526 tutorial tests still accurate.
+- **Actual test breakdown (verified by `dotnet test`)**:
+  - UnitTests: 1,691
+  - ContractTests: 57
+  - WorkflowTests: 29
+  - BrokerAgnosticTests: 38
+  - TutorialLabs: 526 (7 skipped)
+  - **Total: 2,341**
+
+## Chunk 307 — Broker health check integration smoke test
+
+- **Date**: 2026-04-09
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Cross-broker health check verification — all 3 existing health checks (NATS, Kafka, Pulsar) implement IHealthCheck, can be constructed, and return expected status. Postgres does not yet have a health check.
+- **Files created**:
+  - `tests/UnitTests/BrokerHealthCheckTests.cs` — 8 tests: 3 IHealthCheck interface checks, Kafka healthy/unhealthy, NATS unhealthy (mock cast), Pulsar healthy/unhealthy
+- **Test counts after**:
+  - UnitTests: 1691 (was 1683, +8 new tests)
+
+## Chunk 306 — NATS JetStream test expansion
+
+- **Date**: 2026-04-09
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Expand NATS JetStream test coverage — add service extension chaining tests, singleton verification, options URL override, producer/consumer type contracts.
+- **Files created**:
+  - `tests/UnitTests/NatsProducerTests.cs` — 2 tests: IAsyncDisposable implementation, sealed class
+  - `tests/UnitTests/NatsConsumerTests.cs` — 2 tests: IMessageBrokerConsumer implementation, sealed class
+- **Files modified**:
+  - `tests/UnitTests/NatsServiceExtensionsFullTests.cs` — +5 tests: returns same collection (chaining), URL overrides default, producer singleton, consumer singleton, options resolvable
+- **Test counts after**:
+  - UnitTests: 1683 (was 1674, +9 new tests)
+
+## Chunk 305 — Security project unit tests
+
+- **Date**: 2026-04-09
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Add comprehensive unit tests for the Security project (InputSanitizer, PayloadSizeGuard, JwtOptions, PayloadSizeOptions, PayloadTooLargeException, SecurityServiceExtensions). Prior sessions had already created InputSanitizerTests.cs (23 tests) and PayloadSizeGuardTests.cs (8 tests). This chunk adds 4 more test files.
+- **Files created**:
+  - `tests/UnitTests/JwtOptionsTests.cs` — 7 tests: section name, 5 defaults, all-properties settable
+  - `tests/UnitTests/PayloadSizeOptionsTests.cs` — 3 tests: section name, default 1MB, settable
+  - `tests/UnitTests/PayloadTooLargeExceptionTests.cs` — 4 tests: ActualBytes, MaxBytes, message content, derives from Exception
+  - `tests/UnitTests/SecurityServiceExtensionsTests.cs` — 7 tests: AddInputSanitizer registration + null guard, AddPayloadSizeGuard registration + options binding, AddPlatformJwtAuthentication missing key + null services + null config
+- **Test counts after**:
+  - UnitTests: 1674 (was 1653, +21 new tests; 52 total Security tests across 6 files)
+
+## Chunk 304 — Ingestion.Postgres unit tests
+
+- **Date**: 2026-04-08
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Add first-ever unit tests for Ingestion.Postgres module (previously 0 tests).
+- **Files created**:
+  - `tests/UnitTests/PostgresBrokerOptionsTests.cs` — 7 tests
+  - `tests/UnitTests/PostgresBrokerProducerTests.cs` — 5 tests
+  - `tests/UnitTests/PostgresBrokerConsumerTests.cs` — 5 tests
+  - `tests/UnitTests/PostgresTransactionalClientTests.cs` — 3 tests
+  - `tests/UnitTests/PostgresConnectionFactoryTests.cs` — 4 tests
+  - `tests/UnitTests/PostgresServiceExtensionsTests.cs` — 6 tests
+- **Files modified**:
+  - `tests/UnitTests/UnitTests.csproj` — Added Ingestion.Postgres project reference
+- **Test counts after**:
+  - UnitTests: 1653 (was 1623, +30 new tests)
+
+## Chunk 303 — Pulsar provider hardening
+
+- **Date**: 2026-04-08
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Harden Pulsar provider with IOptions pattern, health check, ActivitySource tracing, proper IAsyncDisposable, ObjectDisposedException guards. **Critical fix: eliminated producer-per-message anti-pattern** by caching producers per topic in ConcurrentDictionary.
+- **Files created**:
+  - `src/Ingestion.Pulsar/PulsarOptions.cs` — IOptions config with ServiceUrl, OperationTimeoutMs, KeepAliveIntervalMs + URL scheme validation (pulsar:// or pulsar+ssl://)
+  - `src/Ingestion.Pulsar/PulsarHealthCheck.cs` — IHealthCheck verifying Pulsar client via NewProducer() builder
+  - `tests/UnitTests/PulsarOptionsTests.cs` — 16 tests: defaults, section name, URL validation, timeout validation
+  - `tests/UnitTests/PulsarHealthCheckTests.cs` — 4 tests: constructor validation, healthy/unhealthy paths
+  - `tests/UnitTests/PulsarProducerCachingTests.cs` — 7 tests: cache lifecycle, dispose, ObjectDisposedException, argument validation
+- **Files modified**:
+  - `src/Ingestion.Pulsar/PulsarProducer.cs` — **Replaced producer-per-message with ConcurrentDictionary<string, IProducer> cache**. Added IAsyncDisposable (disposes all cached producers), ActivitySource tracing, ObjectDisposedException guard, CachedProducerCount diagnostic property
+  - `src/Ingestion.Pulsar/PulsarConsumer.cs` — Added ActivitySource tracing, linked CancellationTokenSource for DisposeAsync, ObjectDisposedException guard
+  - `src/Ingestion.Pulsar/PulsarServiceExtensions.cs` — IOptions<PulsarOptions>, PulsarHealthCheck registration, URL validation
+  - `src/Ingestion.Pulsar/Ingestion.Pulsar.csproj` — Added HealthChecks.Abstractions + Options package refs
+  - `tests/UnitTests/PulsarProducerTests.cs` — Updated dispose tests for real IAsyncDisposable behavior
+  - `tests/UnitTests/PulsarConsumerTests.cs` — Added 3 tests: dispose safety, double-dispose, ObjectDisposedException after dispose
+  - `tests/UnitTests/PulsarServiceExtensionsTests.cs` — Added 3 tests: IOptions<PulsarOptions>, PulsarHealthCheck, whitespace URL validation
+- **Test counts after**:
+  - UnitTests: 1623 (was 1591, +32 new tests)
+
+## Chunk 302 — Kafka provider hardening
+
+- **Date**: 2026-04-08
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Harden Kafka provider with IOptions pattern, health check, ActivitySource tracing, proper IAsyncDisposable (flush+dispose on producer, cancel+close on consumer), ObjectDisposedException guards.
+- **Files created**:
+  - `src/Ingestion.Kafka/KafkaOptions.cs` — 11 configurable properties (BootstrapServers, Acks, EnableIdempotence, CompressionType, LingerMs, BatchSize, SessionTimeoutMs, GroupId, AutoOffsetReset, EnableAutoCommit) + Validate()
+  - `src/Ingestion.Kafka/KafkaHealthCheck.cs` — IHealthCheck verifying producer handle health
+  - `tests/UnitTests/KafkaOptionsTests.cs` — 20 tests: defaults, section name, validation happy/error paths
+  - `tests/UnitTests/KafkaHealthCheckTests.cs` — 5 tests: constructor validation, healthy/unhealthy paths
+- **Files modified**:
+  - `src/Ingestion.Kafka/KafkaProducer.cs` — Added IAsyncDisposable, ActivitySource tracing, ObjectDisposedException guard, flush before dispose
+  - `src/Ingestion.Kafka/KafkaConsumer.cs` — Added ActivitySource tracing, linked CancellationTokenSource for DisposeAsync, ObjectDisposedException guard, consumer.Close() on exit
+  - `src/Ingestion.Kafka/KafkaServiceExtensions.cs` — IOptions<KafkaOptions>, producer tuning (Acks, idempotence, compression, linger, batch), consumer tuning (session timeout, auto-offset, auto-commit), KafkaHealthCheck registration
+  - `src/Ingestion.Kafka/Ingestion.Kafka.csproj` — Added HealthChecks.Abstractions + Options package refs
+  - `tests/UnitTests/KafkaProducerTests.cs` — Added 4 tests: flush+dispose, double-dispose, DisposeAsync, ObjectDisposedException after dispose
+  - `tests/UnitTests/KafkaConsumerTests.cs` — Replaced trivial DisposeAsync test with 3 real tests: safe dispose, double-dispose, ObjectDisposedException after dispose
+  - `tests/UnitTests/KafkaServiceExtensionsTests.cs` — Added 2 tests: IOptions<KafkaOptions> registration, KafkaHealthCheck registration
+- **Test counts after**:
+  - UnitTests: 1591 (was 1560, +31 new tests)
+
+## Chunk 301 — NATS JetStream provider hardening
+
+- **Date**: 2026-04-08
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Harden NATS JetStream provider with IOptions pattern, health check, ActivitySource tracing, proper IAsyncDisposable, and finite retry logic.
+- **Files created**:
+  - `src/Ingestion.Nats/NatsOptions.cs` — IOptions-based config with Validate(), section binding, linear backoff params
+  - `src/Ingestion.Nats/NatsHealthCheck.cs` — IHealthCheck verifying JetStream API responsiveness
+  - `tests/UnitTests/NatsOptionsTests.cs` — 9 tests for options defaults, section name, validation
+  - `tests/UnitTests/NatsHealthCheckTests.cs` — 3 tests for health check constructor and unhealthy paths
+  - `tests/UnitTests/NatsServiceExtensionsFullTests.cs` — 7 tests for DI registration, options, health check, argument validation
+- **Files modified**:
+  - `src/Ingestion.Nats/NatsJetStreamProducer.cs` — Added IAsyncDisposable, ActivitySource tracing, IOptions-driven retries, InvalidOperationException after max retries
+  - `src/Ingestion.Nats/NatsJetStreamConsumer.cs` — Added ActivitySource tracing, linked CancellationTokenSource, ObjectDisposedException guard
+  - `src/Ingestion.Nats/NatsServiceExtensions.cs` — Register IOptions<NatsOptions>, NatsHealthCheck, validate on connection creation
+  - `src/Ingestion.Nats/Ingestion.Nats.csproj` — Added HealthChecks.Abstractions + Options package refs
+  - `Directory.Packages.props` — Added Microsoft.Extensions.Options 10.0.5
+  - `tests/UnitTests/UnitTests.csproj` — Added Ingestion.Nats project reference
+  - `rules/milestones.md` — Chunk 301 marked done
+- **Test counts after**:
+  - UnitTests: 1560 (was 1540, +20 new tests)
+  - **Total: 2,259** (was 2,239, +20)
+
+## Chunk 300 — Housekeeping: Remove placeholder tests + fix README test counts
+
+- **Date**: 2026-04-08
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Delete 4 `SampleTest.cs` placeholder files containing only `Assert.Pass()`. Fix all stale test counts in README.md.
+- **Files deleted**:
+  - `tests/UnitTests/SampleTest.cs`
+  - `tests/IntegrationTests/SampleTest.cs`
+  - `tests/ContractTests/SampleTest.cs`
+  - `tests/LoadTests/SampleTest.cs`
+- **Files modified**:
+  - `README.md` — Updated project structure section: UnitTests 969→1540, TutorialLabs 522→526, ContractTests 29→57, WorkflowTests 24→29, IntegrationTests 17→16, LoadTests 10→9. Updated "2,000+" claims to exact "2,239". Fixed grammar in production maturity section.
+  - `rules/milestones.md` — Chunk 300 marked done
+- **Test counts after**:
+  - UnitTests: 1540 (was 1541, −1 placeholder)
+  - ContractTests: 57 (was 58, −1 placeholder)
+  - IntegrationTests: 16 (was 17, −1 placeholder)
+  - LoadTests: 9 (was 10, −1 placeholder)
+  - WorkflowTests: 29 (unchanged — SampleTest.cs had real tests)
+  - BrokerAgnosticTests: 38 (unchanged)
+  - **Total: 2,239** (was 2,243, −4 placeholders)
+
 ## Chunk 251 — Final Validation
 
 - **Date**: 2026-04-08
