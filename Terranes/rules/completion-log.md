@@ -763,3 +763,169 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - `rules/milestones.md` — Added Chunk 063 (done)
 
 **Tests:** 29 Playwright E2E tests × 6 browser projects = 174 cross-browser runs. 83 Vitest component tests. 446 NUnit tests. All passing.
+
+---
+
+### Chunk 052 — Responsive Layout Overhaul (2026-04-09)
+
+**Goal:** Migrate sidebar breakpoint from 641px to Bootstrap md (768px). Slide animation sidebar. Mobile-first column classes on all views.
+
+**Changes:**
+- `style.css` — All breakpoints changed from 641px→768px. `.nav-scrollable` uses `max-height` transition instead of `display:none`. `prefers-reduced-motion` support. Card hover effect added. Hardcoded colours replaced with CSS variables (`var(--bs-body-bg)`, `var(--bs-border-color)`).
+- All 7 views — Added `col-12` base class for mobile stacking (`col-12 col-md-4`, `col-12 col-md-6`, etc.)
+
+**Tests:** 4 new tests in `responsive-layout.spec.ts`.
+
+---
+
+### Chunk 053 — Accessibility & Keyboard Navigation (2026-04-09)
+
+**Goal:** Add ARIA attributes, Escape-to-close, focus trap, skip-to-content link.
+
+**Changes:**
+- `App.vue` — Added skip-to-content link, `id="main-content"` on `<main>`, `aria-label="Toggle navigation"` on toggler
+- `DetailModal.vue` — Added `role="dialog"`, `aria-modal="true"`, `aria-label="Close modal"`, Escape key listener, focus trap on open
+- VillagesView, HomeModelsView, LandBlocksView, MarketplaceView — `aria-label` on all action buttons
+
+**Tests:** 7 new tests in `accessibility.spec.ts`.
+
+---
+
+### Chunk 054 — Dark Mode Support (2026-04-09)
+
+**Goal:** useTheme composable with system-preference detection, localStorage persistence, toggle button.
+
+**Files created:**
+- `src/composables/useTheme.ts` — `useTheme()` composable with `isDark` ref, `toggleTheme()`, `_resetTheme()` test helper. Reads localStorage first, then `prefers-color-scheme`. Sets `data-bs-theme` attribute.
+- `src/__tests__/composables/useTheme.spec.ts` — 5 tests
+
+**Files modified:**
+- `App.vue` — Theme toggle button in sidebar
+- `style.css` — Replaced hardcoded `#f7f7f7` and `#d6d5d5` with CSS variables
+
+---
+
+### Chunk 055 — Enhanced Home Landing Page (2026-04-09)
+
+**Goal:** Hero section, how-it-works flow, testimonials, footer.
+
+**Files modified:**
+- `HomeView.vue` — Added hero section with animated gradient, "How It Works" 4-step section, testimonials carousel with prev/next, footer. `scrollTo()` for smooth scroll. All sections responsive with `col-12 col-md-*`.
+
+**Tests:** 4 new tests added to `HomeView.spec.ts` (total 10).
+
+---
+
+### Chunk 056 — Search & Filter UX Improvements (2026-04-09)
+
+**Goal:** Debounced search, filter chips, result count, empty-state SVGs, URL query-string sync.
+
+**Files created:**
+- `src/composables/useDebounce.ts` — Debounce composable (300ms default)
+- `src/components/FilterChip.vue` — Badge with ×-remove button
+- `src/components/EmptyState.vue` — SVG magnifying glass + message
+- `src/__tests__/composables/useDebounce.spec.ts` — 3 tests
+- `src/__tests__/components/FilterChip.spec.ts` — 2 tests
+- `src/__tests__/components/EmptyState.spec.ts` — 2 tests
+
+**Files modified:**
+- VillagesView, HomeModelsView, LandBlocksView, MarketplaceView — Debounced search inputs, filter chips, result count badges, EmptyState component, URL query-string sync with `useRoute`/`useRouter`
+
+---
+
+### Chunk 057 — Card & List Interaction Polish (2026-04-09)
+
+**Goal:** Card hover lift, pagination, sort-by dropdowns.
+
+**Files created:**
+- `src/components/PaginationBar.vue` — Reusable pagination (prev/next, page numbers, "Showing X–Y of Z")
+- `src/__tests__/components/PaginationBar.spec.ts` — 4 tests
+
+**Files modified:**
+- `style.css` — Card hover effect (`translateY(-4px)` + shadow), `prefers-reduced-motion`
+- MarketplaceView — Sort-by dropdown (price/date), pagination
+- LandBlocksView — Sort-by dropdown (area/suburb), pagination
+
+---
+
+### Chunk 058 — Journey UX Enhancement (2026-04-09)
+
+**Goal:** Step indicator, confirmation dialog, timeline, confetti on completion.
+
+**Files created:**
+- `src/components/StepIndicator.vue` — Horizontal stepper with circles and connecting lines
+- `src/components/ConfirmDialog.vue` — Confirmation modal (confirm/cancel emits)
+- `src/components/ConfettiEffect.vue` — 30+ CSS-animated confetti particles, auto-dismiss 3s
+- `src/components/JourneyTimeline.vue` — Vertical timeline of completed stages
+- `src/__tests__/components/StepIndicator.spec.ts` — 3 tests
+- `src/__tests__/components/ConfirmDialog.spec.ts` — 3 tests
+
+**Files modified:**
+- JourneyView.vue — Replaced progress bar with StepIndicator, added ConfirmDialog before completion, ConfettiEffect on completion, JourneyTimeline sidebar
+
+---
+
+### Chunk 059 — Dashboard Widgets & Charts (2026-04-09)
+
+**Goal:** StatCard with animated count-up, sparkline SVG, notification bell, quick actions.
+
+**Files created:**
+- `src/components/StatCard.vue` — Animated count-up with requestAnimationFrame, `prefers-reduced-motion` skip
+- `src/components/SparklineChart.vue` — Pure SVG sparkline (polyline from data points)
+- `src/__tests__/components/StatCard.spec.ts` — 3 tests
+- `src/__tests__/components/SparklineChart.spec.ts` — 2 tests
+
+**Files modified:**
+- DashboardView.vue — StatCard components, SparklineChart in each card, notification bell with unread count badge, quick-action router-links
+
+---
+
+### Chunk 060 — Breadcrumbs, Page Titles & Navigation (2026-04-09)
+
+**Goal:** BreadcrumbBar, document title per route, 404 page.
+
+**Files created:**
+- `src/components/BreadcrumbBar.vue` — Auto-generated from `route.meta.breadcrumb`
+- `src/views/NotFoundView.vue` — 404 page with back-to-home link
+- `src/__tests__/components/BreadcrumbBar.spec.ts` — 3 tests
+- `src/__tests__/NotFoundView.spec.ts` — 2 tests
+
+**Files modified:**
+- `router/index.ts` — Added `meta: { title, breadcrumb }` to all routes, catch-all 404 route
+- `App.vue` — `router.afterEach` sets `document.title`, BreadcrumbBar component
+
+---
+
+### Chunk 061 — Form Validation & Input UX (2026-04-09)
+
+**Goal:** Real-time validation, clear-all-filters, auto-focus.
+
+**Files created:**
+- `src/composables/useValidation.ts` — Validation composable with `required`, `minValue`, `maxValue`, `pattern` rules
+- `src/__tests__/composables/useValidation.spec.ts` — 5 tests
+
+**Files modified:**
+- HomeModelsView — minBedrooms validation (0–10), auto-focus, clear-all-filters
+- MarketplaceView — maxPrice validation (≥0), auto-focus, clear-all-filters
+- LandBlocksView — Auto-focus, clear-all-filters
+
+---
+
+### Chunk 062 — Performance & Bundle Optimisation (2026-04-09)
+
+**Goal:** Route-based code splitting verification, paged list, lazy loading.
+
+**Files created:**
+- `src/composables/usePagedList.ts` — Batched list rendering (20 items per batch, "Show More")
+- `src/__tests__/composables/usePagedList.spec.ts` — 3 tests
+
+**Files modified:**
+- LandBlocksView — Uses `usePagedList` for "Show More" rendering instead of full list
+- `router/index.ts` — Verified all routes use `() => import(...)` lazy loading (including catch-all 404)
+
+**Phase 13 Summary:**
+- 18 shared components, 6 composables in src/Web.Vue
+- 7 view pages + 1 NotFoundView
+- 141 Vitest tests across 32 test files
+- 29 Playwright E2E tests across 5 spec files
+- 446 NUnit tests (.NET backend)
