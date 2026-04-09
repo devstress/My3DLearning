@@ -248,3 +248,62 @@ Tests verify every `Add*` method registers the correct service types in the cont
 ### Next Chunk
 
 Phase 34 is complete. No remaining chunks.
+
+---
+
+## Phase 35 — Observability, Validation & Enrichment Test Hardening
+
+> **Origin:** Audit revealed that CorrelationPropagator, PlatformMeters, and MessageTracer
+> (core observability infrastructure used by every service) had **zero dedicated unit tests**.
+> DefaultMessageValidationService and DefaultCompensationActivityService (core activity services)
+> were also untested. HttpEnrichmentSource and DatabaseEnrichmentSource (external enrichment
+> patterns) lacked tests. This phase closes these test gaps.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 350 | **CorrelationPropagator, PlatformMeters & MessageTracer Tests** — see `rules/completion-log.md` | `done` |
+| 351 | **Activity Service & Message Validation Tests** — see `rules/completion-log.md` | `done` |
+| 352 | **HttpEnrichmentSource & DatabaseEnrichmentSource Tests** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 35 complete — 3 chunks (350–352). 43 new unit tests. UnitTests total: 1886 (was 1843).
+CorrelationPropagator now has 6 tests covering trace context injection/extraction.
+PlatformMeters has 5 tests verifying counter/histogram/gauge recordings via MeterListener.
+MessageTracer has 6 tests covering all 4 trace stage methods plus success/failure completion.
+DefaultMessageValidationService has 8 tests covering all validation paths.
+DefaultCompensationActivityService has 2 tests. MessageValidationResult factory methods tested.
+MessageHistoryEntry record and enum values tested. HttpEnrichmentSource has 6 tests with mock
+HTTP handler. DatabaseEnrichmentSource has 6 tests with mock ADO.NET infrastructure.
+
+---
+
+## Phase 36 — Auth, Observability & System Management Test Hardening
+
+> **Origin:** Audit revealed that `ApiKeyAuthenticationHandler` (security-critical auth handler)
+> had **zero unit tests**. `LokiObservabilityEventLog` (core observability event storage with
+> Loki HTTP API + in-memory fallback) was untested. `ControlBusPublisher` (EIP Control Bus pattern)
+> and `DlqManagementService` (DLQ resubmission) lacked dedicated test fixtures. This phase
+> closes these critical test gaps.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 360 | **ApiKeyAuthenticationHandler Tests** — see `rules/completion-log.md` | `done` |
+| 361 | **LokiObservabilityEventLog Tests** — see `rules/completion-log.md` | `done` |
+| 362 | **ControlBusPublisher & DlqManagementService Tests** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 36 complete — 3 chunks (360–362). 33 new unit tests. UnitTests total: 1919 (was 1886).
+ApiKeyAuthenticationHandler now has 10 tests covering missing header, invalid key, valid key
+with claim verification, case-sensitive comparison, multiple keys, empty config, short key masking.
+LokiObservabilityEventLog has 11 tests covering RecordAsync (push, fallback, error handling),
+GetByCorrelationId (Loki results, fallback, empty), GetByBusinessKey (fallback, case-insensitive).
+ControlBusPublisher has 10 tests covering publish success/failure/intent, subscribe, arg validation.
+DlqManagementService has 2 tests covering replay delegation and filter passthrough.
+
+---
+
+### Next Chunk
+
+Phase 36 is complete. No remaining chunks.
