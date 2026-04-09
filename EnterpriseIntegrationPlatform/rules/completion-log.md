@@ -4,6 +4,20 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 305 — Security project unit tests
+
+- **Date**: 2026-04-09
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Add comprehensive unit tests for the Security project (InputSanitizer, PayloadSizeGuard, JwtOptions, PayloadSizeOptions, PayloadTooLargeException, SecurityServiceExtensions). Prior sessions had already created InputSanitizerTests.cs (23 tests) and PayloadSizeGuardTests.cs (8 tests). This chunk adds 4 more test files.
+- **Files created**:
+  - `tests/UnitTests/JwtOptionsTests.cs` — 7 tests: section name, 5 defaults, all-properties settable
+  - `tests/UnitTests/PayloadSizeOptionsTests.cs` — 3 tests: section name, default 1MB, settable
+  - `tests/UnitTests/PayloadTooLargeExceptionTests.cs` — 4 tests: ActualBytes, MaxBytes, message content, derives from Exception
+  - `tests/UnitTests/SecurityServiceExtensionsTests.cs` — 7 tests: AddInputSanitizer registration + null guard, AddPayloadSizeGuard registration + options binding, AddPlatformJwtAuthentication missing key + null services + null config
+- **Test counts after**:
+  - UnitTests: 1674 (was 1653, +21 new tests; 52 total Security tests across 6 files)
+
 ## Chunk 304 — Ingestion.Postgres unit tests
 
 - **Date**: 2026-04-08

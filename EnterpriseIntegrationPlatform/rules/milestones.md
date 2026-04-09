@@ -108,13 +108,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Chunk 304 — ✅ Done — see `rules/completion-log.md`
 
-### Chunk 305 — Security project unit tests
-
-| Status | `not-started` |
-|---|---|
-| **Goal** | `Security` project has 356 LOC across 6 source files (InputSanitizer, PayloadSizeGuard, JwtOptions, PayloadTooLargeException, SecurityServiceExtensions) but **zero unit tests** in `tests/UnitTests/`. Add comprehensive coverage. |
-| **Tests** | New files in `tests/UnitTests/`: `InputSanitizerTests.cs` (XSS stripping, SQL injection patterns, null/empty input, HTML encoding, script tag removal, event handler attributes), `PayloadSizeGuardTests.cs` (within-limit pass, over-limit throw PayloadTooLargeException, boundary conditions, zero-length, null), `JwtOptionsTests.cs` (defaults, property binding), `SecurityServiceExtensionsTests.cs` (DI registration verification). Minimum 20 new tests. |
-| **Acceptance** | `dotnet build` 0 warnings. All new tests pass. Security project has ≥20 unit tests. |
+### Chunk 305 — ✅ Done — see `rules/completion-log.md`
 
 ### Chunk 306 — NATS JetStream NatsServiceExtensionsTests expansion
 
@@ -142,7 +136,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Next Chunk
 
-**Chunk 305** — Security project unit tests.
+**Chunk 306** — NATS JetStream NatsServiceExtensionsTests expansion.
 
 ---
 
