@@ -7,6 +7,13 @@ import type {
   VillageLot,
   BuyerJourney,
   Notification,
+  SearchResult,
+  PlatformUser,
+  PartnerProfile,
+  Walkthrough,
+  WalkthroughPoi,
+  DesignEdit,
+  Report,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
@@ -101,5 +108,87 @@ export const api = {
       if (!r.ok) throw new Error(`API error: ${r.status}`);
       return r.json() as Promise<{ status: string; timestamp: string }>;
     });
+  },
+
+  // Search
+  search(query: string, maxResults?: number) {
+    const qs = buildQuery({ query, maxResults });
+    return fetchJson<SearchResult[]>(`/search${qs}`);
+  },
+  searchByType(entityType: string, query: string, maxResults?: number) {
+    const qs = buildQuery({ query, maxResults });
+    return fetchJson<SearchResult[]>(`/search/${entityType}${qs}`);
+  },
+
+  // Auth
+  login(email: string, password: string) {
+    const qs = buildQuery({ email, password });
+    return fetchJson<PlatformUser>(`/auth/login${qs}`, { method: 'POST' });
+  },
+  register(user: Omit<PlatformUser, 'id' | 'createdUtc'>, password: string) {
+    const qs = buildQuery({ password });
+    return fetchJson<PlatformUser>(`/auth/register${qs}`, {
+      method: 'POST',
+      body: JSON.stringify(user),
+    });
+  },
+  getUser(userId: string) {
+    return fetchJson<PlatformUser>(`/auth/users/${userId}`);
+  },
+
+  // Partners
+  getBuilders(params?: { bedrooms?: number; floorArea?: number }) {
+    const qs = buildQuery({ bedrooms: params?.bedrooms, floorArea: params?.floorArea });
+    return fetchJson<PartnerProfile[]>(`/partners/builders/search${qs}`);
+  },
+  getBuilderProfile(partnerId: string) {
+    return fetchJson<PartnerProfile>(`/partners/builders/${partnerId}`);
+  },
+
+  // Walkthroughs
+  generateWalkthrough(homeModelId: string, userId: string, sitePlacementId?: string) {
+    const qs = buildQuery({ homeModelId, userId, sitePlacementId });
+    return fetchJson<Walkthrough>(`/walkthroughs/generate${qs}`, { method: 'POST' });
+  },
+  getWalkthrough(id: string) {
+    return fetchJson<Walkthrough>(`/walkthroughs/${id}`);
+  },
+  getWalkthroughsByModel(homeModelId: string) {
+    return fetchJson<Walkthrough[]>(`/walkthroughs/by-model/${homeModelId}`);
+  },
+  getWalkthroughPois(walkthroughId: string) {
+    return fetchJson<WalkthroughPoi[]>(`/walkthroughs/${walkthroughId}/pois`);
+  },
+
+  // Design Editor
+  applyEdit(edit: Omit<DesignEdit, 'id' | 'appliedUtc'>) {
+    return fetchJson<DesignEdit>('/design-editor/edits', {
+      method: 'POST',
+      body: JSON.stringify(edit),
+    });
+  },
+  getEditHistory(sitePlacementId: string) {
+    return fetchJson<DesignEdit[]>(`/design-editor/placements/${sitePlacementId}/history`);
+  },
+  undoLastEdit(sitePlacementId: string) {
+    return fetchJson<DesignEdit>(`/design-editor/placements/${sitePlacementId}/undo`, { method: 'POST' });
+  },
+  resetEdits(sitePlacementId: string) {
+    return fetchJson<{ removedEdits: number }>(`/design-editor/placements/${sitePlacementId}/reset`, { method: 'DELETE' });
+  },
+
+  // Reports
+  generateReport(reportType: string, title: string, generatedByUserId: string, tenantId: string) {
+    const qs = buildQuery({ reportType, title, generatedByUserId, tenantId });
+    return fetchJson<Report>(`/reports${qs}`, { method: 'POST' });
+  },
+  getReport(reportId: string) {
+    return fetchJson<Report>(`/reports/${reportId}`);
+  },
+  getTenantReports(tenantId: string) {
+    return fetchJson<Report[]>(`/reports/tenant/${tenantId}`);
+  },
+  getReportTypes() {
+    return fetchJson<string[]>('/reports/types');
   },
 };

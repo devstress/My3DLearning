@@ -985,3 +985,70 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - Vitest tests: 214 (38 test files)
 - Playwright E2E: 29 tests × 6 browsers
 - NUnit backend: 446
+
+---
+
+### Chunk 064 — Search & Auth Views (2026-04-09)
+
+**Goal:** Add SearchView, LoginView, RegisterView, useAuth composable, and API client extensions.
+
+**New files:**
+- `src/views/SearchView.vue` — Global search with debounced input (400ms), entity type filter dropdown (All/HomeModel/LandBlock/Village/Listing), result list with StatusBadge and relevance scores, navigation to entity views on click.
+- `src/views/LoginView.vue` — Login form with email/password, validation, toast feedback, redirect to dashboard on success, link to register.
+- `src/views/RegisterView.vue` — Registration form with name/email/password/confirm, client-side validation (required, password match, min 6 chars), toast feedback, link to login.
+- `src/composables/useAuth.ts` — Singleton auth state: `currentUser`, `isAuthenticated`, `displayName`, `setUser`, `logout`, `clearError`. Persists to localStorage. Auto-loads stored user on init.
+- `src/__tests__/composables/useAuth.spec.ts` — 5 tests: initial state, set user, localStorage persistence, logout clears, clearError.
+- `src/__tests__/SearchView.spec.ts` — 4 tests: heading, search input, entity type filter, options count.
+- `src/__tests__/LoginView.spec.ts` — 4 tests: heading, email/password inputs, sign-in button, register link.
+- `src/__tests__/RegisterView.spec.ts` — 4 tests: heading, all 4 fields, create account button, login link.
+
+**Files modified:**
+- `src/types/index.ts` — Added `SearchResult`, `PlatformUser`, `PartnerProfile`, `Walkthrough`, `WalkthroughPoi`, `DesignEdit`, `Report` interfaces.
+- `src/api/client.ts` — Added `search`, `searchByType`, `login`, `register`, `getUser` API methods.
+- `src/router/index.ts` — Added routes for `/search`, `/login`, `/register`, `/partners`, `/walkthroughs`, `/design-editor`, `/reports`.
+- `src/App.vue` — Added Login button in top bar. Added Search, Walkthroughs, Design Editor, Partners, Reports nav links in sidebar.
+
+**Tests:** 231 Vitest (17 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+---
+
+### Chunk 065 — Partner & Walkthrough Views (2026-04-09)
+
+**Goal:** Add PartnersView and WalkthroughsView with API client extensions.
+
+**New files:**
+- `src/views/PartnersView.vue` — Partner network browser with 6 tab categories (Builder, Landscaper, Furniture, SmartHome, Solicitor, RealEstateAgent). Builder tab loads profiles from API with SkeletonCard loader. Other tabs show integration-ready placeholder. StatusBadge for active/inactive.
+- `src/views/WalkthroughsView.vue` — Two-column layout: left shows home model list with selection, right shows walkthrough list + generate button. Uses ActionButton for async generation, StatusBadge for status, EmptyState when no walkthroughs exist.
+- `src/__tests__/PartnersView.spec.ts` — 3 tests: heading, 6 tabs, builder tab active by default.
+- `src/__tests__/WalkthroughsView.spec.ts` — 3 tests: heading, select model prompt, model selection prompt.
+
+**Files modified:**
+- `src/api/client.ts` — Added `getBuilders`, `getBuilderProfile`, `generateWalkthrough`, `getWalkthrough`, `getWalkthroughsByModel`, `getWalkthroughPois` API methods.
+
+**Tests:** 237 Vitest (6 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+---
+
+### Chunk 066 — Design Editor & Reports Views (2026-04-09)
+
+**Goal:** Add DesignEditorView and ReportsView with API client extensions.
+
+**New files:**
+- `src/views/DesignEditorView.vue` — Design editor with placement ID input, edit form (operation select, target element, previous/new value), edit history list with undo/reset. Uses ConfirmDialog for destructive reset. ActionButton for async operations. EmptyState for no edits.
+- `src/views/ReportsView.vue` — Report generation form (type select + title) and tenant report table. Report preview panel with markdown content display. Uses SkeletonTable, StatusBadge, EmptyState, ActionButton.
+- `src/__tests__/DesignEditorView.spec.ts` — 3 tests: heading, placement ID input, initial state.
+- `src/__tests__/ReportsView.spec.ts` — 3 tests: heading, report type select, generate button.
+
+**Files modified:**
+- `src/api/client.ts` — Added `applyEdit`, `getEditHistory`, `undoLastEdit`, `resetEdits`, `generateReport`, `getReport`, `getTenantReports`, `getReportTypes` API methods.
+- `src/components/EmptyState.vue` — Extended icon prop type with `partner`, `walkthrough`, `editor`, `report`. Added 4 new SVG paths.
+
+**Tests:** 243 Vitest (6 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+**Running totals after Phase 14 chunks 064–066 (Phase 14 complete):**
+- Vue components: 21 (EmptyState extended + 20 prior)
+- Composables: 8 (useAuth + 7 prior)
+- Views: 15 (SearchView, LoginView, RegisterView, PartnersView, WalkthroughsView, DesignEditorView, ReportsView + 8 prior)
+- Vitest tests: 243 (46 test files)
+- Playwright E2E: 29 tests × 6 browsers
+- NUnit backend: 446

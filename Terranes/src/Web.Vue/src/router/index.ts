@@ -46,6 +46,48 @@ const router = createRouter({
       meta: { title: 'Dashboard', breadcrumb: 'Dashboard' },
     },
     {
+      path: '/search',
+      name: 'search',
+      component: () => import('../views/SearchView.vue'),
+      meta: { title: 'Search', breadcrumb: 'Search' },
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/LoginView.vue'),
+      meta: { title: 'Login', breadcrumb: 'Login' },
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('../views/RegisterView.vue'),
+      meta: { title: 'Register', breadcrumb: 'Register' },
+    },
+    {
+      path: '/partners',
+      name: 'partners',
+      component: () => import('../views/PartnersView.vue'),
+      meta: { title: 'Partners', breadcrumb: 'Partners' },
+    },
+    {
+      path: '/walkthroughs',
+      name: 'walkthroughs',
+      component: () => import('../views/WalkthroughsView.vue'),
+      meta: { title: 'Walkthroughs', breadcrumb: 'Walkthroughs' },
+    },
+    {
+      path: '/design-editor',
+      name: 'design-editor',
+      component: () => import('../views/DesignEditorView.vue'),
+      meta: { title: 'Design Editor', breadcrumb: 'Design Editor' },
+    },
+    {
+      path: '/reports',
+      name: 'reports',
+      component: () => import('../views/ReportsView.vue'),
+      meta: { title: 'Reports', breadcrumb: 'Reports' },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/NotFoundView.vue'),

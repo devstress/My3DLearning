@@ -89,9 +89,17 @@ Vue frontend cleanup, reusable components, and 49 Vitest component tests. Old Bl
 
 ---
 
+## Phase 14 — Extended Views & API Coverage (AI-Driven)
+
+✅ Phase 14 complete — see `rules/completion-log.md` for full history.
+
+21 Vue components, 8 composables, 15 views. 243 Vitest tests (46 files) + 29 Playwright E2E tests. 446 NUnit backend tests. All chunks 064–066 implemented.
+
+---
+
 ## Next Chunk
 
-All Phase 13 chunks are complete. Next: Phase 14 or new feature phase.
+All Phase 14 chunks are complete. Next: Phase 15 or new feature phase.
 
 ---
 
