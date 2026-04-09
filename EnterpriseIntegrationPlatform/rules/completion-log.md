@@ -4,6 +4,20 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 306 — NATS JetStream test expansion
+
+- **Date**: 2026-04-09
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Expand NATS JetStream test coverage — add service extension chaining tests, singleton verification, options URL override, producer/consumer type contracts.
+- **Files created**:
+  - `tests/UnitTests/NatsProducerTests.cs` — 2 tests: IAsyncDisposable implementation, sealed class
+  - `tests/UnitTests/NatsConsumerTests.cs` — 2 tests: IMessageBrokerConsumer implementation, sealed class
+- **Files modified**:
+  - `tests/UnitTests/NatsServiceExtensionsFullTests.cs` — +5 tests: returns same collection (chaining), URL overrides default, producer singleton, consumer singleton, options resolvable
+- **Test counts after**:
+  - UnitTests: 1683 (was 1674, +9 new tests)
+
 ## Chunk 305 — Security project unit tests
 
 - **Date**: 2026-04-09

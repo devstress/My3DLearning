@@ -102,4 +102,76 @@ public class NatsServiceExtensionsFullTests
             Assert.That(options.RetryDelayMs, Is.EqualTo(1000));
         });
     }
+
+    [Test]
+    public void AddNatsJetStreamBroker_ReturnsSameServiceCollection()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        var result = services.AddNatsJetStreamBroker("nats://localhost:4222");
+
+        Assert.That(result, Is.SameAs(services));
+    }
+
+    [Test]
+    public async Task AddNatsJetStreamBroker_OptionsUrlOverridesDefault()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddNatsJetStreamBroker("nats://custom:9999");
+
+        await using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<NatsOptions>>().Value;
+
+        // The default URL is nats://localhost:15222 — AddNatsJetStreamBroker should override it
+        Assert.That(options.Url, Is.EqualTo("nats://custom:9999"));
+        Assert.That(options.Url, Is.Not.EqualTo("nats://localhost:15222"));
+    }
+
+    [Test]
+    public async Task AddNatsJetStreamBroker_ProducerIsSingleton()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddNatsJetStreamBroker("nats://localhost:4222");
+
+        await using var provider = services.BuildServiceProvider();
+
+        var producer1 = provider.GetService<IMessageBrokerProducer>();
+        var producer2 = provider.GetService<IMessageBrokerProducer>();
+
+        Assert.That(producer1, Is.SameAs(producer2));
+    }
+
+    [Test]
+    public async Task AddNatsJetStreamBroker_ConsumerIsSingleton()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddNatsJetStreamBroker("nats://localhost:4222");
+
+        await using var provider = services.BuildServiceProvider();
+
+        var consumer1 = provider.GetService<IMessageBrokerConsumer>();
+        var consumer2 = provider.GetService<IMessageBrokerConsumer>();
+
+        Assert.That(consumer1, Is.SameAs(consumer2));
+    }
+
+    [Test]
+    public async Task AddNatsJetStreamBroker_OptionsCanBeResolved()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddNatsJetStreamBroker("nats://localhost:4222");
+
+        await using var provider = services.BuildServiceProvider();
+
+        Assert.DoesNotThrow(() =>
+        {
+            var options = provider.GetRequiredService<IOptions<NatsOptions>>();
+            _ = options.Value; // Force evaluation
+        });
+    }
 }

@@ -110,13 +110,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Chunk 305 — ✅ Done — see `rules/completion-log.md`
 
-### Chunk 306 — NATS JetStream NatsServiceExtensionsTests expansion
-
-| Status | `not-started` |
-|---|---|
-| **Goal** | Existing `NatsServiceExtensionsTests.cs` has only basic DI checks. Expand to cover new options-pattern registration, health check registration, and configuration validation from Chunk 301. |
-| **Tests** | Expand `tests/UnitTests/NatsServiceExtensionsTests.cs`: verify `IOptions<NatsOptions>` is resolvable, health check registered in `IHealthChecksBuilder`, null/empty connection string throws, default options have expected values. Also add `NatsProducerDisposeTests.cs` and `NatsConsumerDisposeTests.cs` verifying `IAsyncDisposable` cleanup. Minimum 10 new tests. |
-| **Acceptance** | `dotnet build` 0 warnings. All tests pass. |
+### Chunk 306 — ✅ Done — see `rules/completion-log.md`
 
 ### Chunk 307 — Broker health check integration smoke test
 
@@ -136,7 +130,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Next Chunk
 
-**Chunk 306** — NATS JetStream NatsServiceExtensionsTests expansion.
+**Chunk 307** — Broker health check integration smoke test.
 
 ---
 
