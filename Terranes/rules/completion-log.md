@@ -929,3 +929,116 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - 141 Vitest tests across 32 test files
 - 29 Playwright E2E tests across 5 spec files
 - 446 NUnit tests (.NET backend)
+
+---
+
+## Phase 14 — Feature Expansion
+
+### Chunk 064 — Global Search (2026-04-09)
+
+**Goal:** Wire frontend to /api/search endpoints. Global search bar + full search page.
+
+**Files created:**
+- `src/views/SearchView.vue` — Full search page with query input, entity type filter, result cards, debounce, URL sync
+- `src/components/SearchBar.vue` — Compact search bar for App.vue header, navigates to /search on Enter
+- `src/__tests__/SearchView.spec.ts` — 4 tests
+- `src/__tests__/components/SearchBar.spec.ts` — 4 tests
+
+**Files modified:**
+- `src/types/index.ts` — Added `SearchResult` type
+- `src/api/client.ts` — Added `search()` and `searchByType()` methods
+- `src/router/index.ts` — Added /search route
+- `src/App.vue` — Added SearchBar in top-row header
+
+---
+
+### Chunk 065 — Quote Details in Journey (2026-04-09)
+
+**Goal:** Wire journey quote flow to /api/aggregated-quotes. Show quote breakdown after QuoteReceived.
+
+**Files created:**
+- `src/components/QuoteSummary.vue` — Quote display with total amount, line items table, loading state
+- `src/__tests__/components/QuoteSummary.spec.ts` — 3 tests
+
+**Files modified:**
+- `src/types/index.ts` — Added `AggregatedQuote` and `QuoteLineItem` types
+- `src/api/client.ts` — Added `aggregateQuote()` and `getJourneyQuotes()` methods
+- `src/views/JourneyView.vue` — Added QuoteSummary display after QuoteReceived stage
+
+---
+
+### Chunk 066 — User Authentication (2026-04-09)
+
+**Goal:** Login/register views with useAuth composable. Wire to /api/auth endpoints.
+
+**Files created:**
+- `src/composables/useAuth.ts` — Auth composable with login, register, logout, restoreSession, localStorage persistence
+- `src/views/LoginView.vue` — Login form with validation, error handling, redirect to dashboard
+- `src/views/RegisterView.vue` — Register form with password confirmation, validation, redirect
+- `src/__tests__/composables/useAuth.spec.ts` — 6 tests
+- `src/__tests__/LoginView.spec.ts` — 3 tests
+
+**Files modified:**
+- `src/types/index.ts` — Added `PlatformUser` type
+- `src/api/client.ts` — Added `login()`, `register()`, `getUser()` methods
+- `src/router/index.ts` — Added /login and /register routes
+- `src/App.vue` — Added auth state display (user name + logout or login link), restoreSession on mount
+
+---
+
+### Chunk 067 — Partner Directory (2026-04-09)
+
+**Goal:** Partner directory page with category filter. Wire to partner endpoints.
+
+**Files created:**
+- `src/views/PartnersView.vue` — Partner directory with category filter, search, card grid, detail modal
+- `src/__tests__/PartnersView.spec.ts` — 5 tests
+
+**Files modified:**
+- `src/types/index.ts` — Added `Partner` type
+- `src/api/client.ts` — Added `getBuilders()` and `getBuilderProfile()` methods
+- `src/router/index.ts` — Added /partners route
+- `src/App.vue` — Added Partners + Search nav links
+
+---
+
+### Chunk 068 — 3D Walkthroughs & Design Editor (2026-04-09)
+
+**Goal:** Walkthrough sessions list and text-based design editor. Wire to /api/walkthroughs and /api/design-editor.
+
+**Files created:**
+- `src/views/WalkthroughsView.vue` — Walkthrough sessions with generate form, card grid, detail modal
+- `src/views/DesignEditorView.vue` — Design editor with edit form, operation selector, edit history, undo
+- `src/__tests__/WalkthroughsView.spec.ts` — 4 tests
+- `src/__tests__/DesignEditorView.spec.ts` — 3 tests
+
+**Files modified:**
+- `src/types/index.ts` — Added `Walkthrough`, `WalkthroughScene`, `WalkthroughPoi`, `DesignEdit` types
+- `src/api/client.ts` — Added `generateWalkthrough()`, `getWalkthrough()`, `getWalkthroughsByModel()`, `getWalkthroughPois()`, `applyEdit()`, `getEditHistory()`, `undoLastEdit()` methods
+- `src/router/index.ts` — Added /walkthroughs and /design-editor routes
+- `src/App.vue` — Added Walkthroughs + Design Editor nav links
+
+---
+
+### Chunk 069 — Reporting & Compliance (2026-04-09)
+
+**Goal:** Reports generation and compliance checking. Wire to /api/reports and /api/compliance.
+
+**Files created:**
+- `src/views/ReportsView.vue` — Two-section page: reports (generate, list, view) and compliance (check, results)
+- `src/__tests__/ReportsView.spec.ts` — 4 tests
+
+**Files modified:**
+- `src/types/index.ts` — Added `Report` and `ComplianceResult` types
+- `src/api/client.ts` — Added `generateReport()`, `getReport()`, `getTenantReports()`, `getReportTypes()`, `runComplianceCheck()`, `getComplianceResult()`, `getComplianceByPlacement()` methods
+- `src/router/index.ts` — Added /reports route
+- `src/App.vue` — Added Reports nav link
+
+**Phase 14 Summary:**
+- 7 new views (Search, Login, Register, Partners, Walkthroughs, DesignEditor, Reports)
+- 2 new components (SearchBar, QuoteSummary)
+- 1 new composable (useAuth)
+- 18 new API methods in client.ts
+- 8 new TypeScript types
+- 177 Vitest tests across 41 test files
+- All backend API endpoint groups now wired to frontend

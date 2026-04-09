@@ -105,22 +105,15 @@ Each chunk is independently deployable and testable.
 implemented but not yet exposed in the UI. Each chunk adds a new view or feature page with
 full API integration, tests, and navigation.
 
-| Chunk | Scope | Status |
-|-------|-------|--------|
-| 064 | **Global Search** — Add `SearchView.vue` with search bar, type filter, result cards. Wire to `GET /api/search?query=...&maxResults=20` and `GET /api/search/{entityType}?query=...`. Add `SearchBar.vue` header component in App.vue for quick search. Add types + API methods in `client.ts`. 6+ Vitest tests. | `not-started` |
-| 065 | **Quote Details in Journey** — Wire journey quote flow to `POST /api/aggregated-quotes` and `GET /api/aggregated-quotes/journey/{id}`. Show aggregated quote breakdown (builder, landscaper, solicitor, etc.) after QuoteReceived stage. Add `QuoteSummary.vue` component. Add types + API methods. 5+ Vitest tests. | `not-started` |
-| 066 | **User Authentication** — Add `LoginView.vue` and `RegisterView.vue`. Create `useAuth` composable with login/register/logout. Wire to `POST /api/auth/login`, `POST /api/auth/register`, `GET /api/auth/users/{id}`. Add auth-protected route guards. Store user in reactive state. Add types. 8+ Vitest tests. | `not-started` |
-| 067 | **Partner Directory** — Add `PartnersView.vue` displaying all partner categories (Builder, Landscaper, Furniture, SmartHome, Solicitor, RealEstateAgent). Wire to partner GET endpoints. Card grid with category filter. Detail modal for partner info. Add types + API methods. 5+ Vitest tests. | `done` |
-| 068 | **3D Walkthroughs & Design Editor** — Add `WalkthroughView.vue` and `DesignEditorView.vue`. Wire to `GET/POST /api/walkthroughs` and `GET/POST /api/design-editor`. Show walkthrough sessions list and design customisation panel (text-based for now, 3D later). 6+ Vitest tests. | `done` |
-| 069 | **Reporting & Compliance** — Add `ReportsView.vue` for generating and viewing reports. Wire to `GET/POST /api/reports` and `GET/POST /api/compliance/check`. Show compliance check results after site placement. 5+ Vitest tests. | `done` |
+✅ Phase 14 complete — see `rules/completion-log.md` for full history.
+
+6 chunks (064-069). 5 new views (SearchView, LoginView, RegisterView, PartnersView, WalkthroughsView, DesignEditorView, ReportsView) + 2 new components (SearchBar, QuoteSummary) + 1 composable (useAuth). 177 Vitest tests. 18 API methods added. All backend API groups now wired to frontend.
 
 ---
 
 ## Next Chunk
 
-**Chunk 064** — Global Search.
-
-Read `rules/ux-rules.md` before implementing.
+All Phase 14 chunks are complete. Ready for Phase 15 or next feature work.
 
 ---
 
