@@ -1,18 +1,49 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { PropertyListing } from '../types';
 import DetailModal from '../components/DetailModal.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import SkeletonCard from '../components/SkeletonCard.vue';
+import FilterChip from '../components/FilterChip.vue';
+import EmptyState from '../components/EmptyState.vue';
+import PaginationBar from '../components/PaginationBar.vue';
+import { useDebounce } from '../composables/useDebounce';
+
+const route = useRoute();
+const router = useRouter();
 
 const listings = ref<PropertyListing[] | null>(null);
-const searchSuburb = ref('');
-const maxPrice = ref<number | undefined>(undefined);
-const selectedStatus = ref('');
+const searchSuburb = ref((route.query.suburb as string) || '');
+const maxPrice = ref<number | undefined>(
+  route.query.maxPrice ? Number(route.query.maxPrice) : undefined,
+);
+const selectedStatus = ref((route.query.status as string) || '');
 const selectedListing = ref<PropertyListing | null>(null);
+const sortBy = ref('price');
+const currentPage = ref(1);
+const pageSize = 12;
+
+const debouncedSuburb = useDebounce(searchSuburb);
+const debouncedPrice = useDebounce(maxPrice);
 
 const statuses = ['Active', 'Draft', 'UnderOffer', 'Sold', 'Withdrawn'];
+
+const resultCount = computed(() => listings.value?.length ?? 0);
+
+const sortedListings = computed(() => {
+  if (!listings.value) return [];
+  const sorted = [...listings.value];
+  if (sortBy.value === 'price') sorted.sort((a, b) => (a.askingPriceAud ?? Infinity) - (b.askingPriceAud ?? Infinity));
+  else if (sortBy.value === 'date') sorted.sort((a, b) => new Date(b.listedUtc).getTime() - new Date(a.listedUtc).getTime());
+  return sorted;
+});
+
+const paginatedListings = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return sortedListings.value.slice(start, start + pageSize);
+});
 
 function formatPrice(price?: number): string {
   if (price == null) return 'Price on Application';
@@ -21,10 +52,19 @@ function formatPrice(price?: number): string {
 
 async function search() {
   listings.value = await api.getListings({
-    suburb: searchSuburb.value || undefined,
-    maxPriceAud: maxPrice.value,
+    suburb: debouncedSuburb.value || undefined,
+    maxPriceAud: debouncedPrice.value,
     status: selectedStatus.value || undefined,
   });
+  currentPage.value = 1;
+}
+
+function syncQuery() {
+  const query: Record<string, string> = {};
+  if (debouncedSuburb.value) query.suburb = debouncedSuburb.value;
+  if (debouncedPrice.value !== undefined) query.maxPrice = String(debouncedPrice.value);
+  if (selectedStatus.value) query.status = selectedStatus.value;
+  router.replace({ query });
 }
 
 function viewListing(listing: PropertyListing) {
@@ -35,8 +75,12 @@ function closeModal() {
   selectedListing.value = null;
 }
 
+function removeSuburbFilter() { searchSuburb.value = ''; }
+function removePriceFilter() { maxPrice.value = undefined; }
+function removeStatusFilter() { selectedStatus.value = ''; }
+
 onMounted(search);
-watch([searchSuburb, maxPrice, selectedStatus], search);
+watch([debouncedSuburb, debouncedPrice, selectedStatus], () => { search(); syncQuery(); });
 </script>
 
 <template>
@@ -57,35 +101,54 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
           <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
         </select>
       </div>
+      <div class="col-12 col-md-3">
+        <select class="form-select" v-model="sortBy">
+          <option value="price">Sort by Price</option>
+          <option value="date">Sort by Date</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-wrap align-items-center">
+      <FilterChip v-if="debouncedSuburb" :label="`Suburb: ${debouncedSuburb}`" @remove="removeSuburbFilter" />
+      <FilterChip v-if="debouncedPrice !== undefined" :label="`Max: ${formatPrice(debouncedPrice)}`" @remove="removePriceFilter" />
+      <FilterChip v-if="selectedStatus" :label="`Status: ${selectedStatus}`" @remove="removeStatusFilter" />
+      <span v-if="listings !== null" class="badge bg-secondary ms-auto result-count">Showing {{ resultCount }} results</span>
     </div>
 
     <SkeletonCard v-if="listings === null" :count="2" :columns="2" />
-    <div v-else-if="listings.length === 0" class="alert alert-info">
-      No listings found matching your criteria.
-    </div>
-    <div v-else class="row g-4">
-      <div class="col-12 col-md-6" v-for="listing in listings" :key="listing.id">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start">
-              <h5 class="card-title">{{ listing.title }}</h5>
-              <StatusBadge :status="listing.status" />
+    <EmptyState v-else-if="listings.length === 0" message="No listings found matching your criteria." />
+    <template v-else>
+      <div class="row g-4">
+        <div class="col-12 col-md-6" v-for="listing in paginatedListings" :key="listing.id">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <h5 class="card-title">{{ listing.title }}</h5>
+                <StatusBadge :status="listing.status" />
+              </div>
+              <p class="card-text text-muted">{{ listing.description }}</p>
+              <div class="d-flex justify-content-between">
+                <span v-if="listing.askingPriceAud != null" class="h5 text-success">
+                  {{ formatPrice(listing.askingPriceAud) }}
+                </span>
+                <span v-else class="text-muted">Price on Application</span>
+                <small class="text-muted">Listed {{ new Date(listing.listedUtc).toLocaleDateString() }}</small>
+              </div>
             </div>
-            <p class="card-text text-muted">{{ listing.description }}</p>
-            <div class="d-flex justify-content-between">
-              <span v-if="listing.askingPriceAud != null" class="h5 text-success">
-                {{ formatPrice(listing.askingPriceAud) }}
-              </span>
-              <span v-else class="text-muted">Price on Application</span>
-              <small class="text-muted">Listed {{ new Date(listing.listedUtc).toLocaleDateString() }}</small>
+            <div class="card-footer">
+              <button class="btn btn-sm btn-outline-primary" aria-label="View details for this listing" @click="viewListing(listing)">View Details</button>
             </div>
-          </div>
-          <div class="card-footer">
-            <button class="btn btn-sm btn-outline-primary" aria-label="View details for this listing" @click="viewListing(listing)">View Details</button>
           </div>
         </div>
       </div>
-    </div>
+      <PaginationBar
+        :total-items="sortedListings.length"
+        :page-size="pageSize"
+        :current-page="currentPage"
+        @page-change="currentPage = $event"
+      />
+    </template>
 
     <DetailModal :show="!!selectedListing" :title="selectedListing?.title ?? ''" @close="closeModal">
       <template v-if="selectedListing">

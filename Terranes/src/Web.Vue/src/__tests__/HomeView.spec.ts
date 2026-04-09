@@ -75,4 +75,47 @@ describe('HomeView', () => {
     expect(text).toContain('Start Your Journey');
     expect(text).toContain('Dashboard');
   });
+
+  it('renders hero section with animated gradient', async () => {
+    const router = await createTestRouter();
+    const wrapper = mount(HomeView, { global: { plugins: [router] } });
+    const hero = wrapper.find('#hero');
+    expect(hero.exists()).toBe(true);
+    expect(hero.classes()).toContain('hero');
+    expect(hero.text()).toContain('Welcome to Terranes');
+  });
+
+  it('shows how-it-works section with 4 steps', async () => {
+    const router = await createTestRouter();
+    const wrapper = mount(HomeView, { global: { plugins: [router] } });
+    const section = wrapper.find('#how-it-works');
+    expect(section.exists()).toBe(true);
+    expect(section.text()).toContain('Browse');
+    expect(section.text()).toContain('Select');
+    expect(section.text()).toContain('Customise');
+    expect(section.text()).toContain('Quote');
+    const steps = section.findAll('.col-12.col-md-3');
+    expect(steps.length).toBe(4);
+  });
+
+  it('has testimonial carousel with prev/next buttons', async () => {
+    const router = await createTestRouter();
+    const wrapper = mount(HomeView, { global: { plugins: [router] } });
+    const testimonials = wrapper.find('.testimonials');
+    expect(testimonials.exists()).toBe(true);
+    const buttons = testimonials.findAll('button');
+    const prevBtn = buttons.find((b) => b.text().includes('Prev'));
+    const nextBtn = buttons.find((b) => b.text().includes('Next'));
+    expect(prevBtn).toBeTruthy();
+    expect(nextBtn).toBeTruthy();
+  });
+
+  it('renders footer with copyright', async () => {
+    const router = await createTestRouter();
+    const wrapper = mount(HomeView, { global: { plugins: [router] } });
+    const footer = wrapper.find('.site-footer');
+    expect(footer.exists()).toBe(true);
+    expect(footer.text()).toContain('Terranes');
+    expect(footer.text()).toContain('All rights reserved');
+  });
 });

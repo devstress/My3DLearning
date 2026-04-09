@@ -181,6 +181,25 @@ main {
   }
 }
 
+/* Card hover effects */
+.card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+  .card:hover {
+    transform: none;
+  }
+}
+
 /* Route transition */
 .fade-enter-active,
 .fade-leave-active {

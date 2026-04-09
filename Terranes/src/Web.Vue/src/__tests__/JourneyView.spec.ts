@@ -56,15 +56,15 @@ describe('JourneyView', () => {
     expect(wrapper.text()).toContain('Begin Journey');
   });
 
-  it('shows progress bar when journey is active', async () => {
+  it('shows step indicator when journey is active', async () => {
     const browsingJourney = makeMockJourney('Browsing');
     vi.mocked(api.getBuyerJourneys).mockResolvedValue([browsingJourney]);
     vi.mocked(api.getHomeModels).mockResolvedValue(mockModels);
     const router = await createTestRouter();
     const wrapper = mount(JourneyView, { global: { plugins: [router] } });
     await flushPromises();
-    expect(wrapper.find('.progress').exists()).toBe(true);
-    expect(wrapper.find('.progress-bar').exists()).toBe(true);
+    expect(wrapper.find('.step-indicator').exists()).toBe(true);
+    expect(wrapper.findAll('.step-circle').length).toBeGreaterThan(0);
   });
 
   it('shows browsing stage with design cards', async () => {

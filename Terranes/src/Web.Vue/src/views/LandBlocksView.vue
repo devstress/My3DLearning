@@ -1,28 +1,64 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { LandBlock, HomeModel, SitePlacement } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
 import DetailModal from '../components/DetailModal.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import SkeletonTable from '../components/SkeletonTable.vue';
+import FilterChip from '../components/FilterChip.vue';
+import EmptyState from '../components/EmptyState.vue';
+import PaginationBar from '../components/PaginationBar.vue';
 import { useToast } from '../composables/useToast';
+import { useDebounce } from '../composables/useDebounce';
 
 const { showSuccess, showError } = useToast();
+const route = useRoute();
+const router = useRouter();
 
 const blocks = ref<LandBlock[] | null>(null);
-const searchSuburb = ref('');
-const searchState = ref('');
+const searchSuburb = ref((route.query.suburb as string) || '');
+const searchState = ref((route.query.state as string) || '');
 const selectedBlock = ref<LandBlock | null>(null);
 const availableModels = ref<HomeModel[] | null>(null);
 const placementResult = ref<SitePlacement | null>(null);
 const placementError = ref<string | null>(null);
+const sortBy = ref('area');
+const currentPage = ref(1);
+const pageSize = 12;
+
+const debouncedSuburb = useDebounce(searchSuburb);
+const debouncedState = useDebounce(searchState);
+
+const sortedBlocks = computed(() => {
+  if (!blocks.value) return [];
+  const sorted = [...blocks.value];
+  if (sortBy.value === 'area') sorted.sort((a, b) => a.areaSqm - b.areaSqm);
+  else if (sortBy.value === 'suburb') sorted.sort((a, b) => a.suburb.localeCompare(b.suburb));
+  return sorted;
+});
+
+const paginatedBlocks = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return sortedBlocks.value.slice(start, start + pageSize);
+});
+
+const resultCount = computed(() => blocks.value?.length ?? 0);
 
 async function search() {
   blocks.value = await api.getLandBlocks({
-    suburb: searchSuburb.value || undefined,
-    state: searchState.value || undefined,
+    suburb: debouncedSuburb.value || undefined,
+    state: debouncedState.value || undefined,
   });
+  currentPage.value = 1;
+}
+
+function syncQuery() {
+  const query: Record<string, string> = {};
+  if (debouncedSuburb.value) query.suburb = debouncedSuburb.value;
+  if (debouncedState.value) query.state = debouncedState.value;
+  router.replace({ query });
 }
 
 async function selectBlock(block: LandBlock) {
@@ -51,8 +87,11 @@ function closeModal() {
   placementError.value = null;
 }
 
+function removeSuburbFilter() { searchSuburb.value = ''; }
+function removeStateFilter() { searchState.value = ''; }
+
 onMounted(search);
-watch([searchSuburb, searchState], search);
+watch([debouncedSuburb, debouncedState], () => { search(); syncQuery(); });
 </script>
 
 <template>
@@ -67,12 +106,22 @@ watch([searchSuburb, searchState], search);
       <div class="col-12 col-md-3">
         <input type="text" class="form-control" placeholder="State (e.g. NSW)" v-model="searchState" />
       </div>
+      <div class="col-12 col-md-3">
+        <select class="form-select" v-model="sortBy">
+          <option value="area">Sort by Area</option>
+          <option value="suburb">Sort by Suburb</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-wrap align-items-center">
+      <FilterChip v-if="debouncedSuburb" :label="`Suburb: ${debouncedSuburb}`" @remove="removeSuburbFilter" />
+      <FilterChip v-if="debouncedState" :label="`State: ${debouncedState}`" @remove="removeStateFilter" />
+      <span v-if="blocks !== null" class="badge bg-secondary ms-auto result-count">Showing {{ resultCount }} results</span>
     </div>
 
     <SkeletonTable v-if="blocks === null" :rows="5" :cols="8" />
-    <div v-else-if="blocks.length === 0" class="alert alert-info">
-      No land blocks found. Try a different search.
-    </div>
+    <EmptyState v-else-if="blocks.length === 0" message="No land blocks found. Try a different search." />
     <div v-else class="table-responsive">
       <table class="table table-hover">
         <thead>
@@ -88,7 +137,7 @@ watch([searchSuburb, searchState], search);
           </tr>
         </thead>
         <tbody>
-          <tr v-for="block in blocks" :key="block.id">
+          <tr v-for="block in paginatedBlocks" :key="block.id">
             <td>{{ block.address }}</td>
             <td>{{ block.suburb }}</td>
             <td>{{ block.state }}</td>
@@ -102,6 +151,12 @@ watch([searchSuburb, searchState], search);
           </tr>
         </tbody>
       </table>
+      <PaginationBar
+        :total-items="sortedBlocks.length"
+        :page-size="pageSize"
+        :current-page="currentPage"
+        @page-change="currentPage = $event"
+      />
     </div>
 
     <DetailModal :show="!!selectedBlock" :title="selectedBlock ? 'Test-Fit on ' + selectedBlock.address : ''" @close="closeModal">

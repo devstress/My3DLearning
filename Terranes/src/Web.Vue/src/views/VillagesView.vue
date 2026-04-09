@@ -1,24 +1,42 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { VirtualVillage, VillageLot } from '../types';
 import DetailModal from '../components/DetailModal.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import SkeletonCard from '../components/SkeletonCard.vue';
+import FilterChip from '../components/FilterChip.vue';
+import EmptyState from '../components/EmptyState.vue';
+import { useDebounce } from '../composables/useDebounce';
+
+const route = useRoute();
+const router = useRouter();
 
 const villages = ref<VirtualVillage[] | null>(null);
-const searchName = ref('');
-const selectedLayout = ref('');
+const searchName = ref((route.query.name as string) || '');
+const selectedLayout = ref((route.query.layout as string) || '');
 const selectedVillage = ref<VirtualVillage | null>(null);
 const villageLots = ref<VillageLot[] | null>(null);
 
+const debouncedName = useDebounce(searchName);
+
 const layouts = ['Grid', 'Radial', 'Linear', 'Cluster', 'Freeform'];
+
+const resultCount = computed(() => villages.value?.length ?? 0);
 
 async function search() {
   villages.value = await api.getVillages({
-    name: searchName.value || undefined,
+    name: debouncedName.value || undefined,
     layout: selectedLayout.value || undefined,
   });
+}
+
+function syncQuery() {
+  const query: Record<string, string> = {};
+  if (debouncedName.value) query.name = debouncedName.value;
+  if (selectedLayout.value) query.layout = selectedLayout.value;
+  router.replace({ query });
 }
 
 async function viewVillage(village: VirtualVillage) {
@@ -31,8 +49,11 @@ function closeModal() {
   villageLots.value = null;
 }
 
+function removeNameFilter() { searchName.value = ''; }
+function removeLayoutFilter() { selectedLayout.value = ''; }
+
 onMounted(search);
-watch([searchName, selectedLayout], search);
+watch([debouncedName, selectedLayout], () => { search(); syncQuery(); });
 </script>
 
 <template>
@@ -52,10 +73,14 @@ watch([searchName, selectedLayout], search);
       </div>
     </div>
 
-    <SkeletonCard v-if="villages === null" :count="3" :columns="3" />
-    <div v-else-if="villages.length === 0" class="alert alert-info">
-      No villages found. Create one to get started!
+    <div class="mb-3 d-flex flex-wrap align-items-center">
+      <FilterChip v-if="debouncedName" :label="`Name: ${debouncedName}`" @remove="removeNameFilter" />
+      <FilterChip v-if="selectedLayout" :label="`Layout: ${selectedLayout}`" @remove="removeLayoutFilter" />
+      <span v-if="villages !== null" class="badge bg-secondary ms-auto result-count">Showing {{ resultCount }} results</span>
     </div>
+
+    <SkeletonCard v-if="villages === null" :count="3" :columns="3" />
+    <EmptyState v-else-if="villages.length === 0" message="No villages found. Create one to get started!" />
     <div v-else class="row g-4">
       <div class="col-12 col-md-4" v-for="village in villages" :key="village.id">
         <div class="card h-100 shadow-sm">
