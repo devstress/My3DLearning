@@ -278,6 +278,32 @@ HTTP handler. DatabaseEnrichmentSource has 6 tests with mock ADO.NET infrastruct
 
 ---
 
+## Phase 36 — Auth, Observability & System Management Test Hardening
+
+> **Origin:** Audit revealed that `ApiKeyAuthenticationHandler` (security-critical auth handler)
+> had **zero unit tests**. `LokiObservabilityEventLog` (core observability event storage with
+> Loki HTTP API + in-memory fallback) was untested. `ControlBusPublisher` (EIP Control Bus pattern)
+> and `DlqManagementService` (DLQ resubmission) lacked dedicated test fixtures. This phase
+> closes these critical test gaps.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 360 | **ApiKeyAuthenticationHandler Tests** — see `rules/completion-log.md` | `done` |
+| 361 | **LokiObservabilityEventLog Tests** — see `rules/completion-log.md` | `done` |
+| 362 | **ControlBusPublisher & DlqManagementService Tests** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 36 complete — 3 chunks (360–362). 33 new unit tests. UnitTests total: 1919 (was 1886).
+ApiKeyAuthenticationHandler now has 10 tests covering missing header, invalid key, valid key
+with claim verification, case-sensitive comparison, multiple keys, empty config, short key masking.
+LokiObservabilityEventLog has 11 tests covering RecordAsync (push, fallback, error handling),
+GetByCorrelationId (Loki results, fallback, empty), GetByBusinessKey (fallback, case-insensitive).
+ControlBusPublisher has 10 tests covering publish success/failure/intent, subscribe, arg validation.
+DlqManagementService has 2 tests covering replay delegation and filter passthrough.
+
+---
+
 ### Next Chunk
 
-Phase 35 is complete. No remaining chunks.
+Phase 36 is complete. No remaining chunks.

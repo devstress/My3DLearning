@@ -4,6 +4,49 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 362 — ControlBusPublisher & DlqManagementService Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 36 — Auth, Observability & System Management Test Hardening
+- **Status**: done
+- **Goal**: Dedicated unit tests for ControlBusPublisher (10 tests) covering publish success/failure, command intent, topic routing, argument validation, subscribe registration. DlqManagementService (2 tests) covering replay delegation and filter passthrough.
+- **Files created**:
+  - `tests/UnitTests/ControlBusPublisherTests.cs` — 12 tests across 2 fixtures: ControlBusPublisherTests (PublishCommandAsync success/topic/intent/failure/null command/empty type, SubscribeAsync registration/null handler/empty type, constructor null producer/consumer), DlqManagementServiceTests (ResubmitAsync delegates to replayer, passes filter)
+- **Notes**:
+  - ControlBusPublisher.PublishCommandAsync sets MessageIntent.Command on the envelope
+  - NSubstitute When..Do pattern used to capture generic envelope argument
+  - All 12 tests pass. UnitTests total: 1919 (cumulative with chunks 360–361)
+
+## Chunk 361 — LokiObservabilityEventLog Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 36 — Auth, Observability & System Management Test Hardening
+- **Status**: done
+- **Goal**: Dedicated unit tests for LokiObservabilityEventLog covering RecordAsync (Loki push + in-memory fallback), GetByCorrelationId (Loki query + fallback), GetByBusinessKey (fallback + case-insensitive matching).
+- **Files created**:
+  - `tests/UnitTests/LokiObservabilityEventLogTests.cs` — 11 tests: RecordAsync (posts to push endpoint, Loki unavailable doesn't throw, always stores in fallback, correct content type, payload contains correlation_id, multiple events stored), GetByCorrelationId (Loki returns results, no matching returns empty), GetByBusinessKey (Loki unavailable uses fallback, case-insensitive fallback)
+- **Notes**:
+  - Uses MockLokiHandler (DelegatingHandler) for HTTP interception with separate push/query status codes
+  - Uses reflection to clear the static FallbackStore between tests for isolation
+  - Loki query_range response format: values are [timestamp_string, json_string] — log line is a JSON-escaped string
+  - All 11 tests pass
+
+## Chunk 360 — ApiKeyAuthenticationHandler Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 36 — Auth, Observability & System Management Test Hardening
+- **Status**: done
+- **Goal**: Dedicated unit tests for the security-critical ApiKeyAuthenticationHandler covering all authentication paths.
+- **Files created/modified**:
+  - `tests/UnitTests/ApiKeyAuthenticationHandlerTests.cs` — 10 tests: missing header fails, invalid key fails, valid key succeeds, valid key sets Admin role claim, sets Name claim, sets apikey_prefix claim with masking, multiple configured keys accepts any, case-sensitive comparison rejects wrong case, empty configured keys rejects all, short key masks entirely
+  - `src/Admin.Api/Admin.Api.csproj` — added `<InternalsVisibleTo Include="UnitTests" />`
+  - `tests/UnitTests/UnitTests.csproj` — added `<FrameworkReference Include="Microsoft.AspNetCore.App" />`
+- **Notes**:
+  - ApiKeyAuthenticationHandler is `internal sealed` — InternalsVisibleTo enables direct test instantiation
+  - Tests use `AuthenticationHandler.InitializeAsync` + `AuthenticateAsync` pattern with `DefaultHttpContext`
+  - MaskKey masks keys longer than 4 chars to `first4****`, short keys to `****`
+  - All 10 tests pass
+
 ## Chunk 352 — HttpEnrichmentSource & DatabaseEnrichmentSource Tests
 
 - **Date**: 2026-04-09
