@@ -2,6 +2,9 @@
 import { ref } from 'vue';
 import { RouterLink, RouterView } from 'vue-router';
 import ToastContainer from './components/ToastContainer.vue';
+import { useTheme } from './composables/useTheme';
+
+const { theme, toggleTheme } = useTheme();
 
 const sidebarOpen = ref(false);
 function toggleSidebar() {
@@ -58,6 +61,16 @@ function toggleSidebar() {
             <RouterLink class="nav-link" to="/dashboard" active-class="active">
               <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
             </RouterLink>
+          </div>
+          <div class="nav-item px-3 mt-auto">
+            <button
+              class="nav-link theme-toggle-btn w-100 text-start"
+              aria-label="Toggle dark mode"
+              @click.stop="toggleTheme"
+            >
+              <span aria-hidden="true">{{ theme === 'dark' ? '☀️' : '🌙' }}</span>
+              {{ theme === 'dark' ? 'Light Mode' : 'Dark Mode' }}
+            </button>
           </div>
         </nav>
       </div>

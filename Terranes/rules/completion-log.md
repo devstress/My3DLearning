@@ -800,3 +800,17 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - `src/__tests__/Accessibility.spec.ts` — 10 tests: dialog role/aria-modal, close button aria-label, Escape-to-close, backdrop click-to-close, skip-to-content link, main#main-content, nav aria-label, toggler aria-label, skip-to-content CSS, toast aria-live verification.
 
 **Tests:** 98 Vitest tests (88 + 10 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+### Chunk 054 — Dark Mode Support (2026-04-09)
+
+**Goal:** Add dark mode support with system-preference detection, manual toggle, localStorage persistence, and sidebar gradient adaptation.
+
+**Files created:**
+- `src/composables/useTheme.ts` — `useTheme()` composable: singleton pattern with `theme` ref, `toggleTheme()`, `setTheme()`. Detects `prefers-color-scheme: dark`. Sets `data-bs-theme` on `<html>`. Persists to `localStorage('terranes-theme')`. Listens for system preference changes when no user override.
+- `src/__tests__/composables/useTheme.spec.ts` — 8 tests: default light theme, data-bs-theme attribute, toggle switching, localStorage persistence, read stored preference, explicit setTheme, dark-mode CSS verification (2 tests).
+
+**Files modified:**
+- `src/App.vue` — Imported and initialised `useTheme()`. Added theme toggle button in sidebar with 🌙/☀️ emoji and "Dark Mode"/"Light Mode" label.
+- `src/style.css` — Migrated `.top-row` background from `#f7f7f7` to `var(--bs-body-bg)` and border from `#d6d5d5` to `var(--bs-border-color)`. Added `[data-bs-theme="dark"] .sidebar` darker gradient. Added `.theme-toggle-btn` styles.
+
+**Tests:** 106 Vitest tests (98 + 8 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
