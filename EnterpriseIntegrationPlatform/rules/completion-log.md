@@ -4,6 +4,22 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 308 — README accuracy pass
+
+- **Date**: 2026-04-09
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Full audit of README.md claims vs. reality. Fix all stale test counts.
+- **Files modified**:
+  - `README.md` — Updated 4 stale references: "2,239" → "2,341" automated tests (3 occurrences), "1,540" → "1,691" unit tests (1 occurrence). Verified all docs/ links resolve. 50 src projects, 526 tutorial tests still accurate.
+- **Actual test breakdown (verified by `dotnet test`)**:
+  - UnitTests: 1,691
+  - ContractTests: 57
+  - WorkflowTests: 29
+  - BrokerAgnosticTests: 38
+  - TutorialLabs: 526 (7 skipped)
+  - **Total: 2,341**
+
 ## Chunk 307 — Broker health check integration smoke test
 
 - **Date**: 2026-04-09

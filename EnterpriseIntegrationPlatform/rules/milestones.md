@@ -114,18 +114,16 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Chunk 307 — ✅ Done — see `rules/completion-log.md`
 
-### Chunk 308 — README accuracy pass
-
-| Status | `not-started` |
-|---|---|
-| **Goal** | Full audit of README.md claims vs. reality. Fix all discrepancies. |
-| **Changes** | (a) Update project structure test counts to match actual `dotnet test` output after all Phase 30 chunks. (b) Update "2,000+ automated tests" claim to exact number. (c) Update tech stack versions (Aspire, OpenTelemetry, etc.) if any are stale. (d) Verify all `docs/` links resolve to existing files. (e) Verify the "49 src projects" count is still accurate. |
-| **Acceptance** | Every number in README.md is accurate and verifiable by running `dotnet test` and `find`. |
+### Chunk 308 — ✅ Done — see `rules/completion-log.md`
 
 ### Next Chunk
 
-**Chunk 308** — README accuracy pass.
+✅ Phase 30 complete — see `rules/completion-log.md` for full history.
+
+Chunks 300–308 done. All 4 broker providers hardened with IOptions, health checks, IAsyncDisposable, ActivitySource tracing. Pulsar producer-per-message anti-pattern fixed. Security, Postgres, NATS all have comprehensive unit tests. 50 src projects, 9 test projects, 2,341 tests (1,691 UnitTests + 57 ContractTests + 29 WorkflowTests + 38 BrokerAgnosticTests + 526 TutorialLabs).
 
 ---
 
-For detailed completion history, files created, and notes see `rules/completion-log.md`.
+### Next Chunk
+
+Phase 30 is complete. No remaining chunks.
