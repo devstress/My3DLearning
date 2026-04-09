@@ -10,6 +10,7 @@
 // test classes in the assembly. It starts once per test run.
 // ============================================================================
 
+using System.Diagnostics;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -87,7 +88,7 @@ public sealed class AspireFixture
         if (!IsAvailable || NatsUrl is null)
         {
             Assert.Fail("Docker not available — skipping real broker test");
-            return null!; // unreachable — Assert.Fail throws
+            throw new UnreachableException();
         }
         return new NatsBrokerEndpoint(name, NatsUrl);
     }
@@ -101,7 +102,7 @@ public sealed class AspireFixture
         if (!IsAvailable || PostgresConnectionString is null)
         {
             Assert.Fail("Docker not available — skipping real Postgres broker test");
-            return null!; // unreachable — Assert.Fail throws
+            throw new UnreachableException();
         }
         return new PostgresBrokerEndpoint(name, PostgresConnectionString);
     }
@@ -115,7 +116,7 @@ public sealed class AspireFixture
         if (!IsAvailable || KafkaBootstrapServers is null)
         {
             Assert.Fail("Docker not available — skipping real Kafka broker test");
-            return null!; // unreachable — Assert.Fail throws
+            throw new UnreachableException();
         }
         return new KafkaBrokerEndpoint(name, KafkaBootstrapServers);
     }
@@ -129,7 +130,7 @@ public sealed class AspireFixture
         if (!IsAvailable || PulsarServiceUrl is null)
         {
             Assert.Fail("Docker not available — skipping real Pulsar broker test");
-            return null!; // unreachable — Assert.Fail throws
+            throw new UnreachableException();
         }
         return new PulsarBrokerEndpoint(name, PulsarServiceUrl);
     }
