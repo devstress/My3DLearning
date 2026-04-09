@@ -45,13 +45,13 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
     <p class="text-muted">Browse property listings from agents, builders, and homeowners.</p>
 
     <div class="row mb-3">
-      <div class="col-md-3">
+      <div class="col-12 col-md-3">
         <input type="text" class="form-control" placeholder="Suburb..." v-model="searchSuburb" />
       </div>
-      <div class="col-md-3">
+      <div class="col-12 col-md-3">
         <input type="number" class="form-control" placeholder="Max price ($)" v-model.number="maxPrice" />
       </div>
-      <div class="col-md-3">
+      <div class="col-12 col-md-3">
         <select class="form-select" v-model="selectedStatus">
           <option value="">All Statuses</option>
           <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
@@ -64,7 +64,7 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
       No listings found matching your criteria.
     </div>
     <div v-else class="row g-4">
-      <div class="col-md-6" v-for="listing in listings" :key="listing.id">
+      <div class="col-12 col-md-6" v-for="listing in listings" :key="listing.id">
         <div class="card h-100 shadow-sm">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
@@ -81,7 +81,7 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
             </div>
           </div>
           <div class="card-footer">
-            <button class="btn btn-sm btn-outline-primary" @click="viewListing(listing)">View Details</button>
+            <button class="btn btn-sm btn-outline-primary" aria-label="View details for this listing" @click="viewListing(listing)">View Details</button>
           </div>
         </div>
       </div>

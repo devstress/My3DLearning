@@ -37,11 +37,11 @@ watch([minBedrooms, selectedFormat], search);
     <p class="text-muted">Browse our gallery of 3D home models.</p>
 
     <div class="row mb-3">
-      <div class="col-md-3">
+      <div class="col-12 col-md-3">
         <label class="form-label">Min Bedrooms</label>
         <input type="number" class="form-control" min="0" max="10" v-model.number="minBedrooms" />
       </div>
-      <div class="col-md-3">
+      <div class="col-12 col-md-3">
         <label class="form-label">Format</label>
         <select class="form-select" v-model="selectedFormat">
           <option value="">All Formats</option>
@@ -55,7 +55,7 @@ watch([minBedrooms, selectedFormat], search);
       No home designs found matching your criteria.
     </div>
     <div v-else class="row g-4">
-      <div class="col-md-4" v-for="model in models" :key="model.id">
+      <div class="col-12 col-md-4" v-for="model in models" :key="model.id">
         <div class="card h-100 shadow-sm">
           <div class="card-body">
             <h5 class="card-title">{{ model.name }}</h5>
@@ -71,7 +71,7 @@ watch([minBedrooms, selectedFormat], search);
             </div>
           </div>
           <div class="card-footer">
-            <button class="btn btn-sm btn-outline-primary" @click="selectModel(model)">View Details</button>
+            <button class="btn btn-sm btn-outline-primary" aria-label="View details for this design" @click="selectModel(model)">View Details</button>
           </div>
         </div>
       </div>

@@ -61,10 +61,10 @@ watch([searchSuburb, searchState], search);
     <p class="text-muted">Search available land blocks and test-fit home designs.</p>
 
     <div class="row mb-3">
-      <div class="col-md-4">
+      <div class="col-12 col-md-4">
         <input type="text" class="form-control" placeholder="Search by suburb..." v-model="searchSuburb" />
       </div>
-      <div class="col-md-3">
+      <div class="col-12 col-md-3">
         <input type="text" class="form-control" placeholder="State (e.g. NSW)" v-model="searchState" />
       </div>
     </div>
@@ -97,7 +97,7 @@ watch([searchSuburb, searchState], search);
             <td>{{ block.depthMetre.toFixed(1) }}m</td>
             <td><span class="badge bg-secondary">{{ block.zoning }}</span></td>
             <td>
-              <button class="btn btn-sm btn-outline-primary" @click="selectBlock(block)">Test-Fit</button>
+              <button class="btn btn-sm btn-outline-primary" aria-label="Test-fit a design on this land block" @click="selectBlock(block)">Test-Fit</button>
             </td>
           </tr>
         </tbody>
