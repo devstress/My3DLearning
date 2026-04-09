@@ -248,3 +248,36 @@ Tests verify every `Add*` method registers the correct service types in the cont
 ### Next Chunk
 
 Phase 34 is complete. No remaining chunks.
+
+---
+
+## Phase 35 — Observability, Validation & Enrichment Test Hardening
+
+> **Origin:** Audit revealed that CorrelationPropagator, PlatformMeters, and MessageTracer
+> (core observability infrastructure used by every service) had **zero dedicated unit tests**.
+> DefaultMessageValidationService and DefaultCompensationActivityService (core activity services)
+> were also untested. HttpEnrichmentSource and DatabaseEnrichmentSource (external enrichment
+> patterns) lacked tests. This phase closes these test gaps.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 350 | **CorrelationPropagator, PlatformMeters & MessageTracer Tests** — see `rules/completion-log.md` | `done` |
+| 351 | **Activity Service & Message Validation Tests** — see `rules/completion-log.md` | `done` |
+| 352 | **HttpEnrichmentSource & DatabaseEnrichmentSource Tests** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 35 complete — 3 chunks (350–352). 43 new unit tests. UnitTests total: 1886 (was 1843).
+CorrelationPropagator now has 6 tests covering trace context injection/extraction.
+PlatformMeters has 5 tests verifying counter/histogram/gauge recordings via MeterListener.
+MessageTracer has 6 tests covering all 4 trace stage methods plus success/failure completion.
+DefaultMessageValidationService has 8 tests covering all validation paths.
+DefaultCompensationActivityService has 2 tests. MessageValidationResult factory methods tested.
+MessageHistoryEntry record and enum values tested. HttpEnrichmentSource has 6 tests with mock
+HTTP handler. DatabaseEnrichmentSource has 6 tests with mock ADO.NET infrastructure.
+
+---
+
+### Next Chunk
+
+Phase 35 is complete. No remaining chunks.

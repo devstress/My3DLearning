@@ -4,6 +4,46 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 352 — HttpEnrichmentSource & DatabaseEnrichmentSource Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 35 — Observability, Validation & Enrichment Test Hardening
+- **Status**: done
+- **Goal**: Dedicated unit tests for HttpEnrichmentSource (6 tests) and DatabaseEnrichmentSource (6 tests) covering constructor validation, successful enrichment, URL key substitution, HTTP error handling, empty DB results, and column-to-JSON mapping.
+- **Files created**:
+  - `tests/UnitTests/HttpDatabaseEnrichmentSourceTests.cs` — 12 tests: HttpEnrichmentSource (constructor null factory/options/logger, FetchAsync success returns JsonNode, FetchAsync replaces key placeholder, FetchAsync non-success throws), DatabaseEnrichmentSource (constructor null factory, empty SQL, empty param, null logger, FetchAsync no rows returns null, FetchAsync with row returns JsonObject)
+- **Notes**:
+  - HttpEnrichmentSource tests use a lightweight MockHandler (DelegatingHandler subclass) for HTTP interception
+  - DatabaseEnrichmentSource tests use concrete ADO.NET test doubles (InMemoryDbConnection/Command/Reader) since DbCommand.Parameters is non-virtual
+  - All 12 tests pass. UnitTests total: 1886 (cumulative with chunks 350–351)
+
+## Chunk 351 — Activity Service & Message Validation Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 35 — Observability, Validation & Enrichment Test Hardening
+- **Status**: done
+- **Goal**: Dedicated unit tests for DefaultMessageValidationService (8 tests), DefaultCompensationActivityService (2 tests), MessageValidationResult factory methods (2 tests), and MessageHistoryEntry record (2 tests).
+- **Files created**:
+  - `tests/UnitTests/ActivityServiceTests.cs` — 14 tests across 4 fixtures: DefaultMessageValidationServiceTests (empty/whitespace type, empty/whitespace payload, non-JSON, valid JSON object, valid JSON array, whitespace-prefixed JSON), DefaultCompensationActivityServiceTests (valid input returns true, any step returns true), MessageValidationResultTests (Success/Failure factories), MessageHistoryEntryTests (constructor properties, enum values)
+- **Notes**:
+  - DefaultMessageValidationService validates: non-empty message type, non-empty payload, payload starts with `{` or `[`
+  - DefaultCompensationActivityService always returns true (logs compensation; real implementations override)
+  - All 14 tests pass
+
+## Chunk 350 — CorrelationPropagator, PlatformMeters & MessageTracer Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 35 — Observability, Validation & Enrichment Test Hardening
+- **Status**: done
+- **Goal**: Dedicated unit tests for CorrelationPropagator (6 tests), PlatformMeters (5 tests), and MessageTracer (6 tests) covering trace context injection/extraction, metric recording via MeterListener, and message lifecycle tracing.
+- **Files created**:
+  - `tests/UnitTests/CorrelationPropagatorTests.cs` — 17 tests across 3 fixtures: CorrelationPropagatorTests (inject without Activity, inject with Activity sets TraceId/SpanId, extract with valid headers, extract without headers, extract default kind, extract explicit kind), PlatformMetersTests (RecordReceived, RecordProcessed, RecordFailed, RecordDeadLettered, RecordRetry via MeterListener), MessageTracerTests (TraceIngestion/Routing/Transformation/Delivery, CompleteSuccess sets Ok status, CompleteFailed sets Error status)
+- **Notes**:
+  - CorrelationPropagator tests use ActivityListener to capture Activities from DiagnosticsConfig.ActivitySource
+  - PlatformMeters tests use System.Diagnostics.Metrics.MeterListener to verify counter/histogram/gauge recordings
+  - MessageTracer tests verify that trace stages create properly tagged Activity spans
+  - All 17 tests pass
+
 ## Chunk 344 — AI & Remaining DI Tests
 
 - **Date**: 2026-04-09
