@@ -1,16 +1,29 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { PropertyListing } from '../types';
 import DetailModal from '../components/DetailModal.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import SkeletonCard from '../components/SkeletonCard.vue';
+import SearchBar from '../components/SearchBar.vue';
+import FilterChip from '../components/FilterChip.vue';
+import EmptyState from '../components/EmptyState.vue';
+import { useDebounce } from '../composables/useDebounce';
+
+const route = useRoute();
+const router = useRouter();
 
 const listings = ref<PropertyListing[] | null>(null);
-const searchSuburb = ref('');
-const maxPrice = ref<number | undefined>(undefined);
-const selectedStatus = ref('');
+const searchSuburb = ref((route.query.suburb as string) ?? '');
+const maxPrice = ref<number | undefined>(
+  route.query.maxPrice ? Number(route.query.maxPrice) : undefined,
+);
+const selectedStatus = ref((route.query.status as string) ?? '');
 const selectedListing = ref<PropertyListing | null>(null);
+
+const debouncedSuburb = useDebounce(searchSuburb, 300);
+const debouncedPrice = useDebounce(maxPrice, 300);
 
 const statuses = ['Active', 'Draft', 'UnderOffer', 'Sold', 'Withdrawn'];
 
@@ -19,13 +32,26 @@ function formatPrice(price?: number): string {
   return `$${price.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
 }
 
+function syncQuery() {
+  const query: Record<string, string> = {};
+  if (debouncedSuburb.value) query.suburb = debouncedSuburb.value;
+  if (debouncedPrice.value !== undefined && debouncedPrice.value !== null) query.maxPrice = String(debouncedPrice.value);
+  if (selectedStatus.value) query.status = selectedStatus.value;
+  router.replace({ query });
+}
+
 async function search() {
+  syncQuery();
   listings.value = await api.getListings({
-    suburb: searchSuburb.value || undefined,
-    maxPriceAud: maxPrice.value,
+    suburb: debouncedSuburb.value || undefined,
+    maxPriceAud: debouncedPrice.value,
     status: selectedStatus.value || undefined,
   });
 }
+
+function clearSuburb() { searchSuburb.value = ''; }
+function clearPrice() { maxPrice.value = undefined; }
+function clearStatus() { selectedStatus.value = ''; }
 
 function viewListing(listing: PropertyListing) {
   selectedListing.value = listing;
@@ -36,7 +62,7 @@ function closeModal() {
 }
 
 onMounted(search);
-watch([searchSuburb, maxPrice, selectedStatus], search);
+watch([debouncedSuburb, debouncedPrice, selectedStatus], search);
 </script>
 
 <template>
@@ -46,24 +72,30 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
 
     <div class="row mb-3">
       <div class="col-md-3">
-        <input type="text" class="form-control" placeholder="Suburb..." v-model="searchSuburb" />
+        <SearchBar v-model="searchSuburb" placeholder="Suburb..." />
       </div>
       <div class="col-md-3">
-        <input type="number" class="form-control" placeholder="Max price ($)" v-model.number="maxPrice" />
+        <input type="number" class="form-control" placeholder="Max price ($)" v-model.number="maxPrice" aria-label="Maximum price" />
       </div>
       <div class="col-md-3">
-        <select class="form-select" v-model="selectedStatus">
+        <select class="form-select" v-model="selectedStatus" aria-label="Filter by status">
           <option value="">All Statuses</option>
           <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
         </select>
       </div>
     </div>
 
-    <SkeletonCard v-if="listings === null" :count="2" :columns="2" />
-    <div v-else-if="listings.length === 0" class="alert alert-info">
-      No listings found matching your criteria.
+    <div v-if="debouncedSuburb || debouncedPrice !== undefined || selectedStatus" class="d-flex flex-wrap gap-2 mb-3">
+      <FilterChip v-if="debouncedSuburb" label="Suburb" :value="debouncedSuburb" @remove="clearSuburb" />
+      <FilterChip v-if="debouncedPrice !== undefined" label="Max Price" :value="formatPrice(debouncedPrice)" @remove="clearPrice" />
+      <FilterChip v-if="selectedStatus" label="Status" :value="selectedStatus" @remove="clearStatus" />
     </div>
-    <div v-else class="row g-4">
+
+    <SkeletonCard v-if="listings === null" :count="2" :columns="2" />
+    <EmptyState v-else-if="listings.length === 0" title="No listings found" message="Try adjusting your suburb, price, or status filter." icon="listing" />
+    <template v-else>
+    <p class="text-muted small mb-2"><span class="badge bg-secondary result-count">{{ listings.length }}</span> result{{ listings.length !== 1 ? 's' : '' }}</p>
+    <div class="row g-4">
       <div class="col-12 col-md-6" v-for="listing in listings" :key="listing.id">
         <div class="card h-100 shadow-sm">
           <div class="card-body">
@@ -86,6 +118,7 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
         </div>
       </div>
     </div>
+    </template>
 
     <DetailModal :show="!!selectedListing" :title="selectedListing?.title ?? ''" @close="closeModal">
       <template v-if="selectedListing">

@@ -1,23 +1,45 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { HomeModel } from '../types';
 import DetailModal from '../components/DetailModal.vue';
 import SkeletonCard from '../components/SkeletonCard.vue';
+import FilterChip from '../components/FilterChip.vue';
+import EmptyState from '../components/EmptyState.vue';
+import { useDebounce } from '../composables/useDebounce';
+
+const route = useRoute();
+const router = useRouter();
 
 const models = ref<HomeModel[] | null>(null);
-const minBedrooms = ref<number | undefined>(undefined);
-const selectedFormat = ref('');
+const minBedrooms = ref<number | undefined>(
+  route.query.minBedrooms ? Number(route.query.minBedrooms) : undefined,
+);
+const selectedFormat = ref((route.query.format as string) ?? '');
 const selectedModel = ref<HomeModel | null>(null);
+
+const debouncedBedrooms = useDebounce(minBedrooms, 300);
 
 const formats = ['Gltf', 'Glb', 'Obj', 'Fbx', 'Usd'];
 
+function syncQuery() {
+  const query: Record<string, string> = {};
+  if (debouncedBedrooms.value !== undefined && debouncedBedrooms.value !== null) query.minBedrooms = String(debouncedBedrooms.value);
+  if (selectedFormat.value) query.format = selectedFormat.value;
+  router.replace({ query });
+}
+
 async function search() {
+  syncQuery();
   models.value = await api.getHomeModels({
-    minBedrooms: minBedrooms.value,
+    minBedrooms: debouncedBedrooms.value,
     format: selectedFormat.value || undefined,
   });
 }
+
+function clearBedrooms() { minBedrooms.value = undefined; }
+function clearFormat() { selectedFormat.value = ''; }
 
 function selectModel(model: HomeModel) {
   selectedModel.value = model;
@@ -28,7 +50,7 @@ function closeModal() {
 }
 
 onMounted(search);
-watch([minBedrooms, selectedFormat], search);
+watch([debouncedBedrooms, selectedFormat], search);
 </script>
 
 <template>
@@ -39,22 +61,27 @@ watch([minBedrooms, selectedFormat], search);
     <div class="row mb-3">
       <div class="col-md-3">
         <label class="form-label">Min Bedrooms</label>
-        <input type="number" class="form-control" min="0" max="10" v-model.number="minBedrooms" />
+        <input type="number" class="form-control" min="0" max="10" v-model.number="minBedrooms" aria-label="Minimum bedrooms" />
       </div>
       <div class="col-md-3">
         <label class="form-label">Format</label>
-        <select class="form-select" v-model="selectedFormat">
+        <select class="form-select" v-model="selectedFormat" aria-label="Filter by format">
           <option value="">All Formats</option>
           <option v-for="fmt in formats" :key="fmt" :value="fmt">{{ fmt }}</option>
         </select>
       </div>
     </div>
 
-    <SkeletonCard v-if="models === null" :count="3" :columns="3" />
-    <div v-else-if="models.length === 0" class="alert alert-info">
-      No home designs found matching your criteria.
+    <div v-if="debouncedBedrooms !== undefined || selectedFormat" class="d-flex flex-wrap gap-2 mb-3">
+      <FilterChip v-if="debouncedBedrooms !== undefined" label="Min Beds" :value="String(debouncedBedrooms)" @remove="clearBedrooms" />
+      <FilterChip v-if="selectedFormat" label="Format" :value="selectedFormat" @remove="clearFormat" />
     </div>
-    <div v-else class="row g-4">
+
+    <SkeletonCard v-if="models === null" :count="3" :columns="3" />
+    <EmptyState v-else-if="models.length === 0" title="No home designs found" message="Try adjusting your filters or bedrooms count." icon="home" />
+    <template v-else>
+    <p class="text-muted small mb-2"><span class="badge bg-secondary result-count">{{ models.length }}</span> result{{ models.length !== 1 ? 's' : '' }}</p>
+    <div class="row g-4">
       <div class="col-12 col-md-4" v-for="model in models" :key="model.id">
         <div class="card h-100 shadow-sm">
           <div class="card-body">
@@ -76,6 +103,7 @@ watch([minBedrooms, selectedFormat], search);
         </div>
       </div>
     </div>
+    </template>
 
     <DetailModal :show="!!selectedModel" :title="selectedModel?.name ?? ''" @close="closeModal">
       <template v-if="selectedModel">

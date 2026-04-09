@@ -1,29 +1,50 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { LandBlock, HomeModel, SitePlacement } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
 import DetailModal from '../components/DetailModal.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import SkeletonTable from '../components/SkeletonTable.vue';
+import SearchBar from '../components/SearchBar.vue';
+import FilterChip from '../components/FilterChip.vue';
+import EmptyState from '../components/EmptyState.vue';
 import { useToast } from '../composables/useToast';
+import { useDebounce } from '../composables/useDebounce';
 
 const { showSuccess, showError } = useToast();
+const route = useRoute();
+const router = useRouter();
 
 const blocks = ref<LandBlock[] | null>(null);
-const searchSuburb = ref('');
-const searchState = ref('');
+const searchSuburb = ref((route.query.suburb as string) ?? '');
+const searchState = ref((route.query.state as string) ?? '');
 const selectedBlock = ref<LandBlock | null>(null);
 const availableModels = ref<HomeModel[] | null>(null);
 const placementResult = ref<SitePlacement | null>(null);
 const placementError = ref<string | null>(null);
 
+const debouncedSuburb = useDebounce(searchSuburb, 300);
+const debouncedState = useDebounce(searchState, 300);
+
+function syncQuery() {
+  const query: Record<string, string> = {};
+  if (debouncedSuburb.value) query.suburb = debouncedSuburb.value;
+  if (debouncedState.value) query.state = debouncedState.value;
+  router.replace({ query });
+}
+
 async function search() {
+  syncQuery();
   blocks.value = await api.getLandBlocks({
-    suburb: searchSuburb.value || undefined,
-    state: searchState.value || undefined,
+    suburb: debouncedSuburb.value || undefined,
+    state: debouncedState.value || undefined,
   });
 }
+
+function clearSuburb() { searchSuburb.value = ''; }
+function clearState() { searchState.value = ''; }
 
 async function selectBlock(block: LandBlock) {
   selectedBlock.value = block;
@@ -52,7 +73,7 @@ function closeModal() {
 }
 
 onMounted(search);
-watch([searchSuburb, searchState], search);
+watch([debouncedSuburb, debouncedState], search);
 </script>
 
 <template>
@@ -62,18 +83,23 @@ watch([searchSuburb, searchState], search);
 
     <div class="row mb-3">
       <div class="col-md-4">
-        <input type="text" class="form-control" placeholder="Search by suburb..." v-model="searchSuburb" />
+        <SearchBar v-model="searchSuburb" placeholder="Search by suburb..." />
       </div>
       <div class="col-md-3">
-        <input type="text" class="form-control" placeholder="State (e.g. NSW)" v-model="searchState" />
+        <SearchBar v-model="searchState" placeholder="State (e.g. NSW)" />
       </div>
     </div>
 
-    <SkeletonTable v-if="blocks === null" :rows="5" :cols="8" />
-    <div v-else-if="blocks.length === 0" class="alert alert-info">
-      No land blocks found. Try a different search.
+    <div v-if="debouncedSuburb || debouncedState" class="d-flex flex-wrap gap-2 mb-3">
+      <FilterChip v-if="debouncedSuburb" label="Suburb" :value="debouncedSuburb" @remove="clearSuburb" />
+      <FilterChip v-if="debouncedState" label="State" :value="debouncedState" @remove="clearState" />
     </div>
-    <div v-else class="table-responsive">
+
+    <SkeletonTable v-if="blocks === null" :rows="5" :cols="8" />
+    <EmptyState v-else-if="blocks.length === 0" title="No land blocks found" message="Try a different suburb or state." icon="land" />
+    <template v-else>
+    <p class="text-muted small mb-2"><span class="badge bg-secondary result-count">{{ blocks.length }}</span> result{{ blocks.length !== 1 ? 's' : '' }}</p>
+    <div class="table-responsive">
       <table class="table table-hover">
         <thead>
           <tr>
@@ -103,6 +129,7 @@ watch([searchSuburb, searchState], search);
         </tbody>
       </table>
     </div>
+    </template>
 
     <DetailModal :show="!!selectedBlock" :title="selectedBlock ? 'Test-Fit on ' + selectedBlock.address : ''" @close="closeModal">
       <template v-if="selectedBlock">

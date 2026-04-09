@@ -1,25 +1,46 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { VirtualVillage, VillageLot } from '../types';
 import DetailModal from '../components/DetailModal.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import SkeletonCard from '../components/SkeletonCard.vue';
+import SearchBar from '../components/SearchBar.vue';
+import FilterChip from '../components/FilterChip.vue';
+import EmptyState from '../components/EmptyState.vue';
+import { useDebounce } from '../composables/useDebounce';
+
+const route = useRoute();
+const router = useRouter();
 
 const villages = ref<VirtualVillage[] | null>(null);
-const searchName = ref('');
-const selectedLayout = ref('');
+const searchName = ref((route.query.name as string) ?? '');
+const selectedLayout = ref((route.query.layout as string) ?? '');
 const selectedVillage = ref<VirtualVillage | null>(null);
 const villageLots = ref<VillageLot[] | null>(null);
 
+const debouncedName = useDebounce(searchName, 300);
+
 const layouts = ['Grid', 'Radial', 'Linear', 'Cluster', 'Freeform'];
 
+function syncQuery() {
+  const query: Record<string, string> = {};
+  if (debouncedName.value) query.name = debouncedName.value;
+  if (selectedLayout.value) query.layout = selectedLayout.value;
+  router.replace({ query });
+}
+
 async function search() {
+  syncQuery();
   villages.value = await api.getVillages({
-    name: searchName.value || undefined,
+    name: debouncedName.value || undefined,
     layout: selectedLayout.value || undefined,
   });
 }
+
+function clearName() { searchName.value = ''; }
+function clearLayout() { selectedLayout.value = ''; }
 
 async function viewVillage(village: VirtualVillage) {
   selectedVillage.value = village;
@@ -32,7 +53,7 @@ function closeModal() {
 }
 
 onMounted(search);
-watch([searchName, selectedLayout], search);
+watch([debouncedName, selectedLayout], search);
 </script>
 
 <template>
@@ -42,21 +63,26 @@ watch([searchName, selectedLayout], search);
 
     <div class="row mb-3">
       <div class="col-md-4">
-        <input type="text" class="form-control" placeholder="Search by name..." v-model="searchName" />
+        <SearchBar v-model="searchName" placeholder="Search by name..." />
       </div>
       <div class="col-md-3">
-        <select class="form-select" v-model="selectedLayout">
+        <select class="form-select" v-model="selectedLayout" aria-label="Filter by layout">
           <option value="">All Layouts</option>
           <option v-for="layout in layouts" :key="layout" :value="layout">{{ layout }}</option>
         </select>
       </div>
     </div>
 
-    <SkeletonCard v-if="villages === null" :count="3" :columns="3" />
-    <div v-else-if="villages.length === 0" class="alert alert-info">
-      No villages found. Create one to get started!
+    <div v-if="debouncedName || selectedLayout" class="d-flex flex-wrap gap-2 mb-3">
+      <FilterChip v-if="debouncedName" label="Name" :value="debouncedName" @remove="clearName" />
+      <FilterChip v-if="selectedLayout" label="Layout" :value="selectedLayout" @remove="clearLayout" />
     </div>
-    <div v-else class="row g-4">
+
+    <SkeletonCard v-if="villages === null" :count="3" :columns="3" />
+    <EmptyState v-else-if="villages.length === 0" title="No villages found" message="Try adjusting your search or create a new village." icon="village" />
+    <template v-else>
+    <p class="text-muted small mb-2"><span class="badge bg-secondary result-count">{{ villages.length }}</span> result{{ villages.length !== 1 ? 's' : '' }}</p>
+    <div class="row g-4">
       <div class="col-12 col-md-4" v-for="village in villages" :key="village.id">
         <div class="card h-100 shadow-sm">
           <div class="card-body">
@@ -76,6 +102,7 @@ watch([searchName, selectedLayout], search);
         </div>
       </div>
     </div>
+    </template>
 
     <DetailModal :show="!!selectedVillage" :title="selectedVillage?.name ?? ''" @close="closeModal">
       <template v-if="selectedVillage">
