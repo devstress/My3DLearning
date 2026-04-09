@@ -219,3 +219,32 @@ GatewayOptions/GatewayResponse/RouteDefinition configuration defaults fully test
 ### Next Chunk
 
 Phase 33 is complete. No remaining chunks.
+
+---
+
+## Phase 34 — DI Registration (ServiceExtensions) Test Hardening
+
+> **Origin:** Audit revealed 35 `*ServiceExtensions.cs` files (DI registration methods critical
+> for production wiring) had **zero dedicated unit tests**. Only 8 of 42 ServiceExtensions files
+> had tests. This phase adds comprehensive DI registration tests verifying that every
+> `Add*` extension method correctly registers its expected services in the DI container.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 340 | **Processing Pattern DI Tests Part 1** — see `rules/completion-log.md` | `done` |
+| 341 | **Processing Pattern DI Tests Part 2** — see `rules/completion-log.md` | `done` |
+| 342 | **Infrastructure DI Tests** — see `rules/completion-log.md` | `done` |
+| 343 | **Connector & Platform DI Tests** — see `rules/completion-log.md` | `done` |
+| 344 | **AI & Remaining DI Tests** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 34 complete — 5 chunks (340–344). 79 new unit tests covering 35 ServiceExtensions files.
+UnitTests total: 1843 (was 1764). All 42 ServiceExtensions files now have dedicated DI tests.
+Tests verify every `Add*` method registers the correct service types in the container.
+
+---
+
+### Next Chunk
+
+Phase 34 is complete. No remaining chunks.

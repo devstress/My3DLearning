@@ -4,6 +4,51 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 344 — AI & Remaining DI Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 34 — DI Registration (ServiceExtensions) Test Hardening
+- **Status**: done
+- **Goal**: DI registration tests for AI.Ollama, AI.RagFlow, AI.RagKnowledge, Security.Secrets, RuleEngine, Workflow.Temporal.
+- **Files created**:
+  - `tests/UnitTests/ServiceExtensions/AiAndRemainingDiTests.cs` — 12 tests: Ollama (IOllamaService), RagFlow (IRagFlowService), RagKnowledge (RagDocumentParser, RagKnowledgeIndex, RagQueryMatcher), Secrets (ISecretProvider, ISecretRotationService), RuleEngine (IRuleEngine, IRuleStore, AddRuleStore), Temporal (ITemporalWorkflowDispatcher)
+
+## Chunk 343 — Connector & Platform DI Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 34 — DI Registration (ServiceExtensions) Test Hardening
+- **Status**: done
+- **Goal**: DI registration tests for Connectors, Http/Email/Sftp/File connectors, MultiTenancy, TenantOnboarding.
+- **Files created**:
+  - `tests/UnitTests/ServiceExtensions/ConnectorPlatformDiTests.cs` — 16 tests: Connectors (IConnectorRegistry, IConnectorFactory, health check), HttpConnector (IHttpConnector, ITokenCache), EmailConnector (IEmailConnector, ISmtpClientWrapper), SftpConnector (ISftpConnector, ISftpConnectionPool), FileConnector (IFileConnector, IFileSystem), MultiTenancy (ITenantResolver, ITenantIsolationGuard), TenantOnboarding (ITenantOnboardingService, ITenantQuotaManager, IBrokerNamespaceProvisioner)
+
+## Chunk 342 — Infrastructure DI Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 34 — DI Registration (ServiceExtensions) Test Hardening
+- **Status**: done
+- **Goal**: DI registration tests for Channels, Configuration, EventSourcing, SystemManagement, DisasterRecovery, Observability, Profiling.
+- **Files created**:
+  - `tests/UnitTests/ServiceExtensions/InfrastructureDiTests.cs` — 27 tests: Channels (PointToPoint, PubSub, Datatype, InvalidMessage, Bridge), Configuration (IConfigurationStore, IFeatureFlagService, ChangeNotifier, EnvironmentOverride), EventSourcing (IEventStore, ISnapshotStore, EventProjectionEngine), SystemManagement (IControlBus, IMessageStore, ISmartProxy, ITestMessageGenerator), DR (IFailoverManager, IReplicationManager, IRecoveryPointValidator, IDrDrillRunner), Observability (IMessageStateStore, MessageLifecycleRecorder, ITraceAnalyzer), Profiling (IContinuousProfiler, IHotspotDetector, IGcMonitor, IBenchmarkRegistry)
+
+## Chunk 341 — Processing Pattern DI Tests Part 2
+
+- **Date**: 2026-04-09
+- **Phase**: 34 — DI Registration (ServiceExtensions) Test Hardening
+- **Status**: done
+- **Goal**: DI registration tests for Transform, Translator, Dispatcher, ScatterGather, RequestReply, CompetingConsumers, Throttle ServiceExtensions.
+- **Files created**:
+  - `tests/UnitTests/ServiceExtensions/ProcessingPatternDiTests2.cs` — 16 tests: Transform (pipeline, JsonToXml, XmlToJson, ContentEnricher, ContentFilter, Normalizer), Translator (JSON translator), Dispatcher (IMessageDispatcher, IServiceActivator), ScatterGather (IScatterGatherer), RequestReply (IRequestReplyCorrelator), CompetingConsumers (IConsumerLagMonitor, IBackpressureSignal, IConsumerScaler), Throttle (IMessageThrottle, IThrottleRegistry)
+
+## Chunk 340 — Processing Pattern DI Tests Part 1
+
+- **Date**: 2026-04-09
+- **Phase**: 34 — DI Registration (ServiceExtensions) Test Hardening
+- **Status**: done
+- **Goal**: DI registration tests for DeadLetter, Retry, Replay, Splitter, Aggregator ServiceExtensions.
+- **Files created**:
+  - `tests/UnitTests/ServiceExtensions/ProcessingPatternDiTests1.cs` — 8 tests: DeadLetter (IDeadLetterPublisher, IMessageExpirationChecker), Retry (IRetryPolicy), Replay (IMessageReplayStore, IMessageReplayer), Splitter (IMessageSplitter delegate, IMessageSplitter JSON), Aggregator (IMessageAggregator)
+
 ## Chunk 333 — SftpConnectorAdapter + FileConnectorAdapter Tests
 
 - **Date**: 2026-04-09
