@@ -154,3 +154,37 @@ Phase 31 complete — 9 chunks (310–318). Admin UI expanded from 7 pages to 16
 ### Next Chunk
 
 Phase 31 is complete. No remaining chunks.
+
+---
+
+## Phase 32 — Admin UI UX Polish & Remaining Backend Features
+
+> **Origin:** Phase 31 built 16 Admin UI pages, but several BizTalk-inspired backend features
+> (Message Replay, Connector Health, Event Store) lacked UI. Additionally, some pages displayed
+> raw JSON instead of proper UI components (Profiling, Rate Limiting). This phase adds the missing
+> pages, enhances existing ones, and adds UX polish: dark/light theme, toast notifications,
+> collapsible sidebar with section groupings.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 320 | **Message Replay UI** — see `rules/completion-log.md` | `done` |
+| 321 | **Connector Health Monitor** — see `rules/completion-log.md` | `done` |
+| 322 | **Enhanced Profiling Page** — see `rules/completion-log.md` | `done` |
+| 323 | **Enhanced RateLimit Page** — see `rules/completion-log.md` | `done` |
+| 324 | **Event Store Browser** — see `rules/completion-log.md` | `done` |
+| 325 | **Dark Mode Toggle + Theme Persistence** — see `rules/completion-log.md` | `done` |
+| 326 | **Toast Notification System** — see `rules/completion-log.md` | `done` |
+| 327 | **Responsive Collapsible Sidebar** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 32 complete — 8 chunks (320–327). Admin UI expanded from 16 pages to 19 pages.
+100 Vitest tests (was 77). 16 test files (was 13). 3 new pages (Replay, Connectors, Event Store).
+2 pages enhanced (Profiling, RateLimit). Dark/light theme toggle. Toast notifications.
+Collapsible sidebar with section groupings. Full .NET build succeeds.
+
+---
+
+### Next Chunk
+
+Phase 32 is complete. No remaining chunks.

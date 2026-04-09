@@ -1,4 +1,6 @@
-:root {
+/* ── Dark Theme (default) ────────────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
   --bg: #0f172a;
   --surface: #1e293b;
   --surface2: #283548;
@@ -11,6 +13,22 @@
   --yellow: #facc15;
   --orange: #fb923c;
   --purple: #a78bfa;
+}
+
+/* ── Light Theme ────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface2: #f1f5f9;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --muted: #64748b;
+  --accent: #0284c7;
+  --green: #16a34a;
+  --red: #dc2626;
+  --yellow: #ca8a04;
+  --orange: #ea580c;
+  --purple: #7c3aed;
 }
 
 * {
@@ -408,4 +426,150 @@ th {
   .sidebar nav a.active {
     border-bottom-color: var(--accent);
   }
+
+  .sidebar-header,
+  .sidebar-section,
+  .sidebar-footer {
+    display: none;
+  }
+}
+
+/* ── Sidebar Sections ──────────────────────────────────────────────── */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.75rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-header h1 {
+  border-bottom: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-section {
+  padding: 0.75rem 1rem 0.25rem;
+}
+
+.section-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.sidebar-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+
+/* ── Collapsible sidebar ───────────────────────────────────────────── */
+.btn-collapse {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.25rem;
+}
+
+.sidebar.collapsed {
+  width: 60px;
+}
+
+.sidebar.collapsed nav a {
+  text-align: center;
+  padding: 0.6rem 0.5rem;
+  font-size: 1.1rem;
+}
+
+/* ── Theme Toggle ──────────────────────────────────────────────────── */
+.btn-theme {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.15s;
+}
+
+.btn-theme:hover {
+  background: var(--border);
+}
+
+/* ── Toast Notifications ───────────────────────────────────────────── */
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: toast-slide-in 0.25s ease-out;
+  min-width: 250px;
+  max-width: 400px;
+}
+
+.toast-info {
+  border-left: 3px solid var(--accent);
+}
+
+.toast-success {
+  border-left: 3px solid var(--green);
+}
+
+.toast-error {
+  border-left: 3px solid var(--red);
+}
+
+.toast-warning {
+  border-left: 3px solid var(--orange);
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-left: auto;
+}
+
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ── Badge additions ───────────────────────────────────────────────── */
+.badge-warning {
+  background: var(--yellow);
+  color: #000;
 }

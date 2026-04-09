@@ -4,6 +4,95 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 327 — UX: Responsive Collapsible Sidebar + Keyboard Nav
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: Collapsible sidebar with section groupings (Monitoring, Operations, Configuration, System). Icon-only mode when collapsed. Responsive layout for mobile.
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/App.vue` — Sidebar collapse toggle, section labels, `sidebarCollapsed` data property
+  - `src/Admin.Web/clientapp/src/style.css` — `.sidebar.collapsed`, `.sidebar-header`, `.sidebar-section`, `.sidebar-footer`, `.btn-collapse` styles
+  - `src/Admin.Web/clientapp/src/__tests__/App.test.js` — Added sidebar collapse test
+
+## Chunk 326 — UX: Toast Notification System
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: Toast notification container with auto-dismiss (4s), types (info/success/error/warning), slide-in animation.
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/App.vue` — Toast container template, `addToast`/`removeToast` methods, toast data array
+  - `src/Admin.Web/clientapp/src/style.css` — `.toast-container`, `.toast`, `.toast-info/success/error/warning`, `.toast-close`, `@keyframes toast-slide-in`
+
+## Chunk 325 — UX: Dark Mode Toggle + Theme Persistence
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: Light/dark theme toggle button in sidebar footer. Theme persisted in localStorage. CSS variables for both themes via `[data-theme]` attribute.
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/App.vue` — Theme toggle button, `isDark` data, `toggleTheme`/`applyTheme` methods, localStorage read on mount
+  - `src/Admin.Web/clientapp/src/style.css` — `[data-theme="dark"]` and `[data-theme="light"]` CSS variable definitions
+  - `src/Admin.Web/clientapp/src/__tests__/App.test.js` — Added theme toggle button test
+
+## Chunk 324 — Event Store Browser (BizTalk BAM)
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: New `EventStorePage.vue` for browsing event-sourced aggregate streams. Search by stream ID, event timeline with version markers, expandable event data/metadata. API endpoint: `GET /api/admin/eventstore/stream/{streamId}`.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/EventStorePage.vue` — Stream ID search, stat cards (events, version, first event), timeline with version-colored markers, expandable JSON data/metadata
+  - `src/Admin.Web/clientapp/src/__tests__/EventStorePage.test.js` — 6 tests: renders page, button text, event timeline, stat cards, empty state, error handling
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/eventstore/stream/{streamId}` endpoint using `IEventStore.ReadStreamAsync`
+  - `src/Admin.Api/Admin.Api.csproj` — Added EventSourcing project reference
+
+## Chunk 323 — Enhanced RateLimit Page
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: Replace raw JSON dump with proper UI: stat cards (permit limit, window, queue limit, rejection code), structured settings table, refresh button.
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/components/RateLimitPage.vue` — Stat cards, settings table with descriptions, refresh button, gateway API section
+
+## Chunk 322 — Enhanced Profiling Page
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: Replace raw JSON dumps with proper UI. Five sections: Performance Snapshot (stat cards + collapsible raw JSON), Hotspot Analysis (severity table), Operation Statistics (calls, avg, P95, max, errors), GC Diagnostics (gen0/1/2 collections, allocated MB, recommendations), Benchmark Baselines (regression % tracking).
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/components/ProfilingPage.vue` — 5 sections with proper tables/cards, hotspot detection, operation stats, GC recommendations, benchmark regression tracking
+
+## Chunk 321 — Connector Health Monitor
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: New `ConnectorsPage.vue` — BizTalk Adapter/Port Monitor equivalent. Lists registered connectors with type/status/health. Type filter dropdown. Stat cards (total, healthy, degraded, unhealthy). API endpoint: `GET /api/admin/connectors`.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/ConnectorsPage.vue` — Connector table with type filter, stat cards, health status badges
+  - `src/Admin.Web/clientapp/src/__tests__/ConnectorsPage.test.js` — 5 tests: renders page, empty state, renders rows, stat cards, type filter
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/connectors` endpoint using `IConnectorRegistry.GetDescriptors()`
+  - `src/Admin.Api/Admin.Api.csproj` — Added Connectors project reference
+
+## Chunk 320 — Message Replay UI
+
+- **Date**: 2026-04-09
+- **Phase**: 32 — Admin UI UX Polish & Remaining Backend Features
+- **Status**: done
+- **Goal**: New `ReplayPage.vue` — BizTalk tracked message replay equivalent. Filter by correlation ID, message type, timestamps. Source/target topic fields. Replay result stat cards (replayed, skipped, failed, duration). Session history. API endpoint: `POST /api/admin/replay`.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/ReplayPage.vue` — Replay form with 6 filter fields, result stat cards, computed duration, session history table
+  - `src/Admin.Web/clientapp/src/__tests__/ReplayPage.test.js` — 6 tests: renders form, button text, result display, history tracking, error handling, duration computation
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `POST /api/admin/replay` endpoint using `IMessageReplayer.ReplayAsync()`, added `ReplayRequest` record
+  - `src/Admin.Web/clientapp/src/App.vue` — Added Replay, Connectors, Event Store nav links + page components + sidebar sections + dark mode + toast + collapse
+
 ## Chunk 318 — Tenant Management UI
 
 - **Date**: 2026-04-09

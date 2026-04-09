@@ -11,5 +11,7 @@
     <ProjectReference Include="..\DisasterRecovery\DisasterRecovery.csproj" />
     <ProjectReference Include="..\SystemManagement\SystemManagement.csproj" />
     <ProjectReference Include="..\Performance.Profiling\Performance.Profiling.csproj" />
+    <ProjectReference Include="..\Connectors\Connectors.csproj" />
+    <ProjectReference Include="..\EventSourcing\EventSourcing.csproj" />
   </ItemGroup>
 </Project>

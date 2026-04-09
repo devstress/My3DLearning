@@ -1,18 +1,30 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import App from '../App.vue'
+
+// Mock localStorage for theme tests
+const localStorageMock = {
+  store: {},
+  getItem: vi.fn((key) => localStorageMock.store[key] ?? null),
+  setItem: vi.fn((key, val) => { localStorageMock.store[key] = val }),
+  clear: vi.fn(() => { localStorageMock.store = {} }),
+}
+vi.stubGlobal('localStorage', localStorageMock)
 
 describe('App', () => {
   it('renders the sidebar with all navigation items', () => {
     const wrapper = mount(App, { shallow: true })
     const navLinks = wrapper.findAll('nav a')
-    expect(navLinks).toHaveLength(16)
+    expect(navLinks).toHaveLength(19)
     expect(wrapper.find('[data-nav="dashboard"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="flow"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="messages"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="inflight"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="subscriptions"]').exists()).toBe(true)
+    expect(wrapper.find('[data-nav="connectors"]').exists()).toBe(true)
+    expect(wrapper.find('[data-nav="events"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="dlq"]').exists()).toBe(true)
+    expect(wrapper.find('[data-nav="replay"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="testmsg"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="controlbus"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="throttle"]').exists()).toBe(true)
@@ -115,5 +127,40 @@ describe('App', () => {
     const wrapper = mount(App, { shallow: true })
     await wrapper.find('[data-nav="auditlog"]').trigger('click')
     expect(wrapper.find('h2').text()).toContain('Audit Log')
+  })
+
+  it('switches to Connectors page on nav click', async () => {
+    const wrapper = mount(App, { shallow: true })
+    await wrapper.find('[data-nav="connectors"]').trigger('click')
+    expect(wrapper.find('h2').text()).toContain('Connector Health')
+  })
+
+  it('switches to Event Store page on nav click', async () => {
+    const wrapper = mount(App, { shallow: true })
+    await wrapper.find('[data-nav="events"]').trigger('click')
+    expect(wrapper.find('h2').text()).toContain('Event Store Browser')
+  })
+
+  it('switches to Replay page on nav click', async () => {
+    const wrapper = mount(App, { shallow: true })
+    await wrapper.find('[data-nav="replay"]').trigger('click')
+    expect(wrapper.find('h2').text()).toContain('Message Replay')
+  })
+
+  it('has a theme toggle button', () => {
+    const wrapper = mount(App, { shallow: true })
+    expect(wrapper.find('#btn-toggle-theme').exists()).toBe(true)
+  })
+
+  it('has a sidebar collapse button', () => {
+    const wrapper = mount(App, { shallow: true })
+    expect(wrapper.find('#btn-toggle-sidebar').exists()).toBe(true)
+  })
+
+  it('collapses sidebar on toggle click', async () => {
+    const wrapper = mount(App, { shallow: true })
+    expect(wrapper.find('.sidebar').classes()).not.toContain('collapsed')
+    await wrapper.find('#btn-toggle-sidebar').trigger('click')
+    expect(wrapper.find('.sidebar').classes()).toContain('collapsed')
   })
 })
