@@ -49,11 +49,11 @@ describe('useVirtualScroll', () => {
     const routerModule = await import('../../router/index');
     const router = routerModule.default;
     const routes = router.getRoutes();
-    // All routes should have async component definitions (lazy loaded)
     expect(routes.length).toBeGreaterThan(0);
     for (const route of routes) {
-      // Route components should be defined (either directly or lazy-loaded)
-      expect(route.components).toBeDefined();
+      // Lazy-loaded routes have function components (dynamic import thunks)
+      const defaultComponent = route.components?.default;
+      expect(typeof defaultComponent).toBe('function');
     }
   });
 });
