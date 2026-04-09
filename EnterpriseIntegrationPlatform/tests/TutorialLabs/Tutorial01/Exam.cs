@@ -31,7 +31,10 @@ public sealed class Exam
     {
         var natsUrl = await SharedTestAppHost.GetNatsUrlAsync();
         if (natsUrl is null)
-            Assert.Ignore("Docker not available — skipping real broker test");
+        {
+            Assert.Fail("Docker not available — skipping real broker test");
+            return;
+        }
 
         _natsUrl = natsUrl;
         _broker = new NatsBrokerEndpoint("broker", _natsUrl);

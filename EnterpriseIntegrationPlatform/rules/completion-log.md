@@ -604,7 +604,7 @@ See `milestones.md` for current phase status and next chunk.
   - `PostgresRoutingIntegrationTests` (7 tests): ContentBasedRouter (MessageType + Metadata + Regex), MessageFilter, RecipientListRouter, DynamicRouter (register + route), Detour (activate/deactivate)
   - `PostgresAdvancedEipTests` (7 tests): Splitter (split + causation chain), DeadLetterPublisher (single + multi-reason), Resequencer (out-of-order → in-order + publish), Retry + DLQ pipeline, Aggregator (count completion + concat), full pipeline (Splitter → Router → DLQ)
   - All tests use unique topics (Guid-based) to prevent cross-test interference
-  - All tests Docker-gated: Assert.Ignore when Aspire Postgres container unavailable
+  - All tests Docker-gated: Assert.Fail when Aspire Postgres container unavailable
 - **Files created**:
   - `tests/TutorialLabs/InfrastructureTests/PostgresRoutingIntegrationTests.cs` (7 tests)
   - `tests/TutorialLabs/InfrastructureTests/PostgresAdvancedEipTests.cs` (7 tests)
