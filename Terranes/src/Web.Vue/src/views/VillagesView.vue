@@ -46,6 +46,7 @@ async function search() {
 
 function clearName() { searchName.value = ''; }
 function clearLayout() { selectedLayout.value = ''; }
+function clearAllFilters() { clearName(); clearLayout(); }
 
 async function viewVillage(village: VirtualVillage) {
   selectedVillage.value = village;
@@ -81,6 +82,7 @@ watch([debouncedName, selectedLayout], search);
     <div v-if="debouncedName || selectedLayout" class="d-flex flex-wrap gap-2 mb-3">
       <FilterChip v-if="debouncedName" label="Name" :value="debouncedName" @remove="clearName" />
       <FilterChip v-if="selectedLayout" label="Layout" :value="selectedLayout" @remove="clearLayout" />
+      <button class="btn btn-sm btn-outline-secondary" aria-label="Clear all filters" @click="clearAllFilters">✕ Clear All</button>
     </div>
 
     <SkeletonCard v-if="villages === null" :count="3" :columns="3" />

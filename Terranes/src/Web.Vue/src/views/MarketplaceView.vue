@@ -12,6 +12,7 @@ import EmptyState from '../components/EmptyState.vue';
 import PaginationBar from '../components/PaginationBar.vue';
 import { useDebounce } from '../composables/useDebounce';
 import { usePagedList } from '../composables/usePagedList';
+import { useValidation, rules } from '../composables/useValidation';
 
 const route = useRoute();
 const router = useRouter();
@@ -26,6 +27,9 @@ const selectedListing = ref<PropertyListing | null>(null);
 
 const debouncedSuburb = useDebounce(searchSuburb, 300);
 const debouncedPrice = useDebounce(maxPrice, 300);
+const priceValidation = useValidation(maxPrice, [
+  rules.positiveNumber('Price must be a positive number'),
+]);
 
 const statuses = ['Active', 'Draft', 'UnderOffer', 'Sold', 'Withdrawn'];
 const sortBy = ref((route.query.sort as string) ?? '');
@@ -36,6 +40,8 @@ const sortOptions = [
   { value: 'date-desc', label: 'Newest First' },
   { value: 'date-asc', label: 'Oldest First' },
 ];
+
+const hasActiveFilters = computed(() => !!debouncedSuburb.value || debouncedPrice.value !== undefined || !!selectedStatus.value);
 
 function formatPrice(price?: number): string {
   if (price == null) return 'Price on Application';
@@ -74,8 +80,9 @@ async function search() {
 }
 
 function clearSuburb() { searchSuburb.value = ''; }
-function clearPrice() { maxPrice.value = undefined; }
+function clearPrice() { maxPrice.value = undefined; priceValidation.reset(); }
 function clearStatus() { selectedStatus.value = ''; }
+function clearAllFilters() { clearSuburb(); clearPrice(); clearStatus(); }
 
 function viewListing(listing: PropertyListing) {
   selectedListing.value = listing;
@@ -99,7 +106,8 @@ watch([debouncedSuburb, debouncedPrice, selectedStatus], search);
         <SearchBar v-model="searchSuburb" placeholder="Suburb..." />
       </div>
       <div class="col-md-3">
-        <input type="number" class="form-control" placeholder="Max price ($)" v-model.number="maxPrice" aria-label="Maximum price" />
+        <input type="number" class="form-control" :class="{ 'is-invalid': priceValidation.touched.value && priceValidation.error.value }" placeholder="Max price ($)" v-model.number="maxPrice" aria-label="Maximum price" @blur="priceValidation.touch()" />
+        <div v-if="priceValidation.touched.value && priceValidation.error.value" class="invalid-feedback">{{ priceValidation.error.value }}</div>
       </div>
       <div class="col-md-3">
         <select class="form-select" v-model="selectedStatus" aria-label="Filter by status">
@@ -114,10 +122,11 @@ watch([debouncedSuburb, debouncedPrice, selectedStatus], search);
       </div>
     </div>
 
-    <div v-if="debouncedSuburb || debouncedPrice !== undefined || selectedStatus" class="d-flex flex-wrap gap-2 mb-3">
+    <div v-if="hasActiveFilters" class="d-flex flex-wrap gap-2 mb-3">
       <FilterChip v-if="debouncedSuburb" label="Suburb" :value="debouncedSuburb" @remove="clearSuburb" />
       <FilterChip v-if="debouncedPrice !== undefined" label="Max Price" :value="formatPrice(debouncedPrice)" @remove="clearPrice" />
       <FilterChip v-if="selectedStatus" label="Status" :value="selectedStatus" @remove="clearStatus" />
+      <button class="btn btn-sm btn-outline-secondary" aria-label="Clear all filters" @click="clearAllFilters">✕ Clear All</button>
     </div>
 
     <SkeletonCard v-if="listings === null" :count="2" :columns="2" />

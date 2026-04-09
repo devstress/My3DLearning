@@ -67,6 +67,7 @@ async function search() {
 
 function clearSuburb() { searchSuburb.value = ''; }
 function clearState() { searchState.value = ''; }
+function clearAllFilters() { clearSuburb(); clearState(); sortBy.value = ''; }
 
 async function selectBlock(block: LandBlock) {
   selectedBlock.value = block;
@@ -120,6 +121,7 @@ watch([debouncedSuburb, debouncedState], search);
     <div v-if="debouncedSuburb || debouncedState" class="d-flex flex-wrap gap-2 mb-3">
       <FilterChip v-if="debouncedSuburb" label="Suburb" :value="debouncedSuburb" @remove="clearSuburb" />
       <FilterChip v-if="debouncedState" label="State" :value="debouncedState" @remove="clearState" />
+      <button class="btn btn-sm btn-outline-secondary" aria-label="Clear all filters" @click="clearAllFilters">✕ Clear All</button>
     </div>
 
     <SkeletonTable v-if="blocks === null" :rows="5" :cols="8" />

@@ -10,6 +10,7 @@ import EmptyState from '../components/EmptyState.vue';
 import PaginationBar from '../components/PaginationBar.vue';
 import { useDebounce } from '../composables/useDebounce';
 import { usePagedList } from '../composables/usePagedList';
+import { useValidation, rules } from '../composables/useValidation';
 
 const route = useRoute();
 const router = useRouter();
@@ -20,12 +21,23 @@ const minBedrooms = ref<number | undefined>(
 );
 const selectedFormat = ref((route.query.format as string) ?? '');
 const selectedModel = ref<HomeModel | null>(null);
+const searchInputRef = ref<HTMLElement | null>(null);
 
 const debouncedBedrooms = useDebounce(minBedrooms, 300);
+const bedroomValidation = useValidation(minBedrooms, [
+  rules.minValue(0, 'Bedrooms must be 0 or more'),
+  rules.maxValue(10, 'Bedrooms must be 10 or less'),
+]);
 
 const formats = ['Gltf', 'Glb', 'Obj', 'Fbx', 'Usd'];
 
+const hasActiveFilters = ref(false);
+
 const { currentPage, totalPages, pagedItems, goToPage, resetPage } = usePagedList(models, 12);
+
+function updateFilterState() {
+  hasActiveFilters.value = debouncedBedrooms.value !== undefined || !!selectedFormat.value;
+}
 
 function syncQuery() {
   const query: Record<string, string> = {};
@@ -37,14 +49,16 @@ function syncQuery() {
 async function search() {
   syncQuery();
   resetPage();
+  updateFilterState();
   models.value = await api.getHomeModels({
     minBedrooms: debouncedBedrooms.value,
     format: selectedFormat.value || undefined,
   });
 }
 
-function clearBedrooms() { minBedrooms.value = undefined; }
+function clearBedrooms() { minBedrooms.value = undefined; bedroomValidation.reset(); }
 function clearFormat() { selectedFormat.value = ''; }
+function clearAllFilters() { clearBedrooms(); clearFormat(); }
 
 function selectModel(model: HomeModel) {
   selectedModel.value = model;
@@ -54,7 +68,10 @@ function closeModal() {
   selectedModel.value = null;
 }
 
-onMounted(search);
+onMounted(() => {
+  search();
+  searchInputRef.value?.focus();
+});
 watch([debouncedBedrooms, selectedFormat], search);
 </script>
 
@@ -66,7 +83,8 @@ watch([debouncedBedrooms, selectedFormat], search);
     <div class="row mb-3">
       <div class="col-md-3">
         <label class="form-label">Min Bedrooms</label>
-        <input type="number" class="form-control" min="0" max="10" v-model.number="minBedrooms" aria-label="Minimum bedrooms" />
+        <input ref="searchInputRef" type="number" class="form-control" :class="{ 'is-invalid': bedroomValidation.touched.value && bedroomValidation.error.value }" min="0" max="10" v-model.number="minBedrooms" aria-label="Minimum bedrooms" @blur="bedroomValidation.touch()" />
+        <div v-if="bedroomValidation.touched.value && bedroomValidation.error.value" class="invalid-feedback">{{ bedroomValidation.error.value }}</div>
       </div>
       <div class="col-md-3">
         <label class="form-label">Format</label>
@@ -74,6 +92,9 @@ watch([debouncedBedrooms, selectedFormat], search);
           <option value="">All Formats</option>
           <option v-for="fmt in formats" :key="fmt" :value="fmt">{{ fmt }}</option>
         </select>
+      </div>
+      <div class="col-md-3 d-flex align-items-end">
+        <button v-if="hasActiveFilters" class="btn btn-outline-secondary" aria-label="Clear all filters" @click="clearAllFilters">✕ Clear All</button>
       </div>
     </div>
 
