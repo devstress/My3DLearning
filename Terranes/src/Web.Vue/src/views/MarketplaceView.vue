@@ -1,31 +1,88 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { PropertyListing } from '../types';
 import DetailModal from '../components/DetailModal.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import SkeletonCard from '../components/SkeletonCard.vue';
+import SearchBar from '../components/SearchBar.vue';
+import FilterChip from '../components/FilterChip.vue';
+import EmptyState from '../components/EmptyState.vue';
+import PaginationBar from '../components/PaginationBar.vue';
+import { useDebounce } from '../composables/useDebounce';
+import { usePagedList } from '../composables/usePagedList';
+import { useValidation, rules } from '../composables/useValidation';
+
+const route = useRoute();
+const router = useRouter();
 
 const listings = ref<PropertyListing[] | null>(null);
-const searchSuburb = ref('');
-const maxPrice = ref<number | undefined>(undefined);
-const selectedStatus = ref('');
+const searchSuburb = ref((route.query.suburb as string) ?? '');
+const maxPrice = ref<number | undefined>(
+  route.query.maxPrice ? Number(route.query.maxPrice) : undefined,
+);
+const selectedStatus = ref((route.query.status as string) ?? '');
 const selectedListing = ref<PropertyListing | null>(null);
 
+const debouncedSuburb = useDebounce(searchSuburb, 300);
+const debouncedPrice = useDebounce(maxPrice, 300);
+const priceValidation = useValidation(maxPrice, [
+  rules.positiveNumber('Price must be a positive number'),
+]);
+
 const statuses = ['Active', 'Draft', 'UnderOffer', 'Sold', 'Withdrawn'];
+const sortBy = ref((route.query.sort as string) ?? '');
+const sortOptions = [
+  { value: '', label: 'Default' },
+  { value: 'price-asc', label: 'Price: Low → High' },
+  { value: 'price-desc', label: 'Price: High → Low' },
+  { value: 'date-desc', label: 'Newest First' },
+  { value: 'date-asc', label: 'Oldest First' },
+];
+
+const hasActiveFilters = computed(() => !!debouncedSuburb.value || debouncedPrice.value !== undefined || !!selectedStatus.value);
 
 function formatPrice(price?: number): string {
   if (price == null) return 'Price on Application';
   return `$${price.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
 }
 
+const sortedListings = computed(() => {
+  if (!listings.value) return null;
+  const arr = [...listings.value];
+  if (sortBy.value === 'price-asc') arr.sort((a, b) => (a.askingPriceAud ?? Infinity) - (b.askingPriceAud ?? Infinity));
+  if (sortBy.value === 'price-desc') arr.sort((a, b) => (b.askingPriceAud ?? 0) - (a.askingPriceAud ?? 0));
+  if (sortBy.value === 'date-desc') arr.sort((a, b) => new Date(b.listedUtc).getTime() - new Date(a.listedUtc).getTime());
+  if (sortBy.value === 'date-asc') arr.sort((a, b) => new Date(a.listedUtc).getTime() - new Date(b.listedUtc).getTime());
+  return arr;
+});
+
+const { currentPage, totalPages, pagedItems, goToPage, resetPage } = usePagedList(sortedListings, 12);
+
+function syncQuery() {
+  const query: Record<string, string> = {};
+  if (debouncedSuburb.value) query.suburb = debouncedSuburb.value;
+  if (debouncedPrice.value !== undefined && debouncedPrice.value !== null) query.maxPrice = String(debouncedPrice.value);
+  if (selectedStatus.value) query.status = selectedStatus.value;
+  if (sortBy.value) query.sort = sortBy.value;
+  router.replace({ query });
+}
+
 async function search() {
+  syncQuery();
+  resetPage();
   listings.value = await api.getListings({
-    suburb: searchSuburb.value || undefined,
-    maxPriceAud: maxPrice.value,
+    suburb: debouncedSuburb.value || undefined,
+    maxPriceAud: debouncedPrice.value,
     status: selectedStatus.value || undefined,
   });
 }
+
+function clearSuburb() { searchSuburb.value = ''; }
+function clearPrice() { maxPrice.value = undefined; priceValidation.reset(); }
+function clearStatus() { selectedStatus.value = ''; }
+function clearAllFilters() { clearSuburb(); clearPrice(); clearStatus(); }
 
 function viewListing(listing: PropertyListing) {
   selectedListing.value = listing;
@@ -36,7 +93,7 @@ function closeModal() {
 }
 
 onMounted(search);
-watch([searchSuburb, maxPrice, selectedStatus], search);
+watch([debouncedSuburb, debouncedPrice, selectedStatus], search);
 </script>
 
 <template>
@@ -46,26 +103,39 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
 
     <div class="row mb-3">
       <div class="col-md-3">
-        <input type="text" class="form-control" placeholder="Suburb..." v-model="searchSuburb" />
+        <SearchBar v-model="searchSuburb" placeholder="Suburb..." />
       </div>
       <div class="col-md-3">
-        <input type="number" class="form-control" placeholder="Max price ($)" v-model.number="maxPrice" />
+        <input type="number" class="form-control" :class="{ 'is-invalid': priceValidation.touched.value && priceValidation.error.value }" placeholder="Max price ($)" v-model.number="maxPrice" aria-label="Maximum price" @blur="priceValidation.touch()" />
+        <div v-if="priceValidation.touched.value && priceValidation.error.value" class="invalid-feedback">{{ priceValidation.error.value }}</div>
       </div>
       <div class="col-md-3">
-        <select class="form-select" v-model="selectedStatus">
+        <select class="form-select" v-model="selectedStatus" aria-label="Filter by status">
           <option value="">All Statuses</option>
           <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
         </select>
       </div>
+      <div class="col-md-3">
+        <select class="form-select" v-model="sortBy" aria-label="Sort by">
+          <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div v-if="hasActiveFilters" class="d-flex flex-wrap gap-2 mb-3">
+      <FilterChip v-if="debouncedSuburb" label="Suburb" :value="debouncedSuburb" @remove="clearSuburb" />
+      <FilterChip v-if="debouncedPrice !== undefined" label="Max Price" :value="formatPrice(debouncedPrice)" @remove="clearPrice" />
+      <FilterChip v-if="selectedStatus" label="Status" :value="selectedStatus" @remove="clearStatus" />
+      <button class="btn btn-sm btn-outline-secondary" aria-label="Clear all filters" @click="clearAllFilters">✕ Clear All</button>
     </div>
 
     <SkeletonCard v-if="listings === null" :count="2" :columns="2" />
-    <div v-else-if="listings.length === 0" class="alert alert-info">
-      No listings found matching your criteria.
-    </div>
-    <div v-else class="row g-4">
-      <div class="col-12 col-md-6" v-for="listing in listings" :key="listing.id">
-        <div class="card h-100 shadow-sm">
+    <EmptyState v-else-if="listings.length === 0" title="No listings found" message="Try adjusting your suburb, price, or status filter." icon="listing" />
+    <template v-else>
+    <p class="text-muted small mb-2"><span class="badge bg-secondary result-count">{{ listings.length }}</span> result{{ listings.length !== 1 ? 's' : '' }}</p>
+    <div class="row g-4">
+      <div class="col-12 col-md-6" v-for="listing in pagedItems" :key="listing.id">
+        <div class="card h-100 shadow-sm card-hover-lift">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
               <h5 class="card-title">{{ listing.title }}</h5>
@@ -86,8 +156,10 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
         </div>
       </div>
     </div>
+    <PaginationBar :current-page="currentPage" :total-pages="totalPages" @page="goToPage" />
+    </template>
 
-    <DetailModal :show="!!selectedListing" :title="selectedListing?.title ?? ''" @close="closeModal">
+    <DetailModal :show="!!selectedListing" :title="selectedListing?.title ?? ''" back-label="Marketplace" @close="closeModal">
       <template v-if="selectedListing">
         <p>{{ selectedListing.description }}</p>
         <table class="table table-sm">

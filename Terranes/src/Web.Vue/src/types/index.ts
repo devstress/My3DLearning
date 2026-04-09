@@ -84,3 +84,68 @@ export interface Notification {
   isRead: boolean;
   createdUtc: string;
 }
+
+export interface SearchResult {
+  entityType: string;
+  entityId: string;
+  title: string;
+  summary: string;
+  relevanceScore: number;
+}
+
+export interface PlatformUser {
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
+  isActive: boolean;
+  createdUtc: string;
+}
+
+export interface PartnerProfile {
+  partnerId: string;
+  companyName: string;
+  contactEmail: string;
+  partnerType: string;
+  isActive: boolean;
+}
+
+export interface Walkthrough {
+  id: string;
+  homeModelId: string;
+  sitePlacementId?: string;
+  userId: string;
+  status: string;
+  sceneUrl?: string;
+  createdUtc: string;
+}
+
+export interface WalkthroughPoi {
+  id: string;
+  walkthroughId: string;
+  room: string;
+  label: string;
+  positionX: number;
+  positionY: number;
+  positionZ: number;
+}
+
+export interface DesignEdit {
+  id: string;
+  sitePlacementId: string;
+  operation: string;
+  targetElement: string;
+  previousValue: string;
+  newValue: string;
+  appliedUtc: string;
+}
+
+export interface Report {
+  id: string;
+  reportType: string;
+  title: string;
+  generatedByUserId: string;
+  tenantId: string;
+  contentMarkdown: string;
+  generatedUtc: string;
+}

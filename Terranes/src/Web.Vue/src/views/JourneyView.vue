@@ -5,6 +5,11 @@ import type { BuyerJourney, HomeModel, LandBlock } from '../types';
 import StatusBadge from '../components/StatusBadge.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import ActionButton from '../components/ActionButton.vue';
+import StepIndicator from '../components/StepIndicator.vue';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
+import JourneyTimeline from '../components/JourneyTimeline.vue';
+import ConfettiEffect from '../components/ConfettiEffect.vue';
+import type { TimelineEvent } from '../components/JourneyTimeline.vue';
 import { useToast } from '../composables/useToast';
 
 const { showSuccess, showError, showInfo } = useToast();
@@ -17,6 +22,10 @@ const availableModels = ref<HomeModel[] | null>(null);
 const availableLand = ref<LandBlock[] | null>(null);
 const errorMessage = ref<string | null>(null);
 const actionLoading = ref(false);
+const showConfirmComplete = ref(false);
+const showConfetti = ref(false);
+const timelineEvents = ref<TimelineEvent[]>([]);
+const confettiRef = ref<InstanceType<typeof ConfettiEffect> | null>(null);
 
 const journeyStages = [
   'Browsing', 'DesignSelected', 'PlacedOnLand',
@@ -27,6 +36,15 @@ function getProgressPercent(): number {
   if (!currentJourney.value) return 0;
   const idx = journeyStages.indexOf(currentJourney.value.currentStage);
   return idx < 0 ? 0 : Math.round(((idx + 1) / journeyStages.length) * 100);
+}
+
+function addTimelineEvent(stage: string, description: string) {
+  timelineEvents.value.push({
+    id: String(timelineEvents.value.length + 1),
+    stage,
+    timestamp: new Date().toISOString(),
+    description,
+  });
 }
 
 async function loadStageData() {
@@ -42,6 +60,8 @@ async function startJourney() {
   actionLoading.value = true;
   try {
     currentJourney.value = await api.createJourney(DEMO_BUYER_ID);
+    timelineEvents.value = [];
+    addTimelineEvent('Journey Started', 'You began your home buying journey.');
     showSuccess('Journey started! Browse our home designs to begin.');
     await loadStageData();
   } catch (err: unknown) {
@@ -55,6 +75,7 @@ async function selectDesign(modelId: string) {
   actionLoading.value = true;
   try {
     currentJourney.value = await api.advanceJourney(currentJourney.value!.id, 'DesignSelected', modelId);
+    addTimelineEvent('Design Selected', `Selected a home design.`);
     showSuccess('Design selected! Now choose a land block.');
     await loadStageData();
   } catch (err: unknown) {
@@ -69,6 +90,7 @@ async function selectLand(blockId: string) {
   actionLoading.value = true;
   try {
     currentJourney.value = await api.advanceJourney(currentJourney.value!.id, 'PlacedOnLand', blockId);
+    addTimelineEvent('Placed on Land', 'Design placed on the selected land block.');
     showSuccess('Land block selected! Your design has been placed.');
     await loadStageData();
   } catch (err: unknown) {
@@ -83,6 +105,7 @@ async function moveToCustomising() {
   actionLoading.value = true;
   try {
     currentJourney.value = await api.advanceJourney(currentJourney.value!.id, 'Customising');
+    addTimelineEvent('Customising', 'Customisation mode enabled.');
     showInfo('Customisation mode enabled.');
     await loadStageData();
   } catch (err: unknown) {
@@ -97,6 +120,7 @@ async function requestQuote() {
   actionLoading.value = true;
   try {
     currentJourney.value = await api.advanceJourney(currentJourney.value!.id, 'QuoteRequested');
+    addTimelineEvent('Quote Requested', 'Quote requested from partner network.');
     showSuccess('Quote requested! Our partner network is preparing your quote.');
     await loadStageData();
   } catch (err: unknown) {
@@ -125,10 +149,15 @@ async function checkQuoteReady() {
 }
 
 async function completeJourney() {
+  showConfirmComplete.value = false;
   actionLoading.value = true;
   try {
     currentJourney.value = await api.advanceJourney(currentJourney.value!.id, 'Completed');
+    addTimelineEvent('Completed', 'Journey completed successfully!');
+    showConfetti.value = true;
+    confettiRef.value?.start(50, 3000);
     showSuccess('🎉 Journey complete! Thank you for using Terranes.');
+    setTimeout(() => { showConfetti.value = false; }, 3500);
   } catch (err: unknown) {
     errorMessage.value = err instanceof Error ? err.message : 'Unknown error';
     showError('Failed to complete journey.');
@@ -201,22 +230,7 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div class="d-flex flex-nowrap overflow-auto text-center">
-            <div
-              v-for="stage in journeyStages"
-              :key="stage"
-              class="flex-shrink-0 px-2"
-              style="min-width: 6rem;"
-              :class="{
-                'text-success': journeyStages.indexOf(currentJourney.currentStage) >= journeyStages.indexOf(stage),
-                'text-muted': journeyStages.indexOf(currentJourney.currentStage) < journeyStages.indexOf(stage),
-                'fw-bold': currentJourney.currentStage === stage,
-              }"
-            >
-              {{ journeyStages.indexOf(currentJourney.currentStage) >= journeyStages.indexOf(stage) ? '✅' : '⬜' }}
-              {{ stage }}
-            </div>
-          </div>
+          <StepIndicator :steps="journeyStages" :current-step="currentJourney.currentStage" />
         </div>
       </div>
 
@@ -295,7 +309,7 @@ onMounted(async () => {
         <div class="card-body">
           <h5>✅ Quote Received!</h5>
           <p>Your indicative quote is ready. You can proceed to partner referral.</p>
-          <ActionButton :loading="actionLoading" variant="success" loading-text="Completing..." @click="completeJourney">🎉 Complete Journey</ActionButton>
+          <ActionButton :loading="actionLoading" variant="success" loading-text="Completing..." @click="showConfirmComplete = true">🎉 Complete Journey</ActionButton>
         </div>
       </div>
 
@@ -307,6 +321,26 @@ onMounted(async () => {
       </div>
 
       <ErrorAlert :message="errorMessage" />
+
+      <div v-if="timelineEvents.length > 0" class="card shadow-sm mt-4">
+        <div class="card-body">
+          <h5>📋 Journey Timeline</h5>
+          <JourneyTimeline :events="timelineEvents" />
+        </div>
+      </div>
     </template>
+
+    <ConfirmDialog
+      :show="showConfirmComplete"
+      title="Complete Journey"
+      message="Are you sure you want to complete this journey? This action cannot be undone."
+      confirm-text="Complete Journey"
+      cancel-text="Go Back"
+      variant="warning"
+      @confirm="completeJourney"
+      @cancel="showConfirmComplete = false"
+    />
+
+    <ConfettiEffect ref="confettiRef" :active="showConfetti" />
   </div>
 </template>

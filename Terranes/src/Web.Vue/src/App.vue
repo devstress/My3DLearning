@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { RouterLink, RouterView } from 'vue-router';
 import ToastContainer from './components/ToastContainer.vue';
+import BreadcrumbBar from './components/BreadcrumbBar.vue';
 import { useTheme } from './composables/useTheme';
 
 const { theme, toggleTheme } = useTheme();
@@ -62,6 +63,31 @@ function toggleSidebar() {
               <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
             </RouterLink>
           </div>
+          <div class="nav-item px-3">
+            <RouterLink class="nav-link" to="/search" active-class="active">
+              <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Search
+            </RouterLink>
+          </div>
+          <div class="nav-item px-3">
+            <RouterLink class="nav-link" to="/walkthroughs" active-class="active">
+              <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Walkthroughs
+            </RouterLink>
+          </div>
+          <div class="nav-item px-3">
+            <RouterLink class="nav-link" to="/design-editor" active-class="active">
+              <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Design Editor
+            </RouterLink>
+          </div>
+          <div class="nav-item px-3">
+            <RouterLink class="nav-link" to="/partners" active-class="active">
+              <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Partners
+            </RouterLink>
+          </div>
+          <div class="nav-item px-3">
+            <RouterLink class="nav-link" to="/reports" active-class="active">
+              <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Reports
+            </RouterLink>
+          </div>
           <div class="nav-item px-3 mt-auto">
             <button
               class="nav-link theme-toggle-btn w-100 text-start"
@@ -78,9 +104,11 @@ function toggleSidebar() {
 
     <main id="main-content">
       <div class="top-row px-4">
+        <RouterLink to="/login" class="btn btn-sm btn-outline-primary me-2">Login</RouterLink>
         <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
       </div>
       <article class="content px-4">
+        <BreadcrumbBar />
         <RouterView v-slot="{ Component }">
           <Transition name="fade" mode="out-in">
             <component :is="Component" />
