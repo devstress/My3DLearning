@@ -188,3 +188,34 @@ Collapsible sidebar with section groupings. Full .NET build succeeds.
 ### Next Chunk
 
 Phase 32 is complete. No remaining chunks.
+
+---
+
+## Phase 33 — Gateway & Connector Adapter Test Hardening
+
+> **Origin:** Audit revealed that `HttpMessagingGateway` (the core Messaging Gateway EIP pattern)
+> had **zero unit tests**, and all 4 connector adapter classes (`HttpConnectorAdapter`,
+> `SftpConnectorAdapter`, `EmailConnectorAdapter`, `FileConnectorAdapter`) lacked dedicated
+> unit tests. `GatewayOptions`, `GatewayResponse`, and `RouteDefinition` were also untested.
+> This phase closes these critical test gaps.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 330 | **HttpMessagingGateway Tests** — see `rules/completion-log.md` | `done` |
+| 331 | **Gateway Options/Response/RouteDefinition Tests** — see `rules/completion-log.md` | `done` |
+| 332 | **HttpConnectorAdapter + EmailConnectorAdapter Tests** — see `rules/completion-log.md` | `done` |
+| 333 | **SftpConnectorAdapter + FileConnectorAdapter Tests** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 33 complete — 4 chunks (330–333). 73 new unit tests. UnitTests total: 1764 (was 1691).
+HttpMessagingGateway now has 15 tests covering SendAsync/SendAndReceiveAsync success, failure,
+timeout, correlation ID forwarding, custom headers, and argument validation. All 4 connector
+adapters have dedicated tests for SendAsync, TestConnectionAsync, constructor validation.
+GatewayOptions/GatewayResponse/RouteDefinition configuration defaults fully tested.
+
+---
+
+### Next Chunk
+
+Phase 33 is complete. No remaining chunks.

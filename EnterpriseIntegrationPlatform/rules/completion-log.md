@@ -4,6 +4,46 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 333 — SftpConnectorAdapter + FileConnectorAdapter Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 33 — Gateway & Connector Adapter Test Hardening
+- **Status**: done
+- **Goal**: Dedicated unit tests for SftpConnectorAdapter (12 tests) and FileConnectorAdapter (10 tests) covering SendAsync success/failure, TestConnectionAsync (connect/disconnect/exception), constructor validation, argument guards.
+- **Files created**:
+  - `tests/UnitTests/SftpConnectorAdapterTests.cs` — 12 tests: Name, ConnectorType, SendAsync success/default-filename/exception, TestConnectionAsync connected/not-connected/throws, constructor null name/connector, SendAsync null envelope/options
+  - `tests/UnitTests/FileConnectorAdapterTests.cs` — 10 tests: Name, ConnectorType, SendAsync success/exception, TestConnectionAsync configured/no-root/throws, constructor null name/connector, SendAsync null envelope/options
+
+## Chunk 332 — HttpConnectorAdapter + EmailConnectorAdapter Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 33 — Gateway & Connector Adapter Test Hardening
+- **Status**: done
+- **Goal**: Dedicated unit tests for HttpConnectorAdapter (9 tests) and EmailConnectorAdapter (11 tests) covering SendAsync success/failure, TestConnectionAsync, constructor validation, argument guards.
+- **Files created**:
+  - `tests/UnitTests/HttpConnectorAdapterTests.cs` — 9 tests: Name, ConnectorType, SendAsync success/null-destination/exception, constructor null name/connector, SendAsync null envelope/options
+  - `tests/UnitTests/EmailConnectorAdapterTests.cs` — 11 tests: Name, ConnectorType, SendAsync success/with-subject/no-destination/exception, TestConnectionAsync connected/not-connected, constructor null name/connector, SendAsync null envelope
+
+## Chunk 331 — Gateway Options/Response/RouteDefinition Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 33 — Gateway & Connector Adapter Test Hardening
+- **Status**: done
+- **Goal**: Unit tests for GatewayOptions (7 tests — all defaults), GatewayResponse/GatewayResponse<T> (5 tests — success/failure/nullable), RouteDefinition (3 tests — defaults and properties).
+- **Files created**:
+  - `tests/UnitTests/Gateway/GatewayOptionsTests.cs` — 7 tests: SectionName, AdminApiBaseUrl, OpenClawBaseUrl, RateLimitPerMinute, GlobalRateLimitPerMinute, RequireHttps, AllowedOrigins defaults
+  - `tests/UnitTests/Gateway/GatewayResponseTests.cs` — 5 tests: success/failure, generic success/failure/nullable payload
+  - `tests/UnitTests/Gateway/RouteDefinitionTests.cs` — 3 tests: RequiresAuth default, RateLimitPolicy default, all properties settable
+
+## Chunk 330 — HttpMessagingGateway Tests
+
+- **Date**: 2026-04-09
+- **Phase**: 33 — Gateway & Connector Adapter Test Hardening
+- **Status**: done
+- **Goal**: 15 unit tests for HttpMessagingGateway (the core Messaging Gateway EIP pattern). Tests cover SendAsync (success, JSON content, correlation ID header, custom headers, non-success status, HttpRequestException→502, Timeout→504, null destination, null payload) and SendAndReceiveAsync (success with payload deserialization, non-success status, HttpRequestException→502, Timeout→504, null destination, null request). Uses FakeHttpMessageHandler for HTTP interception without real network calls.
+- **Files created**:
+  - `tests/UnitTests/Gateway/HttpMessagingGatewayTests.cs` — 15 tests
+
 ## Chunk 327 — UX: Responsive Collapsible Sidebar + Keyboard Nav
 
 - **Date**: 2026-04-09
