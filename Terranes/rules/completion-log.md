@@ -825,3 +825,96 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - `src/__tests__/ResponsiveLayout.spec.ts` — Updated card count assertion to ≥6 (accounts for how-it-works steps).
 
 **Tests:** 110 Vitest tests (106 + 4 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+---
+
+### Chunk 056 — Search & Filter UX (2026-04-09)
+
+**Goal:** Add debounced search, filter chips, result count badges, empty-state illustrations, and URL query-string sync across 4 data views.
+
+**New files:**
+- `src/composables/useDebounce.ts` — Generic debounce composable wrapping a reactive ref with configurable delay (default 300ms).
+- `src/components/SearchBar.vue` — Reusable search input with magnifying glass icon, clear button, v-model, aria-label.
+- `src/components/FilterChip.vue` — Badge showing active filter label:value with ×-remove button and accessible aria-label.
+- `src/components/EmptyState.vue` — SVG illustration component with 5 icon variants (search, village, home, land, listing) and customisable title/message.
+- `src/__tests__/composables/useDebounce.spec.ts` — 5 tests: initial value, delay timing, post-delay update, rapid change reset, number values.
+- `src/__tests__/components/SearchBar.spec.ts` — 7 tests: placeholder, icon, emit on input, clear button show/hide, emit on clear, aria-label.
+- `src/__tests__/components/FilterChip.spec.ts` — 4 tests: label/value render, remove emit, aria-label, badge styling.
+- `src/__tests__/components/EmptyState.spec.ts` — 5 tests: defaults, custom props, SVG icon, empty-state class, different icon paths.
+
+**Files modified:**
+- `src/views/VillagesView.vue` — Added SearchBar, FilterChip, EmptyState; debounced search by name; filter chips; result count badge; URL query sync via `useRoute/useRouter`.
+- `src/views/HomeModelsView.vue` — Added FilterChip, EmptyState; debounced min-bedrooms filter; filter chips; result count badge; URL query sync.
+- `src/views/LandBlocksView.vue` — Added SearchBar, FilterChip, EmptyState; debounced suburb/state search; filter chips; result count badge; URL query sync.
+- `src/views/MarketplaceView.vue` — Added SearchBar, FilterChip, EmptyState; debounced suburb search; filter chips; result count badge; URL query sync.
+
+**Tests:** 131 Vitest (21 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+---
+
+### Chunk 057 — Card & List Interaction Polish (2026-04-09)
+
+**Goal:** Add hover lift effects, image placeholder gradients, pagination, and sort-by dropdowns.
+
+**New files:**
+- `src/composables/usePagedList.ts` — Generic pagination composable: currentPage, totalPages, pagedItems, goToPage, nextPage, prevPage, resetPage.
+- `src/components/PaginationBar.vue` — Bootstrap-styled pagination with prev/next, page buttons, disabled states, aria-labels.
+- `src/__tests__/composables/usePagedList.spec.ts` — 8 tests: null source, first page, total pages, next/prev navigation, boundary limits, reset.
+- `src/__tests__/components/PaginationBar.spec.ts` — 7 tests: hidden on 1 page, renders on multi-page, active marking, disabled prev/next, emit, aria-label.
+
+**Files modified:**
+- `src/style.css` — Added `.card-hover-lift` (transform + shadow on hover, prefers-reduced-motion safe). Added `.card-img-placeholder` gradient.
+- `src/views/VillagesView.vue` — Added PaginationBar, usePagedList, card-hover-lift, image placeholder. Uses pagedItems for grid.
+- `src/views/HomeModelsView.vue` — Added PaginationBar, usePagedList, card-hover-lift, image placeholder. Uses pagedItems for grid.
+- `src/views/LandBlocksView.vue` — Added PaginationBar, usePagedList, sort-by dropdown (area/frontage). Uses sortedBlocks + pagedItems for table.
+- `src/views/MarketplaceView.vue` — Added PaginationBar, usePagedList, sort-by dropdown (price/date), card-hover-lift. Uses sortedListings + pagedItems.
+
+**Tests:** 146 Vitest (15 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+---
+
+### Chunk 058 — Journey UX Enhancement (2026-04-09)
+
+**Goal:** Add step indicator, confirmation dialogs, journey timeline, and confetti celebration.
+
+**New files:**
+- `src/components/StepIndicator.vue` — Horizontal stepper with numbered circles, connecting lines, completed/active/pending states, role="group" + aria-labels.
+- `src/components/ConfirmDialog.vue` — Modal confirmation dialog with customisable title, message, confirm/cancel buttons, variant colours, dismiss on backdrop/close.
+- `src/components/JourneyTimeline.vue` — Vertical timeline with markers, stage names, timestamps, descriptions. role="list" + aria-label.
+- `src/components/ConfettiEffect.vue` — Animated confetti particles with CSS keyframes, configurable particle count/duration, prefers-reduced-motion safe, aria-hidden.
+- `src/__tests__/components/StepIndicator.spec.ts` — 7 tests: all steps render, active marking, completed checkmarks, pending steps, connectors, active connectors, accessibility.
+- `src/__tests__/components/ConfirmDialog.spec.ts` — 6 tests: hidden when show=false, visible when show=true, custom title/message, confirm emit, cancel emit, variant class.
+- `src/__tests__/components/JourneyTimeline.spec.ts` — 5 tests: event count, stage/description text, timestamps, timeline markers, accessibility.
+- `src/__tests__/components/ConfettiEffect.spec.ts` — 4 tests: hidden when inactive, container visible when active, aria-hidden, particle creation on start.
+
+**Files modified:**
+- `src/views/JourneyView.vue` — Replaced inline stage dots with StepIndicator. Added ConfirmDialog before journey completion. Added JourneyTimeline tracking all stage transitions. Added ConfettiEffect on completion. Timeline events tracked via addTimelineEvent helper.
+
+**Tests:** 168 Vitest (22 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+---
+
+### Chunk 059 — Dashboard Widgets & Charts (2026-04-09)
+
+**Goal:** Add StatCard with animated count-up, SparklineChart (SVG), QuoteSummary, notification bell with unread count, quick-action buttons.
+
+**New files:**
+- `src/components/StatCard.vue` — Card with animated count-up (ease-out cubic, 800ms), configurable icon/colour/label. Uses requestAnimationFrame with jsdom-safe fallback.
+- `src/components/SparklineChart.vue` — Pure SVG sparkline chart with polyline and filled polygon. Configurable width, height, colour, fill opacity. role="img" + aria-label.
+- `src/components/QuoteSummary.vue` — Summary card showing total journeys, completed count, pending quotes, completion rate percentage with progress bar.
+- `src/__tests__/components/StatCard.spec.ts` — 6 tests: label render, icon, colour class, hover-lift class, value display, stat-value element.
+- `src/__tests__/components/SparklineChart.spec.ts` — 7 tests: SVG render, polyline, polygon fill, custom colour, custom dimensions, accessibility, single data point handling.
+- `src/__tests__/components/QuoteSummary.spec.ts` — 5 tests: total count, completed/pending, completion rate %, zero journeys, progress bar.
+
+**Files modified:**
+- `src/views/DashboardView.vue` — Replaced inline stat boxes with StatCard components. Added SparklineChart for activity trend. Added QuoteSummary widget. Added notification bell with unread count badge (🔔 + `.badge.bg-danger`). Added Quick Actions row with RouterLinks to Journey, Designs, Land, Marketplace.
+
+**Tests:** 186 Vitest (18 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+**Running totals after Phase 13 chunks 056–059:**
+- Vue components: 20 (SearchBar, FilterChip, EmptyState, PaginationBar, StepIndicator, ConfirmDialog, JourneyTimeline, ConfettiEffect, StatCard, SparklineChart, QuoteSummary + 9 prior)
+- Composables: 7 (useDebounce, usePagedList + 5 prior)
+- Views: 8 (unchanged)
+- Vitest tests: 186 (33 test files)
+- Playwright E2E: 29 tests × 6 browsers
+- NUnit backend: 446
