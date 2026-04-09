@@ -8,6 +8,7 @@ import SkeletonCard from '../components/SkeletonCard.vue';
 import FilterChip from '../components/FilterChip.vue';
 import EmptyState from '../components/EmptyState.vue';
 import { useDebounce } from '../composables/useDebounce';
+import { useValidation, minValue, maxValue } from '../composables/useValidation';
 
 const route = useRoute();
 const router = useRouter();
@@ -18,12 +19,25 @@ const minBedrooms = ref<number | undefined>(
 );
 const selectedFormat = ref((route.query.format as string) || '');
 const selectedModel = ref<HomeModel | null>(null);
+const searchInput = ref<HTMLInputElement | null>(null);
 
 const debouncedBedrooms = useDebounce(minBedrooms);
 
 const formats = ['Gltf', 'Glb', 'Obj', 'Fbx', 'Usd'];
 
 const resultCount = computed(() => models.value?.length ?? 0);
+
+const hasActiveFilters = computed(() => debouncedBedrooms.value !== undefined || !!selectedFormat.value);
+
+const { errors: bedroomErrors, validate: validateBedrooms, clearErrors: clearBedroomErrors } = useValidation();
+
+watch(minBedrooms, (v) => {
+  if (v !== undefined && v !== null && String(v) !== '') {
+    validateBedrooms(v, [minValue(0), maxValue(10)]);
+  } else {
+    clearBedroomErrors();
+  }
+});
 
 async function search() {
   models.value = await api.getHomeModels({
@@ -49,8 +63,15 @@ function closeModal() {
 
 function removeBedroomsFilter() { minBedrooms.value = undefined; }
 function removeFormatFilter() { selectedFormat.value = ''; }
+function clearAllFilters() {
+  minBedrooms.value = undefined;
+  selectedFormat.value = '';
+}
 
-onMounted(search);
+onMounted(() => {
+  search();
+  searchInput.value?.focus();
+});
 watch([debouncedBedrooms, selectedFormat], () => { search(); syncQuery(); });
 </script>
 
@@ -62,7 +83,10 @@ watch([debouncedBedrooms, selectedFormat], () => { search(); syncQuery(); });
     <div class="row mb-3">
       <div class="col-12 col-md-3">
         <label class="form-label">Min Bedrooms</label>
-        <input type="number" class="form-control" min="0" max="10" v-model.number="minBedrooms" />
+        <input type="number" class="form-control" :class="{ 'is-invalid': bedroomErrors.length > 0 }" min="0" max="10" v-model.number="minBedrooms" ref="searchInput" />
+        <div v-if="bedroomErrors.length > 0" class="invalid-feedback">
+          {{ bedroomErrors[0] }}
+        </div>
       </div>
       <div class="col-12 col-md-3">
         <label class="form-label">Format</label>
@@ -76,6 +100,7 @@ watch([debouncedBedrooms, selectedFormat], () => { search(); syncQuery(); });
     <div class="mb-3 d-flex flex-wrap align-items-center">
       <FilterChip v-if="debouncedBedrooms !== undefined" :label="`Min Beds: ${debouncedBedrooms}`" @remove="removeBedroomsFilter" />
       <FilterChip v-if="selectedFormat" :label="`Format: ${selectedFormat}`" @remove="removeFormatFilter" />
+      <button v-if="hasActiveFilters" class="btn btn-sm btn-outline-danger ms-2 clear-all-filters" @click="clearAllFilters">Clear All Filters</button>
       <span v-if="models !== null" class="badge bg-secondary ms-auto result-count">Showing {{ resultCount }} results</span>
     </div>
 

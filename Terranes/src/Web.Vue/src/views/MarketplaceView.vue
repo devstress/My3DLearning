@@ -10,6 +10,7 @@ import FilterChip from '../components/FilterChip.vue';
 import EmptyState from '../components/EmptyState.vue';
 import PaginationBar from '../components/PaginationBar.vue';
 import { useDebounce } from '../composables/useDebounce';
+import { useValidation, minValue } from '../composables/useValidation';
 
 const route = useRoute();
 const router = useRouter();
@@ -24,6 +25,7 @@ const selectedListing = ref<PropertyListing | null>(null);
 const sortBy = ref('price');
 const currentPage = ref(1);
 const pageSize = 12;
+const searchInput = ref<HTMLInputElement | null>(null);
 
 const debouncedSuburb = useDebounce(searchSuburb);
 const debouncedPrice = useDebounce(maxPrice);
@@ -31,6 +33,18 @@ const debouncedPrice = useDebounce(maxPrice);
 const statuses = ['Active', 'Draft', 'UnderOffer', 'Sold', 'Withdrawn'];
 
 const resultCount = computed(() => listings.value?.length ?? 0);
+
+const hasActiveFilters = computed(() => !!debouncedSuburb.value || debouncedPrice.value !== undefined || !!selectedStatus.value);
+
+const { errors: priceErrors, validate: validatePrice, clearErrors: clearPriceErrors } = useValidation();
+
+watch(maxPrice, (v) => {
+  if (v !== undefined && v !== null && String(v) !== '') {
+    validatePrice(v, [minValue(0)]);
+  } else {
+    clearPriceErrors();
+  }
+});
 
 const sortedListings = computed(() => {
   if (!listings.value) return [];
@@ -78,8 +92,16 @@ function closeModal() {
 function removeSuburbFilter() { searchSuburb.value = ''; }
 function removePriceFilter() { maxPrice.value = undefined; }
 function removeStatusFilter() { selectedStatus.value = ''; }
+function clearAllFilters() {
+  searchSuburb.value = '';
+  maxPrice.value = undefined;
+  selectedStatus.value = '';
+}
 
-onMounted(search);
+onMounted(() => {
+  search();
+  searchInput.value?.focus();
+});
 watch([debouncedSuburb, debouncedPrice, selectedStatus], () => { search(); syncQuery(); });
 </script>
 
@@ -90,10 +112,13 @@ watch([debouncedSuburb, debouncedPrice, selectedStatus], () => { search(); syncQ
 
     <div class="row mb-3">
       <div class="col-12 col-md-3">
-        <input type="text" class="form-control" placeholder="Suburb..." v-model="searchSuburb" />
+        <input type="text" class="form-control" placeholder="Suburb..." v-model="searchSuburb" ref="searchInput" />
       </div>
       <div class="col-12 col-md-3">
-        <input type="number" class="form-control" placeholder="Max price ($)" v-model.number="maxPrice" />
+        <input type="number" class="form-control" :class="{ 'is-invalid': priceErrors.length > 0 }" placeholder="Max price ($)" v-model.number="maxPrice" />
+        <div v-if="priceErrors.length > 0" class="invalid-feedback">
+          {{ priceErrors[0] }}
+        </div>
       </div>
       <div class="col-12 col-md-3">
         <select class="form-select" v-model="selectedStatus">
@@ -113,6 +138,7 @@ watch([debouncedSuburb, debouncedPrice, selectedStatus], () => { search(); syncQ
       <FilterChip v-if="debouncedSuburb" :label="`Suburb: ${debouncedSuburb}`" @remove="removeSuburbFilter" />
       <FilterChip v-if="debouncedPrice !== undefined" :label="`Max: ${formatPrice(debouncedPrice)}`" @remove="removePriceFilter" />
       <FilterChip v-if="selectedStatus" :label="`Status: ${selectedStatus}`" @remove="removeStatusFilter" />
+      <button v-if="hasActiveFilters" class="btn btn-sm btn-outline-danger ms-2 clear-all-filters" @click="clearAllFilters">Clear All Filters</button>
       <span v-if="listings !== null" class="badge bg-secondary ms-auto result-count">Showing {{ resultCount }} results</span>
     </div>
 

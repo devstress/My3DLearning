@@ -9,9 +9,10 @@ import ErrorAlert from '../components/ErrorAlert.vue';
 import SkeletonTable from '../components/SkeletonTable.vue';
 import FilterChip from '../components/FilterChip.vue';
 import EmptyState from '../components/EmptyState.vue';
-import PaginationBar from '../components/PaginationBar.vue';
 import { useToast } from '../composables/useToast';
 import { useDebounce } from '../composables/useDebounce';
+import { useValidation, required } from '../composables/useValidation';
+import { usePagedList } from '../composables/usePagedList';
 
 const { showSuccess, showError } = useToast();
 const route = useRoute();
@@ -25,11 +26,29 @@ const availableModels = ref<HomeModel[] | null>(null);
 const placementResult = ref<SitePlacement | null>(null);
 const placementError = ref<string | null>(null);
 const sortBy = ref('area');
-const currentPage = ref(1);
-const pageSize = 12;
+const searchInput = ref<HTMLInputElement | null>(null);
 
 const debouncedSuburb = useDebounce(searchSuburb);
 const debouncedState = useDebounce(searchState);
+
+const { validate: validateSuburb, clearErrors: clearSuburbErrors } = useValidation();
+const { validate: validateState, clearErrors: clearStateErrors } = useValidation();
+
+watch(searchSuburb, (v) => {
+  if (v.length > 0) {
+    validateSuburb(v, [required('Suburb cannot be empty')]);
+  } else {
+    clearSuburbErrors();
+  }
+});
+
+watch(searchState, (v) => {
+  if (v.length > 0) {
+    validateState(v, [required('State cannot be empty')]);
+  } else {
+    clearStateErrors();
+  }
+});
 
 const sortedBlocks = computed(() => {
   if (!blocks.value) return [];
@@ -39,10 +58,9 @@ const sortedBlocks = computed(() => {
   return sorted;
 });
 
-const paginatedBlocks = computed(() => {
-  const start = (currentPage.value - 1) * pageSize;
-  return sortedBlocks.value.slice(start, start + pageSize);
-});
+const { visibleItems: pagedBlocks, hasMore, showMore, resetVisible } = usePagedList(sortedBlocks, 20);
+
+const hasActiveFilters = computed(() => !!debouncedSuburb.value || !!debouncedState.value);
 
 const resultCount = computed(() => blocks.value?.length ?? 0);
 
@@ -51,7 +69,7 @@ async function search() {
     suburb: debouncedSuburb.value || undefined,
     state: debouncedState.value || undefined,
   });
-  currentPage.value = 1;
+  resetVisible();
 }
 
 function syncQuery() {
@@ -89,8 +107,15 @@ function closeModal() {
 
 function removeSuburbFilter() { searchSuburb.value = ''; }
 function removeStateFilter() { searchState.value = ''; }
+function clearAllFilters() {
+  searchSuburb.value = '';
+  searchState.value = '';
+}
 
-onMounted(search);
+onMounted(() => {
+  search();
+  searchInput.value?.focus();
+});
 watch([debouncedSuburb, debouncedState], () => { search(); syncQuery(); });
 </script>
 
@@ -101,7 +126,7 @@ watch([debouncedSuburb, debouncedState], () => { search(); syncQuery(); });
 
     <div class="row mb-3">
       <div class="col-12 col-md-4">
-        <input type="text" class="form-control" placeholder="Search by suburb..." v-model="searchSuburb" />
+        <input type="text" class="form-control" placeholder="Search by suburb..." v-model="searchSuburb" ref="searchInput" />
       </div>
       <div class="col-12 col-md-3">
         <input type="text" class="form-control" placeholder="State (e.g. NSW)" v-model="searchState" />
@@ -117,6 +142,7 @@ watch([debouncedSuburb, debouncedState], () => { search(); syncQuery(); });
     <div class="mb-3 d-flex flex-wrap align-items-center">
       <FilterChip v-if="debouncedSuburb" :label="`Suburb: ${debouncedSuburb}`" @remove="removeSuburbFilter" />
       <FilterChip v-if="debouncedState" :label="`State: ${debouncedState}`" @remove="removeStateFilter" />
+      <button v-if="hasActiveFilters" class="btn btn-sm btn-outline-danger ms-2 clear-all-filters" @click="clearAllFilters">Clear All Filters</button>
       <span v-if="blocks !== null" class="badge bg-secondary ms-auto result-count">Showing {{ resultCount }} results</span>
     </div>
 
@@ -137,7 +163,7 @@ watch([debouncedSuburb, debouncedState], () => { search(); syncQuery(); });
           </tr>
         </thead>
         <tbody>
-          <tr v-for="block in paginatedBlocks" :key="block.id">
+          <tr v-for="block in pagedBlocks" :key="block.id">
             <td>{{ block.address }}</td>
             <td>{{ block.suburb }}</td>
             <td>{{ block.state }}</td>
@@ -151,12 +177,9 @@ watch([debouncedSuburb, debouncedState], () => { search(); syncQuery(); });
           </tr>
         </tbody>
       </table>
-      <PaginationBar
-        :total-items="sortedBlocks.length"
-        :page-size="pageSize"
-        :current-page="currentPage"
-        @page-change="currentPage = $event"
-      />
+      <div v-if="hasMore" class="text-center mt-3">
+        <button class="btn btn-outline-primary show-more-btn" @click="showMore">Show More</button>
+      </div>
     </div>
 
     <DetailModal :show="!!selectedBlock" :title="selectedBlock ? 'Test-Fit on ' + selectedBlock.address : ''" @close="closeModal">

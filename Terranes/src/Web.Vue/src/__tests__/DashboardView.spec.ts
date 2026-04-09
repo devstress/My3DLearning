@@ -124,4 +124,35 @@ describe('DashboardView', () => {
     expect(wrapper.text()).toContain('Modern Villa');
     expect(wrapper.text()).toContain('4 bed');
   });
+
+  it('renders StatCard components with values', async () => {
+    setupMocks();
+    const router = await createTestRouter();
+    const wrapper = mount(DashboardView, { global: { plugins: [router] } });
+    await flushPromises();
+    const statCards = wrapper.findAll('.stat-card');
+    expect(statCards.length).toBe(4);
+    expect(wrapper.find('.stat-label').exists()).toBe(true);
+  });
+
+  it('shows quick action buttons', async () => {
+    setupMocks();
+    const router = await createTestRouter();
+    const wrapper = mount(DashboardView, { global: { plugins: [router] } });
+    await flushPromises();
+    const quickActions = wrapper.findAll('.quick-action');
+    expect(quickActions.length).toBe(2);
+    expect(wrapper.text()).toContain('New Journey');
+    expect(wrapper.text()).toContain('Browse Designs');
+  });
+
+  it('shows notification count badge for unread notifications', async () => {
+    setupMocks();
+    const router = await createTestRouter();
+    const wrapper = mount(DashboardView, { global: { plugins: [router] } });
+    await flushPromises();
+    const badge = wrapper.find('.notification-count');
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toBe('1');
+  });
 });

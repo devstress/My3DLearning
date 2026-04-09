@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { RouterLink } from 'vue-router';
 import { api } from '../api/client';
 import type { BuyerJourney, Notification as AppNotification, HomeModel } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import StatCard from '../components/StatCard.vue';
+import SparklineChart from '../components/SparklineChart.vue';
 
 const DEMO_BUYER_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -14,6 +17,15 @@ const activeJourneyCount = ref(0);
 const homeModelCount = ref(0);
 const listingCount = ref(0);
 const analyticsEventCount = ref(0);
+
+const unreadCount = computed(() =>
+  notifications.value?.filter(n => !n.isRead).length ?? 0,
+);
+
+const trendJourneys = [5, 8, 12, 9, 15, 20, 18];
+const trendModels = [3, 6, 4, 10, 8, 14, 12];
+const trendListings = [2, 5, 7, 6, 11, 9, 13];
+const trendAnalytics = [10, 25, 18, 30, 22, 35, 42];
 
 onMounted(async () => {
   const [journeys, notifs, models, listings, analytics] = await Promise.all([
@@ -36,40 +48,46 @@ onMounted(async () => {
 
 <template>
   <div class="container">
-    <h2 class="mb-4">📊 Dashboard</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>📊 Dashboard</h2>
+      <div class="d-flex align-items-center gap-3">
+        <span class="position-relative notification-bell" aria-label="Notifications">
+          🔔
+          <span
+            v-if="unreadCount > 0"
+            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-count"
+          >
+            {{ unreadCount }}
+          </span>
+        </span>
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mb-4">
+      <RouterLink to="/journey" class="btn btn-primary quick-action">New Journey</RouterLink>
+      <RouterLink to="/home-models" class="btn btn-outline-secondary quick-action">Browse Designs</RouterLink>
+    </div>
 
     <div class="row g-4 mb-4">
       <div class="col-6 col-md-3">
-        <div class="card shadow-sm text-center">
-          <div class="card-body">
-            <h3 class="text-primary">{{ activeJourneyCount }}</h3>
-            <small class="text-muted">Active Journeys</small>
-          </div>
-        </div>
+        <StatCard label="Active Journeys" :value="activeJourneyCount" color="primary" icon="🚀">
+          <SparklineChart :data="trendJourneys" color="#0d6efd" />
+        </StatCard>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card shadow-sm text-center">
-          <div class="card-body">
-            <h3 class="text-success">{{ homeModelCount }}</h3>
-            <small class="text-muted">Home Designs</small>
-          </div>
-        </div>
+        <StatCard label="Home Designs" :value="homeModelCount" color="success" icon="🏡">
+          <SparklineChart :data="trendModels" color="#198754" />
+        </StatCard>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card shadow-sm text-center">
-          <div class="card-body">
-            <h3 class="text-info">{{ listingCount }}</h3>
-            <small class="text-muted">Marketplace Listings</small>
-          </div>
-        </div>
+        <StatCard label="Marketplace Listings" :value="listingCount" color="info" icon="🏬">
+          <SparklineChart :data="trendListings" color="#0dcaf0" />
+        </StatCard>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card shadow-sm text-center">
-          <div class="card-body">
-            <h3 class="text-warning">{{ analyticsEventCount }}</h3>
-            <small class="text-muted">Analytics Events</small>
-          </div>
-        </div>
+        <StatCard label="Analytics Events" :value="analyticsEventCount" color="warning" icon="📈">
+          <SparklineChart :data="trendAnalytics" color="#ffc107" />
+        </StatCard>
       </div>
     </div>
 
