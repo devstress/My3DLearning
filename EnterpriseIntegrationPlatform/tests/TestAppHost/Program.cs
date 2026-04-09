@@ -42,10 +42,11 @@ var postgres = builder.AddContainer("postgres", "postgres", "17")
 
 // ── Apache Kafka (via Bitnami image) — high-throughput event streaming ───────
 // Uses KRaft mode (no ZooKeeper) for minimal resource footprint in tests.
-// IMPORTANT: The EXTERNAL listener port MUST be pinned (port: 29094) and the
-// KAFKA_CFG_ADVERTISED_LISTENERS EXTERNAL address MUST match, otherwise Kafka
-// advertises the container-internal port in metadata and the Confluent.Kafka
-// producer reconnects to the wrong address after the initial bootstrap.
+// IMPORTANT: isProxied: false is REQUIRED for Kafka. Aspire's TCP proxy does
+// not correctly relay Kafka's binary protocol (ApiVersionRequest times out).
+// With isProxied: false, Docker maps host:29094 → container:9094 directly,
+// and the KAFKA_CFG_ADVERTISED_LISTENERS EXTERNAL address matches the actual
+// host port so that Kafka metadata reconnections work correctly.
 var kafka = builder.AddContainer("kafka", "bitnami/kafka", "3.9.0")
     .WithEnvironment("KAFKA_CFG_NODE_ID", "0")
     .WithEnvironment("KAFKA_CFG_PROCESS_ROLES", "controller,broker")
@@ -56,7 +57,7 @@ var kafka = builder.AddContainer("kafka", "bitnami/kafka", "3.9.0")
     .WithEnvironment("KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP", "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT")
     .WithEnvironment("KAFKA_CFG_INTER_BROKER_LISTENER_NAME", "PLAINTEXT")
     .WithEnvironment("KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE", "true")
-    .WithEndpoint(port: 29094, targetPort: 9094, name: "kafka-tcp", scheme: "tcp");
+    .WithEndpoint(port: 29094, targetPort: 9094, name: "kafka-tcp", scheme: "tcp", isProxied: false);
 
 // ── Apache Pulsar — Key_Shared subscription for recipient-keyed distribution ─
 // Standalone mode includes broker + bookie + ZooKeeper in a single container.
