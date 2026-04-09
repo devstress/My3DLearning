@@ -7,7 +7,9 @@ import DetailModal from '../components/DetailModal.vue';
 import SkeletonCard from '../components/SkeletonCard.vue';
 import FilterChip from '../components/FilterChip.vue';
 import EmptyState from '../components/EmptyState.vue';
+import PaginationBar from '../components/PaginationBar.vue';
 import { useDebounce } from '../composables/useDebounce';
+import { usePagedList } from '../composables/usePagedList';
 
 const route = useRoute();
 const router = useRouter();
@@ -23,6 +25,8 @@ const debouncedBedrooms = useDebounce(minBedrooms, 300);
 
 const formats = ['Gltf', 'Glb', 'Obj', 'Fbx', 'Usd'];
 
+const { currentPage, totalPages, pagedItems, goToPage, resetPage } = usePagedList(models, 12);
+
 function syncQuery() {
   const query: Record<string, string> = {};
   if (debouncedBedrooms.value !== undefined && debouncedBedrooms.value !== null) query.minBedrooms = String(debouncedBedrooms.value);
@@ -32,6 +36,7 @@ function syncQuery() {
 
 async function search() {
   syncQuery();
+  resetPage();
   models.value = await api.getHomeModels({
     minBedrooms: debouncedBedrooms.value,
     format: selectedFormat.value || undefined,
@@ -82,8 +87,9 @@ watch([debouncedBedrooms, selectedFormat], search);
     <template v-else>
     <p class="text-muted small mb-2"><span class="badge bg-secondary result-count">{{ models.length }}</span> result{{ models.length !== 1 ? 's' : '' }}</p>
     <div class="row g-4">
-      <div class="col-12 col-md-4" v-for="model in models" :key="model.id">
-        <div class="card h-100 shadow-sm">
+      <div class="col-12 col-md-4" v-for="model in pagedItems" :key="model.id">
+        <div class="card h-100 shadow-sm card-hover-lift">
+          <div class="card-img-placeholder"></div>
           <div class="card-body">
             <h5 class="card-title">{{ model.name }}</h5>
             <p class="card-text text-muted small">{{ model.description }}</p>
@@ -103,6 +109,7 @@ watch([debouncedBedrooms, selectedFormat], search);
         </div>
       </div>
     </div>
+    <PaginationBar :current-page="currentPage" :total-pages="totalPages" @page="goToPage" />
     </template>
 
     <DetailModal :show="!!selectedModel" :title="selectedModel?.name ?? ''" @close="closeModal">

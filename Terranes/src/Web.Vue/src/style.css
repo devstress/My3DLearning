@@ -239,3 +239,31 @@ main {
     transition: none;
   }
 }
+
+/* Card hover lift */
+.card-hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-hover-lift {
+    transition: none;
+  }
+  .card-hover-lift:hover {
+    transform: none;
+  }
+}
+
+/* Image placeholder gradient */
+.card-img-placeholder {
+  height: 140px;
+  background: linear-gradient(135deg, var(--bs-primary, #0d6efd) 0%, var(--bs-info, #0dcaf0) 100%);
+  opacity: 0.15;
+  border-radius: var(--bs-card-inner-border-radius) var(--bs-card-inner-border-radius) 0 0;
+}

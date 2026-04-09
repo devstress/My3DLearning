@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, computed, onMounted, watch } from 'vue';import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { LandBlock, HomeModel, SitePlacement } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
@@ -10,8 +9,10 @@ import SkeletonTable from '../components/SkeletonTable.vue';
 import SearchBar from '../components/SearchBar.vue';
 import FilterChip from '../components/FilterChip.vue';
 import EmptyState from '../components/EmptyState.vue';
+import PaginationBar from '../components/PaginationBar.vue';
 import { useToast } from '../composables/useToast';
 import { useDebounce } from '../composables/useDebounce';
+import { usePagedList } from '../composables/usePagedList';
 
 const { showSuccess, showError } = useToast();
 const route = useRoute();
@@ -28,15 +29,36 @@ const placementError = ref<string | null>(null);
 const debouncedSuburb = useDebounce(searchSuburb, 300);
 const debouncedState = useDebounce(searchState, 300);
 
+const sortBy = ref((route.query.sort as string) ?? '');
+const sortOptions = [
+  { value: '', label: 'Default' },
+  { value: 'area-asc', label: 'Area: Smallest' },
+  { value: 'area-desc', label: 'Area: Largest' },
+  { value: 'frontage-desc', label: 'Frontage: Widest' },
+];
+
+const sortedBlocks = computed(() => {
+  if (!blocks.value) return null;
+  const arr = [...blocks.value];
+  if (sortBy.value === 'area-asc') arr.sort((a, b) => a.areaSqm - b.areaSqm);
+  if (sortBy.value === 'area-desc') arr.sort((a, b) => b.areaSqm - a.areaSqm);
+  if (sortBy.value === 'frontage-desc') arr.sort((a, b) => b.frontageMetre - a.frontageMetre);
+  return arr;
+});
+
+const { currentPage, totalPages, pagedItems, goToPage, resetPage } = usePagedList(sortedBlocks, 12);
+
 function syncQuery() {
   const query: Record<string, string> = {};
   if (debouncedSuburb.value) query.suburb = debouncedSuburb.value;
   if (debouncedState.value) query.state = debouncedState.value;
+  if (sortBy.value) query.sort = sortBy.value;
   router.replace({ query });
 }
 
 async function search() {
   syncQuery();
+  resetPage();
   blocks.value = await api.getLandBlocks({
     suburb: debouncedSuburb.value || undefined,
     state: debouncedState.value || undefined,
@@ -88,6 +110,11 @@ watch([debouncedSuburb, debouncedState], search);
       <div class="col-md-3">
         <SearchBar v-model="searchState" placeholder="State (e.g. NSW)" />
       </div>
+      <div class="col-md-3">
+        <select class="form-select" v-model="sortBy" aria-label="Sort by">
+          <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+      </div>
     </div>
 
     <div v-if="debouncedSuburb || debouncedState" class="d-flex flex-wrap gap-2 mb-3">
@@ -114,7 +141,7 @@ watch([debouncedSuburb, debouncedState], search);
           </tr>
         </thead>
         <tbody>
-          <tr v-for="block in blocks" :key="block.id">
+          <tr v-for="block in pagedItems" :key="block.id">
             <td>{{ block.address }}</td>
             <td>{{ block.suburb }}</td>
             <td>{{ block.state }}</td>
@@ -129,6 +156,7 @@ watch([debouncedSuburb, debouncedState], search);
         </tbody>
       </table>
     </div>
+    <PaginationBar :current-page="currentPage" :total-pages="totalPages" @page="goToPage" />
     </template>
 
     <DetailModal :show="!!selectedBlock" :title="selectedBlock ? 'Test-Fit on ' + selectedBlock.address : ''" @close="closeModal">

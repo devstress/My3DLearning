@@ -9,7 +9,9 @@ import SkeletonCard from '../components/SkeletonCard.vue';
 import SearchBar from '../components/SearchBar.vue';
 import FilterChip from '../components/FilterChip.vue';
 import EmptyState from '../components/EmptyState.vue';
+import PaginationBar from '../components/PaginationBar.vue';
 import { useDebounce } from '../composables/useDebounce';
+import { usePagedList } from '../composables/usePagedList';
 
 const route = useRoute();
 const router = useRouter();
@@ -24,6 +26,8 @@ const debouncedName = useDebounce(searchName, 300);
 
 const layouts = ['Grid', 'Radial', 'Linear', 'Cluster', 'Freeform'];
 
+const { currentPage, totalPages, pagedItems, goToPage, resetPage } = usePagedList(villages, 12);
+
 function syncQuery() {
   const query: Record<string, string> = {};
   if (debouncedName.value) query.name = debouncedName.value;
@@ -33,6 +37,7 @@ function syncQuery() {
 
 async function search() {
   syncQuery();
+  resetPage();
   villages.value = await api.getVillages({
     name: debouncedName.value || undefined,
     layout: selectedLayout.value || undefined,
@@ -83,8 +88,9 @@ watch([debouncedName, selectedLayout], search);
     <template v-else>
     <p class="text-muted small mb-2"><span class="badge bg-secondary result-count">{{ villages.length }}</span> result{{ villages.length !== 1 ? 's' : '' }}</p>
     <div class="row g-4">
-      <div class="col-12 col-md-4" v-for="village in villages" :key="village.id">
-        <div class="card h-100 shadow-sm">
+      <div class="col-12 col-md-4" v-for="village in pagedItems" :key="village.id">
+        <div class="card h-100 shadow-sm card-hover-lift">
+          <div class="card-img-placeholder"></div>
           <div class="card-body">
             <h5 class="card-title">{{ village.name }}</h5>
             <p class="card-text text-muted">{{ village.description }}</p>
@@ -102,6 +108,7 @@ watch([debouncedName, selectedLayout], search);
         </div>
       </div>
     </div>
+    <PaginationBar :current-page="currentPage" :total-pages="totalPages" @page="goToPage" />
     </template>
 
     <DetailModal :show="!!selectedVillage" :title="selectedVillage?.name ?? ''" @close="closeModal">

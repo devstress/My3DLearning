@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { PropertyListing } from '../types';
@@ -9,7 +9,9 @@ import SkeletonCard from '../components/SkeletonCard.vue';
 import SearchBar from '../components/SearchBar.vue';
 import FilterChip from '../components/FilterChip.vue';
 import EmptyState from '../components/EmptyState.vue';
+import PaginationBar from '../components/PaginationBar.vue';
 import { useDebounce } from '../composables/useDebounce';
+import { usePagedList } from '../composables/usePagedList';
 
 const route = useRoute();
 const router = useRouter();
@@ -26,22 +28,44 @@ const debouncedSuburb = useDebounce(searchSuburb, 300);
 const debouncedPrice = useDebounce(maxPrice, 300);
 
 const statuses = ['Active', 'Draft', 'UnderOffer', 'Sold', 'Withdrawn'];
+const sortBy = ref((route.query.sort as string) ?? '');
+const sortOptions = [
+  { value: '', label: 'Default' },
+  { value: 'price-asc', label: 'Price: Low → High' },
+  { value: 'price-desc', label: 'Price: High → Low' },
+  { value: 'date-desc', label: 'Newest First' },
+  { value: 'date-asc', label: 'Oldest First' },
+];
 
 function formatPrice(price?: number): string {
   if (price == null) return 'Price on Application';
   return `$${price.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
 }
 
+const sortedListings = computed(() => {
+  if (!listings.value) return null;
+  const arr = [...listings.value];
+  if (sortBy.value === 'price-asc') arr.sort((a, b) => (a.askingPriceAud ?? Infinity) - (b.askingPriceAud ?? Infinity));
+  if (sortBy.value === 'price-desc') arr.sort((a, b) => (b.askingPriceAud ?? 0) - (a.askingPriceAud ?? 0));
+  if (sortBy.value === 'date-desc') arr.sort((a, b) => new Date(b.listedUtc).getTime() - new Date(a.listedUtc).getTime());
+  if (sortBy.value === 'date-asc') arr.sort((a, b) => new Date(a.listedUtc).getTime() - new Date(b.listedUtc).getTime());
+  return arr;
+});
+
+const { currentPage, totalPages, pagedItems, goToPage, resetPage } = usePagedList(sortedListings, 12);
+
 function syncQuery() {
   const query: Record<string, string> = {};
   if (debouncedSuburb.value) query.suburb = debouncedSuburb.value;
   if (debouncedPrice.value !== undefined && debouncedPrice.value !== null) query.maxPrice = String(debouncedPrice.value);
   if (selectedStatus.value) query.status = selectedStatus.value;
+  if (sortBy.value) query.sort = sortBy.value;
   router.replace({ query });
 }
 
 async function search() {
   syncQuery();
+  resetPage();
   listings.value = await api.getListings({
     suburb: debouncedSuburb.value || undefined,
     maxPriceAud: debouncedPrice.value,
@@ -83,6 +107,11 @@ watch([debouncedSuburb, debouncedPrice, selectedStatus], search);
           <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
         </select>
       </div>
+      <div class="col-md-3">
+        <select class="form-select" v-model="sortBy" aria-label="Sort by">
+          <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+      </div>
     </div>
 
     <div v-if="debouncedSuburb || debouncedPrice !== undefined || selectedStatus" class="d-flex flex-wrap gap-2 mb-3">
@@ -96,8 +125,8 @@ watch([debouncedSuburb, debouncedPrice, selectedStatus], search);
     <template v-else>
     <p class="text-muted small mb-2"><span class="badge bg-secondary result-count">{{ listings.length }}</span> result{{ listings.length !== 1 ? 's' : '' }}</p>
     <div class="row g-4">
-      <div class="col-12 col-md-6" v-for="listing in listings" :key="listing.id">
-        <div class="card h-100 shadow-sm">
+      <div class="col-12 col-md-6" v-for="listing in pagedItems" :key="listing.id">
+        <div class="card h-100 shadow-sm card-hover-lift">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
               <h5 class="card-title">{{ listing.title }}</h5>
@@ -118,6 +147,7 @@ watch([debouncedSuburb, debouncedPrice, selectedStatus], search);
         </div>
       </div>
     </div>
+    <PaginationBar :current-page="currentPage" :total-pages="totalPages" @page="goToPage" />
     </template>
 
     <DetailModal :show="!!selectedListing" :title="selectedListing?.title ?? ''" @close="closeModal">
