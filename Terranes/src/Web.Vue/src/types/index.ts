@@ -117,3 +117,70 @@ export interface PlatformUser {
   isActive: boolean;
   createdUtc: string;
 }
+
+export interface Partner {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  contactEmail: string;
+  phone?: string;
+  website?: string;
+  isActive: boolean;
+}
+
+export interface Walkthrough {
+  id: string;
+  homeModelId: string;
+  sitePlacementId?: string;
+  userId: string;
+  scenes: WalkthroughScene[];
+  generatedUtc: string;
+}
+
+export interface WalkthroughScene {
+  id: string;
+  walkthroughId: string;
+  sceneName: string;
+  sceneOrder: number;
+  durationSeconds: number;
+}
+
+export interface WalkthroughPoi {
+  id: string;
+  walkthroughId: string;
+  room: string;
+  label: string;
+  description: string;
+  positionX: number;
+  positionY: number;
+  positionZ: number;
+}
+
+export interface DesignEdit {
+  id: string;
+  sitePlacementId: string;
+  operation: string;
+  targetElement: string;
+  newValue: string;
+  appliedUtc: string;
+}
+
+export interface Report {
+  id: string;
+  reportType: string;
+  title: string;
+  contentMarkdown: string;
+  generatedByUserId: string;
+  tenantId: string;
+  generatedUtc: string;
+}
+
+export interface ComplianceResult {
+  id: string;
+  sitePlacementId: string;
+  jurisdiction: string;
+  isCompliant: boolean;
+  issues: string[];
+  checkedUtc: string;
+}

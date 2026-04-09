@@ -64,6 +64,30 @@ const router = createRouter({
       meta: { title: 'Register | Terranes', breadcrumb: 'Register' },
     },
     {
+      path: '/partners',
+      name: 'partners',
+      component: () => import('../views/PartnersView.vue'),
+      meta: { title: 'Partners | Terranes', breadcrumb: 'Partners' },
+    },
+    {
+      path: '/walkthroughs',
+      name: 'walkthroughs',
+      component: () => import('../views/WalkthroughsView.vue'),
+      meta: { title: 'Walkthroughs | Terranes', breadcrumb: 'Walkthroughs' },
+    },
+    {
+      path: '/design-editor',
+      name: 'design-editor',
+      component: () => import('../views/DesignEditorView.vue'),
+      meta: { title: 'Design Editor | Terranes', breadcrumb: 'Design Editor' },
+    },
+    {
+      path: '/reports',
+      name: 'reports',
+      component: () => import('../views/ReportsView.vue'),
+      meta: { title: 'Reports | Terranes', breadcrumb: 'Reports' },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/NotFoundView.vue'),

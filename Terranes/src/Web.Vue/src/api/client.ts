@@ -10,6 +10,12 @@ import type {
   SearchResult,
   AggregatedQuote,
   PlatformUser,
+  Partner,
+  Walkthrough,
+  WalkthroughPoi,
+  DesignEdit,
+  Report,
+  ComplianceResult,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
@@ -139,5 +145,73 @@ export const api = {
   },
   getUser(userId: string) {
     return fetchJson<PlatformUser>(`/auth/users/${userId}`);
+  },
+
+  // Partners
+  getBuilders(params?: { bedrooms?: number; floorArea?: number }) {
+    const qs = buildQuery({ bedrooms: params?.bedrooms, floorArea: params?.floorArea });
+    return fetchJson<Partner[]>(`/partners/builders/search${qs}`);
+  },
+  getBuilderProfile(partnerId: string) {
+    return fetchJson<Partner>(`/partners/builders/${partnerId}`);
+  },
+
+  // Walkthroughs
+  generateWalkthrough(homeModelId: string, userId: string, sitePlacementId?: string) {
+    const qs = buildQuery({ homeModelId, userId, sitePlacementId });
+    return fetchJson<Walkthrough>(`/walkthroughs/generate${qs}`, { method: 'POST' });
+  },
+  getWalkthrough(id: string) {
+    return fetchJson<Walkthrough>(`/walkthroughs/${id}`);
+  },
+  getWalkthroughsByModel(homeModelId: string) {
+    return fetchJson<Walkthrough[]>(`/walkthroughs/by-model/${homeModelId}`);
+  },
+  getWalkthroughPois(walkthroughId: string, room?: string) {
+    const qs = buildQuery({ room });
+    return fetchJson<WalkthroughPoi[]>(`/walkthroughs/${walkthroughId}/pois${qs}`);
+  },
+
+  // Design Editor
+  applyEdit(edit: { sitePlacementId: string; operation: string; targetElement: string; newValue: string }) {
+    return fetchJson<DesignEdit>('/design-editor/edits', {
+      method: 'POST',
+      body: JSON.stringify(edit),
+    });
+  },
+  getEditHistory(sitePlacementId: string) {
+    return fetchJson<DesignEdit[]>(`/design-editor/placements/${sitePlacementId}/history`);
+  },
+  undoLastEdit(sitePlacementId: string) {
+    return fetchJson<DesignEdit>(`/design-editor/placements/${sitePlacementId}/undo`, { method: 'POST' });
+  },
+
+  // Reports
+  generateReport(reportType: string, title: string, userId: string, tenantId: string) {
+    const qs = buildQuery({ reportType, title, generatedByUserId: userId, tenantId });
+    return fetchJson<Report>(`/reports${qs}`, { method: 'POST' });
+  },
+  getReport(reportId: string) {
+    return fetchJson<Report>(`/reports/${reportId}`);
+  },
+  getTenantReports(tenantId: string) {
+    return fetchJson<Report[]>(`/reports/tenant/${tenantId}`);
+  },
+  getReportTypes() {
+    return fetchJson<string[]>('/reports/types');
+  },
+
+  // Compliance
+  runComplianceCheck(sitePlacementId: string, jurisdiction: string) {
+    return fetchJson<ComplianceResult>('/compliance/check', {
+      method: 'POST',
+      body: JSON.stringify({ sitePlacementId, jurisdiction }),
+    });
+  },
+  getComplianceResult(id: string) {
+    return fetchJson<ComplianceResult>(`/compliance/${id}`);
+  },
+  getComplianceByPlacement(sitePlacementId: string) {
+    return fetchJson<ComplianceResult[]>(`/compliance/placement/${sitePlacementId}`);
   },
 };

@@ -71,6 +71,31 @@ router.afterEach((to) => {
             </RouterLink>
           </div>
           <div class="nav-item px-3">
+            <RouterLink class="nav-link" to="/walkthroughs" active-class="active">
+              <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Walkthroughs
+            </RouterLink>
+          </div>
+          <div class="nav-item px-3">
+            <RouterLink class="nav-link" to="/design-editor" active-class="active">
+              <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Design Editor
+            </RouterLink>
+          </div>
+          <div class="nav-item px-3">
+            <RouterLink class="nav-link" to="/search" active-class="active">
+              <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Search
+            </RouterLink>
+          </div>
+          <div class="nav-item px-3">
+            <RouterLink class="nav-link" to="/partners" active-class="active">
+              <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Partners
+            </RouterLink>
+          </div>
+          <div class="nav-item px-3">
+            <RouterLink class="nav-link" to="/reports" active-class="active">
+              <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Reports
+            </RouterLink>
+          </div>
+          <div class="nav-item px-3">
             <RouterLink class="nav-link" to="/dashboard" active-class="active">
               <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
             </RouterLink>
