@@ -4,6 +4,17 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 307 — Broker health check integration smoke test
+
+- **Date**: 2026-04-09
+- **Phase**: 30 — Quality Hardening (Audit-Driven)
+- **Status**: done
+- **Goal**: Cross-broker health check verification — all 3 existing health checks (NATS, Kafka, Pulsar) implement IHealthCheck, can be constructed, and return expected status. Postgres does not yet have a health check.
+- **Files created**:
+  - `tests/UnitTests/BrokerHealthCheckTests.cs` — 8 tests: 3 IHealthCheck interface checks, Kafka healthy/unhealthy, NATS unhealthy (mock cast), Pulsar healthy/unhealthy
+- **Test counts after**:
+  - UnitTests: 1691 (was 1683, +8 new tests)
+
 ## Chunk 306 — NATS JetStream test expansion
 
 - **Date**: 2026-04-09

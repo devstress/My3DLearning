@@ -112,13 +112,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Chunk 306 — ✅ Done — see `rules/completion-log.md`
 
-### Chunk 307 — Broker health check integration smoke test
-
-| Status | `not-started` |
-|---|---|
-| **Goal** | Add a new `BrokerHealthCheckTests.cs` in `tests/UnitTests/` that verifies all 4 broker health checks (NATS, Kafka, Pulsar, Postgres) can be constructed, return `Healthy` when mocked connection succeeds, and return `Unhealthy` when mocked connection fails. |
-| **Tests** | `tests/UnitTests/BrokerHealthCheckTests.cs` — 4 healthy + 4 unhealthy = 8 tests. Uses NSubstitute mocks to simulate broker connectivity without real infrastructure. |
-| **Acceptance** | `dotnet build` 0 warnings. 8 new tests pass. |
+### Chunk 307 — ✅ Done — see `rules/completion-log.md`
 
 ### Chunk 308 — README accuracy pass
 
@@ -130,7 +124,7 @@ All 50 tutorials now have Lab.cs + Exam.cs (fill-in-blank) + Exam.Answers.cs. 15
 
 ### Next Chunk
 
-**Chunk 307** — Broker health check integration smoke test.
+**Chunk 308** — README accuracy pass.
 
 ---
 
