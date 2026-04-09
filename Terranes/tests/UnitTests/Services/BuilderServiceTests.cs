@@ -167,6 +167,20 @@ public sealed class BuilderServiceTests
         Assert.ThrowsAsync<ArgumentException>(() => _sut.SubmitQuoteResponseAsync(registered.PartnerId, quoteId, -100m, 180, "Invalid"));
     }
 
+       [Test]
+    public async Task SubmitQuoteResponseAsync_NegativeAmount_ThrowsArgumentExceptionTTest()
+    {
+        var (partner, profile) = MakeBuilder();
+        var registered = await _sut.RegisterAsync(partner, profile);
+
+        var quoteId = Guid.NewGuid();
+        var model = new HomeModel(Guid.NewGuid(), "Villa", "A villa", ModelFormat.Gltf, 1024, 4, 2, 2, 200, Guid.NewGuid(), default);
+        var block = new LandBlock(Guid.NewGuid(), "1 Test St", "TestSuburb", "NSW", "2000", 500, 15, 30, ZoningType.Residential, -33, 151);
+
+        await _sut.RequestQuoteAsync(registered.PartnerId, quoteId, model, block);
+        Assert.ThrowsAsync<ArgumentException>(() => _sut.SubmitQuoteResponseAsync(registered.PartnerId, quoteId, -100m, 180, "Invalid"));
+    }
+
     [Test]
     public async Task SubmitQuoteResponseAsync_ZeroDays_ThrowsArgumentException()
     {
