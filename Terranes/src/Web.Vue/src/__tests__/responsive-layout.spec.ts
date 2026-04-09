@@ -1,8 +1,19 @@
-import { describe, it, expect } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { describe, it, expect, vi } from 'vitest';
+import { mount, flushPromises } from '@vue/test-utils';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import App from '../App.vue';
 import HomeView from '../views/HomeView.vue';
+
+vi.mock('../api/client', () => ({
+  api: {
+    getLandBlocks: vi.fn().mockResolvedValue([
+      { id: 'b1', address: '10 Main St', suburb: 'Surry Hills', state: 'NSW', areaSqm: 450, frontageMetre: 15, depthMetre: 30, zoning: 'R2' },
+    ]),
+    getHomeModels: vi.fn().mockResolvedValue([]),
+    createSitePlacement: vi.fn().mockResolvedValue({}),
+  },
+}));
+
 import LandBlocksView from '../views/LandBlocksView.vue';
 
 async function createTestRouter() {
@@ -45,16 +56,8 @@ describe('Responsive Layout', () => {
 
   it('LandBlocksView has table-responsive class', async () => {
     const router = await createTestRouter();
-    // Mount LandBlocksView with API stubs
-    const wrapper = mount(LandBlocksView, {
-      global: {
-        plugins: [router],
-        stubs: {
-          SkeletonTable: { template: '<div class="table-responsive"><table></table></div>' },
-        },
-      },
-    });
-    // The skeleton placeholder wraps in table-responsive, or the actual view does
+    const wrapper = mount(LandBlocksView, { global: { plugins: [router] } });
+    await flushPromises();
     expect(wrapper.html()).toContain('table-responsive');
   });
 });
