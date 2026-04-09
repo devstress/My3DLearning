@@ -71,7 +71,7 @@ watch([searchName, selectedLayout], search);
             </small>
           </div>
           <div class="card-footer">
-            <button class="btn btn-sm btn-outline-primary" @click="viewVillage(village)">View Details</button>
+            <button class="btn btn-sm btn-outline-primary" aria-label="View village details" @click="viewVillage(village)">View Details</button>
           </div>
         </div>
       </div>

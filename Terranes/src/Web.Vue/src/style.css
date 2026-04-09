@@ -1,3 +1,19 @@
+/* Skip to content */
+.skip-to-content {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  background: #052767;
+  color: white;
+  padding: 0.5rem 1rem;
+  z-index: 2000;
+  text-decoration: none;
+}
+
+.skip-to-content:focus {
+  top: 0;
+}
+
 /* Layout */
 .page {
   position: relative;

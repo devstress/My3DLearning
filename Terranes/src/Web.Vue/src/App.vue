@@ -11,18 +11,19 @@ function toggleSidebar() {
 
 <template>
   <div class="page">
+    <a href="#main-content" class="skip-to-content">Skip to content</a>
     <div class="sidebar">
       <div class="top-row ps-3 navbar navbar-dark">
         <div class="container-fluid">
           <RouterLink class="navbar-brand" to="/">🏠 Terranes</RouterLink>
-          <button class="navbar-toggler" type="button" @click="toggleSidebar">
+          <button class="navbar-toggler" type="button" aria-label="Toggle navigation" @click="toggleSidebar">
             <span class="navbar-toggler-icon"></span>
           </button>
         </div>
       </div>
 
       <div class="nav-scrollable" :class="{ open: sidebarOpen }" @click="sidebarOpen = false">
-        <nav class="nav flex-column">
+        <nav class="nav flex-column" aria-label="Main navigation">
           <div class="nav-item px-3">
             <RouterLink class="nav-link" to="/" exact-active-class="active">
               <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
@@ -62,7 +63,7 @@ function toggleSidebar() {
       </div>
     </div>
 
-    <main>
+    <main id="main-content">
       <div class="top-row px-4">
         <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
       </div>

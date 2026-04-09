@@ -71,7 +71,7 @@ watch([minBedrooms, selectedFormat], search);
             </div>
           </div>
           <div class="card-footer">
-            <button class="btn btn-sm btn-outline-primary" @click="selectModel(model)">View Details</button>
+            <button class="btn btn-sm btn-outline-primary" aria-label="View model details" @click="selectModel(model)">View Details</button>
           </div>
         </div>
       </div>

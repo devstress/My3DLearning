@@ -97,7 +97,7 @@ watch([searchSuburb, searchState], search);
             <td>{{ block.depthMetre.toFixed(1) }}m</td>
             <td><span class="badge bg-secondary">{{ block.zoning }}</span></td>
             <td>
-              <button class="btn btn-sm btn-outline-primary" @click="selectBlock(block)">Test-Fit</button>
+              <button class="btn btn-sm btn-outline-primary" aria-label="Test-fit design on block" @click="selectBlock(block)">Test-Fit</button>
             </td>
           </tr>
         </tbody>

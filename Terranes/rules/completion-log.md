@@ -782,3 +782,21 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - `src/__tests__/ResponsiveLayout.spec.ts` — 5 tests: breakpoint migration verification, sidebar slide animation CSS, prefers-reduced-motion, HomeView col-12 stacking, SkeletonCard col-12 stacking.
 
 **Tests:** 88 Vitest tests (83 + 5 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+### Chunk 053 — Accessibility & Keyboard Navigation (2026-04-09)
+
+**Goal:** Add comprehensive accessibility support: ARIA attributes, keyboard navigation, focus trapping, skip-to-content link, and screen-reader-friendly toast announcements.
+
+**Files modified:**
+- `src/components/DetailModal.vue` — Added `role="dialog"`, `aria-modal="true"`, `aria-label`, close button `aria-label="Close modal"`. Added Escape-to-close keydown handler. Added Tab focus trap cycling between first/last focusable elements. Added backdrop click-to-close. Auto-focuses modal on open.
+- `src/App.vue` — Added skip-to-content link (`<a href="#main-content" class="skip-to-content">`). Added `id="main-content"` on `<main>`. Added `aria-label="Main navigation"` on sidebar nav. Added `aria-label="Toggle navigation"` on navbar toggler.
+- `src/style.css` — Added `.skip-to-content` styles: positioned off-screen, shown on focus.
+- `src/views/VillagesView.vue` — Added `aria-label="View village details"` on button.
+- `src/views/HomeModelsView.vue` — Added `aria-label="View model details"` on button.
+- `src/views/MarketplaceView.vue` — Added `aria-label="View listing details"` on button.
+- `src/views/LandBlocksView.vue` — Added `aria-label="Test-fit design on block"` on button.
+
+**Files created:**
+- `src/__tests__/Accessibility.spec.ts` — 10 tests: dialog role/aria-modal, close button aria-label, Escape-to-close, backdrop click-to-close, skip-to-content link, main#main-content, nav aria-label, toggler aria-label, skip-to-content CSS, toast aria-live verification.
+
+**Tests:** 98 Vitest tests (88 + 10 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.

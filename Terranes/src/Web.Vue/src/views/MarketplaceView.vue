@@ -81,7 +81,7 @@ watch([searchSuburb, maxPrice, selectedStatus], search);
             </div>
           </div>
           <div class="card-footer">
-            <button class="btn btn-sm btn-outline-primary" @click="viewListing(listing)">View Details</button>
+            <button class="btn btn-sm btn-outline-primary" aria-label="View listing details" @click="viewListing(listing)">View Details</button>
           </div>
         </div>
       </div>
