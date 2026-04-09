@@ -39,7 +39,7 @@ onMounted(async () => {
     <h2 class="mb-4">📊 Dashboard</h2>
 
     <div class="row g-4 mb-4">
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card shadow-sm text-center">
           <div class="card-body">
             <h3 class="text-primary">{{ activeJourneyCount }}</h3>
@@ -47,7 +47,7 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card shadow-sm text-center">
           <div class="card-body">
             <h3 class="text-success">{{ homeModelCount }}</h3>
@@ -55,7 +55,7 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card shadow-sm text-center">
           <div class="card-body">
             <h3 class="text-info">{{ listingCount }}</h3>
@@ -63,7 +63,7 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <div class="card shadow-sm text-center">
           <div class="card-body">
             <h3 class="text-warning">{{ analyticsEventCount }}</h3>
@@ -74,7 +74,7 @@ onMounted(async () => {
     </div>
 
     <div class="row g-4">
-      <div class="col-md-6">
+      <div class="col-12 col-md-6">
         <div class="card shadow-sm h-100">
           <div class="card-header"><strong>Active Buyer Journeys</strong></div>
           <div class="card-body">
@@ -97,7 +97,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="col-md-6">
+      <div class="col-12 col-md-6">
         <div class="card shadow-sm h-100">
           <div class="card-header"><strong>Recent Notifications</strong></div>
           <div class="card-body">
@@ -130,7 +130,7 @@ onMounted(async () => {
           <div class="card-header"><strong>Recent Home Designs</strong></div>
           <div class="card-body">
             <div v-if="recentModels && recentModels.length > 0" class="row g-3">
-              <div class="col-md-3" v-for="model in recentModels.slice(0, 4)" :key="model.id">
+              <div class="col-6 col-md-3" v-for="model in recentModels.slice(0, 4)" :key="model.id">
                 <div class="card h-100">
                   <div class="card-body">
                     <h6>{{ model.name }}</h6>

@@ -94,7 +94,7 @@ Each chunk is independently deployable and testable.
 |-------|-------|--------|
 | 050 | **Toast Notifications & Action Feedback** — Create `ToastContainer.vue` + `useToast()` composable. Add success/error toasts to Journey actions (advance stage, request quote, complete). Add loading-disabled state to all async buttons. 6+ Vitest tests. | `done` |
 | 051 | **Skeleton Loaders & Smooth Transitions** — Create `SkeletonCard.vue` and `SkeletonTable.vue` components. Replace `<LoadingSpinner>` with skeleton placeholders in all 5 data views. Add Vue `<Transition>` fade on route changes and list enter/leave in card grids. 8+ Vitest tests. | `done` |
-| 052 | **Responsive Layout Overhaul** — Migrate sidebar breakpoint from 641px to Bootstrap md (768px). Add collapsible sidebar with slide animation. Make all card grids stack to 1-column on mobile. Add responsive table scrolling. Fix top-bar on mobile. Verify on 320px/768px/1200px. 4+ Vitest tests. | `not-started` |
+| 052 | **Responsive Layout Overhaul** — Migrate sidebar breakpoint from 641px to Bootstrap md (768px). Add collapsible sidebar with slide animation. Make all card grids stack to 1-column on mobile. Add responsive table scrolling. Fix top-bar on mobile. Verify on 320px/768px/1200px. 4+ Vitest tests. | `done` |
 | 053 | **Accessibility & Keyboard Navigation** — Add `aria-label` to all buttons and interactive elements. Add Escape-to-close on all modals. Add focus trap inside modals. Add skip-to-content link. Add `aria-live` region for toast announcements. Audit with axe-core rules. 6+ Vitest tests. | `not-started` |
 | 054 | **Dark Mode Support** — Add `useTheme()` composable with system-preference detection + manual toggle. Add theme toggle button in sidebar. Migrate `style.css` hardcoded colours to Bootstrap CSS variables. Sidebar gradient adapts to dark mode. Persist preference in localStorage. 4+ Vitest tests. | `not-started` |
 | 055 | **Enhanced Home Landing Page** — Add hero section with animated gradient background. Add "How it works" 4-step visual flow. Add testimonial carousel (static data). Add footer with links. Add smooth scroll to sections. Mobile-optimised layout. 4+ Vitest tests. | `not-started` |
@@ -111,7 +111,7 @@ Each chunk is independently deployable and testable.
 
 ## Next Chunk
 
-**Chunk 052** — Responsive Layout Overhaul.
+**Chunk 053** — Accessibility & Keyboard Navigation.
 
 Read `rules/ux-rules.md` before implementing.
 

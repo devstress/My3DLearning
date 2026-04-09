@@ -13,7 +13,7 @@ withDefaults(defineProps<{
     <div
       v-for="i in count"
       :key="i"
-      :class="`col-md-${12 / columns}`"
+      :class="`col-12 col-md-${12 / columns}`"
     >
       <div class="card h-100 shadow-sm placeholder-glow" aria-hidden="true">
         <div class="card-body">

@@ -763,3 +763,22 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - `rules/milestones.md` — Added Chunk 063 (done)
 
 **Tests:** 29 Playwright E2E tests × 6 browser projects = 174 cross-browser runs. 83 Vitest component tests. 446 NUnit tests. All passing.
+
+### Chunk 052 — Responsive Layout Overhaul (2026-04-09)
+
+**Goal:** Migrate sidebar breakpoint from 641px to Bootstrap md (768px). Add collapsible sidebar with slide animation. Make all card grids stack to 1-column on mobile. Add responsive scrolling for journey stages. Respect prefers-reduced-motion.
+
+**Files modified:**
+- `src/style.css` — Migrated all breakpoints from 641px/640.98px to 768px/767.98px. Replaced `display: none/block` sidebar toggle with `max-height: 0 → 100vh` slide transition. Added `prefers-reduced-motion` media query for sidebar animation.
+- `src/views/HomeView.vue` — Added `col-12` to all 6 feature card columns for mobile stacking.
+- `src/views/VillagesView.vue` — Added `col-12` to village card columns.
+- `src/views/HomeModelsView.vue` — Added `col-12` to model card columns.
+- `src/views/MarketplaceView.vue` — Added `col-12` to listing card columns.
+- `src/views/DashboardView.vue` — Added `col-6` to stat cards, `col-12` to journey/notification cards and recent models.
+- `src/views/JourneyView.vue` — Added `col-12` to design cards. Replaced row/col stage indicators with flex-nowrap scrollable container for mobile.
+- `src/components/SkeletonCard.vue` — Added `col-12` for mobile stacking.
+
+**Files created:**
+- `src/__tests__/ResponsiveLayout.spec.ts` — 5 tests: breakpoint migration verification, sidebar slide animation CSS, prefers-reduced-motion, HomeView col-12 stacking, SkeletonCard col-12 stacking.
+
+**Tests:** 88 Vitest tests (83 + 5 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.

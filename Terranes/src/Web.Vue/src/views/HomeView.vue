@@ -13,7 +13,7 @@
     </div>
 
     <div class="row g-4 mb-5">
-      <div class="col-md-4">
+      <div class="col-12 col-md-4">
         <div class="card h-100 shadow-sm">
           <div class="card-body text-center">
             <h3>🏘️ Virtual Villages</h3>
@@ -23,7 +23,7 @@
         </div>
       </div>
 
-      <div class="col-md-4">
+      <div class="col-12 col-md-4">
         <div class="card h-100 shadow-sm">
           <div class="card-body text-center">
             <h3>🏡 Home Designs</h3>
@@ -33,7 +33,7 @@
         </div>
       </div>
 
-      <div class="col-md-4">
+      <div class="col-12 col-md-4">
         <div class="card h-100 shadow-sm">
           <div class="card-body text-center">
             <h3>🗺️ Find Land</h3>
@@ -45,7 +45,7 @@
     </div>
 
     <div class="row g-4 mb-5">
-      <div class="col-md-4">
+      <div class="col-12 col-md-4">
         <div class="card h-100 shadow-sm">
           <div class="card-body text-center">
             <h3>🏬 Marketplace</h3>
@@ -55,7 +55,7 @@
         </div>
       </div>
 
-      <div class="col-md-4">
+      <div class="col-12 col-md-4">
         <div class="card h-100 shadow-sm">
           <div class="card-body text-center">
             <h3>🚀 Start Your Journey</h3>
@@ -65,7 +65,7 @@
         </div>
       </div>
 
-      <div class="col-md-4">
+      <div class="col-12 col-md-4">
         <div class="card h-100 shadow-sm">
           <div class="card-body text-center">
             <h3>📊 Dashboard</h3>

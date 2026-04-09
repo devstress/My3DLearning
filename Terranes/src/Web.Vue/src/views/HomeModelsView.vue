@@ -55,7 +55,7 @@ watch([minBedrooms, selectedFormat], search);
       No home designs found matching your criteria.
     </div>
     <div v-else class="row g-4">
-      <div class="col-md-4" v-for="model in models" :key="model.id">
+      <div class="col-12 col-md-4" v-for="model in models" :key="model.id">
         <div class="card h-100 shadow-sm">
           <div class="card-body">
             <h5 class="card-title">{{ model.name }}</h5>
