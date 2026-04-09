@@ -918,3 +918,70 @@ Deployment manifests are not applicable to the in-memory demo platform. All serv
 - Vitest tests: 186 (33 test files)
 - Playwright E2E: 29 tests × 6 browsers
 - NUnit backend: 446
+
+---
+
+### Chunk 060 — Breadcrumbs, Page Titles & Navigation (2026-04-09)
+
+**Goal:** Add breadcrumb navigation, document titles, "back-to" links in modals, and 404 page.
+
+**New files:**
+- `src/components/BreadcrumbBar.vue` — Auto-generated breadcrumbs from route meta. Home always first, current page as plain text. `aria-label="Breadcrumb"` + `aria-current="page"` on last item. Uses Bootstrap `.breadcrumb` classes.
+- `src/views/NotFoundView.vue` — 404 page with SVG icon, heading, description, and "Go to Home" link.
+- `src/__tests__/components/BreadcrumbBar.spec.ts` — 5 tests: hidden on home, visible on child, link vs text, active+aria-current, nav aria-label.
+- `src/__tests__/NotFoundView.spec.ts` — 4 tests: 404 heading, "Page Not Found" text, home link, description text.
+
+**Files modified:**
+- `src/router/index.ts` — Added `meta: { title, breadcrumb }` to all routes. Added catch-all `/:pathMatch(.*)*` route for 404. Added `router.afterEach()` to set `document.title` per route.
+- `src/App.vue` — Added `BreadcrumbBar` import and rendered inside `<article>` before `<RouterView>`.
+- `src/components/DetailModal.vue` — Added `backLabel` prop with `withDefaults`. Added modal footer with "← Back to" link button when backLabel is set.
+- `src/views/VillagesView.vue` — Added `back-label="Villages"` to DetailModal.
+- `src/views/HomeModelsView.vue` — Added `back-label="Home Designs"` to DetailModal.
+- `src/views/LandBlocksView.vue` — Added `back-label="Land Blocks"` to DetailModal.
+- `src/views/MarketplaceView.vue` — Added `back-label="Marketplace"` to DetailModal.
+
+**Tests:** 195 Vitest (9 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+---
+
+### Chunk 061 — Form Validation & Input UX (2026-04-09)
+
+**Goal:** Add validation composable, real-time validation, clear-all filters, and standardised form spacing.
+
+**New files:**
+- `src/composables/useValidation.ts` — Generic validation composable: `useValidation(source, rules)` returns `{ error, touched, validate, touch, reset }`. Common rules factory: `required`, `minValue`, `maxValue`, `positiveNumber`.
+- `src/__tests__/composables/useValidation.spec.ts` — 9 tests: initial state, required after touch, clears on valid, minValue, maxValue, positiveNumber, allows undefined, reset, validate returns boolean.
+
+**Files modified:**
+- `src/views/HomeModelsView.vue` — Added useValidation for bedrooms (min 0, max 10). Added `is-invalid` + `invalid-feedback` classes. Added auto-focus via ref. Added `clearAllFilters` button.
+- `src/views/MarketplaceView.vue` — Added useValidation for price (positiveNumber). Added `is-invalid` + `invalid-feedback`. Added `hasActiveFilters` computed. Added `clearAllFilters` with "✕ Clear All" button in filter chip row.
+- `src/views/LandBlocksView.vue` — Added `clearAllFilters` function and "✕ Clear All" button.
+- `src/views/VillagesView.vue` — Added `clearAllFilters` function and "✕ Clear All" button.
+- `src/style.css` — Added standardised `.form-label` (font-weight 500, 0.875rem) and `.form-control`/`.form-select` (0.9rem) spacing.
+
+**Tests:** 204 Vitest (9 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+---
+
+### Chunk 062 — Performance & Bundle Optimisation (2026-04-09)
+
+**Goal:** Add lazy image loading, virtual scrolling composable, font preloading, and code-splitting verification.
+
+**New files:**
+- `src/components/LazyImage.vue` — IntersectionObserver-based lazy image loader. Shows placeholder until element enters viewport (200px rootMargin). Native `loading="lazy"` attribute. Accessible placeholder with `role="img"` + `aria-label`.
+- `src/composables/useVirtualScroll.ts` — Virtual scroll composable: `useVirtualScroll(items, itemHeight, containerHeight, overscan)`. Returns `{ scrollTop, totalHeight, startIndex, endIndex, visibleItems, offsetY, onScroll }`. Computes visible window from scroll position.
+- `src/__tests__/components/LazyImage.spec.ts` — 4 tests: placeholder before loading, img after intersection, loading="lazy" attribute, accessible placeholder.
+- `src/__tests__/composables/useVirtualScroll.spec.ts` — 6 tests: all items fit, scrolled window, totalHeight, null items, offsetY, code-splitting verification.
+
+**Files modified:**
+- `index.html` — Added `<link rel="preload">` for Bootstrap CSS. Added `<link rel="dns-prefetch">` for cdn.jsdelivr.net.
+
+**Tests:** 214 Vitest (10 new). 29 Playwright E2E × 6 browsers. 446 NUnit. All passing.
+
+**Running totals after Phase 13 chunks 060–062 (Phase 13 complete):**
+- Vue components: 22 (BreadcrumbBar, LazyImage + 20 prior)
+- Composables: 9 (useValidation, useVirtualScroll + 7 prior)
+- Views: 9 (NotFoundView + 8 prior)
+- Vitest tests: 214 (38 test files)
+- Playwright E2E: 29 tests × 6 browsers
+- NUnit backend: 446
