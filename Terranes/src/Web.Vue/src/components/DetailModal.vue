@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { watch, ref, nextTick, onBeforeUnmount } from 'vue';
 
-const props = defineProps<{ title: string; show: boolean }>();
+const props = withDefaults(defineProps<{
+  title: string;
+  show: boolean;
+  backLabel?: string;
+}>(), {
+  backLabel: '',
+});
 const emit = defineEmits<{ close: [] }>();
 
 const modalRef = ref<HTMLElement | null>(null);
@@ -67,6 +73,9 @@ onBeforeUnmount(() => {
         </div>
         <div class="modal-body">
           <slot />
+        </div>
+        <div v-if="backLabel" class="modal-footer">
+          <button type="button" class="btn btn-link text-decoration-none" @click="$emit('close')">← Back to {{ backLabel }}</button>
         </div>
       </div>
     </div>

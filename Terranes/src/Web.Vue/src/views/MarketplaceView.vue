@@ -150,7 +150,7 @@ watch([debouncedSuburb, debouncedPrice, selectedStatus], search);
     <PaginationBar :current-page="currentPage" :total-pages="totalPages" @page="goToPage" />
     </template>
 
-    <DetailModal :show="!!selectedListing" :title="selectedListing?.title ?? ''" @close="closeModal">
+    <DetailModal :show="!!selectedListing" :title="selectedListing?.title ?? ''" back-label="Marketplace" @close="closeModal">
       <template v-if="selectedListing">
         <p>{{ selectedListing.description }}</p>
         <table class="table table-sm">

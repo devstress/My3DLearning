@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { RouterLink, RouterView } from 'vue-router';
 import ToastContainer from './components/ToastContainer.vue';
+import BreadcrumbBar from './components/BreadcrumbBar.vue';
 import { useTheme } from './composables/useTheme';
 
 const { theme, toggleTheme } = useTheme();
@@ -81,6 +82,7 @@ function toggleSidebar() {
         <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
       </div>
       <article class="content px-4">
+        <BreadcrumbBar />
         <RouterView v-slot="{ Component }">
           <Transition name="fade" mode="out-in">
             <component :is="Component" />

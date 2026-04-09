@@ -111,7 +111,7 @@ watch([debouncedName, selectedLayout], search);
     <PaginationBar :current-page="currentPage" :total-pages="totalPages" @page="goToPage" />
     </template>
 
-    <DetailModal :show="!!selectedVillage" :title="selectedVillage?.name ?? ''" @close="closeModal">
+    <DetailModal :show="!!selectedVillage" :title="selectedVillage?.name ?? ''" back-label="Villages" @close="closeModal">
       <template v-if="selectedVillage">
         <p>{{ selectedVillage.description }}</p>
         <table class="table table-sm">

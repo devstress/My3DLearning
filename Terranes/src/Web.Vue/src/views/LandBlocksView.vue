@@ -159,7 +159,7 @@ watch([debouncedSuburb, debouncedState], search);
     <PaginationBar :current-page="currentPage" :total-pages="totalPages" @page="goToPage" />
     </template>
 
-    <DetailModal :show="!!selectedBlock" :title="selectedBlock ? 'Test-Fit on ' + selectedBlock.address : ''" @close="closeModal">
+    <DetailModal :show="!!selectedBlock" :title="selectedBlock ? 'Test-Fit on ' + selectedBlock.address : ''" back-label="Land Blocks" @close="closeModal">
       <template v-if="selectedBlock">
         <div class="row mb-3">
           <div class="col">

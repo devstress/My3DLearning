@@ -112,7 +112,7 @@ watch([debouncedBedrooms, selectedFormat], search);
     <PaginationBar :current-page="currentPage" :total-pages="totalPages" @page="goToPage" />
     </template>
 
-    <DetailModal :show="!!selectedModel" :title="selectedModel?.name ?? ''" @close="closeModal">
+    <DetailModal :show="!!selectedModel" :title="selectedModel?.name ?? ''" back-label="Home Designs" @close="closeModal">
       <template v-if="selectedModel">
         <p>{{ selectedModel.description }}</p>
         <table class="table table-sm">
