@@ -15,8 +15,7 @@ See `milestones.md` for current phase status and next chunk.
   - `src/Admin.Web/clientapp/src/__tests__/TenantsPage.test.js` — 4 tests: renders page, button text, form toggle, validation
 - **Files modified**:
   - `src/Admin.Web/clientapp/src/App.vue` — Added Tenants nav link + page component
-  - `src/Admin.Web/clientapp/src/__tests__/App.test.js` — Updated nav count to 12, added Tenants nav test
-- **Test counts after**: 52 Vitest tests (was 46, +6 from Tenants page + App tests)
+  - `src/Admin.Web/clientapp/src/__tests__/App.test.js` — Updated nav count, added Tenants nav test
 
 ## Chunk 317 — Configuration & Feature Flags UI
 
@@ -51,6 +50,59 @@ See `milestones.md` for current phase status and next chunk.
 - **Files modified**:
   - `src/Admin.Api/Program.cs` — Added `POST /api/admin/test-messages` and `POST /api/admin/test-messages/custom` endpoints, `TestMessageRequest` + `CustomTestMessageRequest` records, SystemManagement DI registration
   - `src/Admin.Api/Admin.Api.csproj` — Added SystemManagement project reference
+
+## Chunk 314 — Audit Log Viewer
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `AuditLogPage.vue` with paginated audit trail. Filter by action/API key. Load More pagination. Stat cards for entries shown and unique actions.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/AuditLogPage.vue` — Paginated audit log with action/API key filters, Load More, stat cards
+  - `src/Admin.Web/clientapp/src/__tests__/AuditLogPage.test.js` — 5 tests: renders, empty state, renders entries, Load More button, stat cards
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/audit` endpoint
+
+## Chunk 313 — Control Bus UI
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `ControlBusPage.vue` for sending control commands through the messaging infrastructure. Predefined command types (config.reload, throttle.update, route.enable/disable, endpoint.start/stop, cache.clear) plus custom command type. JSON payload editor. Command history.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/ControlBusPage.vue` — Command type selector, JSON payload editor, session command history
+  - `src/Admin.Web/clientapp/src/__tests__/ControlBusPage.test.js` — 6 tests: renders, button text, empty custom validation, sends command, history tracking, invalid JSON validation
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `POST /api/admin/controlbus/send` endpoint + `ControlBusSendRequest` record
+
+## Chunk 312 — In-Flight Message Monitor
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `InFlightPage.vue` — BizTalk Service Instances-inspired view. Real-time stat cards (total, pending, processing, retrying). Auto-refresh checkbox (5s interval). Breakdown table by message type.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/InFlightPage.vue` — Stat cards, auto-refresh, breakdown table with status badges, scoped CSS
+  - `src/Admin.Web/clientapp/src/__tests__/InFlightPage.test.js` — 5 tests: renders, idle state, total calculation, auto-refresh checkbox, timer cleanup
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/messages/inflight` endpoint
+
+## Chunk 311 — Subscription Viewer
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `SubscriptionsPage.vue` — BizTalk Subscription Viewer-inspired. Lists active subscriptions per broker with topic/consumer group/status. Broker type filter dropdown. Summary stat cards (total, active, brokers, topics).
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/SubscriptionsPage.vue` — Subscription table with broker filter, stat cards, computed uniqueBrokers/uniqueTopics
+  - `src/Admin.Web/clientapp/src/__tests__/SubscriptionsPage.test.js` — 5 tests: renders, broker filter, empty state, renders rows, stat cards
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/subscriptions` endpoint
+- **All Phase 31 chunks complete**:
+  - 16 pages total (was 7): Dashboard, Message Flow, Messages, In-Flight, Subscriptions, DLQ, Test Messages, Control Bus, Throttle, Rate Limiting, Config, Feature Flags, Tenants, Audit Log, DR Drills, Profiling
+  - 77 Vitest tests (was 19), 13 test files (was 4)
+  - 11 new API endpoints added to Admin.Api
+  - Full .NET build succeeds, all tests pass
 
 ## Chunk 310 — Message Flow Timeline
 

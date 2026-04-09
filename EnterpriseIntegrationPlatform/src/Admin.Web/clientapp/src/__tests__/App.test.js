@@ -6,17 +6,21 @@ describe('App', () => {
   it('renders the sidebar with all navigation items', () => {
     const wrapper = mount(App, { shallow: true })
     const navLinks = wrapper.findAll('nav a')
-    expect(navLinks).toHaveLength(12)
+    expect(navLinks).toHaveLength(16)
     expect(wrapper.find('[data-nav="dashboard"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="flow"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="messages"]').exists()).toBe(true)
+    expect(wrapper.find('[data-nav="inflight"]').exists()).toBe(true)
+    expect(wrapper.find('[data-nav="subscriptions"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="dlq"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="testmsg"]').exists()).toBe(true)
+    expect(wrapper.find('[data-nav="controlbus"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="throttle"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="ratelimit"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="config"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="features"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="tenants"]').exists()).toBe(true)
+    expect(wrapper.find('[data-nav="auditlog"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="dr"]').exists()).toBe(true)
     expect(wrapper.find('[data-nav="profiling"]').exists()).toBe(true)
   })
@@ -87,5 +91,29 @@ describe('App', () => {
     const wrapper = mount(App, { shallow: true })
     await wrapper.find('[data-nav="tenants"]').trigger('click')
     expect(wrapper.find('h2').text()).toContain('Tenant Management')
+  })
+
+  it('switches to In-Flight page on nav click', async () => {
+    const wrapper = mount(App, { shallow: true })
+    await wrapper.find('[data-nav="inflight"]').trigger('click')
+    expect(wrapper.find('h2').text()).toContain('In-Flight Messages')
+  })
+
+  it('switches to Subscriptions page on nav click', async () => {
+    const wrapper = mount(App, { shallow: true })
+    await wrapper.find('[data-nav="subscriptions"]').trigger('click')
+    expect(wrapper.find('h2').text()).toContain('Subscription Viewer')
+  })
+
+  it('switches to Control Bus page on nav click', async () => {
+    const wrapper = mount(App, { shallow: true })
+    await wrapper.find('[data-nav="controlbus"]').trigger('click')
+    expect(wrapper.find('h2').text()).toContain('Control Bus')
+  })
+
+  it('switches to Audit Log page on nav click', async () => {
+    const wrapper = mount(App, { shallow: true })
+    await wrapper.find('[data-nav="auditlog"]').trigger('click')
+    expect(wrapper.find('h2').text()).toContain('Audit Log')
   })
 })
