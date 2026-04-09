@@ -9,6 +9,7 @@ using EnterpriseIntegrationPlatform.Configuration;
 using EnterpriseIntegrationPlatform.Processing.Throttle;
 using EnterpriseIntegrationPlatform.Storage.Cassandra;
 using EnterpriseIntegrationPlatform.MultiTenancy.Onboarding;
+using EnterpriseIntegrationPlatform.SystemManagement;
 using EnterpriseIntegrationPlatform.DisasterRecovery;
 using Performance.Profiling;
 using Microsoft.AspNetCore.Authentication;
@@ -85,6 +86,12 @@ builder.Services.AddConfigurationManagement();
 // ── Tenant Onboarding ─────────────────────────────────────────────────────────
 // Self-service tenant provisioning, quota management, and broker namespaces.
 builder.Services.AddTenantOnboarding(builder.Configuration);
+
+// ── System Management ─────────────────────────────────────────────────────────
+// Control Bus, Message Store, Smart Proxy, and Test Message Generator.
+builder.Services.AddControlBus(builder.Configuration);
+builder.Services.AddMessageStore();
+builder.Services.AddTestMessageGenerator();
 
 // ── Disaster Recovery ─────────────────────────────────────────────────────────
 // Automated failover, cross-region replication, recovery point validation, and DR drills.
@@ -691,6 +698,102 @@ app.MapGet("/api/admin/dr/drills/history", async (
 .WithName("AdminGetDrDrillHistory")
 .RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
 
+// ── Message Flow Timeline (BizTalk-inspired tracked activity view) ─────────────
+// Returns the full lifecycle event history + optional AI trace analysis for
+// a correlation ID or business key. Powers the MessageFlowPage in Admin.Web.
+
+app.MapGet("/api/admin/flow/correlation/{correlationId:guid}", async (
+    Guid correlationId,
+    MessageStateInspector inspector,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("MessageFlowByCorrelation", correlationId.ToString(), http.User);
+    var result = await inspector.WhereIsByCorrelationAsync(correlationId, ct);
+    return Results.Ok(result);
+})
+.WithName("AdminMessageFlowByCorrelation")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapGet("/api/admin/flow/business/{businessKey}", async (
+    string businessKey,
+    MessageStateInspector inspector,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("MessageFlowByBusinessKey", businessKey, http.User);
+    var result = await inspector.WhereIsAsync(businessKey, ct);
+    return Results.Ok(result);
+})
+.WithName("AdminMessageFlowByBusinessKey")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+// ── Metrics Summary (BizTalk Group Hub-inspired) ──────────────────────────────
+// Exposes current counters from PlatformMeters for the dashboard.
+
+app.MapGet("/api/admin/metrics/summary", (
+    AdminAuditLogger audit,
+    HttpContext http) =>
+{
+    audit.LogAction("GetMetricsSummary", null, http.User);
+
+    // Read the current metric instrument snapshots.
+    // Note: OTel metric export is async; these are the instrument objects themselves.
+    // For live dashboard, we expose the instrument metadata and let the frontend
+    // query Prometheus/Grafana for actual values. This endpoint provides structure.
+    return Results.Ok(new
+    {
+        Instruments = new[]
+        {
+            new { Name = "eip.messages.received", Type = "Counter", Unit = "{message}" },
+            new { Name = "eip.messages.processed", Type = "Counter", Unit = "{message}" },
+            new { Name = "eip.messages.failed", Type = "Counter", Unit = "{message}" },
+            new { Name = "eip.messages.dead_lettered", Type = "Counter", Unit = "{message}" },
+            new { Name = "eip.messages.retried", Type = "Counter", Unit = "{message}" },
+            new { Name = "eip.messages.in_flight", Type = "UpDownCounter", Unit = "{message}" },
+            new { Name = "eip.messages.processing_duration", Type = "Histogram", Unit = "ms" },
+        },
+        PrometheusEndpoint = "/metrics",
+        Description = "Use the Prometheus endpoint or Grafana dashboards for live metric values. " +
+                      "These instruments are exported via OpenTelemetry.",
+    });
+})
+.WithName("AdminGetMetricsSummary")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+// ── Test Message Generator ────────────────────────────────────────────────────
+// Publishes synthetic test messages to verify pipeline health (BizTalk test message pattern).
+
+app.MapPost("/api/admin/test-messages", async (
+    TestMessageRequest request,
+    EnterpriseIntegrationPlatform.SystemManagement.ITestMessageGenerator generator,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("GenerateTestMessage", request.TargetTopic, http.User);
+    var result = await generator.GenerateAsync(request.TargetTopic, ct);
+    return Results.Ok(result);
+})
+.WithName("AdminGenerateTestMessage")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
+app.MapPost("/api/admin/test-messages/custom", async (
+    CustomTestMessageRequest request,
+    EnterpriseIntegrationPlatform.SystemManagement.ITestMessageGenerator generator,
+    AdminAuditLogger audit,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    audit.LogAction("GenerateCustomTestMessage", request.TargetTopic, http.User);
+    var result = await generator.GenerateAsync(request.Payload, request.TargetTopic, ct);
+    return Results.Ok(result);
+})
+.WithName("AdminGenerateCustomTestMessage")
+.RequireAuthorization(new AuthorizeAttribute { Roles = ApiKeyAuthenticationHandler.AdminRole });
+
 // ── Performance Profiling Endpoints ───────────────────────────────────────────
 
 app.MapGet("/api/admin/profiling/status", (
@@ -897,3 +1000,16 @@ public sealed record SetFeatureFlagRequest(
     Dictionary<string, string>? Variants = null,
     int RolloutPercentage = 100,
     List<string>? TargetTenants = null);
+
+/// <summary>
+/// Request body for generating a synthetic test message.
+/// </summary>
+/// <param name="TargetTopic">The topic to publish the test message to.</param>
+public sealed record TestMessageRequest(string TargetTopic);
+
+/// <summary>
+/// Request body for generating a custom test message with a specific payload.
+/// </summary>
+/// <param name="Payload">The JSON payload to send as a test message.</param>
+/// <param name="TargetTopic">The topic to publish the test message to.</param>
+public sealed record CustomTestMessageRequest(string Payload, string TargetTopic);

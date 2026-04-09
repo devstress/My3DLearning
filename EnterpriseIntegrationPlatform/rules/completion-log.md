@@ -4,6 +4,66 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 318 — Tenant Management UI
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `TenantsPage.vue` for tenant onboarding/deprovisioning, status lookup, and quota viewer. Wired to existing `/api/admin/tenants/*` API endpoints.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/TenantsPage.vue` — Onboard form (ID, name, tier, region), tenant status lookup, quota viewer, deprovision button
+  - `src/Admin.Web/clientapp/src/__tests__/TenantsPage.test.js` — 4 tests: renders page, button text, form toggle, validation
+- **Files modified**:
+  - `src/Admin.Web/clientapp/src/App.vue` — Added Tenants nav link + page component
+  - `src/Admin.Web/clientapp/src/__tests__/App.test.js` — Updated nav count to 12, added Tenants nav test
+- **Test counts after**: 52 Vitest tests (was 46, +6 from Tenants page + App tests)
+
+## Chunk 317 — Configuration & Feature Flags UI
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: Two new pages wired to existing API endpoints: `ConfigPage.vue` (CRUD config store with environment filtering) and `FeatureFlagsPage.vue` (CRUD feature flags with rollout % and tenant targeting).
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/ConfigPage.vue` — Config store CRUD with environment filter dropdown
+  - `src/Admin.Web/clientapp/src/components/FeatureFlagsPage.vue` — Feature flag CRUD with rollout %, tenant targeting
+  - `src/Admin.Web/clientapp/src/__tests__/ConfigPage.test.js` — 4 tests
+  - `src/Admin.Web/clientapp/src/__tests__/FeatureFlagsPage.test.js` — 4 tests
+
+## Chunk 316 — Enhanced Dashboard with Metrics API
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New API endpoint `GET /api/admin/metrics/summary` exposing OpenTelemetry instrument metadata (received, processed, failed, DLQ, in-flight, retries, processing duration). Dashboard can use this + Prometheus endpoint for live values.
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `/api/admin/metrics/summary` endpoint returning all 7 PlatformMeters instrument definitions + Prometheus endpoint info
+
+## Chunk 315 — Test Message Generator UI
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: New `TestMessagesPage.vue` + API endpoints for publishing synthetic test messages. Implements the BizTalk Test Message EIP pattern in the admin UI.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/TestMessagesPage.vue` — Topic input, custom JSON payload toggle, session history
+  - `src/Admin.Web/clientapp/src/__tests__/TestMessagesPage.test.js` — 6 tests: renders, button text, validation, API call, history tracking, custom payload toggle
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `POST /api/admin/test-messages` and `POST /api/admin/test-messages/custom` endpoints, `TestMessageRequest` + `CustomTestMessageRequest` records, SystemManagement DI registration
+  - `src/Admin.Api/Admin.Api.csproj` — Added SystemManagement project reference
+
+## Chunk 310 — Message Flow Timeline
+
+- **Date**: 2026-04-09
+- **Phase**: 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+- **Status**: done
+- **Goal**: BizTalk-inspired tracked activity viewer. New `MessageFlowPage.vue` with visual lifecycle timeline (Received → Processing → Delivered / Failed / DLQ). Query by correlation ID or business key. Timeline with status-colored markers, expandable event detail, AI trace analysis summary.
+- **Files created**:
+  - `src/Admin.Web/clientapp/src/components/MessageFlowPage.vue` — Timeline UI with search (correlation/business), status badges, expandable detail, AI summary card, scoped CSS
+  - `src/Admin.Web/clientapp/src/__tests__/MessageFlowPage.test.js` — 10 tests: renders, defaults, button text, GUID validation, correlation API, business key API, timeline events, expand/collapse, not-found, error handling
+- **Files modified**:
+  - `src/Admin.Api/Program.cs` — Added `GET /api/admin/flow/correlation/{id}` and `GET /api/admin/flow/business/{key}` endpoints using `MessageStateInspector`
+
 ## Chunk 308 — README accuracy pass
 
 - **Date**: 2026-04-09

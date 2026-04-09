@@ -124,6 +124,28 @@ Chunks 300–308 done. All 4 broker providers hardened with IOptions, health che
 
 ---
 
+## Phase 31 — Admin UI Monitoring & Observability (BizTalk-Inspired)
+
+> **Origin:** The platform has a robust backend (50 src projects, 4 brokers, full EIP patterns,
+> observability instrumentation, control bus, test message generator, audit logging) but the
+> Admin.Web UI only exposes 7 basic pages. This phase adds BizTalk-inspired message monitoring,
+> flow visualization, subscription management, control bus UI, and real-time metrics — bringing
+> the admin experience to production-grade.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 310 | **Message Flow Timeline** — see `rules/completion-log.md` | `done` |
+| 311 | **Subscription Viewer** — New `SubscriptionsPage.vue`: list active subscriptions per broker, show topic/queue/consumer group info. Backend API endpoint (`GET /api/admin/subscriptions`). Refresh button. Sidebar nav link. 4+ Vitest tests. | `not-started` |
+| 312 | **In-Flight Message Monitor** — New `InFlightPage.vue`: real-time card showing in-flight count, breakdown by message type, auto-refresh every 5s. Backend API endpoint (`GET /api/admin/messages/inflight`). Sidebar nav link. 4+ Vitest tests. | `not-started` |
+| 313 | **Control Bus UI** — New `ControlBusPage.vue`: send control commands (JSON payload + command type), view command history. Wired to IControlBus via new API endpoints. Sidebar nav link. 4+ Vitest tests. | `not-started` |
+| 314 | **Audit Log Viewer** — New `AuditLogPage.vue`: paginated audit trail from AdminAuditLogger. Filter by action type and user. Backend API endpoint (`GET /api/admin/audit`). 4+ Vitest tests. | `not-started` |
+| 315 | **Test Message Generator UI** — see `rules/completion-log.md` | `done` |
+| 316 | **Enhanced Dashboard with Metrics** — see `rules/completion-log.md` | `done` |
+| 317 | **Configuration & Feature Flags UI** — see `rules/completion-log.md` | `done` |
+| 318 | **Tenant Management UI** — see `rules/completion-log.md` | `done` |
+
 ### Next Chunk
 
-Phase 30 is complete. No remaining chunks.
+**Chunk 311** — Subscription Viewer.
+
+Read the Admin.Web clientapp structure and follow the existing Vue component patterns.
