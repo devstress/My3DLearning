@@ -106,7 +106,7 @@ onMounted(() => {
 
 <template>
   <div class="container">
-    <h2 class="mb-4">📋 Reports &amp; Compliance</h2>
+    <h2 class="mb-4">📋 Reports & Compliance</h2>
     <p class="text-muted">Generate reports and run compliance checks for your projects.</p>
 
     <ul class="nav nav-tabs mb-4">
