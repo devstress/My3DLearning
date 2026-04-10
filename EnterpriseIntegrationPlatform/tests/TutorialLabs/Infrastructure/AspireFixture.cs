@@ -10,6 +10,7 @@
 // test classes in the assembly. It starts once per test run.
 // ============================================================================
 
+using System.Diagnostics;
 using NUnit.Framework;
 using TutorialLabs.Infrastructure;
 
@@ -80,45 +81,57 @@ public sealed class AspireFixture
 
     /// <summary>
     /// Creates a NatsBrokerEndpoint connected to the real NATS JetStream.
-    /// Throws Ignore if Docker is not available.
+    /// Throws Fail if Docker is not available.
     /// </summary>
     public static NatsBrokerEndpoint CreateNatsEndpoint(string name)
     {
         if (!IsAvailable || NatsUrl is null)
-            Assert.Ignore("Docker not available — skipping real broker test");
+        {
+            Assert.Fail("Docker not available — skipping real broker test");
+            throw new UnreachableException();
+        }
         return new NatsBrokerEndpoint(name, NatsUrl);
     }
 
     /// <summary>
     /// Creates a PostgresBrokerEndpoint connected to the real PostgreSQL.
-    /// Throws Ignore if Docker is not available.
+    /// Throws Fail if Docker is not available.
     /// </summary>
     public static PostgresBrokerEndpoint CreatePostgresEndpoint(string name)
     {
         if (!IsAvailable || PostgresConnectionString is null)
-            Assert.Ignore("Docker not available — skipping real Postgres broker test");
+        {
+            Assert.Fail("Docker not available — skipping real Postgres broker test");
+            throw new UnreachableException();
+        }
         return new PostgresBrokerEndpoint(name, PostgresConnectionString);
     }
 
     /// <summary>
     /// Creates a KafkaBrokerEndpoint connected to the real Apache Kafka.
-    /// Throws Ignore if Docker is not available.
+    /// Throws Fail if Docker is not available.
     /// </summary>
     public static KafkaBrokerEndpoint CreateKafkaEndpoint(string name)
     {
         if (!IsAvailable || KafkaBootstrapServers is null)
-            Assert.Ignore("Docker not available — skipping real Kafka broker test");
+        {
+            Assert.Fail("Docker not available — skipping real Kafka broker test");
+            throw new UnreachableException();
+        }
         return new KafkaBrokerEndpoint(name, KafkaBootstrapServers);
     }
 
     /// <summary>
     /// Creates a PulsarBrokerEndpoint connected to the real Apache Pulsar.
-    /// Throws Ignore if Docker is not available.
+    /// Throws Fail if Docker is not available.
     /// </summary>
     public static PulsarBrokerEndpoint CreatePulsarEndpoint(string name)
     {
         if (!IsAvailable || PulsarServiceUrl is null)
-            Assert.Ignore("Docker not available — skipping real Pulsar broker test");
+        {
+            Assert.Fail("Docker not available — skipping real Pulsar broker test");
+            throw new UnreachableException();
+        }
         return new PulsarBrokerEndpoint(name, PulsarServiceUrl);
     }
 

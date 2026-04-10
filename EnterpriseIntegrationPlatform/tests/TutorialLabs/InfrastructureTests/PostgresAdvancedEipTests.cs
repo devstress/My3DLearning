@@ -3,7 +3,7 @@
 // ============================================================================
 // Proves advanced EIP patterns work on real PostgreSQL broker transport:
 // Splitter, Aggregator, Resequencer, Dead-Letter Publisher, Retry Policy.
-// Requires Docker (Aspire Postgres container); tests skipped when unavailable.
+// Requires Docker (Aspire Postgres container); tests fail when unavailable.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -32,7 +32,7 @@ public sealed class PostgresAdvancedEipTests
     public async Task Splitter_SplitsComposite_PublishesEachPart_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("split-pg", connStr);
         var splitTopic = $"split-{Guid.NewGuid():N}";
@@ -65,7 +65,7 @@ public sealed class PostgresAdvancedEipTests
     public async Task DeadLetterPublisher_PublishesToDlqTopic_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("dlq-pg", connStr);
         var dlqTopic = $"dlq-{Guid.NewGuid():N}";
@@ -105,7 +105,7 @@ public sealed class PostgresAdvancedEipTests
     public async Task DeadLetterPublisher_MultipleReasons_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("dlq-multi-pg", connStr);
         var dlqTopic = $"dlq-multi-{Guid.NewGuid():N}";
@@ -131,7 +131,7 @@ public sealed class PostgresAdvancedEipTests
     public async Task Resequencer_OrdersOutOfSequenceMessages_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         // Resequencer is in-memory but we prove it works in a Postgres pipeline
         var resequencer = new MessageResequencer(
@@ -210,7 +210,7 @@ public sealed class PostgresAdvancedEipTests
     public async Task RetryPolicy_ExhaustsRetries_ThenDlq_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("retry-pg", connStr);
         var dlqTopic = $"retry-dlq-{Guid.NewGuid():N}";
@@ -270,7 +270,7 @@ public sealed class PostgresAdvancedEipTests
     public async Task Aggregator_CollectsAndPublishesAggregate_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("agg-pg", connStr);
         var aggTopic = $"aggregated-{Guid.NewGuid():N}";
@@ -315,7 +315,7 @@ public sealed class PostgresAdvancedEipTests
     public async Task FullPipeline_SplitterRouterDlq_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("pipeline-pg", connStr);
 

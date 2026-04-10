@@ -8,7 +8,7 @@
 //   3. Apache Pulsar     (Key_Shared recipient-keyed distribution)
 //   4. PostgreSQL        (SQL-based, ACID, pg_notify)
 //
-// Requires Docker; tests are skipped (Assert.Ignore) when unavailable.
+// Requires Docker; tests fail (Assert.Fail) when unavailable.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;

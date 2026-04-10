@@ -4,7 +4,7 @@
 // These tests wire real EIP routing components (ContentBasedRouter, MessageFilter,
 // RecipientListRouter, DynamicRouter, Detour) to the real PostgresBrokerEndpoint.
 // Each test creates unique topics to prevent cross-test interference.
-// Requires Docker (Aspire Postgres container); tests are skipped when unavailable.
+// Requires Docker (Aspire Postgres container); tests fail when unavailable.
 // ============================================================================
 
 using EnterpriseIntegrationPlatform.Contracts;
@@ -30,7 +30,7 @@ public sealed class PostgresRoutingIntegrationTests
     public async Task ContentBasedRouter_RoutesOnMessageType_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("cbr-pg", connStr);
 
@@ -87,7 +87,7 @@ public sealed class PostgresRoutingIntegrationTests
     public async Task ContentBasedRouter_RoutesOnMetadata_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("cbr-meta-pg", connStr);
 
@@ -133,7 +133,7 @@ public sealed class PostgresRoutingIntegrationTests
     public async Task MessageFilter_FiltersAndRoutes_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("filter-pg", connStr);
 
@@ -176,7 +176,7 @@ public sealed class PostgresRoutingIntegrationTests
     public async Task RecipientListRouter_FansOutToAllMatching_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("rlist-pg", connStr);
 
@@ -226,7 +226,7 @@ public sealed class PostgresRoutingIntegrationTests
     public async Task DynamicRouter_RegisterAndRoute_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("dynroute-pg", connStr);
 
@@ -264,7 +264,7 @@ public sealed class PostgresRoutingIntegrationTests
     public async Task Detour_ActivateAndDeactivate_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("detour-pg", connStr);
 
@@ -309,7 +309,7 @@ public sealed class PostgresRoutingIntegrationTests
     public async Task ContentBasedRouter_RegexRouting_ViaPostgres()
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
-        if (connStr is null) Assert.Ignore("Docker not available");
+        if (connStr is null) { Assert.Fail("Docker not available"); return; }
 
         await using var broker = new PostgresBrokerEndpoint("cbr-regex-pg", connStr);
 

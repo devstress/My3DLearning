@@ -40,23 +40,28 @@ var postgres = builder.AddContainer("postgres", "postgres", "17")
     .WithEnvironment("POSTGRES_PASSWORD", "eip")
     .WithEndpoint(targetPort: 5432, name: "postgres-tcp", scheme: "tcp");
 
-// ── Apache Kafka (via Bitnami image) — high-throughput event streaming ───────
-// Uses KRaft mode (no ZooKeeper) for minimal resource footprint in tests.
-// IMPORTANT: The EXTERNAL listener port MUST be pinned (port: 29094) and the
-// KAFKA_CFG_ADVERTISED_LISTENERS EXTERNAL address MUST match, otherwise Kafka
-// advertises the container-internal port in metadata and the Confluent.Kafka
-// producer reconnects to the wrong address after the initial bootstrap.
-var kafka = builder.AddContainer("kafka", "bitnami/kafka", "3.9.0")
-    .WithEnvironment("KAFKA_CFG_NODE_ID", "0")
-    .WithEnvironment("KAFKA_CFG_PROCESS_ROLES", "controller,broker")
-    .WithEnvironment("KAFKA_CFG_CONTROLLER_QUORUM_VOTERS", "0@localhost:9093")
-    .WithEnvironment("KAFKA_CFG_CONTROLLER_LISTENER_NAMES", "CONTROLLER")
-    .WithEnvironment("KAFKA_CFG_LISTENERS", "PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094")
-    .WithEnvironment("KAFKA_CFG_ADVERTISED_LISTENERS", "PLAINTEXT://localhost:9092,EXTERNAL://localhost:29094")
-    .WithEnvironment("KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP", "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT")
-    .WithEnvironment("KAFKA_CFG_INTER_BROKER_LISTENER_NAME", "PLAINTEXT")
-    .WithEnvironment("KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE", "true")
-    .WithEndpoint(port: 29094, targetPort: 9094, name: "kafka-tcp", scheme: "tcp");
+// ── Apache Kafka — high-throughput event streaming for T05 and broker tests ──
+// Uses official Apache Kafka image in KRaft mode (no ZooKeeper).
+// IMPORTANT: isProxied: false is required because Kafka's binary protocol needs
+// the advertised listener port to match the actual host port. With Aspire's TCP
+// proxy, the proxy port is dynamic and cannot be injected into the container's
+// KAFKA_ADVERTISED_LISTENERS before startup. Direct Docker port mapping solves
+// this: host:29092 → container:9092, and Kafka advertises localhost:29092.
+// NOTE: Listeners MUST use ://:PORT format (not ://0.0.0.0:PORT) because
+// the Apache Kafka Docker image rejects 0.0.0.0 in advertised.listeners.
+var kafka = builder.AddContainer("kafka", "apache/kafka", "3.9.0")
+    .WithEnvironment("KAFKA_NODE_ID", "1")
+    .WithEnvironment("KAFKA_PROCESS_ROLES", "broker,controller")
+    .WithEnvironment("KAFKA_CONTROLLER_QUORUM_VOTERS", "1@localhost:9093")
+    .WithEnvironment("KAFKA_CONTROLLER_LISTENER_NAMES", "CONTROLLER")
+    .WithEnvironment("KAFKA_LISTENERS", "PLAINTEXT://:9092,CONTROLLER://:9093")
+    .WithEnvironment("KAFKA_ADVERTISED_LISTENERS", "PLAINTEXT://localhost:29092")
+    .WithEnvironment("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP", "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT")
+    .WithEnvironment("KAFKA_INTER_BROKER_LISTENER_NAME", "PLAINTEXT")
+    .WithEnvironment("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
+    .WithEnvironment("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "true")
+    .WithEnvironment("CLUSTER_ID", "eip-test-cluster-001")
+    .WithEndpoint(port: 29092, targetPort: 9092, name: "kafka-tcp", scheme: "tcp", isProxied: false);
 
 // ── Apache Pulsar — Key_Shared subscription for recipient-keyed distribution ─
 // Standalone mode includes broker + bookie + ZooKeeper in a single container.

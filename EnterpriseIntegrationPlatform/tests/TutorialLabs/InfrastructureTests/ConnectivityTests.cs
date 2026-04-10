@@ -10,7 +10,7 @@ namespace TutorialLabs.InfrastructureTests;
 
 /// <summary>
 /// Smoke tests that verify the Aspire-hosted test infrastructure starts
-/// and connects. Requires Docker; tests are skipped when unavailable.
+/// and connects. Requires Docker; tests fail when unavailable.
 /// </summary>
 [TestFixture]
 public sealed class InfrastructureConnectivityTests
@@ -22,7 +22,10 @@ public sealed class InfrastructureConnectivityTests
     {
         var natsUrl = await SharedTestAppHost.GetNatsUrlAsync();
         if (natsUrl is null)
-            Assert.Ignore("Docker not available — skipping NATS test");
+        {
+            Assert.Fail("Docker not available — skipping NATS test");
+            return;
+        }
 
         await using var endpoint = new NatsBrokerEndpoint("nats-test", natsUrl);
 
@@ -56,7 +59,10 @@ public sealed class InfrastructureConnectivityTests
     {
         var natsUrl = await SharedTestAppHost.GetNatsUrlAsync();
         if (natsUrl is null)
-            Assert.Ignore("Docker not available — skipping NATS test");
+        {
+            Assert.Fail("Docker not available — skipping NATS test");
+            return;
+        }
 
         await using var endpoint = new NatsBrokerEndpoint("capture-test", natsUrl);
 
@@ -110,7 +116,10 @@ public sealed class InfrastructureConnectivityTests
     {
         var app = await SharedTestAppHost.GetAppAsync();
         if (app is null)
-            Assert.Ignore("Docker not available — skipping Aspire test");
+        {
+            Assert.Fail("Docker not available — skipping Aspire test");
+            return;
+        }
 
         Assert.That(SharedTestAppHost.IsAvailable, Is.True,
             "Aspire TestAppHost should be running");
@@ -123,7 +132,10 @@ public sealed class InfrastructureConnectivityTests
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
         if (connStr is null)
-            Assert.Ignore("Docker not available — skipping Postgres test");
+        {
+            Assert.Fail("Docker not available — skipping Postgres test");
+            return;
+        }
 
         await using var endpoint = new PostgresBrokerEndpoint("pg-roundtrip-test", connStr);
         await endpoint.EnsureSchemaAsync();
@@ -147,7 +159,10 @@ public sealed class InfrastructureConnectivityTests
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
         if (connStr is null)
-            Assert.Ignore("Docker not available — skipping Postgres test");
+        {
+            Assert.Fail("Docker not available — skipping Postgres test");
+            return;
+        }
 
         await using var endpoint = new PostgresBrokerEndpoint("pg-capture-test", connStr);
         await endpoint.EnsureSchemaAsync();
@@ -169,7 +184,10 @@ public sealed class InfrastructureConnectivityTests
     {
         var connStr = await SharedTestAppHost.GetPostgresConnectionStringAsync();
         if (connStr is null)
-            Assert.Ignore("Docker not available — skipping Postgres test");
+        {
+            Assert.Fail("Docker not available — skipping Postgres test");
+            return;
+        }
 
         await using var endpoint = new PostgresBrokerEndpoint("pg-subscribe-test", connStr);
         await endpoint.EnsureSchemaAsync();
