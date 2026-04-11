@@ -4,6 +4,60 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 373 — Onboarding Checklist
+
+- **Date**: 2026-04-11
+- **Phase**: 37 — Onboarding Documentation & Tutorials
+- **Status**: done
+- **Goal**: Structured 4-week onboarding checklist for new team members covering environment setup, all 50 tutorials, Admin Dashboard deep dive, and operations readiness.
+- **Files created**:
+  - `docs/onboarding-checklist.md` — 4-week program: Week 1 (environment setup + core concepts tutorials 01–08), Week 2 (routing/transformation/error handling tutorials 09–28), Week 3 (advanced patterns/operations tutorials 29–46), Week 4 (real-world scenarios tutorials 47–50 + Admin Dashboard deep dive + operations readiness). Includes completion criteria and documentation reference.
+- **Notes**:
+  - Covers running all test suites (unit, contract, tutorial labs, Vue, broker-agnostic)
+  - Includes hands-on Admin Dashboard exercises (throttle, test messages, DLQ, replay, feature flags, DR drills)
+  - References all existing documentation (architecture, security, operations runbook, BizTalk migration)
+
+## Chunk 372 — Admin UI Guide
+
+- **Date**: 2026-04-11
+- **Phase**: 37 — Onboarding Documentation & Tutorials
+- **Status**: done
+- **Goal**: Comprehensive walkthrough of all 19 Admin Dashboard pages with descriptions, key elements, usage guidance, and tips.
+- **Files created**:
+  - `docs/admin-ui-guide.md` — Covers all 19 pages organized in 4 sections: Monitoring (Dashboard, Message Flow, Messages, In-Flight, Subscriptions, Connectors, Event Store), Operations (DLQ, Replay, Test Messages, Control Bus), Configuration (Throttle, Rate Limiting, Config, Feature Flags, Tenants), System (Audit Log, DR Drills, Profiling). Includes Daily Operations Workflow and Incident Investigation procedures.
+- **Notes**:
+  - Each page documented with: What it shows, Key elements, When to use, Tips
+  - Includes recommended daily routine (5-minute morning check)
+  - Covers incident investigation workflow and configuration change procedure
+
+## Chunk 371 — Installation Guide
+
+- **Date**: 2026-04-11
+- **Phase**: 37 — Onboarding Documentation & Tutorials
+- **Status**: done
+- **Goal**: Comprehensive installation guide covering all deployment modes and configuration options.
+- **Files created**:
+  - `docs/installation-guide.md` — 12 sections: System Requirements, Local Development Setup (Aspire), Docker Compose Deployment, Kubernetes Deployment (Helm/Kustomize + Ingress), Broker Configuration (NATS/Kafka/Pulsar/PostgreSQL), Infrastructure Services (Cassandra/Temporal/Ollama), Admin Web Frontend, Security Configuration (API key/secrets/TLS), Observability Stack (OTel/Loki/Grafana/Jaeger/Prometheus), Verification, Upgrading, Uninstalling. Includes production checklist.
+- **Notes**:
+  - Covers all 4 broker providers with configuration examples
+  - Kubernetes section includes Helm chart installation, Kustomize overlays, and Ingress configuration
+  - Security section covers API key, Azure Key Vault, HashiCorp Vault, and TLS configuration
+  - Verification section includes health checks, test message submission, and test suite execution
+
+## Chunk 370 — Quick Start Guide
+
+- **Date**: 2026-04-11
+- **Phase**: 37 — Onboarding Documentation & Tutorials
+- **Status**: done
+- **Goal**: 15-minute quick-start tutorial from zero to first message with tracking.
+- **Files created**:
+  - `docs/quickstart.md` — 5 steps: Install Prerequisites (5 min), Clone and Build (3 min), Start the Platform (2 min), Submit Your First Message (2 min), Track Your Message (3 min). Includes end-to-end flow diagram, troubleshooting, and next steps links.
+- **Notes**:
+  - Covers all prerequisite installations (.NET 10, Docker, Node.js, Aspire templates)
+  - Includes curl command for submitting a test message with sample OrderCreated payload
+  - Shows 3 tracking methods: OpenClaw, Admin Dashboard, Admin API
+  - Includes ASCII art flow diagram showing the full message journey
+
 ## Chunk 362 — ControlBusPublisher & DlqManagementService Tests
 
 - **Date**: 2026-04-09

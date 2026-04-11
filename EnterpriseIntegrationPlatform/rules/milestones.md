@@ -304,6 +304,28 @@ DlqManagementService has 2 tests covering replay delegation and filter passthrou
 
 ---
 
+## Phase 37 — Onboarding Documentation & Tutorials
+
+> **Origin:** The platform has 50 src projects, 19 Admin UI pages, 50 tutorials with labs & exams,
+> and comprehensive backend documentation. However, there was no dedicated installation guide,
+> quick-start tutorial, Admin UI walkthrough, or structured onboarding checklist for new users.
+> This phase adds all onboarding documentation to make the platform approachable and self-service.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 370 | **Quick Start Guide** — `docs/quickstart.md` — 15-minute zero-to-first-message tutorial | `done` |
+| 371 | **Installation Guide** — `docs/installation-guide.md` — All deployment modes (Aspire, Docker, K8s), broker config, security, observability | `done` |
+| 372 | **Admin UI Guide** — `docs/admin-ui-guide.md` — Walkthrough of all 19 Admin Dashboard pages with daily operations workflow | `done` |
+| 373 | **Onboarding Checklist** — `docs/onboarding-checklist.md` — 4-week structured checklist for new team members covering all 50 tutorials | `done` |
+
+### Summary
+
+Phase 37 complete — 4 chunks (370–373). 4 new documentation files created.
+Quick Start (zero to first message in 15 min), Installation Guide (Aspire/Docker/K8s + broker/security/observability config),
+Admin UI Guide (all 19 pages with daily operations workflow), Onboarding Checklist (4-week structured program covering all 50 tutorials).
+
+---
+
 ### Next Chunk
 
-Phase 36 is complete. No remaining chunks.
+Phase 37 is complete. No remaining chunks.
