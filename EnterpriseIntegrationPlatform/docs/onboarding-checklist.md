@@ -30,7 +30,7 @@
 
 ### Day 2: Run Tests
 
-- [ ] Run unit tests: `dotnet test tests/UnitTests` (expect ~1919 passing)
+- [ ] Run unit tests: `dotnet test tests/UnitTests` (expect ~1995+ passing)
 - [ ] Run contract tests: `dotnet test tests/ContractTests` (expect 57 passing)
 - [ ] Run tutorial labs: `dotnet test tests/TutorialLabs` (expect 526 passing)
 - [ ] Run Vue frontend tests: `cd src/Admin.Web/clientapp && npx vitest run` (expect 100 passing)

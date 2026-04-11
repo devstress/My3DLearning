@@ -725,7 +725,7 @@ curl -X POST http://localhost:15100/api/gateway/submit \
 ### Run Tests
 
 ```bash
-# Unit tests (1919 tests)
+# Unit tests (1995+ tests)
 dotnet test tests/UnitTests
 
 # Contract tests (57 tests)
