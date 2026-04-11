@@ -329,3 +329,36 @@ Admin UI Guide (all 19 pages with daily operations workflow), Onboarding Checkli
 ### Next Chunk
 
 Phase 37 is complete. No remaining chunks.
+
+---
+
+## Phase 38 — Secret Provider, Throttle & Multi-Tenancy Test Hardening
+
+> **Origin:** Audit revealed that `AzureKeyVaultSecretProvider` (338 LOC, Azure Key Vault REST API
+> integration with thread-safe auth) and `VaultSecretProvider` (297 LOC, HashiCorp Vault KV v2)
+> had **zero unit tests**. `InMemorySecretProvider` had tests but lacked argument validation coverage.
+> `SecretsOptions`, `SecretEntry`, `SecretAuditEvent`, `SecretAccessAction`, `SecretRotationPolicy`
+> records/enums were untested. `ThrottlePolicy`, `ThrottleResult`, `ThrottleMetrics`, `ThrottlePolicyStatus`
+> records were untested. `TenantContext` and `TenantIsolationException` were untested. This phase
+> closes all these test gaps.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 380 | **AzureKeyVaultSecretProvider Tests** — see `rules/completion-log.md` | `done` |
+| 381 | **VaultSecretProvider Tests** — see `rules/completion-log.md` | `done` |
+| 382 | **InMemorySecretProvider Audit + SecretsOptions + SecretEntry + Record Tests** — see `rules/completion-log.md` | `done` |
+| 383 | **ThrottlePolicy/Result/Metrics + TenantContext + TenantIsolationException Tests** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 38 complete — 4 chunks (380–383). 76 new unit tests. UnitTests total: 1995 (was 1919).
+AzureKeyVaultSecretProvider now has 16 tests covering Get/Set/Delete/List success/failure, versioned access,
+prefix filtering, null body handling, audit logging, and argument validation.
+VaultSecretProvider now has 17 tests covering Get/Set/Delete/List, versioned read, lease tracking,
+metadata merge, Vault token header, and argument validation.
+InMemorySecretProvider has 6 additional audit/validation tests. SecretsOptions has 5 tests covering
+defaults and round-trip. SecretEntry has 8 tests covering IsExpired, equality, with-expression, metadata.
+SecretAuditEvent has 2 tests. SecretAccessAction has 1 enum coverage test. SecretRotationPolicy has 2 tests.
+ThrottlePolicy has 2 tests. ThrottleResult has 4 tests. ThrottleMetrics has 2 tests. ThrottlePolicyStatus has 1 test.
+TenantContext has 5 tests covering Anonymous singleton, resolved context, defaults.
+TenantIsolationException has 4 tests covering properties, null actual tenant, inheritance.
