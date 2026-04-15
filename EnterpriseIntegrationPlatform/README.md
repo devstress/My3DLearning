@@ -381,9 +381,20 @@ For the complete pattern-to-component mapping with implementation details, see [
 
 ## Documentation
 
+### Getting Started
+
+- [**Quick Start** — Your First Message in 15 Minutes](docs/quickstart.md)
+- [**Installation Guide** — All Deployment Modes](docs/installation-guide.md)
+- [**Admin UI Guide** — All 19 Dashboard Pages](docs/admin-ui-guide.md)
+- [**Onboarding Checklist** — 4-Week New Team Member Program](docs/onboarding-checklist.md)
+- [Developer Setup Guide](docs/developer-setup.md)
+- [Platform Usage Guide](docs/platform-usage-guide.md)
+- [Tutorial Course — 50 Tutorials with Labs & Exams](tutorials/README.md)
+
+### Architecture & Design
+
 - [Architecture Overview](docs/architecture-overview.md)
 - [Detailed Architecture](docs/architecture.md)
-- [Developer Setup Guide](docs/developer-setup.md)
 - [Domain Model](docs/domain-model.md)
 - [EIP Pattern Mapping](docs/eip-mapping.md)
 - [Connector Architecture](docs/connectors.md)
@@ -398,9 +409,12 @@ For the complete pattern-to-component mapping with implementation details, see [
 - [Cassandra Data Model](docs/cassandra-data-model.md)
 - [AI Strategy](docs/ai-strategy.md)
 - [AI Code Generation](docs/ai-code-generation.md)
+- [System Context (C4)](docs/system-context.md)
+
+### Operations
+
 - [Operations Runbook](docs/operations-runbook.md)
 - [Migration from BizTalk](docs/migration-from-biztalk.md)
-- [System Context (C4)](docs/system-context.md)
 
 ## Contributing
 

@@ -304,6 +304,61 @@ DlqManagementService has 2 tests covering replay delegation and filter passthrou
 
 ---
 
+## Phase 37 — Onboarding Documentation & Tutorials
+
+> **Origin:** The platform has 50 src projects, 19 Admin UI pages, 50 tutorials with labs & exams,
+> and comprehensive backend documentation. However, there was no dedicated installation guide,
+> quick-start tutorial, Admin UI walkthrough, or structured onboarding checklist for new users.
+> This phase adds all onboarding documentation to make the platform approachable and self-service.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 370 | **Quick Start Guide** — `docs/quickstart.md` — 15-minute zero-to-first-message tutorial | `done` |
+| 371 | **Installation Guide** — `docs/installation-guide.md` — All deployment modes (Aspire, Docker, K8s), broker config, security, observability | `done` |
+| 372 | **Admin UI Guide** — `docs/admin-ui-guide.md` — Walkthrough of all 19 Admin Dashboard pages with daily operations workflow | `done` |
+| 373 | **Onboarding Checklist** — `docs/onboarding-checklist.md` — 4-week structured checklist for new team members covering all 50 tutorials | `done` |
+
+### Summary
+
+Phase 37 complete — 4 chunks (370–373). 4 new documentation files created.
+Quick Start (zero to first message in 15 min), Installation Guide (Aspire/Docker/K8s + broker/security/observability config),
+Admin UI Guide (all 19 pages with daily operations workflow), Onboarding Checklist (4-week structured program covering all 50 tutorials).
+
+---
+
 ### Next Chunk
 
-Phase 36 is complete. No remaining chunks.
+Phase 37 is complete. No remaining chunks.
+
+---
+
+## Phase 38 — Secret Provider, Throttle & Multi-Tenancy Test Hardening
+
+> **Origin:** Audit revealed that `AzureKeyVaultSecretProvider` (338 LOC, Azure Key Vault REST API
+> integration with thread-safe auth) and `VaultSecretProvider` (297 LOC, HashiCorp Vault KV v2)
+> had **zero unit tests**. `InMemorySecretProvider` had tests but lacked argument validation coverage.
+> `SecretsOptions`, `SecretEntry`, `SecretAuditEvent`, `SecretAccessAction`, `SecretRotationPolicy`
+> records/enums were untested. `ThrottlePolicy`, `ThrottleResult`, `ThrottleMetrics`, `ThrottlePolicyStatus`
+> records were untested. `TenantContext` and `TenantIsolationException` were untested. This phase
+> closes all these test gaps.
+
+| Chunk | Description | Status |
+|-------|-------------|--------|
+| 380 | **AzureKeyVaultSecretProvider Tests** — see `rules/completion-log.md` | `done` |
+| 381 | **VaultSecretProvider Tests** — see `rules/completion-log.md` | `done` |
+| 382 | **InMemorySecretProvider Audit + SecretsOptions + SecretEntry + Record Tests** — see `rules/completion-log.md` | `done` |
+| 383 | **ThrottlePolicy/Result/Metrics + TenantContext + TenantIsolationException Tests** — see `rules/completion-log.md` | `done` |
+
+### Summary
+
+Phase 38 complete — 4 chunks (380–383). 76 new unit tests. UnitTests total: 1995 (was 1919).
+AzureKeyVaultSecretProvider now has 16 tests covering Get/Set/Delete/List success/failure, versioned access,
+prefix filtering, null body handling, audit logging, and argument validation.
+VaultSecretProvider now has 17 tests covering Get/Set/Delete/List, versioned read, lease tracking,
+metadata merge, Vault token header, and argument validation.
+InMemorySecretProvider has 6 additional audit/validation tests. SecretsOptions has 5 tests covering
+defaults and round-trip. SecretEntry has 8 tests covering IsExpired, equality, with-expression, metadata.
+SecretAuditEvent has 2 tests. SecretAccessAction has 1 enum coverage test. SecretRotationPolicy has 2 tests.
+ThrottlePolicy has 2 tests. ThrottleResult has 4 tests. ThrottleMetrics has 2 tests. ThrottlePolicyStatus has 1 test.
+TenantContext has 5 tests covering Anonymous singleton, resolved context, defaults.
+TenantIsolationException has 4 tests covering properties, null actual tenant, inheritance.

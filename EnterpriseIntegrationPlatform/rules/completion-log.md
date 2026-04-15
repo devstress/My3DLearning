@@ -4,6 +4,112 @@ Detailed record of completed chunks, files created/modified, and notes.
 
 See `milestones.md` for current phase status and next chunk.
 
+## Chunk 383 — ThrottlePolicy/Result/Metrics + TenantContext + TenantIsolationException Tests
+
+- **Date**: 2026-04-11
+- **Phase**: 38 — Secret Provider, Throttle & Multi-Tenancy Test Hardening
+- **Status**: done
+- **Goal**: Unit tests for untested record/DTO/exception types: ThrottlePolicy, ThrottleResult, ThrottleMetrics, ThrottlePolicyStatus, TenantContext, TenantIsolationException.
+- **Files created**:
+  - `tests/UnitTests/ThrottleTenantRecordTests.cs` — 18 tests across 6 fixtures: ThrottlePolicyTests (2: defaults, round-trip), ThrottleResultTests (4: permitted, rejected, equality, inequality), ThrottleMetricsTests (2: properties, equality), ThrottlePolicyStatusTests (1: policy+metrics accessible), TenantContextTests (5: Anonymous values, resolved, singleton, default name null, default IsResolved false), TenantIsolationExceptionTests (4: properties, null actual, inheritance, message match)
+- **Notes**:
+  - NUnit analyzer NUnit2009 required separating Anonymous into two local variables for singleton test
+  - All 18 tests pass
+
+## Chunk 382 — InMemorySecretProvider Audit + SecretsOptions + SecretEntry + Record Tests
+
+- **Date**: 2026-04-11
+- **Phase**: 38 — Secret Provider, Throttle & Multi-Tenancy Test Hardening
+- **Status**: done
+- **Goal**: Argument validation tests for InMemorySecretProvider with audit logger, plus comprehensive tests for SecretsOptions, SecretEntry, SecretAuditEvent, SecretAccessAction, SecretRotationPolicy.
+- **Files created**:
+  - `tests/UnitTests/SecretsTests/InMemorySecretProviderSecretsOptionsTests.cs` — 24 tests across 6 fixtures: InMemorySecretProviderAuditTests (6: invalid version returns latest, null/empty key throws, null value throws, constructor without logger), SecretsOptionsTests (5: defaults, section name, Azure null defaults, Vault null defaults, round-trip), SecretEntryTests (8: IsExpired false/true/no-expiry, equality, inequality, with-expression, null metadata, metadata values), SecretAuditEventTests (2: all properties, default optionals), SecretAccessActionTests (1: all 7 enum values), SecretRotationPolicyTests (2: all properties, default optionals)
+- **Notes**:
+  - ThrowIfNullOrWhiteSpace(null) throws ArgumentNullException (subclass of ArgumentException)
+  - Existing InMemorySecretProviderTests in same folder — new class named InMemorySecretProviderAuditTests to avoid conflict
+
+## Chunk 381 — VaultSecretProvider Tests
+
+- **Date**: 2026-04-11
+- **Phase**: 38 — Secret Provider, Throttle & Multi-Tenancy Test Hardening
+- **Status**: done
+- **Goal**: Comprehensive unit tests for VaultSecretProvider covering all ISecretProvider methods, Vault KV v2 REST API paths, lease tracking, token header, and argument validation.
+- **Files created**:
+  - `tests/UnitTests/SecretsTests/VaultSecretProviderTests.cs` — 17 tests: GetSecretAsync (success, not found, versioned path, null data, lease tracking), SetSecretAsync (success, metadata merge), DeleteSecretAsync (success with metadata path, failure), ListSecretKeysAsync (success, failure returns empty), argument validation (null key get, null key set, null value set, empty key delete), constructor (null httpClient, vault token header)
+- **Notes**:
+  - Uses MockVaultHandler DelegatingHandler for HTTP interception
+  - Vault KV v2 response format: data.data contains the secret, data.metadata contains version/created_time
+  - VaultToken is set as X-Vault-Token header in constructor
+  - Delete uses /metadata/ path for permanent deletion
+
+## Chunk 380 — AzureKeyVaultSecretProvider Tests
+
+- **Date**: 2026-04-11
+- **Phase**: 38 — Secret Provider, Throttle & Multi-Tenancy Test Hardening
+- **Status**: done
+- **Goal**: Comprehensive unit tests for AzureKeyVaultSecretProvider covering all ISecretProvider methods, Azure Key Vault REST API response parsing, audit logging, and argument validation.
+- **Files created**:
+  - `tests/UnitTests/SecretsTests/AzureKeyVaultSecretProviderTests.cs` — 16 tests: GetSecretAsync (success with tags/attributes, not found, versioned path, null body), SetSecretAsync (success, with metadata), DeleteSecretAsync (success, not found), ListSecretKeysAsync (returns keys, prefix filter, failure returns empty), argument validation (null/empty key get, null key set, null value set), constructor (null httpClient, null options)
+- **Notes**:
+  - Uses MockHttpHandler DelegatingHandler for HTTP interception
+  - Azure Key Vault secret ID format: https://vault.vault.azure.net/secrets/{name}/{version}
+  - Version extracted from last segment of the ID URI
+  - ListSecretKeysAsync extracts name from URI path segment [2]
+
+## Chunk 373 — Onboarding Checklist
+
+- **Date**: 2026-04-11
+- **Phase**: 37 — Onboarding Documentation & Tutorials
+- **Status**: done
+- **Goal**: Structured 4-week onboarding checklist for new team members covering environment setup, all 50 tutorials, Admin Dashboard deep dive, and operations readiness.
+- **Files created**:
+  - `docs/onboarding-checklist.md` — 4-week program: Week 1 (environment setup + core concepts tutorials 01–08), Week 2 (routing/transformation/error handling tutorials 09–28), Week 3 (advanced patterns/operations tutorials 29–46), Week 4 (real-world scenarios tutorials 47–50 + Admin Dashboard deep dive + operations readiness). Includes completion criteria and documentation reference.
+- **Notes**:
+  - Covers running all test suites (unit, contract, tutorial labs, Vue, broker-agnostic)
+  - Includes hands-on Admin Dashboard exercises (throttle, test messages, DLQ, replay, feature flags, DR drills)
+  - References all existing documentation (architecture, security, operations runbook, BizTalk migration)
+
+## Chunk 372 — Admin UI Guide
+
+- **Date**: 2026-04-11
+- **Phase**: 37 — Onboarding Documentation & Tutorials
+- **Status**: done
+- **Goal**: Comprehensive walkthrough of all 19 Admin Dashboard pages with descriptions, key elements, usage guidance, and tips.
+- **Files created**:
+  - `docs/admin-ui-guide.md` — Covers all 19 pages organized in 4 sections: Monitoring (Dashboard, Message Flow, Messages, In-Flight, Subscriptions, Connectors, Event Store), Operations (DLQ, Replay, Test Messages, Control Bus), Configuration (Throttle, Rate Limiting, Config, Feature Flags, Tenants), System (Audit Log, DR Drills, Profiling). Includes Daily Operations Workflow and Incident Investigation procedures.
+- **Notes**:
+  - Each page documented with: What it shows, Key elements, When to use, Tips
+  - Includes recommended daily routine (5-minute morning check)
+  - Covers incident investigation workflow and configuration change procedure
+
+## Chunk 371 — Installation Guide
+
+- **Date**: 2026-04-11
+- **Phase**: 37 — Onboarding Documentation & Tutorials
+- **Status**: done
+- **Goal**: Comprehensive installation guide covering all deployment modes and configuration options.
+- **Files created**:
+  - `docs/installation-guide.md` — 12 sections: System Requirements, Local Development Setup (Aspire), Docker Compose Deployment, Kubernetes Deployment (Helm/Kustomize + Ingress), Broker Configuration (NATS/Kafka/Pulsar/PostgreSQL), Infrastructure Services (Cassandra/Temporal/Ollama), Admin Web Frontend, Security Configuration (API key/secrets/TLS), Observability Stack (OTel/Loki/Grafana/Jaeger/Prometheus), Verification, Upgrading, Uninstalling. Includes production checklist.
+- **Notes**:
+  - Covers all 4 broker providers with configuration examples
+  - Kubernetes section includes Helm chart installation, Kustomize overlays, and Ingress configuration
+  - Security section covers API key, Azure Key Vault, HashiCorp Vault, and TLS configuration
+  - Verification section includes health checks, test message submission, and test suite execution
+
+## Chunk 370 — Quick Start Guide
+
+- **Date**: 2026-04-11
+- **Phase**: 37 — Onboarding Documentation & Tutorials
+- **Status**: done
+- **Goal**: 15-minute quick-start tutorial from zero to first message with tracking.
+- **Files created**:
+  - `docs/quickstart.md` — 5 steps: Install Prerequisites (5 min), Clone and Build (3 min), Start the Platform (2 min), Submit Your First Message (2 min), Track Your Message (3 min). Includes end-to-end flow diagram, troubleshooting, and next steps links.
+- **Notes**:
+  - Covers all prerequisite installations (.NET 10, Docker, Node.js, Aspire templates)
+  - Includes curl command for submitting a test message with sample OrderCreated payload
+  - Shows 3 tracking methods: OpenClaw, Admin Dashboard, Admin API
+  - Includes ASCII art flow diagram showing the full message journey
+
 ## Chunk 362 — ControlBusPublisher & DlqManagementService Tests
 
 - **Date**: 2026-04-09
